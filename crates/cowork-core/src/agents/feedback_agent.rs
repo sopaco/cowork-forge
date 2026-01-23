@@ -37,7 +37,7 @@ impl FeedbackAgent {
         })
     }
 
-    async fn analyze_feedback(
+    pub async fn analyze_feedback(
         &self,
         session_id: &str,
         check_artifact: &CheckReportArtifact,

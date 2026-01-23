@@ -8,7 +8,7 @@ use crate::memory::ArtifactStore;
 use crate::agents::{
     IdeaIntakeAgent, PrdAgent, DesignAgent, PlanAgent, 
     CheckAgent, FeedbackAgent, DeliveryAgent,
-    StageExecutor, CodingStageAgent, StageAgent
+    StageExecutor, CodingStageAgent
 };
 use crate::hitl::HitlController;
 use crate::config::ModelConfig;
@@ -150,6 +150,17 @@ impl Orchestrator {
         model_config: &ModelConfig,
         resume_from: Option<Stage>,
     ) -> Result<()> {
+        // 使用 Box::pin 包装递归调用
+        Box::pin(self.run_workflow_from_stage_impl(session_id, model_config, resume_from)).await
+    }
+
+    /// 实际的工作流实现（内部方法）
+    async fn run_workflow_from_stage_impl(
+        &self,
+        session_id: &str,
+        model_config: &ModelConfig,
+        resume_from: Option<Stage>,
+    ) -> Result<()> {
         tracing::info!("Running workflow for session: {}, resume_from: {:?}", session_id, resume_from);
 
         let hitl = Arc::new(HitlController::new());
@@ -226,16 +237,37 @@ impl Orchestrator {
                 break;
             }
 
-            // TODO: 实现 delta 应用和阶段重跑逻辑
-            // 这里可以复用原有的 apply_feedback_delta 和 rerun 逻辑
-            println!("⚠️  Feedback 迭代逻辑待实现");
-            println!("  Delta: {} 项", feedback_artifact.data.delta.len());
-            println!("  Rerun: {} 阶段", feedback_artifact.data.rerun.len());
+            // 应用 delta 修改
+            if !feedback_artifact.data.delta.is_empty() {
+                println!("\n📝 应用 {} 项修改...", feedback_artifact.data.delta.len());
+                self.apply_feedback_deltas(session_id, &feedback_artifact.data.delta)?;
+            }
             
+            // 处理需要重跑的阶段
+            if !feedback_artifact.data.rerun.is_empty() {
+                println!("\n🔄 需要重跑 {} 个阶段", feedback_artifact.data.rerun.len());
+                
+                // 找到最早需要重跑的阶段
+                let earliest_rerun_stage = self.find_earliest_stage(&feedback_artifact.data.rerun);
+                
+                println!("从 {:?} 阶段开始重新执行", earliest_rerun_stage);
+                
+                // 清除该阶段及之后所有阶段的完成状态
+                self.clear_stages_from(&mut meta, earliest_rerun_stage)?;
+                
+                // 增加迭代计数
+                meta.feedback_iterations += 1;
+                self.save_session_meta(&meta)?;
+                
+                // 递归重新执行工作流
+                return Box::pin(self.run_workflow_from_stage_impl(session_id, model_config, Some(earliest_rerun_stage))).await;
+            }
+            
+            // 没有重跑需求但有 delta，继续下一轮 feedback
             meta.feedback_iterations += 1;
             self.save_session_meta(&meta)?;
             
-            break;  // 暂时跳出循环
+            println!("\n继续收集反馈（迭代 {}/{}）", meta.feedback_iterations, meta.max_feedback_iterations);
         }
 
         // ========================================
@@ -311,7 +343,7 @@ impl Orchestrator {
         &self,
         session_id: &str,
         modification: &str,
-        _model_config: &ModelConfig,
+        model_config: &ModelConfig,
     ) -> Result<()> {
         tracing::info!("modify_and_rerun: session={}, modification={}", session_id, modification);
 
@@ -333,12 +365,53 @@ impl Orchestrator {
         // 保存修改上下文
         meta.modification_context = Some(modification.to_string());
         self.save_session_meta(&meta)?;
+        
         println!("\n💾 保存修改上下文: {}", modification);
+        println!("🤖 使用 FeedbackAgent 分析修改影响...");
 
-        // TODO: 实现修改逻辑
-        println!("⚠️  修改逻辑待实现");
-
-        Ok(())
+        // 使用 FeedbackAgent 分析修改
+        let feedback_agent = FeedbackAgent::new(&model_config.llm, self.store.clone())?;
+        
+        // 加载 CheckReport
+        let check_artifact: crate::artifacts::CheckReportArtifact = 
+            self.load_artifact(session_id, Stage::Check)?;
+        
+        // 调用 FeedbackAgent 分析修改
+        let feedback_artifact = feedback_agent.analyze_feedback(
+            session_id,
+            &check_artifact,
+            modification
+        ).await?;
+        
+        println!("\n📋 分析结果:");
+        println!("  Delta 修改: {} 项", feedback_artifact.data.delta.len());
+        println!("  需要重跑: {} 个阶段", feedback_artifact.data.rerun.len());
+        
+        // 应用 delta 修改
+        if !feedback_artifact.data.delta.is_empty() {
+            println!("\n📝 应用修改...");
+            self.apply_feedback_deltas(session_id, &feedback_artifact.data.delta)?;
+        }
+        
+        // 找到需要重跑的最早阶段
+        if !feedback_artifact.data.rerun.is_empty() {
+            let earliest_stage = self.find_earliest_stage(&feedback_artifact.data.rerun);
+            
+            println!("\n🔄 从 {:?} 阶段开始重新执行", earliest_stage);
+            
+            // 清除该阶段及之后所有阶段的完成状态
+            self.clear_stages_from(&mut meta, earliest_stage)?;
+            
+            // 增加迭代计数
+            meta.feedback_iterations += 1;
+            self.save_session_meta(&meta)?;
+            
+            // 重新执行工作流
+            self.run_workflow_from_stage(session_id, model_config, Some(earliest_stage)).await
+        } else {
+            println!("\n✅ 修改已应用，无需重跑阶段");
+            Ok(())
+        }
     }
 
     /// 列出 session 的所有 artifacts
@@ -384,6 +457,132 @@ impl Orchestrator {
         println!("从阶段继续: {:?}", start_stage);
         println!();
         
+        Ok(())
+    }
+
+    /// 应用 Feedback delta 修改
+    /// 
+    /// Delta 格式示例：
+    /// - target_stage: Requirements
+    ///   change: "添加用户登录功能"
+    fn apply_feedback_deltas(&self, session_id: &str, deltas: &[crate::artifacts::Delta]) -> Result<()> {
+        for delta in deltas {
+            println!("  🔧 {}: {}", delta.target_stage.as_str(), delta.change);
+            
+            // 根据目标阶段，修改对应的 artifact
+            match delta.target_stage {
+                Stage::IdeaIntake => {
+                    // 修改 IdeaSpec（一般不常见）
+                    tracing::info!("Applying delta to IdeaSpec: {}", delta.change);
+                }
+                Stage::Requirements => {
+                    // 修改 PRD
+                    self.apply_delta_to_prd(session_id, &delta.change)?;
+                }
+                Stage::Design => {
+                    // 修改 Design
+                    self.apply_delta_to_design(session_id, &delta.change)?;
+                }
+                Stage::Plan => {
+                    // 修改 Plan
+                    self.apply_delta_to_plan(session_id, &delta.change)?;
+                }
+                _ => {
+                    tracing::warn!("Delta target stage {:?} not supported yet", delta.target_stage);
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
+    /// 应用 delta 到 PRD
+    fn apply_delta_to_prd(&self, session_id: &str, change: &str) -> Result<()> {
+        // 加载现有 PRD
+        let mut prd_artifact: crate::artifacts::PRDArtifact = 
+            self.load_artifact(session_id, Stage::Requirements)?;
+        
+        // 简单实现：将变更添加到 hitl 问题中（标记为待处理）
+        prd_artifact.data.hitl.push(crate::artifacts::HitlQuestion {
+            id: format!("FEEDBACK-{}", uuid::Uuid::new_v4().to_string()[..8].to_string()),
+            q: format!("反馈修改: {}", change),
+            opts: vec!["是".to_string(), "否".to_string()],
+            def: "是".to_string(),
+        });
+        
+        // 保存修改后的 PRD
+        self.store.put(session_id, Stage::Requirements, &prd_artifact)?;
+        
+        tracing::info!("Applied delta to PRD: {}", change);
+        Ok(())
+    }
+
+    /// 应用 delta 到 Design
+    fn apply_delta_to_design(&self, session_id: &str, change: &str) -> Result<()> {
+        let mut design_artifact: crate::artifacts::DesignDocArtifact = 
+            self.load_artifact(session_id, Stage::Design)?;
+        
+        // 简单实现：添加变更说明到组件列表中
+        design_artifact.data.arch.comps.push(format!("反馈修改: {}", change));
+        
+        self.store.put(session_id, Stage::Design, &design_artifact)?;
+        
+        tracing::info!("Applied delta to Design: {}", change);
+        Ok(())
+    }
+
+    /// 应用 delta 到 Plan
+    fn apply_delta_to_plan(&self, session_id: &str, change: &str) -> Result<()> {
+        let mut plan_artifact: crate::artifacts::PlanArtifact = 
+            self.load_artifact(session_id, Stage::Plan)?;
+        
+        // 简单实现：添加新任务
+        plan_artifact.data.tasks.push(crate::artifacts::Task {
+            id: format!("FEEDBACK-{}", uuid::Uuid::new_v4().to_string()[..8].to_string()),
+            pri: crate::artifacts::Priority::P1,
+            desc: format!("反馈修改: {}", change),
+            deps: vec![],
+            out: vec![],
+        });
+        
+        self.store.put(session_id, Stage::Plan, &plan_artifact)?;
+        
+        tracing::info!("Applied delta to Plan: {}", change);
+        Ok(())
+    }
+
+    /// 找到需要重跑的最早阶段
+    fn find_earliest_stage(&self, reruns: &[crate::artifacts::Rerun]) -> Stage {
+        let all_stages = Stage::all();
+        
+        for stage in all_stages {
+            if reruns.iter().any(|r| r.stage == *stage) {
+                return *stage;
+            }
+        }
+        
+        // 默认从 Requirements 开始
+        Stage::Requirements
+    }
+
+    /// 清除指定阶段及之后所有阶段的完成状态
+    fn clear_stages_from(&self, meta: &mut SessionMeta, start_stage: Stage) -> Result<()> {
+        let all_stages = Stage::all();
+        let mut should_clear = false;
+        
+        for stage in all_stages {
+            if *stage == start_stage {
+                should_clear = true;
+            }
+            
+            if should_clear {
+                // 移除完成状态
+                meta.stage_status.remove(stage);
+                println!("  清除 {} 阶段状态", stage.as_str());
+            }
+        }
+        
+        self.save_session_meta(meta)?;
         Ok(())
     }
 }
