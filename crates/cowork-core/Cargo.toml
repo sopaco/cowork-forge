@@ -1,0 +1,52 @@
+[package]
+name = "cowork-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# ADK Rust
+adk-rust.workspace = true
+adk-model.workspace = true
+
+# Core
+tokio.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+# Configuration
+toml.workspace = true
+
+# Time and ID
+chrono.workspace = true
+uuid.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# File operations
+walkdir.workspace = true
+ignore.workspace = true
+
+# CLI (needed for HITL)
+dialoguer.workspace = true
+
+# Async trait
+async-trait = "0.1"
+
+# Futures
+futures.workspace = true
+
+# JSON Schema for tools (must match adk-tool version)
+schemars = "0.8.22"
+
+# Error parsing
+regex = "1"
+once_cell = "1"
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,12 @@
+{
+  "session_id": "e07955ae-48e9-43dc-b5c6-26a2eee91634",
+  "created_at": "2026-01-22T08:11:12.896253Z",
+  "current_stage": "requirements",
+  "stage_status": {},
+  "completed_stages": [
+    "idea_intake",
+    "requirements"
+  ],
+  "feedback_iterations": 0,
+  "max_feedback_iterations": 20
+}

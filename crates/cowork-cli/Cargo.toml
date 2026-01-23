@@ -1,0 +1,31 @@
+[package]
+name = "cowork-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "cowork"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace crates
+cowork-core = { path = "../cowork-core" }
+
+# Core
+tokio.workspace = true
+anyhow.workspace = true
+
+# CLI
+clap.workspace = true
+dialoguer.workspace = true
+console.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# Environment
+dotenv = "0.15"

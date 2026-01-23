@@ -1,0 +1,22 @@
+# Cowork AI 大模型配置文件示例
+# 复制此文件为 config.toml 并填入你的实际配置
+
+[llm]
+# LLM 服务 API 基础 URL
+api_base_url = "https://wanqing-api.corp.kuaishou.com/api/gateway/v1/endpoints"
+
+# LLM 服务 API Key
+api_key = "your-api-key-here"
+
+# LLM 模型名称（或 endpoint ID）
+model_name = "ep-i4abhq-1764595896785685523"
+
+[embedding]
+# Embedding 服务 API 基础 URL  
+api_base_url = "https://wanqing-api.corp.kuaishou.com/api/gateway/v1/endpoints"
+
+# Embedding 服务 API Key
+api_key = "your-api-key-here"
+
+# Embedding 模型名称（或 endpoint ID）
+model_name = "ep-9kf01g-1762237999831608613"
