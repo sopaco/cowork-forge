@@ -15,6 +15,7 @@ impl HitlController {
     pub fn input(&self, prompt: &str) -> Result<String> {
         let input: String = Input::new()
             .with_prompt(prompt)
+            .allow_empty(true)
             .interact_text()?;
         Ok(input)
     }
