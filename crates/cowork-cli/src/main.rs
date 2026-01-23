@@ -11,7 +11,7 @@ struct Cli {
     command: Option<Commands>,
 
     /// Path to model configuration file (TOML)
-    #[arg(long, default_value = "项目材料/大模型配置说明.md")]
+    #[arg(long, default_value = "config.toml")]
     config: String,
 }
 
