@@ -152,6 +152,7 @@ pub(crate) fn build_gitignore_walker(root: &str, recursive: bool, include_hidden
         // 排除常见依赖和构建目录
         let excluded_dirs = [
             "node_modules",    // Node.js
+            ".litho",          // litho(deepwiki-rs) cache
             "target",          // Rust
             "dist",            // 构建输出
             "build",           // 构建输出

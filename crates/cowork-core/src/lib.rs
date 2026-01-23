@@ -10,5 +10,5 @@ pub mod verification;
 pub use artifacts::{Stage, ArtifactEnvelope};
 pub use memory::ArtifactStore;
 pub use config::ModelConfig;
-pub use orchestrator::Orchestrator;
+pub use orchestrator::{Orchestrator, StageStatus};
 pub use hitl::HitlController;

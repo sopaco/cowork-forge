@@ -122,6 +122,7 @@ async fn resume_session(orchestrator: Orchestrator, session_id: &str, model_conf
 
 fn inspect_session(orchestrator: Orchestrator, session_id: &str) -> Result<()> {
     use console::style;
+    use cowork_core::StageStatus;
 
     println!("{}", style(format!("🔍 检查会话: {}", session_id)).bold().cyan());
 
@@ -130,7 +131,13 @@ fn inspect_session(orchestrator: Orchestrator, session_id: &str) -> Result<()> {
     println!("\n📊 会话信息:");
     println!("  创建时间: {}", meta.created_at);
     println!("  当前阶段: {:?}", meta.current_stage);
-    println!("  已完成阶段: {:?}", meta.completed_stages);
+    
+    // 显示已完成的阶段
+    let completed_stages: Vec<_> = meta.stage_status.iter()
+        .filter(|(_, status)| matches!(status, StageStatus::Completed { .. }))
+        .map(|(stage, _)| stage)
+        .collect();
+    println!("  已完成阶段: {:?}", completed_stages);
 
     let artifacts = orchestrator.list_artifacts(session_id)?;
 
@@ -150,7 +157,7 @@ fn inspect_session(orchestrator: Orchestrator, session_id: &str) -> Result<()> {
     let all_stages = cowork_core::Stage::all();
     let next_stage = all_stages
         .iter()
-        .find(|s| !meta.completed_stages.contains(s))
+        .find(|s| !matches!(meta.stage_status.get(s), Some(StageStatus::Completed { .. })))
         .cloned();
 
     if let Some(stage) = next_stage {
@@ -221,16 +228,22 @@ async fn modify_session(
     model_config: ModelConfig,
 ) -> Result<()> {
     use console::style;
-    use cowork_core::HitlController;
+    use cowork_core::{HitlController, StageStatus};
 
     println!("{}", style(format!("🔧 修改会话: {}", session_id)).bold().cyan());
 
     // 检查 session 是否存在
     let meta = orchestrator.load_session_meta(session_id)?;
     
+    // 显示已完成的阶段
+    let completed_stages: Vec<_> = meta.stage_status.iter()
+        .filter(|(_, status)| matches!(status, StageStatus::Completed { .. }))
+        .map(|(stage, _)| stage)
+        .collect();
+    
     println!("\n📊 当前会话状态:");
     println!("  创建时间: {}", meta.created_at);
-    println!("  已完成阶段: {:?}", meta.completed_stages);
+    println!("  已完成阶段: {:?}", completed_stages);
     println!("  Feedback 迭代次数: {}/{}", meta.feedback_iterations, meta.max_feedback_iterations);
 
     // 获取修改内容

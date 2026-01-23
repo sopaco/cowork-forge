@@ -50,11 +50,7 @@ pub struct SessionMeta {
     pub current_stage: Option<Stage>,
     
     #[serde(default)]
-    pub stage_status: HashMap<Stage, StageStatus>,  // 详细状态
-    
-    // 保留旧字段用于向后兼容
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub completed_stages: Vec<Stage>,
+    pub stage_status: HashMap<Stage, StageStatus>,  // 阶段状态
     
     // Feedback loop 控制
     #[serde(default)]
@@ -63,7 +59,7 @@ pub struct SessionMeta {
     #[serde(default = "default_max_feedback_iterations")]
     pub max_feedback_iterations: usize,  // 最大 Feedback 迭代次数（默认 20）
     
-    // 🆕 修改上下文：保存用户通过 modify 命令提交的修改意图
+    // 修改上下文：保存用户通过 modify 命令提交的修改意图
     // 用于在重跑阶段时告知 CodePlanner 这是修改任务，而非从头创建
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub modification_context: Option<String>,
@@ -93,7 +89,6 @@ impl Orchestrator {
             created_at: chrono::Utc::now(),
             current_stage: None,
             stage_status: HashMap::new(),
-            completed_stages: Vec::new(),
             feedback_iterations: 0,
             max_feedback_iterations: 20,
             modification_context: None,
@@ -167,10 +162,6 @@ impl Orchestrator {
                 verified,
             }
         );
-        // 向后兼容
-        if !meta.completed_stages.contains(&stage) {
-            meta.completed_stages.push(stage);
-        }
         self.save_session_meta(meta)?;
         Ok(())
     }
@@ -193,6 +184,14 @@ impl Orchestrator {
         );
         self.save_session_meta(meta)?;
         Ok(())
+    }
+    
+    /// 检查阶段是否已完成（包括已验证和未验证）
+    fn is_stage_completed(&self, meta: &SessionMeta, stage: Stage) -> bool {
+        matches!(
+            meta.stage_status.get(&stage),
+            Some(StageStatus::Completed { .. })
+        )
     }
     
     /// 检查阶段是否已成功完成并验证
@@ -249,24 +248,12 @@ impl Orchestrator {
                         return Err(anyhow::anyhow!("前置阶段 {} 失败，无法继续", stage.as_str()));
                     }
                     Some(StageStatus::InProgress { .. }) => {
-                        // 🔧 修复：异常退出导致状态不一致
-                        // 如果 completed_stages 包含该阶段，说明实际已完成，只是 stage_status 未更新
-                        if meta.completed_stages.contains(stage) {
-                            println!("⚠️  {} - 状态不一致（异常退出导致）", stage.as_str());
-                            println!("   → 检测到该阶段已在完成列表中，视为已完成");
-                        } else {
-                            println!("🔄 {} - 未完成（进行中）", stage.as_str());
-                            return Err(anyhow::anyhow!("前置阶段 {} 未完成", stage.as_str()));
-                        }
+                        println!("🔄 {} - 未完成（进行中）", stage.as_str());
+                        return Err(anyhow::anyhow!("前置阶段 {} 未完成", stage.as_str()));
                     }
-                    _ => {
-                        // 检查 completed_stages（异常退出可能导致 stage_status 未记录）
-                        if meta.completed_stages.contains(stage) {
-                            println!("⚠️  {} - 已完成但 stage_status 未记录（异常退出导致）", stage.as_str());
-                        } else {
-                            println!("❓ {} - 未开始", stage.as_str());
-                            return Err(anyhow::anyhow!("前置阶段 {} 未完成", stage.as_str()));
-                        }
+                    Some(StageStatus::NotStarted) | None => {
+                        println!("❓ {} - 未开始", stage.as_str());
+                        return Err(anyhow::anyhow!("前置阶段 {} 未完成", stage.as_str()));
                     }
                 }
             }
@@ -311,7 +298,7 @@ impl Orchestrator {
         };
 
         // Stage 2: PRD Generation
-        let prd_artifact = if meta.completed_stages.contains(&Stage::Requirements) {
+        let prd_artifact = if self.is_stage_completed(&meta, Stage::Requirements) {
             println!("✓ 跳过 Stage 2: Requirements (已完成)");
             self.load_artifact::<crate::artifacts::PRDArtifact>(session_id, Stage::Requirements)?
         } else {
@@ -330,9 +317,7 @@ impl Orchestrator {
                 println!("✅ PRD 已更新");
             }
             
-            meta.current_stage = Some(Stage::Requirements);
-            meta.completed_stages.push(Stage::Requirements);
-            self.save_session_meta(&meta)?;
+            self.mark_stage_completed(&mut meta, Stage::Requirements, prd_artifact.meta.artifact_id.clone(), true)?;
 
             self.print_prd_summary(&prd_artifact);
 
@@ -344,7 +329,7 @@ impl Orchestrator {
         };
 
         // Stage 3: Design
-        let design_artifact = if meta.completed_stages.contains(&Stage::Design) {
+        let design_artifact = if self.is_stage_completed(&meta, Stage::Design) {
             println!("✓ 跳过 Stage 3: Design (已完成)");
             self.load_artifact::<crate::artifacts::DesignDocArtifact>(session_id, Stage::Design)?
         } else {
@@ -363,9 +348,7 @@ impl Orchestrator {
                 println!("✅ DesignDoc 已更新");
             }
             
-            meta.current_stage = Some(Stage::Design);
-            meta.completed_stages.push(Stage::Design);
-            self.save_session_meta(&meta)?;
+            self.mark_stage_completed(&mut meta, Stage::Design, design_artifact.meta.artifact_id.clone(), true)?;
 
             self.print_design_summary(&design_artifact);
 
@@ -377,7 +360,7 @@ impl Orchestrator {
         };
 
         // Stage 4: Plan
-        let mut plan_artifact = if meta.completed_stages.contains(&Stage::Plan) {
+        let mut plan_artifact = if self.is_stage_completed(&meta, Stage::Plan) {
             println!("✓ 跳过 Stage 4: Plan (已完成)");
             self.load_artifact::<crate::artifacts::PlanArtifact>(session_id, Stage::Plan)?
         } else {
@@ -396,9 +379,7 @@ impl Orchestrator {
                 println!("✅ Plan 已更新");
             }
             
-            meta.current_stage = Some(Stage::Plan);
-            meta.completed_stages.push(Stage::Plan);
-            self.save_session_meta(&meta)?;
+            self.mark_stage_completed(&mut meta, Stage::Plan, plan_artifact.meta.artifact_id.clone(), true)?;
 
             self.print_plan_summary(&plan_artifact);
 
@@ -497,7 +478,7 @@ impl Orchestrator {
         const MAX_RETRY: usize = 3;
         let mut retry_count = 0;
         let mut check_artifact = loop {
-            if meta.completed_stages.contains(&Stage::Check) && retry_count == 0 {
+            if self.is_stage_completed(&meta, Stage::Check) && retry_count == 0 {
                 println!("✓ 跳过 Stage 6: Check (已完成)");
                 break self.load_artifact::<crate::artifacts::CheckReportArtifact>(session_id, Stage::Check)?;
             }
@@ -513,11 +494,7 @@ impl Orchestrator {
             let check_agent = CheckAgent::new(&model_config.llm, self.store.clone())?;
             let check_artifact = check_agent.execute(session_id, &code_artifact).await?;
             
-            meta.current_stage = Some(Stage::Check);
-            if !meta.completed_stages.contains(&Stage::Check) {
-                meta.completed_stages.push(Stage::Check);
-            }
-            self.save_session_meta(&meta)?;
+            self.mark_stage_completed(&mut meta, Stage::Check, check_artifact.meta.artifact_id.clone(), true)?;
 
             self.print_check_summary(&check_artifact);
             
@@ -649,10 +626,7 @@ impl Orchestrator {
             let feedback_agent = FeedbackAgent::new(&model_config.llm, self.store.clone())?;
             let feedback_artifact = feedback_agent.execute(session_id, &check_artifact, &user_feedback).await?;
             
-            meta.current_stage = Some(Stage::Feedback);
-            if !meta.completed_stages.contains(&Stage::Feedback) {
-                meta.completed_stages.push(Stage::Feedback);
-            }
+            self.mark_stage_completed(&mut meta, Stage::Feedback, feedback_artifact.meta.artifact_id.clone(), true)?;
             meta.feedback_iterations += 1;
             self.save_session_meta(&meta)?;
 
@@ -814,7 +788,7 @@ impl Orchestrator {
         }
 
         // Stage 8: Delivery
-        if !meta.completed_stages.contains(&Stage::Delivery) {
+        if !self.is_stage_completed(&meta, Stage::Delivery) {
             println!("\n╔═══════════════════════════════════════╗");
             println!("║   Stage 8: Delivery Report            ║");
             println!("╚═══════════════════════════════════════╝\n");
@@ -822,9 +796,7 @@ impl Orchestrator {
             let delivery_agent = DeliveryAgent::new(&model_config.llm, self.store.clone())?;
             let delivery_artifact = delivery_agent.execute(session_id, &check_artifact, &idea_artifact).await?;
             
-            meta.current_stage = Some(Stage::Delivery);
-            meta.completed_stages.push(Stage::Delivery);
-            self.save_session_meta(&meta)?;
+            self.mark_stage_completed(&mut meta, Stage::Delivery, delivery_artifact.meta.artifact_id.clone(), true)?;
 
             self.print_delivery_summary(&delivery_artifact);
         } else {
@@ -836,7 +808,6 @@ impl Orchestrator {
         println!("╚═══════════════════════════════════════╝\n");
         println!("Session ID: {}", session_id);
         println!("Artifacts: .cowork/{}/artifacts/", session_id);
-        println!("\n完成的阶段: {:?}", meta.completed_stages);
 
         Ok(())
     }
@@ -879,19 +850,17 @@ impl Orchestrator {
         let all_stages = Stage::all();
         let next_stage = all_stages
             .iter()
-            .find(|s| !meta.completed_stages.contains(s))
+            .find(|s| !self.is_stage_completed(&meta, **s))
             .cloned();
 
         if let Some(stage) = next_stage {
             println!("\n📋 恢复会话: {}", session_id);
-            println!("已完成: {:?}", meta.completed_stages);
             println!("下一阶段: {:?}", stage);
             println!();
             
             self.run_workflow_from_stage(session_id, model_config, Some(stage)).await
         } else {
             println!("\n✅ 会话 {} 已全部完成", session_id);
-            println!("完成的阶段: {:?}", meta.completed_stages);
             Ok(())
         }
     }
@@ -932,7 +901,7 @@ impl Orchestrator {
         println!("╚═══════════════════════════════════════╝\n");
 
         // 获取 CheckReport（如果存在）
-        let check_artifact = if meta.completed_stages.contains(&Stage::Check) {
+        let check_artifact = if self.is_stage_completed(&meta, Stage::Check) {
             self.load_artifact::<CheckReportArtifact>(session_id, Stage::Check).ok()
         } else {
             None
@@ -991,9 +960,6 @@ impl Orchestrator {
             
             // 清除从 earliest_stage 开始的所有阶段的完成状态
             for stage in &all_stages[earliest_index..] {
-                // 从 completed_stages 中移除
-                meta.completed_stages.retain(|s| s != stage);
-                
                 // 从 stage_status 中移除
                 meta.stage_status.remove(stage);
                 
@@ -1012,209 +978,6 @@ impl Orchestrator {
         } else {
             println!("\n⚠️  无需重跑任何阶段");
         }
-
-        Ok(())
-    }
-
-    /// 运行完整的 8 阶段工作流（旧版本，保持兼容）
-    #[allow(dead_code)]
-    async fn run_full_workflow_legacy(&self, session_id: &str, model_config: &ModelConfig) -> Result<()> {
-        tracing::info!("Running full workflow for session: {}", session_id);
-
-        let hitl = HitlController::new();
-        let mut meta = self.load_session_meta(session_id)?;
-
-        // ===== Stage 1: IDEA Intake =====
-        println!("\n╔═══════════════════════════════════════╗");
-        println!("║   Stage 1: IDEA Intake               ║");
-        println!("╚═══════════════════════════════════════╝\n");
-        
-        let user_idea = hitl.input("请描述你的 IDEA：")?;
-        
-        let idea_agent = IdeaIntakeAgent::new(&model_config.llm, self.store.clone())?;
-        let mut idea_artifact = idea_agent.execute(session_id, &user_idea).await?;
-        
-        // HITL 审查和修改
-        if let Some(modified_json) = hitl.review_and_edit_json("IdeaSpec", &idea_artifact.data)? {
-            let modified_data: crate::artifacts::IdeaSpec = serde_json::from_str(&modified_json)?;
-            idea_artifact.data = modified_data;
-            // 重新保存修改后的artifact
-            self.store.put(session_id, Stage::IdeaIntake, &idea_artifact)?;
-            println!("✅ IdeaSpec 已更新");
-        }
-        
-        meta.current_stage = Some(Stage::IdeaIntake);
-        meta.completed_stages.push(Stage::IdeaIntake);
-        self.save_session_meta(&meta)?;
-
-        self.print_idea_summary(&idea_artifact);
-
-        if !hitl.confirm("继续生成 PRD？")? {
-            return Ok(());
-        }
-
-        // ===== Stage 2: PRD Generation =====
-        println!("\n╔═══════════════════════════════════════╗");
-        println!("║   Stage 2: Requirements (PRD)        ║");
-        println!("╚═══════════════════════════════════════╝\n");
-        
-        let prd_agent = PrdAgent::new(&model_config.llm, self.store.clone())?;
-        let mut prd_artifact = prd_agent.execute(session_id, &idea_artifact).await?;
-        
-        // HITL 审查和修改
-        if let Some(modified_json) = hitl.review_and_edit_json("PRD", &prd_artifact.data)? {
-            let modified_data: crate::artifacts::PRD = serde_json::from_str(&modified_json)?;
-            prd_artifact.data = modified_data;
-            self.store.put(session_id, Stage::Requirements, &prd_artifact)?;
-            println!("✅ PRD 已更新");
-        }
-        
-        meta.current_stage = Some(Stage::Requirements);
-        meta.completed_stages.push(Stage::Requirements);
-        self.save_session_meta(&meta)?;
-
-        self.print_prd_summary(&prd_artifact);
-
-        if !hitl.confirm("继续生成设计文档？")? {
-            return Ok(());
-        }
-
-        // ===== Stage 3: Design =====
-        println!("\n╔═══════════════════════════════════════╗");
-        println!("║   Stage 3: Design Document            ║");
-        println!("╚═══════════════════════════════════════╝\n");
-        
-        let design_agent = DesignAgent::new(&model_config.llm, self.store.clone())?;
-        let mut design_artifact = design_agent.execute(session_id, &prd_artifact).await?;
-        
-        // HITL 审查和修改
-        if let Some(modified_json) = hitl.review_and_edit_json("DesignDoc", &design_artifact.data)? {
-            let modified_data: crate::artifacts::DesignDoc = serde_json::from_str(&modified_json)?;
-            design_artifact.data = modified_data;
-            self.store.put(session_id, Stage::Design, &design_artifact)?;
-            println!("✅ DesignDoc 已更新");
-        }
-        
-        meta.current_stage = Some(Stage::Design);
-        meta.completed_stages.push(Stage::Design);
-        self.save_session_meta(&meta)?;
-
-        self.print_design_summary(&design_artifact);
-
-        if !hitl.confirm("继续生成实施计划？")? {
-            return Ok(());
-        }
-
-        // ===== Stage 4: Plan =====
-        println!("\n╔═══════════════════════════════════════╗");
-        println!("║   Stage 4: Implementation Plan        ║");
-        println!("╚═══════════════════════════════════════╝\n");
-        
-        let plan_agent = PlanAgent::new(&model_config.llm, self.store.clone())?;
-        let mut plan_artifact = plan_agent.execute(session_id, &design_artifact).await?;
-        
-        // HITL 审查和修改
-        if let Some(modified_json) = hitl.review_and_edit_json("Plan", &plan_artifact.data)? {
-            let modified_data: crate::artifacts::Plan = serde_json::from_str(&modified_json)?;
-            plan_artifact.data = modified_data;
-            self.store.put(session_id, Stage::Plan, &plan_artifact)?;
-            println!("✅ Plan 已更新");
-        }
-        
-        meta.current_stage = Some(Stage::Plan);
-        meta.completed_stages.push(Stage::Plan);
-        self.save_session_meta(&meta)?;
-
-        self.print_plan_summary(&plan_artifact);
-
-        if !hitl.confirm("继续生成代码？")? {
-            return Ok(());
-        }
-
-        // ===== Stage 5: Coding =====
-        println!("\n╔═══════════════════════════════════════╗");
-        println!("║   Stage 5: Code Planning              ║");
-        println!("╚═══════════════════════════════════════╝\n");
-        
-        let code_planner = CodePlanner::new(&model_config.llm, self.store.clone())?;
-        let code_artifact = code_planner.execute(
-            session_id,
-            &prd_artifact,
-            &design_artifact,
-            &plan_artifact
-        ).await?;
-        
-        meta.current_stage = Some(Stage::Coding);
-        meta.completed_stages.push(Stage::Coding);
-        self.save_session_meta(&meta)?;
-
-        self.print_code_summary(&code_artifact);
-
-        if !hitl.confirm("继续代码检查？")? {
-            return Ok(());
-        }
-
-        // ===== Stage 6: Check =====
-        println!("\n╔═══════════════════════════════════════╗");
-        println!("║   Stage 6: Quality Check              ║");
-        println!("╚═══════════════════════════════════════╝\n");
-        
-        let check_agent = CheckAgent::new(&model_config.llm, self.store.clone())?;
-        let check_artifact = check_agent.execute(session_id, &code_artifact).await?;
-        
-        meta.current_stage = Some(Stage::Check);
-        meta.completed_stages.push(Stage::Check);
-        self.save_session_meta(&meta)?;
-
-        self.print_check_summary(&check_artifact);
-
-        // ===== Stage 7: Feedback (Optional) =====
-        let user_feedback = hitl.input("有反馈吗？（直接回车跳过）")?;
-        
-        if !user_feedback.trim().is_empty() {
-            println!("\n╔═══════════════════════════════════════╗");
-            println!("║   Stage 7: Feedback Analysis          ║");
-            println!("╚═══════════════════════════════════════╝\n");
-            
-            let feedback_agent = FeedbackAgent::new(&model_config.llm, self.store.clone())?;
-            let feedback_artifact = feedback_agent.execute(session_id, &check_artifact, &user_feedback).await?;
-            
-            meta.current_stage = Some(Stage::Feedback);
-            meta.completed_stages.push(Stage::Feedback);
-            self.save_session_meta(&meta)?;
-
-            self.print_feedback_summary(&feedback_artifact);
-
-            if !feedback_artifact.data.rerun.is_empty() {
-                println!("\n⚠️  需要重新执行以下阶段：");
-                for rerun in &feedback_artifact.data.rerun {
-                    println!("  - {:?}: {}", rerun.stage, rerun.reason);
-                }
-                println!("\n提示：使用 'cowork resume {}' 继续迭代", session_id);
-                return Ok(());
-            }
-        }
-
-        // ===== Stage 8: Delivery =====
-        println!("\n╔═══════════════════════════════════════╗");
-        println!("║   Stage 8: Delivery Report            ║");
-        println!("╚═══════════════════════════════════════╝\n");
-        
-        let delivery_agent = DeliveryAgent::new(&model_config.llm, self.store.clone())?;
-        let delivery_artifact = delivery_agent.execute(session_id, &check_artifact, &idea_artifact).await?;
-        
-        meta.current_stage = Some(Stage::Delivery);
-        meta.completed_stages.push(Stage::Delivery);
-        self.save_session_meta(&meta)?;
-
-        self.print_delivery_summary(&delivery_artifact);
-
-        println!("\n╔═══════════════════════════════════════╗");
-        println!("║   🎉 工作流完成！                     ║");
-        println!("╚═══════════════════════════════════════╝\n");
-        println!("Session ID: {}", session_id);
-        println!("Artifacts: .cowork/{}/artifacts/", session_id);
-        println!("\n完成的阶段: {:?}", meta.completed_stages);
 
         Ok(())
     }

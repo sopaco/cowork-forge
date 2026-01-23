@@ -21,8 +21,8 @@ mod tests {
         // Verify meta.json exists
         let meta = orchestrator.load_session_meta(&session_id).unwrap();
         assert_eq!(meta.session_id, session_id);
-        assert!(meta.completed_stages.is_empty());
         assert_eq!(meta.current_stage, None);
+        assert!(meta.stage_status.is_empty());
     }
 
     #[test]
@@ -34,17 +34,37 @@ mod tests {
         // Modify meta
         let mut meta = orchestrator.load_session_meta(&session_id).unwrap();
         meta.current_stage = Some(Stage::Requirements);
-        meta.completed_stages.push(Stage::IdeaIntake);
-        meta.completed_stages.push(Stage::Requirements);
+        meta.stage_status.insert(
+            Stage::IdeaIntake,
+            StageStatus::Completed {
+                artifact_id: "test-artifact-1".to_string(),
+                completed_at: chrono::Utc::now(),
+                verified: true,
+            }
+        );
+        meta.stage_status.insert(
+            Stage::Requirements,
+            StageStatus::Completed {
+                artifact_id: "test-artifact-2".to_string(),
+                completed_at: chrono::Utc::now(),
+                verified: true,
+            }
+        );
         
         orchestrator.save_session_meta(&meta).unwrap();
         
         // Reload and verify
         let loaded_meta = orchestrator.load_session_meta(&session_id).unwrap();
         assert_eq!(loaded_meta.current_stage, Some(Stage::Requirements));
-        assert_eq!(loaded_meta.completed_stages.len(), 2);
-        assert!(loaded_meta.completed_stages.contains(&Stage::IdeaIntake));
-        assert!(loaded_meta.completed_stages.contains(&Stage::Requirements));
+        assert_eq!(loaded_meta.stage_status.len(), 2);
+        assert!(matches!(
+            loaded_meta.stage_status.get(&Stage::IdeaIntake),
+            Some(StageStatus::Completed { verified: true, .. })
+        ));
+        assert!(matches!(
+            loaded_meta.stage_status.get(&Stage::Requirements),
+            Some(StageStatus::Completed { verified: true, .. })
+        ));
     }
 
     #[test]
