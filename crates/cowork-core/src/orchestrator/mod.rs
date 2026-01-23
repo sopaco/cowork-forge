@@ -942,12 +942,13 @@ impl Orchestrator {
             println!("  - 重跑 {:?}: {}", rerun.stage, rerun.reason);
         }
 
+        // 🔧 关键修复：在重跑之前保存修改意图，让 CodePlanner 能读取到
+        meta.modification_context = Some(modification.to_string());
+        self.save_session_meta(&meta)?;
+        println!("\n💾 保存修改上下文: {}", modification);
+
         // 应用 delta 修改
         self.apply_feedback_delta(session_id, &feedback_artifact.data.delta, model_config).await?;
-
-        // 🆕 保存用户的修改意图到 meta，供 CodePlanner 使用
-        meta.modification_context = Some(modification.to_string());
-        println!("\n💾 保存修改上下文: {}", modification);
 
         // 获取最早需要重跑的阶段
         if let Some(earliest_stage) = Self::get_earliest_stage_to_rerun(&feedback_artifact.data.rerun) {
