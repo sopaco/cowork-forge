@@ -1,4 +1,5 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use adk_rust::prelude::*;
 use adk_rust::model::{OpenAIClient, OpenAIConfig};
 use adk_rust::runner::{Runner, RunnerConfig};
@@ -10,6 +11,7 @@ use std::sync::Arc;
 use crate::artifacts::*;
 use crate::memory::ArtifactStore;
 use crate::config::LlmConfig;
+use crate::agents::{StageAgent, StageAgentContext, StageAgentResult};
 
 /// Plan Agent - 基于 Design 生成实施计划
 pub struct PlanAgent {
@@ -35,7 +37,7 @@ impl PlanAgent {
         })
     }
 
-    pub async fn execute(&self, session_id: &str, design_artifact: &DesignDocArtifact) -> Result<PlanArtifact> {
+    async fn generate_plan(&self, session_id: &str, design_artifact: &DesignDocArtifact) -> Result<PlanArtifact> {
         tracing::info!("PlanAgent: generating implementation plan for session {}", session_id);
 
         let output_schema = serde_json::json!({
@@ -284,3 +286,51 @@ Create a detailed C4 model and task breakdown."#,
         Ok(artifact)
     }
 }
+
+#[async_trait]
+impl StageAgent for PlanAgent {
+    fn stage(&self) -> Stage {
+        Stage::Plan
+    }
+    
+    async fn execute(&self, context: &StageAgentContext) -> Result<StageAgentResult> {
+        // 1. 加载 Design artifact
+        let design_artifact: DesignDocArtifact = context.load_artifact(Stage::Design)?;
+        
+        // 2. 生成实施计划
+        let mut artifact = self.generate_plan(&context.session_id, &design_artifact).await?;
+        
+        // 3. HITL 审查和修改
+        if let Some(modified_json) = context.hitl.review_and_edit_json("Plan", &artifact.data)? {
+            let modified_data: Plan = serde_json::from_str(&modified_json)?;
+            artifact.data = modified_data;
+            context.store.put(&context.session_id, Stage::Plan, &artifact)?;
+            println!("✅ Plan 已更新");
+        }
+        
+        // 4. 返回结果
+        let summary = vec![
+            format!("C4 Context: {} items", artifact.data.c4.context.len()),
+            format!("Tasks: {} total", artifact.data.tasks.len()),
+            format!("Milestones: {}", artifact.data.milestones.len()),
+            format!("TodoList: {} items", artifact.data.todo_list.as_ref().map(|t| t.items.len()).unwrap_or(0)),
+        ];
+        
+        Ok(StageAgentResult::new(artifact.meta.artifact_id, Stage::Plan)
+            .with_verified(true)
+            .with_summary(summary))
+    }
+    
+    fn dependencies(&self) -> Vec<Stage> {
+        vec![Stage::Design]
+    }
+    
+    fn requires_hitl_review(&self) -> bool {
+        true
+    }
+    
+    fn description(&self) -> &str {
+        "基于技术设计文档生成实施计划"
+    }
+}
+

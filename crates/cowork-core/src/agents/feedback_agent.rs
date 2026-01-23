@@ -1,4 +1,5 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use adk_rust::prelude::*;
 use adk_rust::model::{OpenAIClient, OpenAIConfig};
 use adk_rust::runner::{Runner, RunnerConfig};
@@ -10,6 +11,7 @@ use std::sync::Arc;
 use crate::artifacts::*;
 use crate::memory::ArtifactStore;
 use crate::config::LlmConfig;
+use crate::agents::{StageAgent, StageAgentContext, StageAgentResult};
 
 /// Feedback Agent - 收集反馈并决定是否需要迭代
 pub struct FeedbackAgent {
@@ -35,7 +37,7 @@ impl FeedbackAgent {
         })
     }
 
-    pub async fn execute(
+    async fn analyze_feedback(
         &self,
         session_id: &str,
         check_artifact: &CheckReportArtifact,
@@ -248,3 +250,68 @@ Determine what changes are needed and which stages should be re-run."#,
         Ok(artifact)
     }
 }
+
+#[async_trait]
+impl StageAgent for FeedbackAgent {
+    fn stage(&self) -> Stage {
+        Stage::Feedback
+    }
+    
+    async fn execute(&self, context: &StageAgentContext) -> Result<StageAgentResult> {
+        // 1. 加载 CheckReport
+        let check_artifact: CheckReportArtifact = context.load_artifact(Stage::Check)?;
+        
+        // 2. 获取用户反馈
+        let user_feedback = if let Some(ref input) = context.user_input {
+            input.clone()
+        } else {
+            context.hitl.input("有反馈吗？（直接回车跳过）")?
+        };
+        
+        // 如果没有反馈，返回空的 Feedback
+        if user_feedback.trim().is_empty() {
+            println!("✓ 用户满意，跳过 Feedback");
+            
+            let empty_feedback = Feedback {
+                delta: vec![],
+                rerun: vec![],
+            };
+            
+            let artifact = ArtifactEnvelope::new(context.session_id.clone(), Stage::Feedback, empty_feedback)
+                .with_summary(vec!["No feedback".to_string()])
+                .with_prev(vec![check_artifact.meta.artifact_id.clone()]);
+            
+            context.store.put(&context.session_id, Stage::Feedback, &artifact)?;
+            
+            return Ok(StageAgentResult::new(artifact.meta.artifact_id, Stage::Feedback)
+                .with_verified(true)
+                .with_summary(vec!["No changes needed".to_string()]));
+        }
+        
+        // 3. 分析反馈
+        let artifact = self.analyze_feedback(&context.session_id, &check_artifact, &user_feedback).await?;
+        
+        // 4. 返回结果
+        let summary = vec![
+            format!("Changes needed: {}", artifact.data.delta.len()),
+            format!("Stages to rerun: {}", artifact.data.rerun.len()),
+        ];
+        
+        Ok(StageAgentResult::new(artifact.meta.artifact_id, Stage::Feedback)
+            .with_verified(true)
+            .with_summary(summary))
+    }
+    
+    fn dependencies(&self) -> Vec<Stage> {
+        vec![Stage::Check]
+    }
+    
+    fn requires_hitl_review(&self) -> bool {
+        false  // Feedback 阶段本身就是收集 HITL
+    }
+    
+    fn description(&self) -> &str {
+        "收集用户反馈并决定是否需要迭代"
+    }
+}
+

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use adk_rust::prelude::*;
 use adk_rust::model::{OpenAIClient, OpenAIConfig};
 use adk_rust::runner::{Runner, RunnerConfig};
@@ -10,6 +11,7 @@ use std::sync::Arc;
 use crate::artifacts::*;
 use crate::memory::ArtifactStore;
 use crate::config::LlmConfig;
+use crate::agents::{StageAgent, StageAgentContext, StageAgentResult};
 
 /// IDEA Intake Agent - 将用户输入转换为结构化的 IdeaSpec
 pub struct IdeaIntakeAgent {
@@ -40,7 +42,7 @@ impl IdeaIntakeAgent {
         })
     }
 
-    pub async fn execute(&self, session_id: &str, user_input: &str) -> Result<IdeaSpecArtifact> {
+    async fn generate_idea_spec(&self, session_id: &str, user_input: &str) -> Result<IdeaSpecArtifact> {
         tracing::info!("IdeaIntakeAgent: processing user input for session {}", session_id);
 
         // Define the output schema for IdeaSpec
@@ -248,3 +250,51 @@ impl IdeaIntakeAgent {
         Ok(artifact)
     }
 }
+
+#[async_trait]
+impl StageAgent for IdeaIntakeAgent {
+    fn stage(&self) -> Stage {
+        Stage::IdeaIntake
+    }
+    
+    async fn execute(&self, context: &StageAgentContext) -> Result<StageAgentResult> {
+        // 1. 获取用户输入
+        let user_idea = if let Some(ref input) = context.user_input {
+            input.clone()
+        } else {
+            context.hitl.input("请描述你的 IDEA：")?
+        };
+        
+        // 2. 生成 IdeaSpec
+        let mut artifact = self.generate_idea_spec(&context.session_id, &user_idea).await?;
+        
+        // 3. HITL 审查和修改
+        if let Some(modified_json) = context.hitl.review_and_edit_json("IdeaSpec", &artifact.data)? {
+            let modified_data: IdeaSpec = serde_json::from_str(&modified_json)?;
+            artifact.data = modified_data;
+            context.store.put(&context.session_id, Stage::IdeaIntake, &artifact)?;
+            println!("✅ IdeaSpec 已更新");
+        }
+        
+        // 4. 返回结果
+        let summary = vec![
+            format!("背景: {}", artifact.data.bg),
+            format!("目标: {} 项", artifact.data.g.len()),
+            format!("非目标: {} 项", artifact.data.ng.len()),
+            format!("约束: {} 项", artifact.data.c.len()),
+        ];
+        
+        Ok(StageAgentResult::new(artifact.meta.artifact_id, Stage::IdeaIntake)
+            .with_verified(true)
+            .with_summary(summary))
+    }
+    
+    fn requires_hitl_review(&self) -> bool {
+        true
+    }
+    
+    fn description(&self) -> &str {
+        "将用户输入的 IDEA 转换为结构化的 IdeaSpec"
+    }
+}
+

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use adk_rust::prelude::*;
 use adk_rust::model::{OpenAIClient, OpenAIConfig};
 use adk_rust::runner::{Runner, RunnerConfig};
@@ -10,6 +11,7 @@ use std::sync::Arc;
 use crate::artifacts::*;
 use crate::memory::ArtifactStore;
 use crate::config::LlmConfig;
+use crate::agents::{StageAgent, StageAgentContext, StageAgentResult};
 
 /// Design Agent - 基于 PRD 生成技术设计文档
 pub struct DesignAgent {
@@ -35,7 +37,7 @@ impl DesignAgent {
         })
     }
 
-    pub async fn execute(&self, session_id: &str, prd_artifact: &PRDArtifact) -> Result<DesignDocArtifact> {
+    async fn generate_design(&self, session_id: &str, prd_artifact: &PRDArtifact) -> Result<DesignDocArtifact> {
         tracing::info!("DesignAgent: generating design document for session {}", session_id);
 
         let output_schema = serde_json::json!({
@@ -235,3 +237,51 @@ Create a design that addresses all functional and non-functional requirements."#
         Ok(artifact)
     }
 }
+
+#[async_trait]
+impl StageAgent for DesignAgent {
+    fn stage(&self) -> Stage {
+        Stage::Design
+    }
+    
+    async fn execute(&self, context: &StageAgentContext) -> Result<StageAgentResult> {
+        // 1. 加载 PRD artifact
+        let prd_artifact: PRDArtifact = context.load_artifact(Stage::Requirements)?;
+        
+        // 2. 生成设计文档
+        let mut artifact = self.generate_design(&context.session_id, &prd_artifact).await?;
+        
+        // 3. HITL 审查和修改
+        if let Some(modified_json) = context.hitl.review_and_edit_json("DesignDoc", &artifact.data)? {
+            let modified_data: DesignDoc = serde_json::from_str(&modified_json)?;
+            artifact.data = modified_data;
+            context.store.put(&context.session_id, Stage::Design, &artifact)?;
+            println!("✅ DesignDoc 已更新");
+        }
+        
+        // 4. 返回结果
+        let summary = vec![
+            format!("CLI modes: {}", artifact.data.cli.modes.len()),
+            format!("Workflow stages: {}", artifact.data.wf.stages.len()),
+            format!("Architecture components: {}", artifact.data.arch.comps.len()),
+            format!("Output formats: {}", artifact.data.io.formats.join(", ")),
+        ];
+        
+        Ok(StageAgentResult::new(artifact.meta.artifact_id, Stage::Design)
+            .with_verified(true)
+            .with_summary(summary))
+    }
+    
+    fn dependencies(&self) -> Vec<Stage> {
+        vec![Stage::Requirements]
+    }
+    
+    fn requires_hitl_review(&self) -> bool {
+        true
+    }
+    
+    fn description(&self) -> &str {
+        "基于 PRD 生成技术设计文档"
+    }
+}
+

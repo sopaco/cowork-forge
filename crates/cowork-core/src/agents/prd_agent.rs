@@ -1,4 +1,5 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use adk_rust::prelude::*;
 use adk_rust::model::{OpenAIClient, OpenAIConfig};
 use adk_rust::runner::{Runner, RunnerConfig};
@@ -10,6 +11,7 @@ use std::sync::Arc;
 use crate::artifacts::*;
 use crate::memory::ArtifactStore;
 use crate::config::LlmConfig;
+use crate::agents::{StageAgent, StageAgentContext, StageAgentResult};
 
 /// PRD Agent - 基于 IdeaSpec 生成产品需求文档
 pub struct PrdAgent {
@@ -35,7 +37,7 @@ impl PrdAgent {
         })
     }
 
-    pub async fn execute(&self, session_id: &str, idea_artifact: &IdeaSpecArtifact) -> Result<PRDArtifact> {
+    async fn generate_prd(&self, session_id: &str, idea_artifact: &IdeaSpecArtifact) -> Result<PRDArtifact> {
         tracing::info!("PrdAgent: generating PRD for session {}", session_id);
 
         // Define output schema for PRD
@@ -274,3 +276,51 @@ Generate the PRD now based on the IDEA provided."#,
         Ok(artifact)
     }
 }
+
+#[async_trait]
+impl StageAgent for PrdAgent {
+    fn stage(&self) -> Stage {
+        Stage::Requirements
+    }
+    
+    async fn execute(&self, context: &StageAgentContext) -> Result<StageAgentResult> {
+        // 1. 加载 IdeaSpec artifact
+        let idea_artifact: IdeaSpecArtifact = context.load_artifact(Stage::IdeaIntake)?;
+        
+        // 2. 生成 PRD
+        let mut artifact = self.generate_prd(&context.session_id, &idea_artifact).await?;
+        
+        // 3. HITL 审查和修改
+        if let Some(modified_json) = context.hitl.review_and_edit_json("PRD", &artifact.data)? {
+            let modified_data: PRD = serde_json::from_str(&modified_json)?;
+            artifact.data = modified_data;
+            context.store.put(&context.session_id, Stage::Requirements, &artifact)?;
+            println!("✅ PRD 已更新");
+        }
+        
+        // 4. 返回结果
+        let summary = vec![
+            format!("Scope: {} goals, {} non-goals", artifact.data.scope.g.len(), artifact.data.scope.ng.len()),
+            format!("Requirements: {} total", artifact.data.reqs.len()),
+            format!("Constraints: {}", artifact.data.cons.len()),
+            format!("HITL Questions: {}", artifact.data.hitl.len()),
+        ];
+        
+        Ok(StageAgentResult::new(artifact.meta.artifact_id, Stage::Requirements)
+            .with_verified(true)
+            .with_summary(summary))
+    }
+    
+    fn dependencies(&self) -> Vec<Stage> {
+        vec![Stage::IdeaIntake]
+    }
+    
+    fn requires_hitl_review(&self) -> bool {
+        true
+    }
+    
+    fn description(&self) -> &str {
+        "基于 IdeaSpec 生成产品需求文档（PRD）"
+    }
+}
+

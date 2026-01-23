@@ -1,9 +1,11 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use std::sync::Arc;
 
 use crate::artifacts::*;
 use crate::memory::ArtifactStore;
 use crate::config::LlmConfig;
+use crate::agents::{StageAgent, StageAgentContext, StageAgentResult};
 #[path = "check_agent_verification.rs"]
 mod check_agent_verification;
 #[path = "check_agent_verification_impl.rs"]
@@ -23,7 +25,7 @@ impl CheckAgent {
         })
     }
 
-    pub async fn execute(&self, session_id: &str, code_artifact: &CodeChangeArtifact) -> Result<CheckReportArtifact> {
+    async fn perform_checks(&self, session_id: &str, code_artifact: &CodeChangeArtifact) -> Result<CheckReportArtifact> {
         tracing::info!("CheckAgent: checking code for session {}", session_id);
 
         // 尝试加载 PRD artifact（包含 requirements）
@@ -446,3 +448,54 @@ impl CheckAgent {
         tracing::info!("JavaScript project detected, consider adding npm build check");
     }
 }
+
+#[async_trait]
+impl StageAgent for CheckAgent {
+    fn stage(&self) -> Stage {
+        Stage::Check
+    }
+    
+    async fn execute(&self, context: &StageAgentContext) -> Result<StageAgentResult> {
+        // 1. 加载 CodeChange artifact
+        let code_artifact: CodeChangeArtifact = context.load_artifact(Stage::Coding)?;
+        
+        // 2. 执行检查
+        let artifact = self.perform_checks(&context.session_id, &code_artifact).await?;
+        
+        // 3. 打印检查结果
+        println!("\n📊 检查结果:");
+        println!("  总检查数: {}", artifact.data.checks.len());
+        println!("  问题数: {}", artifact.data.issues.len());
+        if let Some(ref cov) = artifact.data.requirement_coverage {
+            println!("  需求覆盖率: {:.1}%", cov.coverage_percentage);
+        }
+        if let Some(ref todo) = artifact.data.todo_completion {
+            println!("  Todo完成度: {}/{}", todo.completed, todo.total);
+        }
+        
+        // 4. 返回结果（不需要额外的 HITL）
+        let summary = vec![
+            format!("Checks: {}", artifact.data.checks.len()),
+            format!("Issues: {}", artifact.data.issues.len()),
+            format!("Coverage: {:.1}%", 
+                artifact.data.requirement_coverage.as_ref().map(|c| c.coverage_percentage).unwrap_or(0.0)),
+        ];
+        
+        Ok(StageAgentResult::new(artifact.meta.artifact_id, Stage::Check)
+            .with_verified(true)
+            .with_summary(summary))
+    }
+    
+    fn dependencies(&self) -> Vec<Stage> {
+        vec![Stage::Coding]
+    }
+    
+    fn requires_hitl_review(&self) -> bool {
+        false  // Check 阶段不需要 HITL
+    }
+    
+    fn description(&self) -> &str {
+        "检查代码质量和完整性"
+    }
+}
+

@@ -1,9 +1,11 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use std::sync::Arc;
 
 use crate::artifacts::*;
 use crate::memory::ArtifactStore;
 use crate::config::LlmConfig;
+use crate::agents::{StageAgent, StageAgentContext, StageAgentResult};
 
 /// Delivery Agent - 生成最终交付报告
 pub struct DeliveryAgent {
@@ -19,7 +21,7 @@ impl DeliveryAgent {
         })
     }
 
-    pub async fn execute(
+    async fn generate_delivery_report(
         &self,
         session_id: &str,
         check_artifact: &CheckReportArtifact,
@@ -66,3 +68,43 @@ impl DeliveryAgent {
         Ok(artifact)
     }
 }
+
+#[async_trait]
+impl StageAgent for DeliveryAgent {
+    fn stage(&self) -> Stage {
+        Stage::Delivery
+    }
+    
+    async fn execute(&self, context: &StageAgentContext) -> Result<StageAgentResult> {
+        // 1. 加载 CheckReport 和 IdeaSpec
+        let check_artifact: CheckReportArtifact = context.load_artifact(Stage::Check)?;
+        let idea_artifact: IdeaSpecArtifact = context.load_artifact(Stage::IdeaIntake)?;
+        
+        // 2. 生成交付报告
+        let artifact = self.generate_delivery_report(&context.session_id, &check_artifact, &idea_artifact).await?;
+        
+        // 3. 返回结果（不需要 HITL）
+        let summary = vec![
+            format!("Capabilities: {}", artifact.data.cap.len()),
+            format!("Usage steps: {}", artifact.data.howto.len()),
+            format!("Known limits: {}", artifact.data.limits.len()),
+        ];
+        
+        Ok(StageAgentResult::new(artifact.meta.artifact_id, Stage::Delivery)
+            .with_verified(true)
+            .with_summary(summary))
+    }
+    
+    fn dependencies(&self) -> Vec<Stage> {
+        vec![Stage::Check, Stage::IdeaIntake]
+    }
+    
+    fn requires_hitl_review(&self) -> bool {
+        false  // Delivery 阶段不需要 HITL
+    }
+    
+    fn description(&self) -> &str {
+        "生成最终交付报告"
+    }
+}
+
