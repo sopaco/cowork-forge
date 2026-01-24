@@ -10,7 +10,7 @@ version = "1.0.0"
 edition = "2024"
 authors = ["Sopaco"]
 license = "MIT"
-repository = "https://github.com/sopaco/cowork-rs"
+repository = "https://github.com/sopaco/cowork-forge"
 
 [workspace.dependencies]
 # ADK Rust framework

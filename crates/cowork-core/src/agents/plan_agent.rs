@@ -202,7 +202,7 @@ Create a detailed C4 model and task breakdown."#,
         );
 
         let session_service = Arc::new(InMemorySessionService::new());
-        let app_name = "cowork".to_string();
+        let app_name = "Cowork Forge".to_string();
         let user_id = session_id.to_string();
 
         let _session = session_service

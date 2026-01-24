@@ -2,7 +2,7 @@
   <img height="200" src="./assets/blend_banner.png">
 </p>
 
-<h1 align="center">Cowork AI Agent System</h1>
+<h1 align="center">Cowork Forge AI Agent System</h1>
 
 <p align="center">
     <a href="./README.md">English</a>
@@ -13,21 +13,21 @@
 <p align="center">
     <strong>🤖 基于 AI 多智能体架构的自动化软件开发框架 🤖</strong>
 </p>
-<p align="center">使用 Rust 构建，Cowork 通过协调智能 AI 智能体，实现从需求到交付的完整软件开发生命周期自动化。</p>
+<p align="center">使用 Rust 构建，Cowork Forge 通过协调智能 AI 智能体，实现从需求到交付的完整软件开发生命周期自动化。</p>
 
 <p align="center">
-  <a href="https://github.com/sopaco/cowork-rs/tree/main/litho.docs"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-Docs-green?logo=Gitbook&color=%23008a60">
-  <a href="https://github.com/sopaco/cowork-rs"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/sopaco/cowork-rs/rust.yml?label=Build">
+  <a href="https://github.com/sopaco/cowork-forge/tree/main/litho.docs"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-Docs-green?logo=Gitbook&color=%23008a60">
+  <a href="https://github.com/sopaco/cowork-forge"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/sopaco/cowork-forge/rust.yml?label=Build">
   <a href="./LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue.svg?label=LICENSE" />
 </p>
 
 <hr />
 
-# 👋 什么是 Cowork AI Agent System？
+# 👋 什么是 Cowork Forge？
 
-<strong>Cowork AI Agent System</strong> 是一个完整的、生产就绪的框架，通过智能多智能体协作实现软件开发自动化。它超越了简单的代码生成，提供了一个全面的系统，协调专业的 AI 智能体处理软件开发生命周期的每个阶段。
+<strong>Cowork Forge</strong> 是一个完整的、生产就绪的框架，通过智能多智能体协作实现软件开发自动化。它超越了简单的代码生成，提供了一个全面的系统，协调专业的 AI 智能体处理软件开发生命周期的每个阶段。
 
-由 Rust 和 LLM 驱动，Cowork 协调 8 个专业智能体协同工作，将你的想法转化为生产就绪的代码。从需求收集和 PRD 生成，到技术设计、实施计划、编码和质量验证——Cowork 全部管理，并在关键决策点进行人工验证。
+由 Rust 和 LLM 驱动，Cowork Forge 协调 8 个专业智能体协同工作，将你的想法转化为生产就绪的代码。从需求收集和 PRD 生成，到技术设计、实施计划、编码和质量验证——Cowork Forge 全部管理，并在关键决策点进行人工验证。
 
 <p align="center">
   <strong>让你的开发工作流程通过像真实开发团队一样思考、规划和协作的 AI 智能体得到变革。</strong>
@@ -37,7 +37,7 @@
   <table style="width: 100%; border-collapse: collapse; margin: 0 auto;">
     <tr>
       <th style="width: 50%; padding: 15px; background-color: #f8f9fa; border: 1px solid #e9ecef; text-align: center; font-weight: bold; color: #495057;">传统开发模式</th>
-      <th style="width: 50%; padding: 15px; background-color: #f8f9fa; border: 1px solid #e9ecef; text-align: center; font-weight: bold; color: #495057;">使用 Cowork 的开发模式</th>
+      <th style="width: 50%; padding: 15px; background-color: #f8f9fa; border: 1px solid #e9ecef; text-align: center; font-weight: bold; color: #495057;">使用 Cowork Forge 的开发模式</th>
     </tr>
     <tr>
       <td style="padding: 15px; border: 1px solid #e9ecef; vertical-align: top;">
@@ -66,9 +66,9 @@
 
 <hr />
 
-# 😺 为什么选择 Cowork？
+# 😺 为什么选择 Cowork Forge？
 
-- <strong>端到端自动化：</strong> 从想法到交付，Cowork 通过协调的 AI 智能体自动化整个软件开发生命周期。
+- <strong>端到端自动化：</strong> 从想法到交付，Cowork Forge 通过协调的 AI 智能体自动化整个软件开发生命周期。
 - <strong>多智能体协作：</strong> 8 个专业智能体协同工作，每个都在其领域带来专业知识——需求、设计、规划、编码和验证。
 - <strong>人机协作：</strong> 关键决策点包含人工验证，在保持自动化效率的同时确保质量和控制。
 - <strong>增量代码更新：</strong> 智能代码分析实现有针对性的更新，无需重新生成整个代码库，保留你的自定义内容。
@@ -76,13 +76,13 @@
 - <strong>安全优先：</strong> 多层安全检查防止危险命令并确保安全的代码执行。
 - <strong>高性能：</strong> 使用 Rust 构建，确保速度、内存安全和高效的资源利用。
 
-# 🏆 Cowork 与竞品对比
+# 🏆 Cowork Forge 与竞品对比
 
-Cowork 在 AI 开发工具领域通过其独特的多智能体架构和全面的工作流覆盖而脱颖而出。
+Cowork Forge 在 AI 开发工具领域通过其独特的多智能体架构和全面的工作流覆盖而脱颖而出。
 
 ## 核心能力对比
 
-| 能力 | Cowork AI Agent System | GitHub Copilot | Cursor AI | Aider |
+| 能力 | Cowork Forge AI Agent System | GitHub Copilot | Cursor AI | Aider |
 |------------|------------------------|----------------|-----------|-------|
 | **端到端工作流** | ✅ 完整（想法→交付） | ❌ 仅代码补全 | ❌ 专注于代码编辑 | ❌ 仅代码辅助 |
 | **多智能体架构** | ✅ 8 个专业智能体 | ❌ 单一模型 | ❌ 单一模型 | ❌ 单一模型 |
@@ -101,10 +101,10 @@ Cowork 在 AI 开发工具领域通过其独特的多智能体架构和全面的
 ## 核心差异化优势
 
 ### 1. 完整的开发生命周期
-与仅协助编写单行代码的代码补全工具不同，Cowork 管理整个软件开发过程——从初始想法收集到最终交付。这种全面的方法确保所有阶段的一致性和可追溯性。
+与仅协助编写单行代码的代码补全工具不同，Cowork Forge 管理整个软件开发过程——从初始想法收集到最终交付。这种全面的方法确保所有阶段的一致性和可追溯性。
 
 ### 2. 多智能体协作
-Cowork 的 8 个专业智能体像真实开发团队一样协同工作：
+Cowork Forge 的 8 个专业智能体像真实开发团队一样协同工作：
 - <strong>需求采集智能体</strong>: 结构化用户需求
 - <strong>PRD 智能体</strong>: 生成全面的 PRD
 - <strong>设计智能体</strong>: 创建技术架构（C4 模型）
@@ -121,10 +121,10 @@ Cowork 的 8 个专业智能体像真实开发团队一样协同工作：
 - 可行的实施计划
 - 安全的代码变更
 
-这种自动化与人工控制的平衡使 Cowork 区别于完全自主的工具。
+这种自动化与人工控制的平衡使 Cowork Forge 区别于完全自主的工具。
 
 ### 4. 增量代码更新
-当需求或设计变更时，Cowork 智能识别受影响的文件并仅更新必要的内容——保留你的自定义内容，避免完全重新生成。
+当需求或设计变更时，Cowork Forge 智能识别受影响的文件并仅更新必要的内容——保留你的自定义内容，避免完全重新生成。
 
 ### 5. 内置安全
 多层安全检查防止：
@@ -134,7 +134,7 @@ Cowork 的 8 个专业智能体像真实开发团队一样协同工作：
 - 资源耗尽
 
 
-❤️ 喜欢 <strong>Cowork</strong>？给它加星 🌟 或 [赞助我](https://github.com/sponsors/sopaco)！❤️
+❤️ 喜欢 <strong>Cowork Forge</strong>？给它加星 🌟 或 [赞助我](https://github.com/sponsors/sopaco)！❤️
 
 # 🌠 功能与特性
 
@@ -151,7 +151,7 @@ Cowork 的 8 个专业智能体像真实开发团队一样协同工作：
 
 # 🏗️ 架构
 
-Cowork 采用模块化、领域驱动的架构构建：
+Cowork Forge 采用模块化、领域驱动的架构构建：
 
 ```mermaid
 graph TB
@@ -252,12 +252,12 @@ graph TB
 
 # 🧠 工作原理
 
-Cowork 使用由 `Orchestrator` 编排的复杂多阶段工作流：
+Cowork Forge 使用由 `Orchestrator` 编排的复杂多阶段工作流：
 
 ```mermaid
 sequenceDiagram
     participant User as 用户
-    participant CLI as Cowork CLI
+    participant CLI as Cowork Forge CLI
     participant Orch as 编排器
     participant Agents as AI 智能体
     participant LLM as OpenAI LLM
@@ -311,8 +311,8 @@ sequenceDiagram
 
 ```sh
 # 克隆仓库
-git clone https://github.com/sopaco/cowork-rs.git
-cd cowork-rs
+git clone https://github.com/sopaco/cowork-forge.git
+cd cowork-forge
 
 # 构建项目
 cargo build --release
@@ -323,7 +323,7 @@ cargo build --release
 
 ### 配置
 
-Cowork 使用 `config.toml` 文件进行配置。在项目目录中创建一个或使用 `--config` 指定路径：
+Cowork Forge 使用 `config.toml` 文件进行配置。在项目目录中创建一个或使用 `--config` 指定路径：
 
 ```toml
 # -----------------------------------------------------------------------------
@@ -382,7 +382,7 @@ cowork resume <session-id>
 
 ### 会话工作流
 
-当你启动会话时，Cowork 将引导你完成 8 阶段工作流：
+当你启动会话时，Cowork Forge 将引导你完成 8 阶段工作流：
 
 1. **需求采集**: 你的想法被结构化为正式规范
 2. **PRD 生成**: 创建全面的产品需求文档
@@ -474,7 +474,7 @@ cowork config set hitl.enabled false
 
 # 🔒 安全
 
-Cowork 实现多层安全：
+Cowork Forge 实现多层安全：
 
 1. **命令验证**: 危险命令在执行前被阻止
 2. **路径访问控制**: 限制对敏感系统目录的访问
@@ -484,7 +484,7 @@ Cowork 实现多层安全：
 
 # 🤝 贡献
 
-我们欢迎各种形式的贡献！通过 [GitHub Issues](https://github.com/sopaco/cowork-rs/issues) 报告错误或提交功能请求。
+我们欢迎各种形式的贡献！通过 [GitHub Issues](https://github.com/sopaco/cowork-forge/issues) 报告错误或提交功能请求。
 
 ### 开发流程
 1. Fork 此项目
@@ -527,9 +527,9 @@ cargo test -p cowork-core
 
 # 📬 联系方式
 
-- **GitHub**: [sopaco/cowork-rs](https://github.com/sopaco/cowork-rs)
-- **Issues**: [GitHub Issues](https://github.com/sopaco/cowork-rs/issues)
+- **GitHub**: [sopaco/cowork-forge](https://github.com/sopaco/cowork-forge)
+- **Issues**: [GitHub Issues](https://github.com/sopaco/cowork-forge/issues)
 
 ---
 
-**通过 Cowork AI Agent System 改变你的开发工作流程——协作式软件开发的未来。** 🚀
+**通过 Cowork Forge 改变你的开发工作流程——协作式软件开发的未来。** 🚀
