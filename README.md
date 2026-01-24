@@ -66,81 +66,6 @@ Powered by Rust and LLMs, Cowork coordinates 8 specialized agents that work toge
 
 <hr />
 
-# 😺 Why Use Cowork?
-
-- <strong>End-to-End Automation:</strong> From idea to delivery, Cowork automates the entire software development lifecycle with coordinated AI agents.
-- <strong>Multi-Agent Collaboration:</strong> 8 specialized agents work together, each bringing expertise to their domain—requirements, design, planning, coding, and verification.
-- <strong>Human-in-the-Loop:</strong> Critical decision points include human validation, ensuring quality and control while maintaining automation efficiency.
-- <strong>Incremental Code Updates:</strong> Smart code analysis enables targeted updates without regenerating entire codebases, preserving your customizations.
-- <strong>Multi-Language Support:</strong> Built-in support for Rust, Python, JavaScript/TypeScript, and more with automatic project detection.
-- <strong>Safety First:</strong> Multi-layer security checks prevent dangerous commands and ensure safe code execution.
-- <strong>High Performance:</strong> Built with Rust for speed, memory safety, and efficient resource utilization.
-
-🌟 <strong>For:</strong>
-- Developers looking to accelerate development workflows
-- Teams building AI-powered development tools
-- Open source projects needing automated development assistance
-- Anyone who wants to build software with AI collaboration!
-
-❤️ Like <strong>Cowork</strong>? Star it 🌟 or [Sponsor Me](https://github.com/sponsors/sopaco)! ❤️
-
-# 🌠 Features & Capabilities
-
-- <strong>8-Stage Development Workflow:</strong> Comprehensive workflow covering Idea Intake → PRD Generation → Technical Design → Implementation Plan → Coding → Checking → Feedback → Delivery.
-- <strong>Specialized AI Agents:</strong> Each stage handled by a dedicated agent with domain-specific expertise and tools.
-- <strong>Intelligent Code Planning:</strong> Analyzes project structure, dependencies, and generates precise code change plans.
-- <strong>Incremental Code Updates:</strong> Smart delta analysis updates only affected files, preserving existing modifications.
-- <strong>Automated Quality Verification:</strong> Multi-language build/test integration with comprehensive error analysis and reporting.
-- <strong>Human-in-the-Loop Validation:</strong> Critical outputs (PRD, design, plans) require human confirmation before proceeding.
-- <strong>Artifact-Based Storage:</strong> Versioned storage of all stage outputs with JSON and Markdown formats.
-- <strong>Todo List Management:</strong> Automatic task tracking with status inference and progress reporting.
-- <strong>Multi-Language Project Support:</strong> Automatic detection and handling of Rust, Python, JavaScript/TypeScript projects.
-- <strong>Security & Safety:</strong> Command validation, path access control, and watchdog monitoring for safe execution.
-
-# 🌐 The Cowork Ecosystem
-
-Cowork is organized as a modular Rust workspace with clear separation of concerns:
-
-```mermaid
-graph TD
-    subgraph "User Interface"
-        CLI["cowork-cli"]
-    end
-
-    subgraph "Core System"
-        Core["cowork-core"]
-    end
-    
-    subgraph "External Services"
-        LLM[("OpenAI LLM")]
-        FS[("File System")]
-        CMD[("Command Line")]
-    end
-
-    %% Define Dependencies
-    CLI --> Core
-    
-    Core --> LLM
-    Core --> FS
-    Core --> CMD
-```
-
-- <strong>`cowork-core`</strong>: The heart of the system containing all business logic, agents, orchestrator, and supporting modules.
-- <strong>`cowork-cli`</strong>: Command-line interface for interacting with the Cowork system.
-
-### Core Modules
-
-<strong>cowork-core</strong> is organized into the following domain modules:
-
-- <strong>`orchestrator`</strong>: Central workflow coordinator managing session lifecycle and stage execution.
-- <strong>`agents`</strong>: 8 specialized AI agents (IdeaIntake, PRD, Design, Plan, Coding, Check, Feedback, Delivery).
-- <strong>`tools`</strong>: File operations and command execution with safety checks.
-- <strong>`verification`</strong>: Project detection, code validation, and security checking.
-- <strong>`hitl`</strong>: Human-in-the-loop interaction controller.
-- <strong>`artifacts`</strong>: Artifact storage and management system.
-- <strong>`memory`</strong>: Data persistence and retrieval.
-- <strong>`config`</strong>: Configuration management.
-
 # 🏆 Cowork vs. Competitors
 
 Cowork stands out in the AI development tools landscape through its unique multi-agent architecture and comprehensive workflow coverage.
@@ -197,6 +122,122 @@ Multi-layer security checks prevent:
 - Unauthorized file system access
 - Malicious code injection
 - Resource exhaustion
+
+❤️ Like <strong>Cowork</strong>? Star it 🌟 or [Sponsor Me](https://github.com/sponsors/sopaco)! ❤️
+
+# 🌠 Features & Capabilities
+
+- <strong>8-Stage Development Workflow:</strong> Comprehensive workflow covering Idea Intake → PRD Generation → Technical Design → Implementation Plan → Coding → Checking → Feedback → Delivery.
+- <strong>Specialized AI Agents:</strong> Each stage handled by a dedicated agent with domain-specific expertise and tools.
+- <strong>Intelligent Code Planning:</strong> Analyzes project structure, dependencies, and generates precise code change plans.
+- <strong>Incremental Code Updates:</strong> Smart delta analysis updates only affected files, preserving existing modifications.
+- <strong>Automated Quality Verification:</strong> Multi-language build/test integration with comprehensive error analysis and reporting.
+- <strong>Human-in-the-Loop Validation:</strong> Critical outputs (PRD, design, plans) require human confirmation before proceeding.
+- <strong>Artifact-Based Storage:</strong> Versioned storage of all stage outputs with JSON and Markdown formats.
+- <strong>Todo List Management:</strong> Automatic task tracking with status inference and progress reporting.
+- <strong>Multi-Language Project Support:</strong> Automatic detection and handling of Rust, Python, JavaScript/TypeScript projects.
+- <strong>Security & Safety:</strong> Command validation, path access control, and watchdog monitoring for safe execution.
+
+# 🏗️ Architecture
+
+Cowork is built with a modular, domain-driven architecture:
+
+```mermaid
+graph TB
+    subgraph "CLI Layer"
+        CLI[cowork-cli]
+    end
+    
+    subgraph "Core Layer"
+        Orch[Orchestrator]
+        Exec[StageExecutor]
+    end
+    
+    subgraph "Agent Layer"
+        IDEA[IdeaIntakeAgent]
+        PRD[PrdAgent]
+        DESIGN[DesignAgent]
+        PLAN[PlanAgent]
+        CODING[CodingStageAgent]
+        CHECK[CheckAgent]
+        FEEDBACK[FeedbackAgent]
+        DELIVERY[DeliveryAgent]
+    end
+    
+    subgraph "Infrastructure Layer"
+        TOOLS[Tools]
+        VERIFY[Verification]
+        MEMORY[Memory]
+        HITL[HITL]
+        CONFIG[Config]
+    end
+    
+    subgraph "External"
+        LLM[OpenAI LLM]
+        FS[File System]
+        CMD[Command Line]
+    end
+    
+    CLI --> Orch
+    Orch --> Exec
+    Exec --> IDEA
+    Exec --> PRD
+    Exec --> DESIGN
+    Exec --> PLAN
+    Exec --> CODING
+    Exec --> CHECK
+    Exec --> FEEDBACK
+    Exec --> DELIVERY
+    
+    IDEA --> TOOLS
+    CODING --> TOOLS
+    CHECK --> TOOLS
+    
+    CHECK --> VERIFY
+    CODING --> VERIFY
+    
+    IDEA --> MEMORY
+    PRD --> MEMORY
+    DESIGN --> MEMORY
+    PLAN --> MEMORY
+    CODING --> MEMORY
+    CHECK --> MEMORY
+    FEEDBACK --> MEMORY
+    DELIVERY --> MEMORY
+    
+    Exec --> HITL
+    
+    TOOLS --> FS
+    TOOLS --> CMD
+    
+    IDEA -.-> LLM
+    PRD -.-> LLM
+    DESIGN -.-> LLM
+    CODING -.-> LLM
+```
+
+## Key Components
+
+### Orchestrator
+The central coordinator that manages session lifecycle, stage dependencies, and workflow execution.
+
+### StageExecutor
+Provides a unified execution framework for all agents with consistent error handling and state management.
+
+### AI Agents
+Eight specialized agents, each responsible for a specific stage of the development lifecycle.
+
+### Tools Module
+Safe file operations and command execution with security checks and resource limits.
+
+### Verification Module
+Project type detection, code validation, and comprehensive error analysis.
+
+### HITL Controller
+Manages human-in-the-loop interactions, including content review and editing.
+
+### Artifact Store
+Versioned storage of all stage outputs in JSON and Markdown formats.
 
 # 🧠 How It Works
 
@@ -420,106 +461,50 @@ cowork config set llm.model gpt-4-turbo
 cowork config set hitl.enabled false
 ```
 
-# 🏗️ Architecture
+# 🌐 The Cowork Ecosystem
 
-Cowork is built with a modular, domain-driven architecture:
+Cowork is organized as a modular Rust workspace with clear separation of concerns:
 
 ```mermaid
-graph TB
-    subgraph "CLI Layer"
-        CLI[cowork-cli]
+graph TD
+    subgraph "User Interface"
+        CLI["cowork-cli"]
+    end
+
+    subgraph "Core System"
+        Core["cowork-core"]
     end
     
-    subgraph "Core Layer"
-        Orch[Orchestrator]
-        Exec[StageExecutor]
+    subgraph "External Services"
+        LLM[("OpenAI LLM")]
+        FS[("File System")]
+        CMD[("Command Line")]
     end
+
+    %% Define Dependencies
+    CLI --> Core
     
-    subgraph "Agent Layer"
-        IDEA[IdeaIntakeAgent]
-        PRD[PrdAgent]
-        DESIGN[DesignAgent]
-        PLAN[PlanAgent]
-        CODING[CodingStageAgent]
-        CHECK[CheckAgent]
-        FEEDBACK[FeedbackAgent]
-        DELIVERY[DeliveryAgent]
-    end
-    
-    subgraph "Infrastructure Layer"
-        TOOLS[Tools]
-        VERIFY[Verification]
-        MEMORY[Memory]
-        HITL[HITL]
-        CONFIG[Config]
-    end
-    
-    subgraph "External"
-        LLM[OpenAI LLM]
-        FS[File System]
-        CMD[Command Line]
-    end
-    
-    CLI --> Orch
-    Orch --> Exec
-    Exec --> IDEA
-    Exec --> PRD
-    Exec --> DESIGN
-    Exec --> PLAN
-    Exec --> CODING
-    Exec --> CHECK
-    Exec --> FEEDBACK
-    Exec --> DELIVERY
-    
-    IDEA --> TOOLS
-    CODING --> TOOLS
-    CHECK --> TOOLS
-    
-    CHECK --> VERIFY
-    CODING --> VERIFY
-    
-    IDEA --> MEMORY
-    PRD --> MEMORY
-    DESIGN --> MEMORY
-    PLAN --> MEMORY
-    CODING --> MEMORY
-    CHECK --> MEMORY
-    FEEDBACK --> MEMORY
-    DELIVERY --> MEMORY
-    
-    Exec --> HITL
-    
-    TOOLS --> FS
-    TOOLS --> CMD
-    
-    IDEA -.-> LLM
-    PRD -.-> LLM
-    DESIGN -.-> LLM
-    CODING -.-> LLM
+    Core --> LLM
+    Core --> FS
+    Core --> CMD
 ```
 
-## Key Components
+- <strong>`cowork-core`</strong>: The heart of the system containing all business logic, agents, orchestrator, and supporting modules.
+- <strong>`cowork-cli`</strong>: Command-line interface for interacting with the Cowork system.
 
-### Orchestrator
-The central coordinator that manages session lifecycle, stage dependencies, and workflow execution.
+### Core Modules
 
-### StageExecutor
-Provides a unified execution framework for all agents with consistent error handling and state management.
+<strong>cowork-core</strong> is organized into the following domain modules:
 
-### AI Agents
-Eight specialized agents, each responsible for a specific stage of the development lifecycle.
+- <strong>`orchestrator`</strong>: Central workflow coordinator managing session lifecycle and stage execution.
+- <strong>`agents`</strong>: 8 specialized AI agents (IdeaIntake, PRD, Design, Plan, Coding, Check, Feedback, Delivery).
+- <strong>`tools`</strong>: File operations and command execution with safety checks.
+- <strong>`verification`</strong>: Project detection, code validation, and security checking.
+- <strong>`hitl`</strong>: Human-in-the-loop interaction controller.
+- <strong>`artifacts`</strong>: Artifact storage and management system.
+- <strong>`memory`</strong>: Data persistence and retrieval.
+- <strong>`config`</strong>: Configuration management.
 
-### Tools Module
-Safe file operations and command execution with security checks and resource limits.
-
-### Verification Module
-Project type detection, code validation, and comprehensive error analysis.
-
-### HITL Controller
-Manages human-in-the-loop interactions, including content review and editing.
-
-### Artifact Store
-Versioned storage of all stage outputs in JSON and Markdown formats.
 
 # 🔒 Security
 

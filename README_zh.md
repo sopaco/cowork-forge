@@ -76,71 +76,6 @@
 - <strong>安全优先：</strong> 多层安全检查防止危险命令并确保安全的代码执行。
 - <strong>高性能：</strong> 使用 Rust 构建，确保速度、内存安全和高效的资源利用。
 
-🌟 <strong>适用于：</strong>
-- 希望加速开发工作流程的开发者
-- 构建 AI 驱动开发工具的团队
-- 需要自动化开发协助的开源项目
-- 任何希望通过 AI 协作构建软件的人！
-
-❤️ 喜欢 <strong>Cowork</strong>？给它加星 🌟 或 [赞助我](https://github.com/sponsors/sopaco)！❤️
-
-# 🌠 功能与特性
-
-- <strong>8 阶段开发工作流：</strong> 涵盖需求采集 → PRD 生成 → 技术设计 → 实施计划 → 编码 → 检查 → 反馈 → 交付的完整工作流。
-- <strong>专业 AI 智能体：</strong> 每个阶段由具有领域特定专业知识和工具的专用智能体处理。
-- <strong>智能代码规划：</strong> 分析项目结构、依赖关系，生成精确的代码变更计划。
-- <strong>增量代码更新：</strong> 智能增量分析只更新受影响的文件，保留现有修改。
-- <strong>自动化质量验证：</strong> 多语言构建/测试集成，包含全面的错误分析和报告。
-- <strong>人机协作验证：</strong> 关键输出（PRD、设计、计划）需要人工确认才能继续。
-- <strong>基于工件的存储：</strong> 所有阶段输出的版本化存储，使用 JSON 和 Markdown 格式。
-- <strong>待办事项列表管理：</strong> 自动任务跟踪，包含状态推断和进度报告。
-- <strong>多语言项目支持：</strong> 自动检测和处理 Rust、Python、JavaScript/TypeScript 项目。
-- <strong>安全与防护：</strong> 命令验证、路径访问控制和看门狗监控，确保安全执行。
-
-# 🌐 Cowork 生态系统
-
-Cowork 组织为模块化的 Rust 工作空间，具有清晰的关注点分离：
-
-```mermaid
-graph TD
-    subgraph "用户界面"
-        CLI["cowork-cli"]
-    end
-
-    subgraph "核心系统"
-        Core["cowork-core"]
-    end
-    
-    subgraph "外部服务"
-        LLM[("OpenAI LLM")]
-        FS[("文件系统")]
-        CMD[("命令行")]
-    end
-
-    %% 定义依赖关系
-    CLI --> Core
-    
-    Core --> LLM
-    Core --> FS
-    Core --> CMD
-```
-
-- <strong>`cowork-core`</strong>: 系统的核心，包含所有业务逻辑、智能体、编排器和支撑模块。
-- <strong>`cowork-cli`</strong>: 与 Cowork 系统交互的命令行界面。
-
-### 核心模块
-
-<strong>cowork-core</strong> 组织为以下领域模块：
-
-- <strong>`orchestrator`</strong>: 中央工作流协调器，管理会话生命周期和阶段执行。
-- <strong>`agents`</strong>: 8 个专业 AI 智能体（需求采集、PRD、设计、计划、编码、检查、反馈、交付）。
-- <strong>`tools`</strong>: 带安全检查的文件操作和命令执行。
-- <strong>`verification`</strong>: 项目检测、代码验证和安全检查。
-- <strong>`hitl`</strong>: 人机协作交互控制器。
-- <strong>`artifacts`</strong>: 工件存储和管理系统。
-- <strong>`memory`</strong>: 数据持久化和检索。
-- <strong>`config`</strong>: 配置管理。
-
 # 🏆 Cowork 与竞品对比
 
 Cowork 在 AI 开发工具领域通过其独特的多智能体架构和全面的工作流覆盖而脱颖而出。
@@ -197,6 +132,123 @@ Cowork 的 8 个专业智能体像真实开发团队一样协同工作：
 - 未授权的文件系统访问
 - 恶意代码注入
 - 资源耗尽
+
+
+❤️ 喜欢 <strong>Cowork</strong>？给它加星 🌟 或 [赞助我](https://github.com/sponsors/sopaco)！❤️
+
+# 🌠 功能与特性
+
+- <strong>8 阶段开发工作流：</strong> 涵盖需求采集 → PRD 生成 → 技术设计 → 实施计划 → 编码 → 检查 → 反馈 → 交付的完整工作流。
+- <strong>专业 AI 智能体：</strong> 每个阶段由具有领域特定专业知识和工具的专用智能体处理。
+- <strong>智能代码规划：</strong> 分析项目结构、依赖关系，生成精确的代码变更计划。
+- <strong>增量代码更新：</strong> 智能增量分析只更新受影响的文件，保留现有修改。
+- <strong>自动化质量验证：</strong> 多语言构建/测试集成，包含全面的错误分析和报告。
+- <strong>人机协作验证：</strong> 关键输出（PRD、设计、计划）需要人工确认才能继续。
+- <strong>基于工件的存储：</strong> 所有阶段输出的版本化存储，使用 JSON 和 Markdown 格式。
+- <strong>待办事项列表管理：</strong> 自动任务跟踪，包含状态推断和进度报告。
+- <strong>多语言项目支持：</strong> 自动检测和处理 Rust、Python、JavaScript/TypeScript 项目。
+- <strong>安全与防护：</strong> 命令验证、路径访问控制和看门狗监控，确保安全执行。
+
+# 🏗️ 架构
+
+Cowork 采用模块化、领域驱动的架构构建：
+
+```mermaid
+graph TB
+    subgraph "CLI 层"
+        CLI[cowork-cli]
+    end
+    
+    subgraph "核心层"
+        Orch[编排器]
+        Exec[阶段执行器]
+    end
+    
+    subgraph "智能体层"
+        IDEA[需求采集智能体]
+        PRD[PRD 智能体]
+        DESIGN[设计智能体]
+        PLAN[计划智能体]
+        CODING[编码阶段智能体]
+        CHECK[检查智能体]
+        FEEDBACK[反馈智能体]
+        DELIVERY[交付智能体]
+    end
+    
+    subgraph "基础设施层"
+        TOOLS[工具]
+        VERIFY[验证]
+        MEMORY[内存]
+        HITL[HITL]
+        CONFIG[配置]
+    end
+    
+    subgraph "外部"
+        LLM[OpenAI LLM]
+        FS[文件系统]
+        CMD[命令行]
+    end
+    
+    CLI --> Orch
+    Orch --> Exec
+    Exec --> IDEA
+    Exec --> PRD
+    Exec --> DESIGN
+    Exec --> PLAN
+    Exec --> CODING
+    Exec --> CHECK
+    Exec --> FEEDBACK
+    Exec --> DELIVERY
+    
+    IDEA --> TOOLS
+    CODING --> TOOLS
+    CHECK --> TOOLS
+    
+    CHECK --> VERIFY
+    CODING --> VERIFY
+    
+    IDEA --> MEMORY
+    PRD --> MEMORY
+    DESIGN --> MEMORY
+    PLAN --> MEMORY
+    CODING --> MEMORY
+    CHECK --> MEMORY
+    FEEDBACK --> MEMORY
+    DELIVERY --> MEMORY
+    
+    Exec --> HITL
+    
+    TOOLS --> FS
+    TOOLS --> CMD
+    
+    IDEA -.-> LLM
+    PRD -.-> LLM
+    DESIGN -.-> LLM
+    CODING -.-> LLM
+```
+
+## 核心组件
+
+### 编排器
+中央协调器，管理会话生命周期、阶段依赖和工作流执行。
+
+### 阶段执行器
+为所有智能体提供统一的执行框架，具有一致的错误处理和状态管理。
+
+### AI 智能体
+八个专业智能体，每个负责开发生命周期的特定阶段。
+
+### 工具模块
+安全的文件操作和命令执行，包含安全检查和资源限制。
+
+### 验证模块
+项目类型检测、代码验证和全面的错误分析。
+
+### HITL 控制器
+管理人机协作交互，包括内容审查和编辑。
+
+### 工件存储
+所有阶段输出的版本化存储，使用 JSON 和 Markdown 格式。
 
 # 🧠 工作原理
 
@@ -419,107 +471,6 @@ cowork config show
 cowork config set llm.model gpt-4-turbo
 cowork config set hitl.enabled false
 ```
-
-# 🏗️ 架构
-
-Cowork 采用模块化、领域驱动的架构构建：
-
-```mermaid
-graph TB
-    subgraph "CLI 层"
-        CLI[cowork-cli]
-    end
-    
-    subgraph "核心层"
-        Orch[编排器]
-        Exec[阶段执行器]
-    end
-    
-    subgraph "智能体层"
-        IDEA[需求采集智能体]
-        PRD[PRD 智能体]
-        DESIGN[设计智能体]
-        PLAN[计划智能体]
-        CODING[编码阶段智能体]
-        CHECK[检查智能体]
-        FEEDBACK[反馈智能体]
-        DELIVERY[交付智能体]
-    end
-    
-    subgraph "基础设施层"
-        TOOLS[工具]
-        VERIFY[验证]
-        MEMORY[内存]
-        HITL[HITL]
-        CONFIG[配置]
-    end
-    
-    subgraph "外部"
-        LLM[OpenAI LLM]
-        FS[文件系统]
-        CMD[命令行]
-    end
-    
-    CLI --> Orch
-    Orch --> Exec
-    Exec --> IDEA
-    Exec --> PRD
-    Exec --> DESIGN
-    Exec --> PLAN
-    Exec --> CODING
-    Exec --> CHECK
-    Exec --> FEEDBACK
-    Exec --> DELIVERY
-    
-    IDEA --> TOOLS
-    CODING --> TOOLS
-    CHECK --> TOOLS
-    
-    CHECK --> VERIFY
-    CODING --> VERIFY
-    
-    IDEA --> MEMORY
-    PRD --> MEMORY
-    DESIGN --> MEMORY
-    PLAN --> MEMORY
-    CODING --> MEMORY
-    CHECK --> MEMORY
-    FEEDBACK --> MEMORY
-    DELIVERY --> MEMORY
-    
-    Exec --> HITL
-    
-    TOOLS --> FS
-    TOOLS --> CMD
-    
-    IDEA -.-> LLM
-    PRD -.-> LLM
-    DESIGN -.-> LLM
-    CODING -.-> LLM
-```
-
-## 核心组件
-
-### 编排器
-中央协调器，管理会话生命周期、阶段依赖和工作流执行。
-
-### 阶段执行器
-为所有智能体提供统一的执行框架，具有一致的错误处理和状态管理。
-
-### AI 智能体
-八个专业智能体，每个负责开发生命周期的特定阶段。
-
-### 工具模块
-安全的文件操作和命令执行，包含安全检查和资源限制。
-
-### 验证模块
-项目类型检测、代码验证和全面的错误分析。
-
-### HITL 控制器
-管理人机协作交互，包括内容审查和编辑。
-
-### 工件存储
-所有阶段输出的版本化存储，使用 JSON 和 Markdown 格式。
 
 # 🔒 安全
 
