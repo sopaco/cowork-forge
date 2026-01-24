@@ -1,5 +1,6 @@
 [package]
 name = "cowork-core"
+description = "AI-powered software development system that automates the entire lifecycle from requirements analysis to code delivery through specialized agent collaboration."
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

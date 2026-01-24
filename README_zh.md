@@ -2,7 +2,7 @@
   <img height="200" src="./assets/blend_banner.png">
 </p>
 
-<h1 align="center">Cowork Forge AI Agent System</h1>
+<h1 align="center">Cowork Forge</h1>
 
 <p align="center">
     <a href="./README.md">English</a>
@@ -82,7 +82,7 @@ Cowork Forge 在 AI 开发工具领域通过其独特的多智能体架构和全
 
 ## 核心能力对比
 
-| 能力 | Cowork Forge AI Agent System | GitHub Copilot | Cursor AI | Aider |
+| 能力 | Cowork Forge | GitHub Copilot | Cursor AI | Aider |
 |------------|------------------------|----------------|-----------|-------|
 | **端到端工作流** | ✅ 完整（想法→交付） | ❌ 仅代码补全 | ❌ 专注于代码编辑 | ❌ 仅代码辅助 |
 | **多智能体架构** | ✅ 8 个专业智能体 | ❌ 单一模型 | ❌ 单一模型 | ❌ 单一模型 |
