@@ -2,7 +2,7 @@
   <img height="200" src="./assets/blend_banner.png">
 </p>
 
-<h1 align="center">Cowork Forge Development System</h1>
+<h1 align="center">Cowork Forge</h1>
 
 <p align="center">
     <a href="./README.md">English</a>
@@ -72,7 +72,7 @@ Cowork Forge stands out in the AI development tools landscape through its unique
 
 ## Core Capabilities Comparison
 
-| Capability | Cowork Forge AI Agent System | GitHub Copilot | Cursor AI | Aider |
+| Capability | Cowork Forge | GitHub Copilot | Cursor AI | Aider |
 |------------|------------------------|----------------|-----------|-------|
 | **End-to-End Workflow** | ✅ Complete (Idea→Delivery) | ❌ Code completion only | ❌ Code editing focus | ❌ Code assistance only |
 | **Multi-Agent Architecture** | ✅ 8 specialized agents | ❌ Single model | ❌ Single model | ❌ Single model |
