@@ -2,7 +2,7 @@
 
 ## 概述
 
-本次重构将 **Cowork-rs** 从单体架构重构为基于 **StageAgent** 接口的模块化架构。
+本次重构将 **Cowork-forge-rs** 从单体架构重构为基于 **StageAgent** 接口的模块化架构。
 
 ## 重构目标
 

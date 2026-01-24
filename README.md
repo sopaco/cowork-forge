@@ -2,7 +2,7 @@
   <img height="200" src="./assets/blend_banner.png">
 </p>
 
-<h1 align="center">Cowork AI Agent System</h1>
+<h1 align="center">Cowork Forge Development System</h1>
 
 <p align="center">
     <a href="./README.md">English</a>
@@ -13,21 +13,21 @@
 <p align="center">
     <strong>🤖 The AI-native multi-agent framework for automated software development 🤖</strong>
 </p>
-<p align="center">Built with Rust, Cowork orchestrates intelligent agents to automate the entire software development lifecycle—from requirements to delivery.</p>
+<p align="center">Built with Rust, Cowork Forge orchestrates intelligent agents to automate the entire software development lifecycle—from requirements to delivery.</p>
 
 <p align="center">
-  <a href="https://github.com/sopaco/cowork-rs/tree/main/litho.docs"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-Docs-green?logo=Gitbook&color=%23008a60">
-  <a href="https://github.com/sopaco/cowork-rs"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/sopaco/cowork-rs/rust.yml?label=Build">
+  <a href="https://github.com/sopaco/cowork-forge/tree/main/litho.docs"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-Docs-green?logo=Gitbook&color=%23008a60">
+  <a href="https://github.com/sopaco/cowork-forge"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/sopaco/cowork-forge/rust.yml?label=Build">
   <a href="./LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue.svg?label=LICENSE" />
 </p>
 
 <hr />
 
-# 👋 What is Cowork AI Agent System?
+# 👋 What is Cowork Forge?
 
-<strong>Cowork AI Agent System</strong> is a complete, production-ready framework for automating software development through intelligent multi-agent collaboration. It moves beyond simple code generation, providing a comprehensive system that orchestrates specialized AI agents to handle every stage of the software development lifecycle.
+<strong>Cowork Forge</strong> is a complete, production-ready framework for automating software development through intelligent multi-agent collaboration. It moves beyond simple code generation, providing a comprehensive system that orchestrates specialized AI agents to handle every stage of the software development lifecycle.
 
-Powered by Rust and LLMs, Cowork coordinates 8 specialized agents that work together to transform your ideas into production-ready code. From requirement gathering and PRD generation to technical design, implementation planning, coding, and quality verification—Cowork manages it all with human-in-the-loop validation at critical decision points.
+Powered by Rust and LLMs, Cowork Forge coordinates 8 specialized agents that work together to transform your ideas into production-ready code. From requirement gathering and PRD generation to technical design, implementation planning, coding, and quality verification—Cowork Forge manages it all with human-in-the-loop validation at critical decision points.
 
 <p align="center">
   <strong>Transform your development workflow with AI agents that think, plan, and collaborate like a real development team.</strong>
@@ -37,7 +37,7 @@ Powered by Rust and LLMs, Cowork coordinates 8 specialized agents that work toge
   <table style="width: 100%; border-collapse: collapse; margin: 0 auto;">
     <tr>
       <th style="width: 50%; padding: 15px; background-color: #f8f9fa; border: 1px solid #e9ecef; text-align: center; font-weight: bold; color: #495057;">Traditional Development</th>
-      <th style="width: 50%; padding: 15px; background-color: #f8f9fa; border: 1px solid #e9ecef; text-align: center; font-weight: bold; color: #495057;">Development with Cowork</th>
+      <th style="width: 50%; padding: 15px; background-color: #f8f9fa; border: 1px solid #e9ecef; text-align: center; font-weight: bold; color: #495057;">Development with Cowork Forge</th>
     </tr>
     <tr>
       <td style="padding: 15px; border: 1px solid #e9ecef; vertical-align: top;">
@@ -66,13 +66,13 @@ Powered by Rust and LLMs, Cowork coordinates 8 specialized agents that work toge
 
 <hr />
 
-# 🏆 Cowork vs. Competitors
+# 🏆 Cowork Forge vs. Competitors
 
-Cowork stands out in the AI development tools landscape through its unique multi-agent architecture and comprehensive workflow coverage.
+Cowork Forge stands out in the AI development tools landscape through its unique multi-agent architecture and comprehensive workflow coverage.
 
 ## Core Capabilities Comparison
 
-| Capability | Cowork AI Agent System | GitHub Copilot | Cursor AI | Aider |
+| Capability | Cowork Forge AI Agent System | GitHub Copilot | Cursor AI | Aider |
 |------------|------------------------|----------------|-----------|-------|
 | **End-to-End Workflow** | ✅ Complete (Idea→Delivery) | ❌ Code completion only | ❌ Code editing focus | ❌ Code assistance only |
 | **Multi-Agent Architecture** | ✅ 8 specialized agents | ❌ Single model | ❌ Single model | ❌ Single model |
@@ -91,10 +91,10 @@ Cowork stands out in the AI development tools landscape through its unique multi
 ## Key Differentiators
 
 ### 1. Complete Development Lifecycle
-Unlike code completion tools that only assist with writing individual lines of code, Cowork manages the entire software development process—from initial idea gathering to final delivery. This comprehensive approach ensures consistency and traceability across all stages.
+Unlike code completion tools that only assist with writing individual lines of code, Cowork Forge manages the entire software development process—from initial idea gathering to final delivery. This comprehensive approach ensures consistency and traceability across all stages.
 
 ### 2. Multi-Agent Collaboration
-Cowork's 8 specialized agents work together like a real development team:
+Cowork Forge's 8 specialized agents work together like a real development team:
 - <strong>IdeaIntakeAgent</strong>: Structures user requirements
 - <strong>PrdAgent</strong>: Generates comprehensive PRDs
 - <strong>DesignAgent</strong>: Creates technical architecture (C4 models)
@@ -111,10 +111,10 @@ Critical outputs require human confirmation before proceeding, ensuring:
 - Feasible implementation plans
 - Safe code changes
 
-This balance of automation and human control sets Cowork apart from fully autonomous tools.
+This balance of automation and human control sets Cowork Forge apart from fully autonomous tools.
 
 ### 4. Incremental Code Updates
-When requirements or designs change, Cowork intelligently identifies affected files and updates only what's necessary—preserving your customizations and avoiding full regeneration.
+When requirements or designs change, Cowork Forge intelligently identifies affected files and updates only what's necessary—preserving your customizations and avoiding full regeneration.
 
 ### 5. Built-in Safety
 Multi-layer security checks prevent:
@@ -123,7 +123,7 @@ Multi-layer security checks prevent:
 - Malicious code injection
 - Resource exhaustion
 
-❤️ Like <strong>Cowork</strong>? Star it 🌟 or [Sponsor Me](https://github.com/sponsors/sopaco)! ❤️
+❤️ Like <strong>Cowork Forge</strong>? Star it 🌟 or [Sponsor Me](https://github.com/sponsors/sopaco)! ❤️
 
 # 🌠 Features & Capabilities
 
@@ -140,7 +140,7 @@ Multi-layer security checks prevent:
 
 # 🏗️ Architecture
 
-Cowork is built with a modular, domain-driven architecture:
+Cowork Forge is built with a modular, domain-driven architecture:
 
 ```mermaid
 graph TB
@@ -241,12 +241,12 @@ Versioned storage of all stage outputs in JSON and Markdown formats.
 
 # 🧠 How It Works
 
-Cowork uses a sophisticated multi-stage workflow orchestrated by the `Orchestrator`:
+Cowork Forge uses a sophisticated multi-stage workflow orchestrated by the `Orchestrator`:
 
 ```mermaid
 sequenceDiagram
     participant User as User
-    participant CLI as Cowork CLI
+    participant CLI as Cowork Forge CLI
     participant Orch as Orchestrator
     participant Agents as AI Agents
     participant LLM as OpenAI LLM
@@ -300,8 +300,8 @@ Build from source:
 
 ```sh
 # Clone the repository
-git clone https://github.com/sopaco/cowork-rs.git
-cd cowork-rs
+git clone https://github.com/sopaco/cowork-forge.git
+cd cowork-forge
 
 # Build the project
 cargo build --release
@@ -312,7 +312,7 @@ cargo build --release
 
 ### Configuration
 
-Cowork uses a `config.toml` file for configuration. Create one in your project directory or use `--config` to specify a path:
+Cowork Forge uses a `config.toml` file for configuration. Create one in your project directory or use `--config` to specify a path:
 
 ```toml
 # -----------------------------------------------------------------------------
@@ -371,7 +371,7 @@ cowork resume <session-id>
 
 ### Session Workflow
 
-When you start a session, Cowork will guide you through the 8-stage workflow:
+When you start a session, Cowork Forge will guide you through the 8-stage workflow:
 
 1. **Idea Intake**: Your idea is structured into a formal specification
 2. **PRD Generation**: A comprehensive Product Requirements Document is created
@@ -461,9 +461,9 @@ cowork config set llm.model gpt-4-turbo
 cowork config set hitl.enabled false
 ```
 
-# 🌐 The Cowork Ecosystem
+# 🌐 The Cowork Forge Ecosystem
 
-Cowork is organized as a modular Rust workspace with clear separation of concerns:
+Cowork Forge is organized as a modular Rust workspace with clear separation of concerns:
 
 ```mermaid
 graph TD
@@ -508,7 +508,7 @@ graph TD
 
 # 🔒 Security
 
-Cowork implements multiple layers of security:
+Cowork Forge implements multiple layers of security:
 
 1. **Command Validation**: Dangerous commands are blocked before execution
 2. **Path Access Control**: Restricted access to sensitive system directories
@@ -518,7 +518,7 @@ Cowork implements multiple layers of security:
 
 # 🤝 Contributing
 
-We welcome all forms of contributions! Report bugs or submit feature requests through [GitHub Issues](https://github.com/sopaco/cowork-rs/issues).
+We welcome all forms of contributions! Report bugs or submit feature requests through [GitHub Issues](https://github.com/sopaco/cowork-forge/issues).
 
 ### Development Process
 1. Fork this project
@@ -561,9 +561,9 @@ This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) f
 
 # 📬 Contact
 
-- **GitHub**: [sopaco/cowork-rs](https://github.com/sopaco/cowork-rs)
-- **Issues**: [GitHub Issues](https://github.com/sopaco/cowork-rs/issues)
+- **GitHub**: [sopaco/cowork-forge](https://github.com/sopaco/cowork-forge)
+- **Issues**: [GitHub Issues](https://github.com/sopaco/cowork-forge/issues)
 
 ---
 
-**Transform your development workflow with Cowork AI Agent System—the future of collaborative software development.** 🚀
+**Transform your development workflow with Cowork Forge—the future of collaborative software development.** 🚀

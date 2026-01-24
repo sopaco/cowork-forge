@@ -5,7 +5,7 @@ use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
 #[command(name = "cowork")]
-#[command(about = "AI-powered multi-agent software development system", long_about = None)]
+#[command(about = "AI-powered multi-agent software development forge", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -89,8 +89,8 @@ async fn main() -> Result<()> {
 async fn interactive_mode(orchestrator: Orchestrator, model_config: ModelConfig) -> Result<()> {
     use console::style;
 
-    println!("{}", style("Welcome to Cowork!").bold().cyan());
-    println!("AI-powered multi-agent software development system\n");
+    println!("{}", style("Welcome to Cowork Forge!").bold().cyan());
+    println!("AI-powered multi-agent software development forge\n");
 
     // Create new session
     let session_id = orchestrator.create_session()?;

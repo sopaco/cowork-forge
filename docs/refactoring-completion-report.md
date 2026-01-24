@@ -1,8 +1,8 @@
-# Cowork-rs 单体架构重构完成报告
+# Cowork-forge-rs 单体架构重构完成报告
 
 ## 📊 重构概览
 
-本次重构成功解决了 **Cowork-rs** 的单体架构问题，将 800+ 行的 Orchestrator 重构为基于 `StageAgent` 接口的模块化架构。
+本次重构成功解决了 **Cowork-forge-rs** 的单体架构问题，将 800+ 行的 Orchestrator 重构为基于 `StageAgent` 接口的模块化架构。
 
 ---
 
