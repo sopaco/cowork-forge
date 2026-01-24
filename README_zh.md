@@ -1,5 +1,5 @@
 <p align="center">
-  <img height="200" src="./assets/cowork_banner_800.jpg">
+  <img height="200" src="./assets/blend_banner.png">
 </p>
 
 <h1 align="center">Cowork AI Agent System</h1>
