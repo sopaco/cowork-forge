@@ -1,0 +1,18 @@
+// Cowork Forge V2 - Core Library
+// Built with adk-rust 0.2.1
+
+pub mod data;
+pub mod storage;
+pub mod llm;
+pub mod tools;
+pub mod agents;
+pub mod pipeline;
+pub mod instructions;
+
+// Re-exports for convenience
+pub use data::*;
+pub use storage::*;
+pub use llm::*;
+
+// Version info
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");

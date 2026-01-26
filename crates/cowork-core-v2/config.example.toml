@@ -1,0 +1,21 @@
+[llm]
+api_base_url = "http://localhost:8000/v1"
+api_key = "your-api-key-here"
+model_name = "gpt-4"
+
+# Example configurations for different providers:
+
+# OpenAI
+# api_base_url = "https://api.openai.com/v1"
+# api_key = "sk-..."
+# model_name = "gpt-4o"
+
+# DeepSeek
+# api_base_url = "https://api.deepseek.com/v1"
+# api_key = "sk-..."
+# model_name = "deepseek-chat"
+
+# Local Ollama
+# api_base_url = "http://localhost:11434/v1"
+# api_key = "ollama"
+# model_name = "llama3"
