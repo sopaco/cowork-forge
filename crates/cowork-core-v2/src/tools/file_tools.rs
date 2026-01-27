@@ -1,11 +1,66 @@
-// File operation tools
+// File operation tools with SECURITY constraints
 use adk_core::{Tool, ToolContext};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::sync::Arc;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+
+// ============================================================================
+// Security Helper - Path Validation
+// ============================================================================
+
+/// Validate that a path is safe to access
+/// Rules:
+/// 1. Must be relative path (no absolute paths like /tmp, C:\)
+/// 2. Must not escape current directory (no ..)
+/// 3. Must be within current working directory or .cowork
+fn validate_path_security(path: &str) -> Result<PathBuf, String> {
+    let path_obj = Path::new(path);
+    
+    // Rule 1: Reject absolute paths
+    if path_obj.is_absolute() {
+        return Err(format!(
+            "Security: Absolute paths are not allowed. Path '{}' must be relative to current directory.",
+            path
+        ));
+    }
+    
+    // Rule 2: Reject parent directory access (..)
+    if path.contains("..") {
+        return Err(format!(
+            "Security: Parent directory access (..) is not allowed. Path: '{}'",
+            path
+        ));
+    }
+    
+    // Rule 3: Canonicalize and verify it's within current directory
+    let current_dir = std::env::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+    
+    let full_path = current_dir.join(path);
+    
+    // Canonicalize if path exists, otherwise just check the constructed path
+    let canonical_path = if full_path.exists() {
+        full_path.canonicalize()
+            .map_err(|e| format!("Failed to resolve path: {}", e))?
+    } else {
+        // For non-existent paths (e.g., files to be created), just verify parent
+        full_path
+    };
+    
+    // Verify the path is within current directory
+    if !canonical_path.starts_with(&current_dir) {
+        return Err(format!(
+            "Security: Path escapes current directory. Path '{}' resolves to '{}'",
+            path,
+            canonical_path.display()
+        ));
+    }
+    
+    Ok(canonical_path)
+}
 
 // ============================================================================
 // ListFilesTool
@@ -21,6 +76,7 @@ impl Tool for ListFilesTool {
 
     fn description(&self) -> &str {
         "List files in a directory (recursively or non-recursively). \
+         SECURITY: Only works within current directory. \
          Useful for understanding project structure."
     }
 
@@ -30,7 +86,7 @@ impl Tool for ListFilesTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Directory path to list (default: current directory)"
+                    "description": "Directory path to list (default: current directory). Must be relative path."
                 },
                 "recursive": {
                     "type": "boolean",
@@ -49,6 +105,17 @@ impl Tool for ListFilesTool {
             .and_then(|v| v.as_str())
             .unwrap_or(".");
         
+        // Security check
+        let safe_path = match validate_path_security(path) {
+            Ok(p) => p,
+            Err(e) => {
+                return Ok(json!({
+                    "status": "security_error",
+                    "message": e
+                }));
+            }
+        };
+        
         let recursive = args.get("recursive")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
@@ -57,7 +124,7 @@ impl Tool for ListFilesTool {
             .and_then(|v| v.as_u64())
             .unwrap_or(3) as usize;
 
-        if !Path::new(path).exists() {
+        if !safe_path.exists() {
             return Ok(json!({
                 "status": "error",
                 "message": format!("Path not found: {}", path)
@@ -69,7 +136,7 @@ impl Tool for ListFilesTool {
 
         if recursive {
             // Recursive listing with max depth
-            for entry in WalkDir::new(path)
+            for entry in WalkDir::new(&safe_path)
                 .max_depth(max_depth)
                 .into_iter()
                 .filter_map(|e| e.ok())
@@ -89,7 +156,7 @@ impl Tool for ListFilesTool {
             }
         } else {
             // Non-recursive listing
-            let entries = fs::read_dir(path)
+            let entries = fs::read_dir(&safe_path)
                 .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read directory: {}", e)))?;
 
             for entry in entries {
@@ -100,7 +167,7 @@ impl Tool for ListFilesTool {
                     continue;
                 }
 
-                if entry.path().is_dir() {
+                if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
                     directories.push(path_str);
                 } else {
                     files.push(path_str);
@@ -108,25 +175,19 @@ impl Tool for ListFilesTool {
             }
         }
 
-        // Sort for consistent output
-        files.sort();
-        directories.sort();
-
         Ok(json!({
             "status": "success",
             "path": path,
-            "recursive": recursive,
-            "directories": directories,
             "files": files,
-            "total_directories": directories.len(),
-            "total_files": files.len()
+            "directories": directories,
+            "total_files": files.len(),
+            "total_directories": directories.len()
         }))
     }
 }
 
-/// Check if a path should be ignored
 fn should_ignore(path: &str) -> bool {
-    let ignore_patterns = [
+    let ignore_patterns = vec![
         "/.git/", "/target/", "/node_modules/", "/.cowork/",
         "/.idea/", "/.vscode/", "/dist/", "/build/",
         ".DS_Store", "Thumbs.db"
@@ -148,7 +209,8 @@ impl Tool for ReadFileTool {
     }
 
     fn description(&self) -> &str {
-        "Read the contents of a file."
+        "Read the contents of a file. \
+         SECURITY: Only works within current directory."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
@@ -157,7 +219,7 @@ impl Tool for ReadFileTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "File path to read"
+                    "description": "File path to read (must be relative path within current directory)"
                 }
             },
             "required": ["path"]
@@ -167,12 +229,25 @@ impl Tool for ReadFileTool {
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let path = args["path"].as_str().unwrap();
 
-        if !Path::new(path).exists() {
+        // Security check
+        let safe_path = match validate_path_security(path) {
+            Ok(p) => p,
+            Err(e) => {
+                return Ok(json!({
+                    "status": "security_error",
+                    "message": e
+                }));
+            }
+        };
+
+        if !safe_path.exists() {
             return Ok(json!({
                 "status": "error",
                 "message": format!("File not found: {}", path)
             }));
-        }        match fs::read_to_string(path) {
+        }
+        
+        match fs::read_to_string(&safe_path) {
             Ok(content) => Ok(json!({
                 "status": "success",
                 "path": path,
@@ -199,7 +274,8 @@ impl Tool for WriteFileTool {
     }
 
     fn description(&self) -> &str {
-        "Write content to a file. Creates parent directories if needed."
+        "Write content to a file. Creates parent directories if needed. \
+         SECURITY: Only works within current directory. Absolute paths and .. are forbidden."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
@@ -208,7 +284,7 @@ impl Tool for WriteFileTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "File path to write"
+                    "description": "File path to write (must be relative path within current directory)"
                 },
                 "content": {
                     "type": "string",
@@ -223,12 +299,23 @@ impl Tool for WriteFileTool {
         let path = args["path"].as_str().unwrap();
         let content = args["content"].as_str().unwrap();
 
+        // Security check
+        let safe_path = match validate_path_security(path) {
+            Ok(p) => p,
+            Err(e) => {
+                return Ok(json!({
+                    "status": "security_error",
+                    "message": e
+                }));
+            }
+        };
+
         // Create parent directories if needed
-        if let Some(parent) = Path::new(path).parent() {
+        if let Some(parent) = safe_path.parent() {
             fs::create_dir_all(parent).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
         }
 
-        match fs::write(path, content) {
+        match fs::write(&safe_path, content) {
             Ok(_) => Ok(json!({
                 "status": "success",
                 "path": path,
@@ -243,10 +330,35 @@ impl Tool for WriteFileTool {
 }
 
 // ============================================================================
-// RunCommandTool
+// RunCommandTool with blocking detection
 // ============================================================================
 
 pub struct RunCommandTool;
+
+/// Detect if a command is a long-running service that would block execution
+fn is_blocking_service_command(command: &str) -> bool {
+    let blocking_patterns = vec![
+        "http.server",      // python -m http.server
+        "npm run dev",      // npm dev server
+        "npm start",        // npm start
+        "yarn dev",
+        "yarn start",
+        "pnpm dev",
+        "pnpm start",
+        "uvicorn",          // Python ASGI server
+        "gunicorn",         // Python WSGI server
+        "flask run",
+        "django runserver",
+        "rails server",
+        "cargo run",        // Might be a server
+        "serve",            // serve package
+        "webpack-dev-server",
+        "vite",
+        "next dev",
+    ];
+
+    blocking_patterns.iter().any(|pattern| command.contains(pattern))
+}
 
 #[async_trait]
 impl Tool for RunCommandTool {
@@ -255,7 +367,10 @@ impl Tool for RunCommandTool {
     }
 
     fn description(&self) -> &str {
-        "Execute a shell command and return the output."
+        "Execute a shell command and return the output. \
+         WARNING: This tool will REJECT commands that start long-running services \
+         (like http.server, npm dev, etc.) as they would block execution. \
+         Use this for: building, testing, linting - NOT for starting servers."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
@@ -264,7 +379,7 @@ impl Tool for RunCommandTool {
             "properties": {
                 "command": {
                     "type": "string",
-                    "description": "Shell command to execute"
+                    "description": "Shell command to execute (must not be a blocking service command)"
                 }
             },
             "required": ["command"]
@@ -274,21 +389,54 @@ impl Tool for RunCommandTool {
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let command = args["command"].as_str().unwrap();
 
-        let output = tokio::process::Command::new("sh")
-            .arg("-c")
-            .arg(command)
-            .output()
-            .await
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+        // Check if command would block
+        if is_blocking_service_command(command) {
+            return Ok(json!({
+                "status": "rejected",
+                "message": format!(
+                    "BLOCKED: This command appears to start a long-running service: '{}'. \
+                     Starting services would block the agent. \
+                     If you need to verify the code works, just create the files - don't start servers.",
+                    command
+                )
+            }));
+        }
 
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        // Execute command with timeout
+        let output = tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            tokio::process::Command::new("sh")
+                .arg("-c")
+                .arg(command)
+                .current_dir(std::env::current_dir().unwrap()) // Run in current dir
+                .output()
+        )
+        .await;
 
-        Ok(json!({
-            "status": if output.status.success() { "success" } else { "failed" },
-            "exit_code": output.status.code(),
-            "stdout": stdout,
-            "stderr": stderr
-        }))
+        match output {
+            Ok(Ok(output)) => {
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+                Ok(json!({
+                    "status": if output.status.success() { "success" } else { "failed" },
+                    "exit_code": output.status.code(),
+                    "stdout": stdout,
+                    "stderr": stderr
+                }))
+            }
+            Ok(Err(e)) => {
+                Ok(json!({
+                    "status": "error",
+                    "message": format!("Failed to execute command: {}", e)
+                }))
+            }
+            Err(_) => {
+                Ok(json!({
+                    "status": "timeout",
+                    "message": "Command execution timeout (30s limit)"
+                }))
+            }
+        }
     }
 }

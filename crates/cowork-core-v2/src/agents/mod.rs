@@ -1,10 +1,18 @@
 // Agents module - Agent builders using adk-rust
+// 
+// IMPORTANT: This file solves a CRITICAL bug where SequentialAgent stops after
+// the first LoopAgent completes. 
+//
+// PROBLEM: When a sub-agent in LoopAgent calls exit_loop(), it terminates the
+// ENTIRE SequentialAgent, not just the LoopAgent. This is adk-rust's design.
+//
+// SOLUTION: Remove exit_loop tools and use max_iterations=1 to let LoopAgent
+// complete naturally, allowing SequentialAgent to continue to next agent.
 
 use crate::instructions::*;
 use crate::tools::*;
 use adk_agent::{LlmAgentBuilder, LoopAgent};
 use adk_core::{Llm, IncludeContents};
-use adk_tool::ExitLoopTool;
 use anyhow::Result;
 use std::sync::Arc;
 
@@ -33,10 +41,11 @@ pub fn create_prd_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
         .instruction(PRD_ACTOR_INSTRUCTION)
         .model(model.clone())
         .tool(Arc::new(ReadFileTool))
+        .tool(Arc::new(WriteFileTool))  // For creating draft files
+        .tool(Arc::new(ReviewWithFeedbackTool))  // HITL tool
         .tool(Arc::new(CreateRequirementTool))
         .tool(Arc::new(AddFeatureTool))
         .tool(Arc::new(GetRequirementsTool))
-        .tool(Arc::new(ExitLoopTool::new()))
         .include_contents(IncludeContents::None)
         .build()?;
 
@@ -46,7 +55,6 @@ pub fn create_prd_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
         .tool(Arc::new(ReadFileTool))
         .tool(Arc::new(GetRequirementsTool))
         .tool(Arc::new(ProvideFeedbackTool))
-        .tool(Arc::new(ExitLoopTool::new()))
         .include_contents(IncludeContents::None)
         .build()?;
 
@@ -54,7 +62,7 @@ pub fn create_prd_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
         "prd_loop",
         vec![Arc::new(prd_actor), Arc::new(prd_critic)],
     );
-    loop_agent = loop_agent.with_max_iterations(10);
+    loop_agent = loop_agent.with_max_iterations(1);
 
     Ok(Arc::new(loop_agent))
 }
@@ -69,8 +77,9 @@ pub fn create_design_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
         .model(model.clone())
         .tool(Arc::new(GetRequirementsTool))
         .tool(Arc::new(GetDesignTool))
+        .tool(Arc::new(WriteFileTool))  // For creating draft files
+        .tool(Arc::new(ReviewWithFeedbackTool))  // HITL tool
         .tool(Arc::new(CreateDesignComponentTool))
-        .tool(Arc::new(ExitLoopTool::new()))
         .include_contents(IncludeContents::None)
         .build()?;
 
@@ -81,12 +90,11 @@ pub fn create_design_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
         .tool(Arc::new(GetDesignTool))
         .tool(Arc::new(CheckFeatureCoverageTool))
         .tool(Arc::new(ProvideFeedbackTool))
-        .tool(Arc::new(ExitLoopTool::new()))
         .include_contents(IncludeContents::None)
         .build()?;
 
     let mut loop_agent = LoopAgent::new("design_loop", vec![Arc::new(design_actor), Arc::new(design_critic)]);
-    loop_agent = loop_agent.with_max_iterations(10);
+    loop_agent = loop_agent.with_max_iterations(1);
 
     Ok(Arc::new(loop_agent))
 }
@@ -102,8 +110,9 @@ pub fn create_plan_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
         .tool(Arc::new(GetRequirementsTool))
         .tool(Arc::new(GetDesignTool))
         .tool(Arc::new(GetPlanTool))
+        .tool(Arc::new(WriteFileTool))  // For creating draft files
+        .tool(Arc::new(ReviewWithFeedbackTool))  // HITL tool
         .tool(Arc::new(CreateTaskTool))
-        .tool(Arc::new(ExitLoopTool::new()))
         .include_contents(IncludeContents::None)
         .build()?;
 
@@ -114,12 +123,11 @@ pub fn create_plan_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
         .tool(Arc::new(GetRequirementsTool))
         .tool(Arc::new(CheckTaskDependenciesTool))
         .tool(Arc::new(ProvideFeedbackTool))
-        .tool(Arc::new(ExitLoopTool::new()))
         .include_contents(IncludeContents::None)
         .build()?;
 
     let mut loop_agent = LoopAgent::new("plan_loop", vec![Arc::new(plan_actor), Arc::new(plan_critic)]);
-    loop_agent = loop_agent.with_max_iterations(10);
+    loop_agent = loop_agent.with_max_iterations(1);
 
     Ok(Arc::new(loop_agent))
 }
@@ -140,7 +148,6 @@ pub fn create_coding_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
         .tool(Arc::new(ListFilesTool))
         .tool(Arc::new(RunCommandTool))
         .tool(Arc::new(CheckTestsTool))
-        .tool(Arc::new(ExitLoopTool::new()))
         .include_contents(IncludeContents::None)
         .build()?;
 
@@ -154,11 +161,11 @@ pub fn create_coding_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
         .tool(Arc::new(CheckTestsTool))
         .tool(Arc::new(CheckLintTool))
         .tool(Arc::new(ProvideFeedbackTool))
-        .tool(Arc::new(ExitLoopTool::new()))
         .include_contents(IncludeContents::None)
         .build()?;
 
     let mut loop_agent = LoopAgent::new("coding_loop", vec![Arc::new(coding_actor), Arc::new(coding_critic)]);
+    // Coding needs more iterations as it implements multiple tasks
     loop_agent = loop_agent.with_max_iterations(20);
 
     Ok(Arc::new(loop_agent))
