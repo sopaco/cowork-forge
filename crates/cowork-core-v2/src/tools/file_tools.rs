@@ -316,11 +316,15 @@ impl Tool for WriteFileTool {
         }
 
         match fs::write(&safe_path, content) {
-            Ok(_) => Ok(json!({
-                "status": "success",
-                "path": path,
-                "lines_written": content.lines().count()
-            })),
+            Ok(_) => {
+                // Log file creation for user visibility
+                println!("📝 Writing file: {} ({} lines)", path, content.lines().count());
+                Ok(json!({
+                    "status": "success",
+                    "path": path,
+                    "lines_written": content.lines().count()
+                }))
+            },
             Err(e) => Ok(json!({
                 "status": "error",
                 "message": format!("Failed to write file: {}", e)

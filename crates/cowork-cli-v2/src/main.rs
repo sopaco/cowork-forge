@@ -27,6 +27,10 @@ struct Cli {
     /// Enable verbose logging
     #[arg(short, long, global = true)]
     verbose: bool,
+
+    /// Enable LLM streaming output (shows AI thinking process in real-time)
+    #[arg(short, long, global = true)]
+    stream: bool,
 }
 
 #[derive(Subcommand)]
@@ -77,10 +81,11 @@ async fn main() -> Result<()> {
     let config = load_config(&config_path)?;
 
     // Execute command
+    let enable_stream = cli.stream;
     match cli.command {
-        Commands::New { idea } => cmd_new(idea, &config).await?,
-        Commands::Resume => cmd_resume(&config).await?,
-        Commands::Modify { from } => cmd_modify(&from, &config).await?,
+        Commands::New { idea } => cmd_new(idea, &config, enable_stream).await?,
+        Commands::Resume => cmd_resume(&config, enable_stream).await?,
+        Commands::Modify { from } => cmd_modify(&from, &config, enable_stream).await?,
         Commands::Status => cmd_status().await?,
         Commands::Init => cmd_init()?,
     }
@@ -100,7 +105,7 @@ fn load_config(path: &str) -> Result<ModelConfig> {
 }
 
 /// Start a new project
-async fn cmd_new(idea: String, config: &ModelConfig) -> Result<()> {
+async fn cmd_new(idea: String, config: &ModelConfig, enable_stream: bool) -> Result<()> {
     info!("Starting new project with idea: {}", idea);
 
     if cowork_dir_exists() {
@@ -116,7 +121,7 @@ async fn cmd_new(idea: String, config: &ModelConfig) -> Result<()> {
     println!("Idea: {}", idea);
     println!();
 
-    execute_pipeline(pipeline, &idea).await?;
+    execute_pipeline(pipeline, &idea, enable_stream).await?;
 
     println!("\n✅ Project creation complete!");
     println!("Check .cowork/ directory for artifacts");
@@ -125,7 +130,7 @@ async fn cmd_new(idea: String, config: &ModelConfig) -> Result<()> {
 }
 
 /// Resume an existing project
-async fn cmd_resume(config: &ModelConfig) -> Result<()> {
+async fn cmd_resume(config: &ModelConfig, enable_stream: bool) -> Result<()> {
     info!("Resuming project");
 
     if !cowork_dir_exists() {
@@ -140,7 +145,7 @@ async fn cmd_resume(config: &ModelConfig) -> Result<()> {
     println!("🔄 Resuming project...");
     println!();
 
-    execute_pipeline(pipeline, "Resume from last checkpoint").await?;
+    execute_pipeline(pipeline, "Resume from last checkpoint", enable_stream).await?;
 
     println!("\n✅ Project resume complete!");
 
@@ -148,7 +153,7 @@ async fn cmd_resume(config: &ModelConfig) -> Result<()> {
 }
 
 /// Modify project from a specific stage
-async fn cmd_modify(from_stage: &str, config: &ModelConfig) -> Result<()> {
+async fn cmd_modify(from_stage: &str, config: &ModelConfig, enable_stream: bool) -> Result<()> {
     info!("Modifying project from stage: {}", from_stage);
 
     if !cowork_dir_exists() {
@@ -163,7 +168,7 @@ async fn cmd_modify(from_stage: &str, config: &ModelConfig) -> Result<()> {
     println!("🔧 Modifying project from {} stage...", from_stage);
     println!();
 
-    execute_pipeline(pipeline, &format!("Modify from {} stage", from_stage)).await?;
+    execute_pipeline(pipeline, &format!("Modify from {} stage", from_stage), enable_stream).await?;
 
     println!("\n✅ Modification complete!");
 
@@ -171,7 +176,7 @@ async fn cmd_modify(from_stage: &str, config: &ModelConfig) -> Result<()> {
 }
 
 /// Execute a pipeline with given input
-async fn execute_pipeline(pipeline: Arc<dyn adk_core::Agent>, input: &str) -> Result<()> {
+async fn execute_pipeline(pipeline: Arc<dyn adk_core::Agent>, input: &str, enable_stream: bool) -> Result<()> {
     use adk_core::RunConfig;
     use adk_session::{CreateRequest, SessionService};
     use std::collections::HashMap;
@@ -210,14 +215,35 @@ async fn execute_pipeline(pipeline: Arc<dyn adk_core::Agent>, input: &str) -> Re
 
     let mut event_stream = runner.run(user_id, session_id, content).await?;
 
-    // Disable streaming output to avoid LLM's erratic newline tokens
-    // Only HITL tool outputs (println! from tools) will be visible
+    // Simple phase indicator - show when we start processing
+    println!("🚀 Starting execution...\n");
+    
+    // Optional: Show streaming mode status
+    if enable_stream {
+        println!("💬 Streaming mode enabled - showing LLM output in real-time\n");
+    }
     
     while let Some(event_result) = event_stream.next().await {
         match event_result {
-            Ok(_event) => {
-                // Silent - let tools handle their own output
-                // HITL tools will print directly via println!
+            Ok(event) => {
+                // If streaming is enabled, show LLM output
+                if enable_stream {
+                    if let Some(llm_content) = &event.llm_response.content {
+                        use std::io::Write;
+                        let mut stdout = std::io::stdout();
+                        
+                        for part in &llm_content.parts {
+                            if let Some(text) = part.text() {
+                                // Filter out standalone newlines to reduce erratic line breaks
+                                if text != "\n" {
+                                    print!("{}", text);
+                                    stdout.flush().ok();
+                                }
+                            }
+                        }
+                    }
+                }
+                // Tools will always print their own progress (e.g., "📝 Writing file: ...")
             }
             Err(e) => {
                 error!("Error during pipeline execution: {}", e);

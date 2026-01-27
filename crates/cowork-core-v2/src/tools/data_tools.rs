@@ -89,9 +89,12 @@ impl Tool for CreateRequirementTool {
             related_features: vec![],
         };
 
-        reqs.requirements.push(requirement);
+        reqs.requirements.push(requirement.clone());
         reqs.updated_at = chrono::Utc::now();
         save_requirements(&reqs).map_err(|e| AdkError::Tool(e.to_string()))?;
+
+        // Log for user visibility
+        println!("✅ Created: {} - {}", req_id, requirement.title);
 
         Ok(json!({
             "status": "success",
@@ -292,8 +295,11 @@ impl Tool for CreateDesignComponentTool {
             related_features,
         };
 
-        design.architecture.components.push(component);
+        design.architecture.components.push(component.clone());
         save_design_spec(&design).map_err(|e| AdkError::Tool(e.to_string()))?;
+
+        // Log for user visibility
+        println!("🏗️  Created component: {} - {}", comp_id, component.name);
 
         Ok(json!({
             "status": "success",
