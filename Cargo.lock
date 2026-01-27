@@ -828,28 +828,13 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 name = "cowork-cli"
 version = "1.0.0"
 dependencies = [
- "anyhow",
- "clap",
- "console",
- "cowork-core",
- "dialoguer",
- "dotenv",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "cowork-cli-v2"
-version = "1.0.0"
-dependencies = [
  "adk-core",
  "adk-runner",
  "adk-session",
  "anyhow",
  "clap",
  "console",
- "cowork-core-v2",
+ "cowork-core",
  "dialoguer",
  "dirs",
  "futures",
@@ -865,32 +850,6 @@ dependencies = [
 
 [[package]]
 name = "cowork-core"
-version = "1.0.0"
-dependencies = [
- "adk-model",
- "adk-rust",
- "anyhow",
- "async-trait",
- "chrono",
- "dialoguer",
- "futures",
- "ignore",
- "once_cell",
- "regex",
- "schemars 0.8.22",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "toml 0.9.11+spec-1.1.0",
- "tracing",
- "uuid",
- "walkdir",
-]
-
-[[package]]
-name = "cowork-core-v2"
 version = "1.0.0"
 dependencies = [
  "adk-agent",
@@ -1136,12 +1095,6 @@ dependencies = [
  "quote",
  "syn 2.0.114",
 ]
-
-[[package]]
-name = "dotenv"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
 
 [[package]]
 name = "dyn-clone"

@@ -1,271 +1,331 @@
+// Cowork Forge V2 - CLI Entry Point
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use cowork_core::{ArtifactStore, Orchestrator, ModelConfig};
-use tracing_subscriber::EnvFilter;
+use cowork_core::llm::ModelConfig;
+use cowork_core::pipeline::{create_cowork_pipeline, create_partial_pipeline, create_resume_pipeline};
+use cowork_core::storage::cowork_dir_exists;
+use std::path::Path;
+use std::sync::Arc;
+use tracing::{info, error};
+use adk_runner::{Runner, RunnerConfig};
+use adk_session::InMemorySessionService;
+use adk_core::Content;
+use futures::StreamExt;
 
 #[derive(Parser)]
-#[command(name = "cowork")]
-#[command(about = "AI-powered multi-agent software development forge", long_about = None)]
+#[command(name = "cowork-v2")]
+#[command(about = "AI-powered software development system V2", long_about = None)]
 struct Cli {
     #[command(subcommand)]
-    command: Option<Commands>,
+    command: Commands,
 
-    /// Path to model configuration file (TOML)
-    #[arg(long, default_value = "config.toml")]
-    config: String,
+    /// Path to config file (default: config.toml)
+    #[arg(short, long, global = true)]
+    config: Option<String>,
+
+    /// Enable verbose logging
+    #[arg(short, long, global = true)]
+    verbose: bool,
+
+    /// Enable LLM streaming output (shows AI thinking process in real-time)
+    #[arg(short, long, global = true)]
+    stream: bool,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Resume a session
-    Resume {
-        session_id: String,
+    /// Start a new project
+    New {
+        /// Project idea/description
+        idea: String,
     },
-    /// Inspect a session's artifacts
-    Inspect {
-        session_id: String,
-    },
-    /// Export final deliverables
-    Export {
-        session_id: String,
-    },
-    /// Modify requirements or design and trigger re-execution
+
+    /// Resume an existing project
+    Resume,
+
+    /// Modify existing project starting from a stage
     Modify {
-        session_id: String,
-        /// Modification description (if not provided, will prompt interactively)
+        /// Stage to restart from (prd, design, plan, coding, check, delivery)
         #[arg(short, long)]
-        change: Option<String>,
+        from: String,
     },
+
+    /// Show project status
+    Status,
+
+    /// Initialize config file
+    Init,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Load environment variables
-    dotenv::dotenv().ok();
-
-    // Initialize logging
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
-        .init();
-
     let cli = Cli::parse();
 
-    // Load model configuration
-    let model_config = ModelConfig::from_file(&cli.config)
-        .or_else(|e| {
-            tracing::warn!("Failed to load config from file: {}, trying environment variables", e);
-            ModelConfig::from_env()
-        })?;
-
-    tracing::info!("Model configuration loaded:");
-    tracing::info!("  LLM: {} at {}", model_config.llm.model_name, model_config.llm.api_base_url);
-
-    // Initialize ArtifactStore
-    let store = ArtifactStore::new(".cowork");
-    let orchestrator = Orchestrator::new(store);
-
-    match cli.command {
-        None => {
-            // Default: interactive mode - create new session
-            interactive_mode(orchestrator, model_config).await?;
-        }
-        Some(Commands::Resume { session_id }) => {
-            resume_session(orchestrator, &session_id, model_config).await?;
-        }
-        Some(Commands::Inspect { session_id }) => {
-            inspect_session(orchestrator, &session_id)?;
-        }
-        Some(Commands::Export { session_id }) => {
-            export_session(&session_id)?;
-        }
-        Some(Commands::Modify { session_id, change }) => {
-            modify_session(orchestrator, &session_id, change, model_config).await?;
-        }
-    }
-
-    Ok(())
-}
-
-async fn interactive_mode(orchestrator: Orchestrator, model_config: ModelConfig) -> Result<()> {
-    use console::style;
-
-    println!("{}", style("Welcome to Cowork Forge!").bold().cyan());
-    println!("AI-powered multi-agent software development forge\n");
-
-    // Create new session
-    let session_id = orchestrator.create_session()?;
-    println!("Session created: {}\n", style(&session_id).green());
-
-    // Run workflow
-    println!("Starting workflow...\n");
-    orchestrator.run_full_workflow(&session_id, &model_config).await?;
-
-    println!("\n{}", style("Session completed!").bold().green());
-    println!("Session ID: {}", session_id);
-    println!("Artifacts saved to: .cowork/{}/artifacts/", session_id);
-
-    Ok(())
-}
-
-async fn resume_session(orchestrator: Orchestrator, session_id: &str, model_config: ModelConfig) -> Result<()> {
-    use console::style;
-
-    println!("{}", style(format!("🔄 恢复会话: {}", session_id)).bold().cyan());
-
-    // 调用 orchestrator 的 resume_session 方法
-    orchestrator.resume_session(session_id, &model_config).await?;
-
-    println!("\n{}", style("✅ 会话恢复完成！").bold().green());
-
-    Ok(())
-}
-
-fn inspect_session(orchestrator: Orchestrator, session_id: &str) -> Result<()> {
-    use console::style;
-    use cowork_core::StageStatus;
-
-    println!("{}", style(format!("🔍 检查会话: {}", session_id)).bold().cyan());
-
-    // 加载 session meta
-    let meta = orchestrator.load_session_meta(session_id)?;
-    println!("\n📊 会话信息:");
-    println!("  创建时间: {}", meta.created_at);
-    println!("  当前阶段: {:?}", meta.current_stage);
-    
-    // 显示已完成的阶段
-    let completed_stages: Vec<_> = meta.stage_status.iter()
-        .filter(|(_, status)| matches!(status, StageStatus::Completed { .. }))
-        .map(|(stage, _)| stage)
-        .collect();
-    println!("  已完成阶段: {:?}", completed_stages);
-
-    let artifacts = orchestrator.list_artifacts(session_id)?;
-
-    if artifacts.is_empty() {
-        println!("{}", style("\n⚠️  没有找到 artifacts").yellow());
-        return Ok(());
-    }
-
-    println!("\n📦 Artifacts ({} 个):", artifacts.len());
-    for artifact in artifacts {
-        println!("  ┌─ {} ({:?})", artifact.artifact_id, artifact.stage);
-        println!("  │  JSON: {}", artifact.path_json.display());
-        println!("  └─ MD:   {}", artifact.path_md.display());
-    }
-
-    // 显示下一步建议
-    let all_stages = cowork_core::Stage::all();
-    let next_stage = all_stages
-        .iter()
-        .find(|s| !matches!(meta.stage_status.get(s), Some(StageStatus::Completed { .. })))
-        .cloned();
-
-    if let Some(stage) = next_stage {
-        println!("\n💡 提示:");
-        println!("  下一阶段: {:?}", stage);
-        println!("  恢复命令: cowork resume {}", session_id);
+    // Setup logging - output to stderr, not stdout
+    let log_filter = if cli.verbose {
+        // Verbose mode: show all logs including adk internals
+        "debug".to_string()
     } else {
-        println!("\n✅ 所有阶段已完成！");
+        // Normal mode: filter out adk verbose logs to avoid clutter
+        "info,adk_agent=warn,adk_core=warn,adk_runner=warn".to_string()
+    };
+    
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr) // Force logs to stderr
+        .with_env_filter(log_filter)
+        .init();
+
+    // Load configuration
+    let config_path = cli.config.unwrap_or_else(|| "config.toml".to_string());
+    let config = load_config(&config_path)?;
+
+    // Execute command
+    let enable_stream = cli.stream;
+    match cli.command {
+        Commands::New { idea } => cmd_new(idea, &config, enable_stream).await?,
+        Commands::Resume => cmd_resume(&config, enable_stream).await?,
+        Commands::Modify { from } => cmd_modify(&from, &config, enable_stream).await?,
+        Commands::Status => cmd_status().await?,
+        Commands::Init => cmd_init()?,
     }
 
     Ok(())
 }
 
-fn export_session(session_id: &str) -> Result<()> {
-    use console::style;
-    use std::fs;
-    use std::path::PathBuf;
+/// Load configuration from file or environment
+fn load_config(path: &str) -> Result<ModelConfig> {
+    if Path::new(path).exists() {
+        info!("Loading configuration from {}", path);
+        ModelConfig::from_file(path)
+    } else {
+        info!("Config file not found, attempting to load from environment variables");
+        ModelConfig::from_env()
+    }
+}
 
-    println!("{}", style(format!("📤 导出会话: {}", session_id)).bold().cyan());
+/// Start a new project
+async fn cmd_new(idea: String, config: &ModelConfig, enable_stream: bool) -> Result<()> {
+    info!("Starting new project with idea: {}", idea);
 
-    let session_dir = PathBuf::from(".cowork").join(session_id);
-    if !session_dir.exists() {
-        return Err(anyhow::anyhow!("Session {} not found", session_id));
+    if cowork_dir_exists() {
+        error!(".cowork directory already exists. Use 'resume' or 'modify' instead.");
+        anyhow::bail!("Project already initialized");
     }
 
-    // 创建导出目录
-    let export_dir = PathBuf::from("exports").join(session_id);
-    fs::create_dir_all(&export_dir)?;
+    // Create pipeline
+    let pipeline = create_cowork_pipeline(config)?;
 
-    // 复制所有 markdown 文件
-    let artifacts_dir = session_dir.join("artifacts");
-    let mut exported_count = 0;
+    // Execute pipeline with idea as input
+    println!("✨ Creating new project...");
+    println!("Idea: {}", idea);
+    println!();
 
-    if artifacts_dir.exists() {
-        for entry in fs::read_dir(&artifacts_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            
-            if path.extension().and_then(|s| s.to_str()) == Some("md") {
-                let file_name = path.file_name().unwrap();
-                let dest = export_dir.join(file_name);
-                fs::copy(&path, &dest)?;
-                println!("  ✓ {}", file_name.to_string_lossy());
-                exported_count += 1;
+    execute_pipeline(pipeline, &idea, enable_stream).await?;
+
+    println!("\n✅ Project creation complete!");
+    println!("Check .cowork/ directory for artifacts");
+
+    Ok(())
+}
+
+/// Resume an existing project
+async fn cmd_resume(config: &ModelConfig, enable_stream: bool) -> Result<()> {
+    info!("Resuming project");
+
+    if !cowork_dir_exists() {
+        error!(".cowork directory not found. Use 'new' to create a project.");
+        anyhow::bail!("No project found");
+    }
+
+    // Create resume pipeline (skips idea stage)
+    let pipeline = create_resume_pipeline(config)?;
+
+    // Execute pipeline
+    println!("🔄 Resuming project...");
+    println!();
+
+    execute_pipeline(pipeline, "Resume from last checkpoint", enable_stream).await?;
+
+    println!("\n✅ Project resume complete!");
+
+    Ok(())
+}
+
+/// Modify project from a specific stage
+async fn cmd_modify(from_stage: &str, config: &ModelConfig, enable_stream: bool) -> Result<()> {
+    info!("Modifying project from stage: {}", from_stage);
+
+    if !cowork_dir_exists() {
+        error!(".cowork directory not found. Use 'new' to create a project.");
+        anyhow::bail!("No project found");
+    }
+
+    // Create partial pipeline
+    let pipeline = create_partial_pipeline(config, from_stage)?;
+
+    // Execute pipeline
+    println!("🔧 Modifying project from {} stage...", from_stage);
+    println!();
+
+    execute_pipeline(pipeline, &format!("Modify from {} stage", from_stage), enable_stream).await?;
+
+    println!("\n✅ Modification complete!");
+
+    Ok(())
+}
+
+/// Execute a pipeline with given input
+async fn execute_pipeline(pipeline: Arc<dyn adk_core::Agent>, input: &str, enable_stream: bool) -> Result<()> {
+    use adk_core::RunConfig;
+    use adk_session::{CreateRequest, SessionService};
+    use std::collections::HashMap;
+
+    // Create session service
+    let session_service = Arc::new(InMemorySessionService::new());
+
+    // Create session FIRST
+    let user_id = "cowork-user".to_string();
+    let app_name = "cowork-forge-v2".to_string();
+    
+    let session = session_service
+        .create(CreateRequest {
+            app_name: app_name.clone(),
+            user_id: user_id.clone(),
+            session_id: None, // Auto-generate session ID
+            state: HashMap::new(),
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to create session: {}", e))?;
+    
+    let session_id = session.id().to_string();
+
+    // Create runner with run config
+    let runner = Runner::new(RunnerConfig {
+        app_name,
+        agent: pipeline,
+        session_service,
+        artifact_service: None,
+        memory_service: None,
+        run_config: Some(RunConfig::default()),
+    })?;
+
+    // Execute
+    let content = Content::new("user").with_text(input);
+
+    let mut event_stream = runner.run(user_id, session_id, content).await?;
+
+    // Simple phase indicator - show when we start processing
+    println!("🚀 Starting execution...\n");
+    
+    // Optional: Show streaming mode status
+    if enable_stream {
+        println!("💬 Streaming mode enabled - showing LLM output in real-time\n");
+    }
+    
+    while let Some(event_result) = event_stream.next().await {
+        match event_result {
+            Ok(event) => {
+                // If streaming is enabled, show LLM output
+                if enable_stream {
+                    if let Some(llm_content) = &event.llm_response.content {
+                        use std::io::Write;
+                        let mut stdout = std::io::stdout();
+                        
+                        for part in &llm_content.parts {
+                            if let Some(text) = part.text() {
+                                // Filter out standalone newlines to reduce erratic line breaks
+                                if text != "\n" {
+                                    print!("{}", text);
+                                    stdout.flush().ok();
+                                }
+                            }
+                        }
+                    }
+                }
+                // Tools will always print their own progress (e.g., "📝 Writing file: ...")
+            }
+            Err(e) => {
+                error!("Error during pipeline execution: {}", e);
+                anyhow::bail!("Pipeline execution failed: {}", e);
             }
         }
     }
 
-    // 复制 meta.json
-    let meta_src = session_dir.join("meta.json");
-    if meta_src.exists() {
-        fs::copy(&meta_src, export_dir.join("meta.json"))?;
-        println!("  ✓ meta.json");
-        exported_count += 1;
-    }
-
-    println!("\n✅ 导出完成！");
-    println!("  导出文件数: {}", exported_count);
-    println!("  导出目录: {}", export_dir.display());
+    println!("\n✅ Pipeline complete!");
 
     Ok(())
 }
 
-async fn modify_session(
-    orchestrator: Orchestrator,
-    session_id: &str,
-    change: Option<String>,
-    model_config: ModelConfig,
-) -> Result<()> {
-    use console::style;
-    use cowork_core::{HitlController, StageStatus};
+/// Show project status
+async fn cmd_status() -> Result<()> {
+    use cowork_core::storage::*;
 
-    println!("{}", style(format!("🔧 修改会话: {}", session_id)).bold().cyan());
-
-    // 检查 session 是否存在
-    let meta = orchestrator.load_session_meta(session_id)?;
-    
-    // 显示已完成的阶段
-    let completed_stages: Vec<_> = meta.stage_status.iter()
-        .filter(|(_, status)| matches!(status, StageStatus::Completed { .. }))
-        .map(|(stage, _)| stage)
-        .collect();
-    
-    println!("\n📊 当前会话状态:");
-    println!("  创建时间: {}", meta.created_at);
-    println!("  已完成阶段: {:?}", completed_stages);
-    println!("  Feedback 迭代次数: {}/{}", meta.feedback_iterations, meta.max_feedback_iterations);
-
-    // 获取修改内容
-    let hitl = HitlController::new();
-    let modification = if let Some(c) = change {
-        c
-    } else {
-        println!("\n请描述您的修改需求（可以是需求变更、技术调整等）:");
-        hitl.input("修改内容")?
-    };
-
-    if modification.trim().is_empty() {
-        return Err(anyhow::anyhow!("修改内容不能为空"));
+    if !cowork_dir_exists() {
+        println!("❌ No project found in current directory");
+        return Ok(());
     }
 
-    println!("\n🔄 正在处理修改请求...");
-    println!("修改内容: {}", modification);
+    println!("📊 Project Status\n");
 
-    // 调用 orchestrator 的 modify_and_rerun 方法
-    orchestrator.modify_and_rerun(session_id, &modification, &model_config).await?;
+    // Load and display requirements
+    match load_requirements() {
+        Ok(reqs) => {
+            println!("Requirements: {} total", reqs.requirements.len());
+        }
+        Err(_) => println!("Requirements: Not yet created"),
+    }
 
-    println!("\n{}", style("✅ 修改完成！").bold().green());
+    // Load and display features
+    match load_feature_list() {
+        Ok(features) => {
+            let completed = features.features.iter().filter(|f| matches!(f.status, cowork_core::data::FeatureStatus::Completed)).count();
+            println!("Features: {}/{} completed", completed, features.features.len());
+        }
+        Err(_) => println!("Features: Not yet created"),
+    }
+
+    // Load and display design
+    match load_design_spec() {
+        Ok(design) => {
+            println!("Components: {} defined", design.architecture.components.len());
+        }
+        Err(_) => println!("Design: Not yet created"),
+    }
+
+    // Load and display plan
+    match load_implementation_plan() {
+        Ok(plan) => {
+            let completed = plan.tasks.iter().filter(|t| matches!(t.status, cowork_core::data::TaskStatus::Completed)).count();
+            println!("Tasks: {}/{} completed", completed, plan.tasks.len());
+        }
+        Err(_) => println!("Implementation Plan: Not yet created"),
+    }
+
+    Ok(())
+}
+
+/// Initialize configuration file
+fn cmd_init() -> Result<()> {
+    let config_path = "config.toml";
+
+    if Path::new(config_path).exists() {
+        error!("config.toml already exists");
+        anyhow::bail!("Configuration file already exists");
+    }
+
+    let default_config = r#"[llm]
+api_base_url = "http://localhost:8000/v1"
+api_key = "your-api-key-here"
+model_name = "gpt-4"
+"#;
+
+    std::fs::write(config_path, default_config)?;
+    println!("✅ Created config.toml");
+    println!("\nPlease edit config.toml and set your API credentials:");
+    println!("  - api_base_url: Your OpenAI-compatible API endpoint");
+    println!("  - api_key: Your API key");
+    println!("  - model_name: Model to use (e.g., gpt-4, gpt-3.5-turbo)");
 
     Ok(())
 }

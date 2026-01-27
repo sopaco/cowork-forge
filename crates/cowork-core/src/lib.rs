@@ -1,14 +1,18 @@
-pub mod artifacts;
-pub mod memory;
-pub mod config;
+// Cowork Forge V2 - Core Library
+// Built with adk-rust 0.2.1
+
+pub mod data;
+pub mod storage;
+pub mod llm;
 pub mod tools;
 pub mod agents;
-pub mod orchestrator;
-pub mod hitl;
-pub mod utils;
-pub mod verification;
-pub use artifacts::{Stage, ArtifactEnvelope};
-pub use memory::ArtifactStore;
-pub use config::ModelConfig;
-pub use orchestrator::{Orchestrator, StageStatus};
-pub use hitl::HitlController;
+pub mod pipeline;
+pub mod instructions;
+
+// Re-exports for convenience
+pub use data::*;
+pub use storage::*;
+pub use llm::*;
+
+// Version info
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");

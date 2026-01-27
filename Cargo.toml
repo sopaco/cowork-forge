@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "crates/cowork-core",
-    "crates/cowork-cli", "crates/cowork-core-v2", "crates/cowork-cli-v2",
+    "crates/cowork-cli",
 ]
 
 [workspace.package]

@@ -1,612 +1,446 @@
-use adk_rust::prelude::*;
-use adk_rust::AdkError;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
+// File operation tools with SECURITY constraints
+use adk_core::{Tool, ToolContext};
+use async_trait::async_trait;
+use serde_json::{json, Value};
 use std::sync::Arc;
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
-/// 文件读取参数
-#[derive(JsonSchema, Serialize, Deserialize)]
-pub struct ReadFileParams {
-    /// 文件路径（相对或绝对路径）
-    pub path: String,
-}
+// ============================================================================
+// Security Helper - Path Validation
+// ============================================================================
 
-/// 文件写入参数
-#[derive(JsonSchema, Serialize, Deserialize)]
-pub struct WriteFileParams {
-    /// 文件路径
-    pub path: String,
-    /// 文件内容
-    pub content: String,
-}
-
-/// 目录列表参数
-#[derive(JsonSchema, Serialize, Deserialize)]
-pub struct ListDirParams {
-    /// 目录路径
-    pub path: String,
-    /// 是否递归列出子目录
-    #[serde(default)]
-    pub recursive: bool,
-    /// 是否包含隐藏文件（默认不包含）
-    #[serde(default)]
-    pub include_hidden: bool,
-}
-
-/// 文件存在检查参数
-#[derive(JsonSchema, Serialize, Deserialize)]
-pub struct FileExistsParams {
-    /// 文件路径
-    pub path: String,
-}
-
-/// 创建目录参数
-#[derive(JsonSchema, Serialize, Deserialize)]
-pub struct CreateDirParams {
-    /// 目录路径
-    pub path: String,
-    /// 是否创建父目录
-    #[serde(default)]
-    pub recursive: bool,
-}
-
-/// 读取文件范围参数
-#[derive(JsonSchema, Serialize, Deserialize)]
-pub struct ReadFileRangeParams {
-    /// 文件路径
-    pub path: String,
-    /// 起始行号（1-based，包含）
-    pub start_line: usize,
-    /// 结束行号（1-based，包含）。如果省略，读到文件末尾
-    #[serde(default)]
-    pub end_line: Option<usize>,
-}
-
-/// 替换文件行范围参数
-#[derive(JsonSchema, Serialize, Deserialize)]
-pub struct ReplaceLineRangeParams {
-    /// 文件路径
-    pub path: String,
-    /// 起始行号（1-based，包含）
-    pub start_line: usize,
-    /// 结束行号（1-based，包含）
-    pub end_line: usize,
-    /// 新内容（多行文本）
-    pub new_content: String,
-}
-
-/// 插入行参数
-#[derive(JsonSchema, Serialize, Deserialize)]
-pub struct InsertLinesParams {
-    /// 文件路径
-    pub path: String,
-    /// 在此行号之后插入（1-based）。0 表示在文件开头插入
-    pub after_line: usize,
-    /// 要插入的内容
-    pub content: String,
-}
-
-/// 删除行范围参数
-#[derive(JsonSchema, Serialize, Deserialize)]
-pub struct DeleteLineRangeParams {
-    /// 文件路径
-    pub path: String,
-    /// 起始行号（1-based，包含）
-    pub start_line: usize,
-    /// 结束行号（1-based，包含）
-    pub end_line: usize,
-}
-
-/// 追加到文件参数
-#[derive(JsonSchema, Serialize, Deserialize)]
-pub struct AppendToFileParams {
-    /// 文件路径
-    pub path: String,
-    /// 要追加的内容
-    pub content: String,
-}
-
-/// 检查文件名是否为隐藏文件
-#[cfg(test)]
-pub(crate) fn is_hidden_file(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|s| s.to_str())
-        .map(|s| s.starts_with('.'))
-        .unwrap_or(false)
-}
-
-/// 构建 gitignore walker
-pub(crate) fn build_gitignore_walker(root: &str, recursive: bool, include_hidden: bool) -> ignore::Walk {
-    let mut builder = ignore::WalkBuilder::new(root);
+/// Validate that a path is safe to access
+/// Rules:
+/// 1. Must be relative path (no absolute paths like /tmp, C:\)
+/// 2. Must not escape current directory (no ..)
+/// 3. Must be within current working directory or .cowork
+fn validate_path_security(path: &str) -> Result<PathBuf, String> {
+    let path_obj = Path::new(path);
     
-    // 设置最大深度
-    if !recursive {
-        builder.max_depth(Some(1));
+    // Rule 1: Reject absolute paths
+    if path_obj.is_absolute() {
+        return Err(format!(
+            "Security: Absolute paths are not allowed. Path '{}' must be relative to current directory.",
+            path
+        ));
     }
     
-    // 控制是否包含隐藏文件
-    if !include_hidden {
-        builder.hidden(false); // 排除隐藏文件
+    // Rule 2: Reject parent directory access (..)
+    if path.contains("..") {
+        return Err(format!(
+            "Security: Parent directory access (..) is not allowed. Path: '{}'",
+            path
+        ));
+    }
+    
+    // Rule 3: Canonicalize and verify it's within current directory
+    let current_dir = std::env::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+    
+    let full_path = current_dir.join(path);
+    
+    // Canonicalize if path exists, otherwise just check the constructed path
+    let canonical_path = if full_path.exists() {
+        full_path.canonicalize()
+            .map_err(|e| format!("Failed to resolve path: {}", e))?
     } else {
-        builder.hidden(true); // 包含隐藏文件
+        // For non-existent paths (e.g., files to be created), just verify parent
+        full_path
+    };
+    
+    // Verify the path is within current directory
+    if !canonical_path.starts_with(&current_dir) {
+        return Err(format!(
+            "Security: Path escapes current directory. Path '{}' resolves to '{}'",
+            path,
+            canonical_path.display()
+        ));
     }
     
-    // 始终遵循 .gitignore 规则
-    builder.git_ignore(true);
-    builder.git_global(true);
-    builder.git_exclude(true);
-    
-    // 不遵循符号链接（避免循环）
-    builder.follow_links(false);
-    
-    // 🔧 额外过滤：排除常见依赖目录和构建输出（即使没有 .gitignore）
-    // 这些目录通常包含大量文件但对代码生成无意义
-    builder.filter_entry(|entry| {
-        let path = entry.path();
-        let file_name = path.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("");
-        
-        // 排除常见依赖和构建目录
-        let excluded_dirs = [
-            "node_modules",    // Node.js
-            ".litho",          // litho(deepwiki-rs) cache
-            "target",          // Rust
-            "dist",            // 构建输出
-            "build",           // 构建输出
-            "out",             // 构建输出
-            ".next",           // Next.js
-            ".nuxt",           // Nuxt.js
-            ".venv",           // Python
-            "venv",            // Python
-            "env",             // Python
-            "__pycache__",     // Python
-            "vendor",          // 多种语言
-            ".tox",            // Python
-            ".pytest_cache",   // Python
-            ".mypy_cache",     // Python
-            "coverage",        // 测试覆盖率
-            ".coverage",       // 测试覆盖率
-            "htmlcov",         // 测试覆盖率
-            "bower_components", // Bower
-            "jspm_packages",   // JSPM
-            ".gradle",         // Gradle
-            ".mvn",            // Maven
-            "Pods",            // CocoaPods
-            ".cargo",          // Rust (local cache)
-        ];
-        
-        !excluded_dirs.contains(&file_name)
-    });
-    
-    builder.build()
+    Ok(canonical_path)
 }
 
-/// 文件工具集合
-pub struct FileToolsBundle {
-    pub read_file: Arc<FunctionTool>,
-    pub write_file: Arc<FunctionTool>,
-    pub list_dir: Arc<FunctionTool>,
-    pub file_exists: Arc<FunctionTool>,
-    pub create_dir: Arc<FunctionTool>,
-    // 增量编辑工具
-    pub read_file_range: Arc<FunctionTool>,
-    pub replace_line_range: Arc<FunctionTool>,
-    pub insert_lines: Arc<FunctionTool>,
-    pub delete_line_range: Arc<FunctionTool>,
-    pub append_to_file: Arc<FunctionTool>,
-}
+// ============================================================================
+// ListFilesTool
+// ============================================================================
 
-/// 创建文件操作工具集
-pub fn create_file_tools() -> FileToolsBundle {
-    // 1. 读取文件工具
-    let read_file = Arc::new(
-        FunctionTool::new(
-            "read_file",
-            "Read the contents of a file. Returns the file content as a string.",
-            |_ctx, args| async move {
-                let params: ReadFileParams = serde_json::from_value(args)
-                    .map_err(|e| AdkError::Tool(format!("Invalid parameters: {}", e)))?;
+pub struct ListFilesTool;
 
-                match std::fs::read_to_string(&params.path) {
-                    Ok(content) => Ok(json!({
-                        "success": true,
-                        "path": params.path,
-                        "content": content,
-                        "size": content.len()
-                    })),
-                    Err(e) => Err(AdkError::Tool(format!(
-                        "Failed to read file '{}': {}",
-                        params.path, e
-                    ))),
+#[async_trait]
+impl Tool for ListFilesTool {
+    fn name(&self) -> &str {
+        "list_files"
+    }
+
+    fn description(&self) -> &str {
+        "List files in a directory (recursively or non-recursively). \
+         SECURITY: Only works within current directory. \
+         Useful for understanding project structure."
+    }
+
+    fn parameters_schema(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Directory path to list (default: current directory). Must be relative path."
+                },
+                "recursive": {
+                    "type": "boolean",
+                    "description": "Whether to list files recursively (default: false)"
+                },
+                "max_depth": {
+                    "type": "integer",
+                    "description": "Maximum depth for recursive listing (default: 3)"
                 }
-            },
-        )
-        .with_parameters_schema::<ReadFileParams>(),
-    );
+            }
+        }))
+    }
 
-    // 2. 写入文件工具
-    let write_file = Arc::new(
-        FunctionTool::new(
-            "write_file",
-            "Write content to a file. Creates the file if it doesn't exist, overwrites if it does.",
-            |_ctx, args| async move {
-                let params: WriteFileParams = serde_json::from_value(args)
-                    .map_err(|e| AdkError::Tool(format!("Invalid parameters: {}", e)))?;
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let path = args.get("path")
+            .and_then(|v| v.as_str())
+            .unwrap_or(".");
+        
+        // Security check
+        let safe_path = match validate_path_security(path) {
+            Ok(p) => p,
+            Err(e) => {
+                return Ok(json!({
+                    "status": "security_error",
+                    "message": e
+                }));
+            }
+        };
+        
+        let recursive = args.get("recursive")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        
+        let max_depth = args.get("max_depth")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(3) as usize;
 
-                // 确保父目录存在
-                if let Some(parent) = Path::new(&params.path).parent() {
-                    if !parent.exists() {
-                        std::fs::create_dir_all(parent).map_err(|e| {
-                            AdkError::Tool(format!(
-                                "Failed to create parent directories: {}",
-                                e
-                            ))
-                        })?;
-                    }
-                }
+        if !safe_path.exists() {
+            return Ok(json!({
+                "status": "error",
+                "message": format!("Path not found: {}", path)
+            }));
+        }
 
-                match std::fs::write(&params.path, &params.content) {
-                    Ok(_) => Ok(json!({
-                        "success": true,
-                        "path": params.path,
-                        "bytes_written": params.content.len()
-                    })),
-                    Err(e) => Err(AdkError::Tool(format!(
-                        "Failed to write file '{}': {}",
-                        params.path, e
-                    ))),
-                }
-            },
-        )
-        .with_parameters_schema::<WriteFileParams>(),
-    );
+        let mut files = Vec::new();
+        let mut directories = Vec::new();
 
-    // 3. 列出目录工具（使用 ignore crate 处理 .gitignore）
-    let list_dir = Arc::new(
-        FunctionTool::new(
-            "list_directory",
-            "List files and directories in a directory. Automatically respects .gitignore rules and excludes hidden files by default. Use include_hidden=true to show hidden files.",
-            |_ctx, args| async move {
-                let params: ListDirParams = serde_json::from_value(args)
-                    .map_err(|e| AdkError::Tool(format!("Invalid parameters: {}", e)))?;
-
-                let mut entries = Vec::new();
+        if recursive {
+            // Recursive listing with max depth
+            for entry in WalkDir::new(&safe_path)
+                .max_depth(max_depth)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
+                let path_str = entry.path().display().to_string();
                 
-                // 使用 ignore crate 构建 walker（自动处理 .gitignore）
-                let walker = build_gitignore_walker(&params.path, params.recursive, params.include_hidden);
-
-                for result in walker {
-                    match result {
-                        Ok(entry) => {
-                            let path = entry.path();
-                            
-                            // 跳过根目录自身
-                            if path == Path::new(&params.path) {
-                                continue;
-                            }
-                            
-                            let path_str = path.to_string_lossy().to_string();
-                            let is_dir = path.is_dir();
-                            let is_file = path.is_file();
-                            
-                            let size = if is_file {
-                                std::fs::metadata(path).ok().map(|m| m.len()).unwrap_or(0)
-                            } else {
-                                0
-                            };
-
-                            entries.push(json!({
-                                "path": path_str,
-                                "is_dir": is_dir,
-                                "is_file": is_file,
-                                "size": size
-                            }));
-                        }
-                        Err(e) => {
-                            // 记录错误但继续处理其他文件
-                            tracing::warn!("Error walking directory: {}", e);
-                        }
-                    }
+                // Skip hidden files and common ignore patterns
+                if should_ignore(&path_str) {
+                    continue;
                 }
 
-                Ok(json!({
-                    "success": true,
-                    "path": params.path,
-                    "count": entries.len(),
-                    "entries": entries,
-                    "note": "Hidden files and .gitignore patterns are excluded by default"
-                }))
-            },
-        )
-        .with_parameters_schema::<ListDirParams>(),
-    );
-
-    // 4. 检查文件是否存在工具
-    let file_exists = Arc::new(
-        FunctionTool::new(
-            "file_exists",
-            "Check if a file or directory exists.",
-            |_ctx, args| async move {
-                let params: FileExistsParams = serde_json::from_value(args)
-                    .map_err(|e| AdkError::Tool(format!("Invalid parameters: {}", e)))?;
-
-                let path = Path::new(&params.path);
-                let exists = path.exists();
-                let is_dir = path.is_dir();
-                let is_file = path.is_file();
-
-                Ok(json!({
-                    "path": params.path,
-                    "exists": exists,
-                    "is_dir": is_dir,
-                    "is_file": is_file
-                }))
-            },
-        )
-        .with_parameters_schema::<FileExistsParams>(),
-    );
-
-    // 5. 创建目录工具
-    let create_dir = Arc::new(
-        FunctionTool::new(
-            "create_directory",
-            "Create a directory. Can create parent directories if recursive is true.",
-            |_ctx, args| async move {
-                let params: CreateDirParams = serde_json::from_value(args)
-                    .map_err(|e| AdkError::Tool(format!("Invalid parameters: {}", e)))?;
-
-                let result = if params.recursive {
-                    std::fs::create_dir_all(&params.path)
+                if entry.file_type().is_dir() {
+                    directories.push(path_str);
                 } else {
-                    std::fs::create_dir(&params.path)
-                };
+                    files.push(path_str);
+                }
+            }
+        } else {
+            // Non-recursive listing
+            let entries = fs::read_dir(&safe_path)
+                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read directory: {}", e)))?;
 
-                match result {
-                    Ok(_) => Ok(json!({
-                        "success": true,
-                        "path": params.path
-                    })),
-                    Err(e) => Err(AdkError::Tool(format!(
-                        "Failed to create directory '{}': {}",
-                        params.path, e
-                    ))),
+            for entry in entries {
+                let entry = entry.map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+                let path_str = entry.path().display().to_string();
+
+                if should_ignore(&path_str) {
+                    continue;
+                }
+
+                if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                    directories.push(path_str);
+                } else {
+                    files.push(path_str);
+                }
+            }
+        }
+
+        Ok(json!({
+            "status": "success",
+            "path": path,
+            "files": files,
+            "directories": directories,
+            "total_files": files.len(),
+            "total_directories": directories.len()
+        }))
+    }
+}
+
+fn should_ignore(path: &str) -> bool {
+    let ignore_patterns = vec![
+        "/.git/", "/target/", "/node_modules/", "/.cowork/", "/.litho/",
+        "/.idea/", "/.vscode/", "/dist/", "/build/", "/docs/", "/tests/",
+        ".DS_Store", "Thumbs.db"
+    ];
+
+    ignore_patterns.iter().any(|pattern| path.contains(pattern))
+}
+
+// ============================================================================
+// ReadFileTool
+// ============================================================================
+
+pub struct ReadFileTool;
+
+#[async_trait]
+impl Tool for ReadFileTool {
+    fn name(&self) -> &str {
+        "read_file"
+    }
+
+    fn description(&self) -> &str {
+        "Read the contents of a file. \
+         SECURITY: Only works within current directory."
+    }
+
+    fn parameters_schema(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "File path to read (must be relative path within current directory)"
                 }
             },
-        )
-        .with_parameters_schema::<CreateDirParams>(),
-    );
+            "required": ["path"]
+        }))
+    }
 
-    // 6. 读取文件范围工具（用于大文件）
-    let read_file_range = Arc::new(
-        FunctionTool::new(
-            "read_file_range",
-            "Read a specific range of lines from a file. Useful for large files to avoid context overflow. Line numbers are 1-based.",
-            |_ctx, args| async move {
-                let params: ReadFileRangeParams = serde_json::from_value(args)
-                    .map_err(|e| AdkError::Tool(format!("Invalid parameters: {}", e)))?;
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let path = args["path"].as_str().unwrap();
 
-                let content = std::fs::read_to_string(&params.path)
-                    .map_err(|e| AdkError::Tool(format!("Failed to read file '{}': {}", params.path, e)))?;
+        // Security check
+        let safe_path = match validate_path_security(path) {
+            Ok(p) => p,
+            Err(e) => {
+                return Ok(json!({
+                    "status": "security_error",
+                    "message": e
+                }));
+            }
+        };
 
-                let lines: Vec<&str> = content.lines().collect();
-                let total_lines = lines.len();
+        if !safe_path.exists() {
+            return Ok(json!({
+                "status": "error",
+                "message": format!("File not found: {}", path)
+            }));
+        }
+        
+        match fs::read_to_string(&safe_path) {
+            Ok(content) => Ok(json!({
+                "status": "success",
+                "path": path,
+                "content": content
+            })),
+            Err(e) => Ok(json!({
+                "status": "error",
+                "message": format!("Failed to read file: {}", e)
+            })),
+        }
+    }
+}
 
-                if params.start_line < 1 || params.start_line > total_lines {
-                    return Err(AdkError::Tool(format!(
-                        "Invalid start_line: {} (file has {} lines)",
-                        params.start_line, total_lines
-                    )));
+// ============================================================================
+// WriteFileTool
+// ============================================================================
+
+pub struct WriteFileTool;
+
+#[async_trait]
+impl Tool for WriteFileTool {
+    fn name(&self) -> &str {
+        "write_file"
+    }
+
+    fn description(&self) -> &str {
+        "Write content to a file. Creates parent directories if needed. \
+         SECURITY: Only works within current directory. Absolute paths and .. are forbidden."
+    }
+
+    fn parameters_schema(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "File path to write (must be relative path within current directory)"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Content to write"
                 }
+            },
+            "required": ["path", "content"]
+        }))
+    }
 
-                let start_idx = params.start_line - 1;
-                let end_idx = match params.end_line {
-                    Some(end) if end > 0 => end.min(total_lines),
-                    _ => total_lines,
-                };
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let path = args["path"].as_str().unwrap();
+        let content = args["content"].as_str().unwrap();
 
-                let selected_lines = &lines[start_idx..end_idx];
-                let selected_content = selected_lines.join("\n");
+        // Security check
+        let safe_path = match validate_path_security(path) {
+            Ok(p) => p,
+            Err(e) => {
+                return Ok(json!({
+                    "status": "security_error",
+                    "message": e
+                }));
+            }
+        };
 
+        // Create parent directories if needed
+        if let Some(parent) = safe_path.parent() {
+            fs::create_dir_all(parent).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+        }
+
+        match fs::write(&safe_path, content) {
+            Ok(_) => {
+                // Log file creation for user visibility
+                println!("📝 Writing file: {} ({} lines)", path, content.lines().count());
                 Ok(json!({
-                    "success": true,
-                    "path": params.path,
-                    "start_line": params.start_line,
-                    "end_line": end_idx,
-                    "total_lines": total_lines,
-                    "content": selected_content,
-                    "lines_read": selected_lines.len()
+                    "status": "success",
+                    "path": path,
+                    "lines_written": content.lines().count()
                 }))
             },
+            Err(e) => Ok(json!({
+                "status": "error",
+                "message": format!("Failed to write file: {}", e)
+            })),
+        }
+    }
+}
+
+// ============================================================================
+// RunCommandTool with blocking detection
+// ============================================================================
+
+pub struct RunCommandTool;
+
+/// Detect if a command is a long-running service that would block execution
+fn is_blocking_service_command(command: &str) -> bool {
+    let blocking_patterns = vec![
+        "http.server",      // python -m http.server
+        "npm run dev",      // npm dev server
+        "npm start",        // npm start
+        "yarn dev",
+        "yarn start",
+        "pnpm dev",
+        "pnpm start",
+        "uvicorn",          // Python ASGI server
+        "gunicorn",         // Python WSGI server
+        "flask run",
+        "django runserver",
+        "rails server",
+        "cargo run",        // Might be a server
+        "serve",            // serve package
+        "webpack-dev-server",
+        "vite",
+        "next dev",
+    ];
+
+    blocking_patterns.iter().any(|pattern| command.contains(pattern))
+}
+
+#[async_trait]
+impl Tool for RunCommandTool {
+    fn name(&self) -> &str {
+        "run_command"
+    }
+
+    fn description(&self) -> &str {
+        "Execute a shell command and return the output. \
+         WARNING: This tool will REJECT commands that start long-running services \
+         (like http.server, npm dev, etc.) as they would block execution. \
+         Use this for: building, testing, linting - NOT for starting servers."
+    }
+
+    fn parameters_schema(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "Shell command to execute (must not be a blocking service command)"
+                }
+            },
+            "required": ["command"]
+        }))
+    }
+
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let command = args["command"].as_str().unwrap();
+
+        // Check if command would block
+        if is_blocking_service_command(command) {
+            return Ok(json!({
+                "status": "rejected",
+                "message": format!(
+                    "BLOCKED: This command appears to start a long-running service: '{}'. \
+                     Starting services would block the agent. \
+                     If you need to verify the code works, just create the files - don't start servers.",
+                    command
+                )
+            }));
+        }
+
+        // Execute command with timeout
+        let output = tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            tokio::process::Command::new("sh")
+                .arg("-c")
+                .arg(command)
+                .current_dir(std::env::current_dir().unwrap()) // Run in current dir
+                .output()
         )
-        .with_parameters_schema::<ReadFileRangeParams>(),
-    );
+        .await;
 
-    // 7. 替换行范围工具
-    let replace_line_range = Arc::new(
-        FunctionTool::new(
-            "replace_line_range",
-            "Replace a range of lines in a file with new content. Useful for modifying specific sections without rewriting the entire file. Line numbers are 1-based.",
-            |_ctx, args| async move {
-                let params: ReplaceLineRangeParams = serde_json::from_value(args)
-                    .map_err(|e| AdkError::Tool(format!("Invalid parameters: {}", e)))?;
-
-                let content = std::fs::read_to_string(&params.path)
-                    .map_err(|e| AdkError::Tool(format!("Failed to read file '{}': {}", params.path, e)))?;
-
-                let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
-                let total_lines = lines.len();
-
-                if params.start_line < 1 || params.start_line > total_lines {
-                    return Err(AdkError::Tool(format!("Invalid start_line: {}", params.start_line)));
-                }
-                if params.end_line < params.start_line || params.end_line > total_lines {
-                    return Err(AdkError::Tool(format!("Invalid end_line: {}", params.end_line)));
-                }
-
-                // 替换指定范围
-                let start_idx = params.start_line - 1;
-                let end_idx = params.end_line;
-                
-                let new_lines: Vec<String> = params.new_content.lines().map(|s| s.to_string()).collect();
-                lines.splice(start_idx..end_idx, new_lines.clone());
-
-                let new_content = lines.join("\n");
-                std::fs::write(&params.path, new_content)
-                    .map_err(|e| AdkError::Tool(format!("Failed to write file: {}", e)))?;
+        match output {
+            Ok(Ok(output)) => {
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
                 Ok(json!({
-                    "success": true,
-                    "path": params.path,
-                    "replaced_lines": format!("{}-{}", params.start_line, params.end_line),
-                    "new_line_count": new_lines.len(),
-                    "total_lines_after": lines.len()
+                    "status": if output.status.success() { "success" } else { "failed" },
+                    "exit_code": output.status.code(),
+                    "stdout": stdout,
+                    "stderr": stderr
                 }))
-            },
-        )
-        .with_parameters_schema::<ReplaceLineRangeParams>(),
-    );
-
-    // 8. 插入行工具
-    let insert_lines = Arc::new(
-        FunctionTool::new(
-            "insert_lines",
-            "Insert new lines after a specific line number. Line numbers are 1-based. Use after_line=0 to insert at the beginning.",
-            |_ctx, args| async move {
-                let params: InsertLinesParams = serde_json::from_value(args)
-                    .map_err(|e| AdkError::Tool(format!("Invalid parameters: {}", e)))?;
-
-                let content = std::fs::read_to_string(&params.path)
-                    .map_err(|e| AdkError::Tool(format!("Failed to read file '{}': {}", params.path, e)))?;
-
-                let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
-                let total_lines = lines.len();
-
-                if params.after_line > total_lines {
-                    return Err(AdkError::Tool(format!(
-                        "Invalid after_line: {} (file has {} lines)",
-                        params.after_line, total_lines
-                    )));
-                }
-
-                let new_lines: Vec<String> = params.content.lines().map(|s| s.to_string()).collect();
-                let insert_idx = params.after_line;
-                
-                for (i, line) in new_lines.iter().enumerate() {
-                    lines.insert(insert_idx + i, line.clone());
-                }
-
-                let new_content = lines.join("\n");
-                std::fs::write(&params.path, new_content)
-                    .map_err(|e| AdkError::Tool(format!("Failed to write file: {}", e)))?;
-
+            }
+            Ok(Err(e)) => {
                 Ok(json!({
-                    "success": true,
-                    "path": params.path,
-                    "inserted_after_line": params.after_line,
-                    "lines_inserted": new_lines.len(),
-                    "total_lines_after": lines.len()
+                    "status": "error",
+                    "message": format!("Failed to execute command: {}", e)
                 }))
-            },
-        )
-        .with_parameters_schema::<InsertLinesParams>(),
-    );
-
-    // 9. 删除行范围工具
-    let delete_line_range = Arc::new(
-        FunctionTool::new(
-            "delete_line_range",
-            "Delete a range of lines from a file. Line numbers are 1-based.",
-            |_ctx, args| async move {
-                let params: DeleteLineRangeParams = serde_json::from_value(args)
-                    .map_err(|e| AdkError::Tool(format!("Invalid parameters: {}", e)))?;
-
-                let content = std::fs::read_to_string(&params.path)
-                    .map_err(|e| AdkError::Tool(format!("Failed to read file '{}': {}", params.path, e)))?;
-
-                let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
-                let total_lines = lines.len();
-
-                if params.start_line < 1 || params.start_line > total_lines {
-                    return Err(AdkError::Tool(format!("Invalid start_line: {}", params.start_line)));
-                }
-                if params.end_line < params.start_line || params.end_line > total_lines {
-                    return Err(AdkError::Tool(format!("Invalid end_line: {}", params.end_line)));
-                }
-
-                let start_idx = params.start_line - 1;
-                let end_idx = params.end_line;
-                let deleted_count = end_idx - start_idx;
-                
-                lines.drain(start_idx..end_idx);
-
-                let new_content = lines.join("\n");
-                std::fs::write(&params.path, new_content)
-                    .map_err(|e| AdkError::Tool(format!("Failed to write file: {}", e)))?;
-
+            }
+            Err(_) => {
                 Ok(json!({
-                    "success": true,
-                    "path": params.path,
-                    "deleted_lines": format!("{}-{}", params.start_line, params.end_line),
-                    "lines_deleted": deleted_count,
-                    "total_lines_after": lines.len()
+                    "status": "timeout",
+                    "message": "Command execution timeout (30s limit)"
                 }))
-            },
-        )
-        .with_parameters_schema::<DeleteLineRangeParams>(),
-    );
-
-    // 10. 追加到文件工具
-    let append_to_file = Arc::new(
-        FunctionTool::new(
-            "append_to_file",
-            "Append content to the end of a file. Adds a newline before the content if the file doesn't end with one.",
-            |_ctx, args| async move {
-                let params: AppendToFileParams = serde_json::from_value(args)
-                    .map_err(|e| AdkError::Tool(format!("Invalid parameters: {}", e)))?;
-
-                let mut file = std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(&params.path)
-                    .map_err(|e| AdkError::Tool(format!("Failed to open file '{}': {}", params.path, e)))?;
-
-                use std::io::Write;
-                
-                // 如果文件不为空且不以换行结尾，先加个换行
-                let metadata = file.metadata()
-                    .map_err(|e| AdkError::Tool(format!("Failed to get metadata: {}", e)))?;
-                
-                if metadata.len() > 0 {
-                    write!(file, "\n")
-                        .map_err(|e| AdkError::Tool(format!("Failed to write newline: {}", e)))?;
-                }
-
-                write!(file, "{}", params.content)
-                    .map_err(|e| AdkError::Tool(format!("Failed to append content: {}", e)))?;
-
-                Ok(json!({
-                    "success": true,
-                    "path": params.path,
-                    "bytes_appended": params.content.len()
-                }))
-            },
-        )
-        .with_parameters_schema::<AppendToFileParams>(),
-    );
-
-    FileToolsBundle {
-        read_file,
-        write_file,
-        list_dir,
-        file_exists,
-        create_dir,
-        read_file_range,
-        replace_line_range,
-        insert_lines,
-        delete_line_range,
-        append_to_file,
+            }
+        }
     }
 }
