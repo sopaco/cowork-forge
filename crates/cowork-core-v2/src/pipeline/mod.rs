@@ -47,33 +47,41 @@ pub fn create_cowork_pipeline(config: &ModelConfig) -> Result<Arc<dyn Agent>> {
     Ok(Arc::new(pipeline))
 }
 
-/// Create a resume pipeline (skip Idea stage)
+/// Create a resume pipeline (skip Idea stage and completed stages)
 /// 
-/// Use this when resuming an existing project
+/// This function intelligently determines which stage to resume from
+/// by checking what data files already exist.
 pub fn create_resume_pipeline(config: &ModelConfig) -> Result<Arc<dyn Agent>> {
+    use crate::storage::*;
+    use std::path::Path;
+    
     let llm = create_llm_client(&config.llm)?;
 
-    // Skip idea agent when resuming
-    let prd_loop = create_prd_loop(llm.clone())?;
-    let design_loop = create_design_loop(llm.clone())?;
-    let plan_loop = create_plan_loop(llm.clone())?;
-    let coding_loop = create_coding_loop(llm.clone())?;
-    let check_agent = create_check_agent(llm.clone())?;
-    let delivery_agent = create_delivery_agent(llm)?;
+    // Determine which stage to start from based on existing data
+    let start_stage = if Path::new(".cowork/artifacts/delivery_report.md").exists() {
+        // Everything is done
+        anyhow::bail!("Project already completed. Check .cowork/artifacts/delivery_report.md");
+    } else if Path::new(".cowork/data/plan.json").exists() 
+            && Path::new(".cowork/data/design.json").exists() 
+            && Path::new(".cowork/data/requirements.json").exists() {
+        // PRD, Design, Plan exist → Resume from Coding
+        "coding"
+    } else if Path::new(".cowork/data/design.json").exists() 
+            && Path::new(".cowork/data/requirements.json").exists() {
+        // PRD, Design exist → Resume from Plan
+        "plan"
+    } else if Path::new(".cowork/data/requirements.json").exists() {
+        // PRD exists → Resume from Design
+        "design"
+    } else {
+        // Nothing exists or only idea.md → Start from PRD
+        "prd"
+    };
 
-    let pipeline = SequentialAgent::new(
-        "cowork_resume_pipeline",
-        vec![
-            prd_loop as Arc<dyn Agent>,
-            design_loop as Arc<dyn Agent>,
-            plan_loop as Arc<dyn Agent>,
-            coding_loop as Arc<dyn Agent>,
-            check_agent,
-            delivery_agent,
-        ],
-    );
+    println!("📍 Resuming from: {} stage", start_stage);
 
-    Ok(Arc::new(pipeline))
+    // Use create_partial_pipeline to start from the determined stage
+    create_partial_pipeline(config, start_stage)
 }
 
 /// Create a partial pipeline starting from a specific stage

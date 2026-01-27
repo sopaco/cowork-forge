@@ -188,8 +188,8 @@ impl Tool for ListFilesTool {
 
 fn should_ignore(path: &str) -> bool {
     let ignore_patterns = vec![
-        "/.git/", "/target/", "/node_modules/", "/.cowork/",
-        "/.idea/", "/.vscode/", "/dist/", "/build/",
+        "/.git/", "/target/", "/node_modules/", "/.cowork/", "/.litho/",
+        "/.idea/", "/.vscode/", "/dist/", "/build/", "/docs/", "/tests/",
         ".DS_Store", "Thumbs.db"
     ];
 

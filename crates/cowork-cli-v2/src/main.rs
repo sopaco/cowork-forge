@@ -58,10 +58,18 @@ enum Commands {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Setup logging
-    let log_level = if cli.verbose { "debug" } else { "info" };
+    // Setup logging - output to stderr, not stdout
+    let log_filter = if cli.verbose {
+        // Verbose mode: show all logs including adk internals
+        "debug".to_string()
+    } else {
+        // Normal mode: filter out adk verbose logs to avoid clutter
+        "info,adk_agent=warn,adk_core=warn,adk_runner=warn".to_string()
+    };
+    
     tracing_subscriber::fmt()
-        .with_env_filter(log_level)
+        .with_writer(std::io::stderr) // Force logs to stderr
+        .with_env_filter(log_filter)
         .init();
 
     // Load configuration
@@ -164,7 +172,6 @@ async fn cmd_modify(from_stage: &str, config: &ModelConfig) -> Result<()> {
 
 /// Execute a pipeline with given input
 async fn execute_pipeline(pipeline: Arc<dyn adk_core::Agent>, input: &str) -> Result<()> {
-    use indicatif::{ProgressBar, ProgressStyle};
     use adk_core::RunConfig;
     use adk_session::{CreateRequest, SessionService};
     use std::collections::HashMap;
@@ -198,45 +205,28 @@ async fn execute_pipeline(pipeline: Arc<dyn adk_core::Agent>, input: &str) -> Re
         run_config: Some(RunConfig::default()),
     })?;
 
-    // Create progress bar
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.green} {msg}")
-            .unwrap(),
-    );
-    pb.set_message("Running pipeline...");
-
     // Execute
     let content = Content::new("user").with_text(input);
 
     let mut event_stream = runner.run(user_id, session_id, content).await?;
 
-    // Process events
+    // Disable streaming output to avoid LLM's erratic newline tokens
+    // Only HITL tool outputs (println! from tools) will be visible
+    
     while let Some(event_result) = event_stream.next().await {
         match event_result {
-            Ok(event) => {
-                // Print agent output
-                if let Some(content) = &event.llm_response.content {
-                    for part in &content.parts {
-                        if let Some(text) = part.text() {
-                            pb.suspend(|| {
-                                print!("{}", text);
-                            });
-                        }
-                    }
-                }
+            Ok(_event) => {
+                // Silent - let tools handle their own output
+                // HITL tools will print directly via println!
             }
             Err(e) => {
-                pb.finish_and_clear();
                 error!("Error during pipeline execution: {}", e);
                 anyhow::bail!("Pipeline execution failed: {}", e);
             }
         }
     }
 
-    pb.finish_with_message("Pipeline complete!");
-    println!(); // Add newline after progress bar
+    println!("\n✅ Pipeline complete!");
 
     Ok(())
 }

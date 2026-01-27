@@ -240,7 +240,12 @@ impl Tool for CreateDesignComponentTool {
 
         let comp_id = generate_id("COMP", design.architecture.components.len());
 
-        let component_type = match args["component_type"].as_str().unwrap() {
+        // Parse component_type with error handling
+        let component_type = args.get("component_type")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'component_type' parameter".to_string()))?;
+        
+        let component_type = match component_type {
             "backend_service" => ComponentType::BackendService,
             "frontend_component" => ComponentType::FrontendComponent,
             "database" => ComponentType::Database,
@@ -248,22 +253,43 @@ impl Tool for CreateDesignComponentTool {
             other => ComponentType::Other(other.to_string()),
         };
 
+        // Parse required fields with error handling
+        let name = args.get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'name' parameter".to_string()))?
+            .to_string();
+
+        let technology = args.get("technology")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'technology' parameter".to_string()))?
+            .to_string();
+
+        // Parse responsibilities array with error handling
+        let responsibilities = args.get("responsibilities")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'responsibilities' parameter (must be an array)".to_string()))?
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect::<Vec<String>>();
+
+        if responsibilities.is_empty() {
+            return Err(AdkError::Tool("'responsibilities' array cannot be empty".to_string()));
+        }
+
+        // Parse optional related_features
+        let related_features = args.get("related_features")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+            .unwrap_or_default();
+
         let component = DesignComponent {
             id: comp_id.clone(),
-            name: args["name"].as_str().unwrap().to_string(),
+            name,
             component_type,
-            responsibilities: args["responsibilities"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|v| v.as_str().unwrap().to_string())
-                .collect(),
-            technology: args["technology"].as_str().unwrap().to_string(),
+            responsibilities,
+            technology,
             interfaces: vec![],
-            related_features: args.get("related_features")
-                .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().map(|v| v.as_str().unwrap().to_string()).collect())
-                .unwrap_or_default(),
+            related_features,
         };
 
         design.architecture.components.push(component);

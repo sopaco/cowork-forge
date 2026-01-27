@@ -158,15 +158,15 @@ pub fn create_coding_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
         .tool(Arc::new(ReadFileTool))
         .tool(Arc::new(ListFilesTool))
         .tool(Arc::new(RunCommandTool))
-        .tool(Arc::new(CheckTestsTool))
-        .tool(Arc::new(CheckLintTool))
+        // Removed check_tests and check_lint - not applicable for pure frontend projects
         .tool(Arc::new(ProvideFeedbackTool))
         .include_contents(IncludeContents::None)
         .build()?;
 
     let mut loop_agent = LoopAgent::new("coding_loop", vec![Arc::new(coding_actor), Arc::new(coding_critic)]);
-    // Coding needs more iterations as it implements multiple tasks
-    loop_agent = loop_agent.with_max_iterations(20);
+    // Coding needs a few iterations to implement and review tasks
+    // Reduced from 20 to 5 to avoid excessive loops
+    loop_agent = loop_agent.with_max_iterations(5);
 
     Ok(Arc::new(loop_agent))
 }
@@ -210,6 +210,8 @@ pub fn create_delivery_agent(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Ag
         .tool(Arc::new(GetDesignTool))
         .tool(Arc::new(GetPlanTool))
         .tool(Arc::new(LoadFeedbackHistoryTool))
+        .tool(Arc::new(ListFilesTool))  // Added to verify project files exist
+        .tool(Arc::new(ReadFileTool))   // For checking file content
         .tool(Arc::new(SaveDeliveryReportTool))
         .tool(Arc::new(SavePrdDocTool))
         .tool(Arc::new(SaveDesignDocTool))

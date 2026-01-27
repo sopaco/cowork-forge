@@ -24,7 +24,6 @@ adk-core = "0.2.1"
 clap = { workspace = true }
 dialoguer = "0.12"
 console = "0.16"
-indicatif = "0.18"
 
 # Error handling
 anyhow = { workspace = true }
