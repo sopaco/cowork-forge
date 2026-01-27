@@ -491,15 +491,21 @@ impl Tool for UpdateTaskStatusTool {
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let mut plan = load_implementation_plan().map_err(|e| AdkError::Tool(e.to_string()))?;
 
-        let task_id = args["task_id"].as_str().unwrap();
-        let new_status_str = args["new_status"].as_str().unwrap();
+        // Parse parameters with error handling
+        let task_id = args.get("task_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'task_id' parameter".to_string()))?;
+        
+        let new_status_str = args.get("new_status")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'new_status' parameter".to_string()))?;
 
         let new_status = match new_status_str {
             "pending" => TaskStatus::Pending,
             "in_progress" => TaskStatus::InProgress,
             "completed" => TaskStatus::Completed,
             "blocked" => TaskStatus::Blocked,
-            _ => TaskStatus::Pending,
+            _ => return Err(AdkError::Tool(format!("Invalid status: {}. Must be one of: pending, in_progress, completed, blocked", new_status_str))),
         };
 
         if let Some(task) = plan.tasks.iter_mut().find(|t| t.id == task_id) {
@@ -510,6 +516,9 @@ impl Tool for UpdateTaskStatusTool {
                 _ => {}
             }
             save_implementation_plan(&plan).map_err(|e| AdkError::Tool(e.to_string()))?;
+
+            // Log for user visibility
+            println!("✓ Task {} → {}", task_id, new_status_str);
 
             Ok(json!({
                 "status": "success",
