@@ -16,7 +16,8 @@
 <p align="center">使用 Rust 构建，Cowork Forge 通过协调智能 AI 智能体，实现从需求到交付的完整软件开发生命周期自动化。</p>
 
 <p align="center">
-  <a href="https://github.com/sopaco/cowork-forge/tree/main/litho.docs"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-Docs-green?logo=Gitbook&color=%23008a60">
+  <a href="https://github.com/sopaco/cowork-forge/tree/main/litho.docs/en"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-Docs-green?logo=Gitbook&color=%23008a60">
+  <a href="https://github.com/sopaco/cowork-forge/tree/main/litho.docs/zh"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-中文-green?logo=Gitbook&color=%23008a60">
   <a href="https://github.com/sopaco/cowork-forge"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/sopaco/cowork-forge/rust.yml?label=Build">
   <a href="./LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue.svg?label=LICENSE" />
 </p>
@@ -27,7 +28,7 @@
 
 <strong>Cowork Forge</strong> 是一个完整的、生产就绪的框架，通过智能多智能体协作实现软件开发自动化。它超越了简单的代码生成，提供了一个全面的系统，协调专业的 AI 智能体处理软件开发生命周期的每个阶段。
 
-由 Rust 和 LLM 驱动，Cowork Forge 协调 8 个专业智能体协同工作，将你的想法转化为生产就绪的代码。从需求收集和 PRD 生成，到技术设计、实施计划、编码和质量验证——Cowork Forge 全部管理，并在关键决策点进行人工验证。
+由 Rust 和 LLM 驱动，Cowork Forge 协调 7 个专业智能体协同工作，将你的想法转化为生产就绪的代码。从需求收集和 PRD 生成，到技术设计、实施计划、编码和质量验证——Cowork Forge 全部管理，并在关键决策点进行人工验证。
 
 <p align="center">
   <strong>让你的开发工作流程通过像真实开发团队一样思考、规划和协作的 AI 智能体得到变革。</strong>
@@ -69,7 +70,7 @@
 # 😺 为什么选择 Cowork Forge？
 
 - <strong>端到端自动化：</strong> 从想法到交付，Cowork Forge 通过协调的 AI 智能体自动化整个软件开发生命周期。
-- <strong>多智能体协作：</strong> 8 个专业智能体协同工作，每个都在其领域带来专业知识——需求、设计、规划、编码和验证。
+- <strong>多智能体协作：</strong> 7 个专业智能体协同工作，每个都在其领域带来专业知识——需求、设计、规划、编码和验证。其中 4 个关键阶段（PRD、设计、规划、编码）采用智能体循环模式进行迭代优化。
 - <strong>人机协作：</strong> 关键决策点包含人工验证，在保持自动化效率的同时确保质量和控制。
 - <strong>增量代码更新：</strong> 智能代码分析实现有针对性的更新，无需重新生成整个代码库，保留你的自定义内容。
 - <strong>多语言支持：</strong> 内置支持 Rust、Python、JavaScript/TypeScript 等，并自动检测项目类型。
@@ -104,15 +105,14 @@ Cowork Forge 在 AI 开发工具领域通过其独特的多智能体架构和全
 与仅协助编写单行代码的代码补全工具不同，Cowork Forge 管理整个软件开发过程——从初始想法收集到最终交付。这种全面的方法确保所有阶段的一致性和可追溯性。
 
 ### 2. 多智能体协作
-Cowork Forge 的 8 个专业智能体像真实开发团队一样协同工作：
-- <strong>需求采集智能体</strong>: 结构化用户需求
-- <strong>PRD 智能体</strong>: 生成全面的 PRD
-- <strong>设计智能体</strong>: 创建技术架构（C4 模型）
-- <strong>计划智能体</strong>: 分解实施任务
-- <strong>编码阶段智能体</strong>: 规划和执行代码变更
-- <strong>检查智能体</strong>: 验证代码质量并运行测试
-- <strong>反馈智能体</strong>: 分析用户反馈并确定重做范围
-- <strong>交付智能体</strong>: 生成交付报告
+Cowork Forge 的 7 个专业智能体像真实开发团队一样协同工作：
+- <strong>Idea Agent</strong>: 捕获并结构化用户需求
+- <strong>PRD Loop Agent</strong>: 使用演员-评论家模式生成全面的 PRD
+- <strong>Design Loop Agent</strong>: 使用演员-评论家模式创建技术架构
+- <strong>Plan Loop Agent</strong>: 使用演员-评论家模式分解实施任务
+- <strong>Coding Loop Agent</strong>: 使用演员-评论家模式规划和执行代码变更
+- <strong>Check Agent</strong>: 验证代码质量和完整性
+- <strong>Delivery Agent</strong>: 生成全面的交付报告
 
 ### 3. 人机协作验证
 关键输出需要人工确认才能继续，确保：
@@ -138,8 +138,8 @@ Cowork Forge 的 8 个专业智能体像真实开发团队一样协同工作：
 
 # 🌠 功能与特性
 
-- <strong>8 阶段开发工作流：</strong> 涵盖需求采集 → PRD 生成 → 技术设计 → 实施计划 → 编码 → 检查 → 反馈 → 交付的完整工作流。
-- <strong>专业 AI 智能体：</strong> 每个阶段由具有领域特定专业知识和工具的专用智能体处理。
+- <strong>7 阶段开发工作流：</strong> 涵盖需求采集 → PRD 生成 → 技术设计 → 实施计划 → 编码 → 质量检查 → 交付的完整工作流。
+- <strong>专业 AI 智能体：</strong> 每个阶段由具有领域特定专业知识的专用智能体处理。4 个关键阶段（PRD、设计、规划、编码）使用演员-评论家循环进行迭代优化。
 - <strong>智能代码规划：</strong> 分析项目结构、依赖关系，生成精确的代码变更计划。
 - <strong>增量代码更新：</strong> 智能增量分析只更新受影响的文件，保留现有修改。
 - <strong>自动化质量验证：</strong> 多语言构建/测试集成，包含全面的错误分析和报告。
@@ -165,14 +165,13 @@ graph TB
     end
     
     subgraph "智能体层"
-        IDEA[需求采集智能体]
-        PRD[PRD 智能体]
-        DESIGN[设计智能体]
-        PLAN[计划智能体]
-        CODING[编码阶段智能体]
-        CHECK[检查智能体]
-        FEEDBACK[反馈智能体]
-        DELIVERY[交付智能体]
+        IDEA[Idea Agent]
+        PRD[PRD Loop Agent]
+        DESIGN[Design Loop Agent]
+        PLAN[Plan Loop Agent]
+        CODING[Coding Loop Agent]
+        CHECK[Check Agent]
+        DELIVERY[Delivery Agent]
     end
     
     subgraph "基础设施层"
@@ -197,7 +196,6 @@ graph TB
     Exec --> PLAN
     Exec --> CODING
     Exec --> CHECK
-    Exec --> FEEDBACK
     Exec --> DELIVERY
     
     IDEA --> TOOLS
@@ -206,15 +204,6 @@ graph TB
     
     CHECK --> VERIFY
     CODING --> VERIFY
-    
-    IDEA --> MEMORY
-    PRD --> MEMORY
-    DESIGN --> MEMORY
-    PLAN --> MEMORY
-    CODING --> MEMORY
-    CHECK --> MEMORY
-    FEEDBACK --> MEMORY
-    DELIVERY --> MEMORY
     
     Exec --> HITL
     
@@ -236,7 +225,7 @@ graph TB
 为所有智能体提供统一的执行框架，具有一致的错误处理和状态管理。
 
 ### AI 智能体
-八个专业智能体，每个负责开发生命周期的特定阶段。
+七个专业智能体，每个负责开发生命周期的特定阶段。其中 4 个智能体（PRD、设计、规划、编码）使用演员-评论家循环模式进行迭代优化和人类反馈整合。
 
 ### 工具模块
 安全的文件操作和命令执行，包含安全检查和资源限制。
@@ -326,43 +315,11 @@ cargo build --release
 Cowork Forge 使用 `config.toml` 文件进行配置。在项目目录中创建一个或使用 `--config` 指定路径：
 
 ```toml
-# -----------------------------------------------------------------------------
-# OpenAI LLM 配置
-# -----------------------------------------------------------------------------
+# LLM 配置
 [llm]
 api_base_url = "https://api.openai.com/v1"
 api_key = "sk-your-openai-api-key"
-model = "gpt-4o"
-temperature = 0.7
-max_tokens = 8192
-
-# -----------------------------------------------------------------------------
-# 工作区配置
-# -----------------------------------------------------------------------------
-[workspace]
-project_root = "."  # 项目的根目录
-artifacts_dir = ".cowork/artifacts"  # 存储生成的工件的目录
-
-# -----------------------------------------------------------------------------
-# HITL（人机协作）配置
-# -----------------------------------------------------------------------------
-[hitl]
-enabled = true
-editor_command = "code"  # 用于验证的外部编辑器
-
-# -----------------------------------------------------------------------------
-# 安全配置
-# -----------------------------------------------------------------------------
-[safety]
-block_dangerous_commands = true
-allowed_build_tools = ["cargo", "npm", "pip", "make", "mvn", "gradle"]
-
-# -----------------------------------------------------------------------------
-# 日志配置
-# -----------------------------------------------------------------------------
-[logging]
-level = "info"
-file = ".cowork/logs/cowork.log"
+model_name = "gpt-5-codex"
 ```
 
 # 🚀 使用
@@ -370,37 +327,36 @@ file = ".cowork/logs/cowork.log"
 ### 启动新的开发会话
 
 ```sh
-# 使用想法启动新会话
-cowork start "构建任务管理应用的 REST API"
+# 使用想法启动新项目
+cowork new "构建任务管理应用的 REST API"
 
 # 使用配置文件启动
-cowork start "创建 Web 仪表板" --config ./config.toml
+cowork new "创建 Web 仪表板" --config ./config.toml
 
-# 恢复现有会话
-cowork resume <session-id>
+# 恢复现有项目
+cowork resume
 ```
 
 ### 会话工作流
 
-当你启动会话时，Cowork Forge 将引导你完成 8 阶段工作流：
+当你启动会话时，Cowork Forge 将引导你完成 7 阶段工作流：
 
-1. **需求采集**: 你的想法被结构化为正式规范
-2. **PRD 生成**: 创建全面的产品需求文档
-3. **技术设计**: C4 架构图和技术规范
-4. **实施计划**: 任务分解，包含里程碑和依赖关系
-5. **编码**: 代码被规划和执行，支持增量更新
-6. **检查**: 构建、测试和质量验证
-7. **反馈**: 审查结果并在需要时请求更改
-8. **交付**: 最终交付报告，包含实施摘要
+1. **需求采集**: 你的想法被结构化为正式规范 (idea.md)
+2. **PRD 生成**: 使用演员-评论家模式创建全面的产品需求文档
+3. **技术设计**: 使用演员-评论家模式设计架构和组件规范
+4. **实施计划**: 使用演员-评论家模式分解任务及依赖关系
+5. **编码**: 使用演员-评论家模式实现代码并进行人工验证
+6. **质量检查**: 验证功能覆盖和代码完整性
+7. **交付**: 生成最终交付报告和实施摘要
 
 在每个关键阶段，你将被提示在继续之前审查和确认输出。
 
 ### 示例会话流程
 
 ```sh
-$ cowork start "构建文件转换的 CLI 工具"
+$ cowork new "构建文件转换的 CLI 工具"
 
-[阶段 1/8] 需求采集智能体
+[阶段 1/7] Idea Agent
 正在分析你的需求...
 生成的需求规格: "用于在格式之间转换文件的命令行工具"
 
@@ -445,31 +401,30 @@ $ cowork start "构建文件转换的 CLI 工具"
 - 测试: 15/15 通过
 ```
 
-### 管理会话
+### 管理项目
 
 ```sh
-# 列出所有会话
-cowork list
+# 查看项目状态
+cowork status
 
-# 查看会话状态
-cowork status <session-id>
-
-# 查看会话的工件
-cowork artifacts <session-id>
-
-# 删除会话
-cowork delete <session-id>
+# 从特定阶段修改
+cowork modify --from prd
+cowork modify --from design
+cowork modify --from plan
+cowork modify --from coding
 ```
 
 ### 配置管理
 
 ```sh
-# 显示当前配置
-cowork config show
+# 初始化配置文件
+cowork init
 
-# 更新配置
-cowork config set llm.model gpt-4-turbo
-cowork config set hitl.enabled false
+# 使用详细日志
+cowork new "你的想法" --verbose
+
+# 启用 LLM 流式输出
+cowork new "你的想法" --stream
 ```
 
 # 🔒 安全
