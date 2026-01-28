@@ -16,6 +16,9 @@ use adk_core::{Llm, IncludeContents};
 use anyhow::Result;
 use std::sync::Arc;
 
+mod hitl;
+use hitl::ResilientAgent;
+
 // ============================================================================
 // IdeaAgent - Simple agent to capture initial idea
 // ============================================================================
@@ -36,7 +39,7 @@ pub fn create_idea_agent(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>
 // PRD Loop - Actor + Critic with LoopAgent
 // ============================================================================
 
-pub fn create_prd_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
+pub fn create_prd_loop(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>> {
     let prd_actor = LlmAgentBuilder::new("prd_actor")
         .instruction(PRD_ACTOR_INSTRUCTION)
         .model(model.clone())
@@ -64,14 +67,14 @@ pub fn create_prd_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
     );
     loop_agent = loop_agent.with_max_iterations(1);
 
-    Ok(Arc::new(loop_agent))
+    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
 }
 
 // ============================================================================
 // Design Loop - Actor + Critic
 // ============================================================================
 
-pub fn create_design_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
+pub fn create_design_loop(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>> {
     let design_actor = LlmAgentBuilder::new("design_actor")
         .instruction(DESIGN_ACTOR_INSTRUCTION)
         .model(model.clone())
@@ -96,14 +99,14 @@ pub fn create_design_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
     let mut loop_agent = LoopAgent::new("design_loop", vec![Arc::new(design_actor), Arc::new(design_critic)]);
     loop_agent = loop_agent.with_max_iterations(1);
 
-    Ok(Arc::new(loop_agent))
+    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
 }
 
 // ============================================================================
 // Plan Loop - Actor + Critic
 // ============================================================================
 
-pub fn create_plan_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
+pub fn create_plan_loop(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>> {
     let plan_actor = LlmAgentBuilder::new("plan_actor")
         .instruction(PLAN_ACTOR_INSTRUCTION)
         .model(model.clone())
@@ -129,14 +132,14 @@ pub fn create_plan_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
     let mut loop_agent = LoopAgent::new("plan_loop", vec![Arc::new(plan_actor), Arc::new(plan_critic)]);
     loop_agent = loop_agent.with_max_iterations(1);
 
-    Ok(Arc::new(loop_agent))
+    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
 }
 
 // ============================================================================
 // Coding Loop - Actor + Critic
 // ============================================================================
 
-pub fn create_coding_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
+pub fn create_coding_loop(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>> {
     let coding_actor = LlmAgentBuilder::new("coding_actor")
         .instruction(CODING_ACTOR_INSTRUCTION)
         .model(model.clone())
@@ -168,7 +171,7 @@ pub fn create_coding_loop(model: Arc<dyn Llm>) -> Result<Arc<LoopAgent>> {
     // Reduced from 20 to 5 to avoid excessive loops
     loop_agent = loop_agent.with_max_iterations(5);
 
-    Ok(Arc::new(loop_agent))
+    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
 }
 
 // ============================================================================
