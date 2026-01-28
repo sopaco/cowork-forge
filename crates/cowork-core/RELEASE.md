@@ -1,4 +1,4 @@
-# Cowork Forge V2 - Release Summary
+# Cowork Forge - Release Summary
 
 ## 📦 Release Version: 1.0.0
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Pipeline Orchestration Domain** is the central coordination layer of Cowork Forge V2, responsible for managing the complete AI-powered software development lifecycle. This domain orchestrates the sequential execution of specialized AI agents, handles workflow transitions, and provides intelligent pipeline resumption capabilities.
+The **Pipeline Orchestration Domain** is the central coordination layer of Cowork Forge, responsible for managing the complete AI-powered software development lifecycle. This domain orchestrates the sequential execution of specialized AI agents, handles workflow transitions, and provides intelligent pipeline resumption capabilities.
 
 ## Core Architecture
 
@@ -214,6 +214,6 @@ pipeline.execute().await?;
 
 ## Conclusion
 
-The Pipeline Orchestration Domain serves as the central nervous system of Cowork Forge V2, providing robust workflow management, intelligent resumption capabilities, and flexible pipeline construction. Its modular design and comprehensive error handling make it a critical component for reliable AI-powered software development orchestration.
+The Pipeline Orchestration Domain serves as the central nervous system of Cowork Forge, providing robust workflow management, intelligent resumption capabilities, and flexible pipeline construction. Its modular design and comprehensive error handling make it a critical component for reliable AI-powered software development orchestration.
 
 The domain's ability to intelligently detect project states and construct appropriate workflows enables both complete project development and targeted modifications, making it an essential tool for modern software development teams leveraging AI assistance.

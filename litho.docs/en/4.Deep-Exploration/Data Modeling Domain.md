@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Data Modeling Domain provides the foundational data structures and schemas that represent the complete software development lifecycle artifacts in Cowork Forge V2. This domain ensures type safety, data integrity, and structured data handling across all development stages through comprehensive Rust structs and serialization support.
+The Data Modeling Domain provides the foundational data structures and schemas that represent the complete software development lifecycle artifacts in Cowork Forge. This domain ensures type safety, data integrity, and structured data handling across all development stages through comprehensive Rust structs and serialization support.
 
 ## Domain Architecture
 
@@ -289,4 +289,4 @@ let json = serde_json::to_string_pretty(&requirements)?;
 - Document data relationships clearly
 - Test serialization/deserialization round-trips
 
-The Data Modeling Domain provides the structural foundation for Cowork Forge V2's AI-powered development workflow, ensuring data consistency, type safety, and seamless integration across all development stages.
+The Data Modeling Domain provides the structural foundation for Cowork Forge's AI-powered development workflow, ensuring data consistency, type safety, and seamless integration across all development stages.

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Agent Management Domain is a core business domain responsible for creating, configuring, and managing specialized AI agents that orchestrate the complete software development lifecycle in Cowork Forge V2. This domain implements the factory pattern to produce seven distinct agent types that handle specific stages of development, from initial idea capture to final delivery.
+The Agent Management Domain is a core business domain responsible for creating, configuring, and managing specialized AI agents that orchestrate the complete software development lifecycle in Cowork Forge. This domain implements the factory pattern to produce seven distinct agent types that handle specific stages of development, from initial idea capture to final delivery.
 
 ## Architecture Context
 
@@ -14,7 +14,7 @@ The Agent Management Domain is a core business domain responsible for creating, 
 
 **Importance**: Critical (9.0/10.0)
 
-The Agent Management Domain sits at the heart of Cowork Forge V2, serving as the primary interface between the Pipeline Orchestration Domain and the specialized AI agents that execute development workflows. It leverages the adk-rust framework to create sophisticated agent configurations with precise tool assignments and instruction sets.
+The Agent Management Domain sits at the heart of Cowork Forge, serving as the primary interface between the Pipeline Orchestration Domain and the specialized AI agents that execute development workflows. It leverages the adk-rust framework to create sophisticated agent configurations with precise tool assignments and instruction sets.
 
 ## Critical Technical Solution
 
@@ -218,4 +218,4 @@ The Agent Management Domain is designed for extensibility, supporting:
 - **Advanced Patterns**: More sophisticated agent collaboration models
 - **Domain Specialization**: Industry-specific agent configurations
 
-This domain represents the intelligent core of Cowork Forge V2, balancing AI automation with human oversight to deliver robust, collaborative software development workflows.
+This domain represents the intelligent core of Cowork Forge, balancing AI automation with human oversight to deliver robust, collaborative software development workflows.

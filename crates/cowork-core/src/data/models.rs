@@ -1,4 +1,4 @@
-// Structured data models for Cowork Forge V2
+// Structured data models for Cowork Forge
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

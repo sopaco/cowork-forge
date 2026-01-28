@@ -1,4 +1,4 @@
-// Cowork Forge V2 - Core Library
+// Cowork Forge - Core Library
 // Built with adk-rust 0.2.1
 
 pub mod data;

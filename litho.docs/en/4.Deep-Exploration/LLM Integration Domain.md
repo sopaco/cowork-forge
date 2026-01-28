@@ -2,7 +2,7 @@
 
 ## Overview
 
-The LLM Integration Domain serves as the external AI service integration layer within Cowork Forge V2, providing configuration management and rate limiting capabilities for language model interactions. This domain enables the system's AI agents to communicate with external LLM services while maintaining performance and compliance with API rate limits.
+The LLM Integration Domain serves as the external AI service integration layer within Cowork Forge, providing configuration management and rate limiting capabilities for language model interactions. This domain enables the system's AI agents to communicate with external LLM services while maintaining performance and compliance with API rate limits.
 
 ## Module Structure
 

@@ -1,4 +1,4 @@
-// Cowork Forge V2 - CLI Entry Point
+// Cowork Forge - CLI Entry Point
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};

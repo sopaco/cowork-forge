@@ -1,4 +1,4 @@
-# Cowork Forge V2
+# Cowork Forge
 
 > AI-powered autonomous software development system built with adk-rust
 
@@ -7,7 +7,7 @@
 
 ## 🚀 What's New in V2
 
-Cowork Forge V2 is a **complete rewrite** using the [adk-rust](https://github.com/zavora-ai/adk-rust) framework, bringing:
+Cowork Forge is a **complete rewrite** using the [adk-rust](https://github.com/zavora-ai/adk-rust) framework, bringing:
 
 - **Actor-Critic Pattern**: Each stage has a dedicated Actor (creates) and Critic (reviews) agent, working in a feedback loop for quality assurance
 - **Autonomous Agents**: LLM-powered agents make decisions and iterate based on feedback

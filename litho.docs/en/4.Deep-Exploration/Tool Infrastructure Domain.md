@@ -297,7 +297,7 @@ async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Re
 
 ## Usage in Development Workflow
 
-The Tool Infrastructure Domain supports the complete Cowork Forge V2 development lifecycle:
+The Tool Infrastructure Domain supports the complete Cowork Forge development lifecycle:
 
 1. **Idea Stage**: File operations and human review tools
 2. **PRD Stage**: Data management tools for requirements and features

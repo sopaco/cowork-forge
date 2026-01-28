@@ -1,4 +1,4 @@
-// Main pipeline - Cowork Forge V2 workflow
+// Main pipeline - Cowork Forge workflow
 
 use crate::agents::*;
 use crate::llm::*;

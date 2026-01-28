@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Storage Management Domain serves as the persistent storage layer for Cowork Forge V2, providing comprehensive data persistence capabilities for project artifacts, session data, and development metadata. This domain is crucial for maintaining workflow continuity, enabling pipeline resumption, and ensuring data integrity throughout the AI-powered development lifecycle.
+The Storage Management Domain serves as the persistent storage layer for Cowork Forge, providing comprehensive data persistence capabilities for project artifacts, session data, and development metadata. This domain is crucial for maintaining workflow continuity, enabling pipeline resumption, and ensuring data integrity throughout the AI-powered development lifecycle.
 
 ## Architecture and Design
 
@@ -249,4 +249,4 @@ let feedback = Feedback {
 storage::append_feedback(&feedback)?;
 ```
 
-The Storage Management Domain provides a robust foundation for data persistence in Cowork Forge V2, enabling reliable workflow execution, seamless pipeline resumption, and comprehensive artifact management throughout the AI-powered development lifecycle.
+The Storage Management Domain provides a robust foundation for data persistence in Cowork Forge, enabling reliable workflow execution, seamless pipeline resumption, and comprehensive artifact management throughout the AI-powered development lifecycle.

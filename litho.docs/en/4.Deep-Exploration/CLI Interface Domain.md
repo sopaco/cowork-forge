@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **CLI Interface Domain** serves as the primary entry point and user interaction layer for Cowork Forge V2, an AI-powered software development system. This domain implements a comprehensive command-line interface that orchestrates the complete software development lifecycle through specialized AI agents.
+The **CLI Interface Domain** serves as the primary entry point and user interaction layer for Cowork Forge, an AI-powered software development system. This domain implements a comprehensive command-line interface that orchestrates the complete software development lifecycle through specialized AI agents.
 
 ## Architecture Position
 
