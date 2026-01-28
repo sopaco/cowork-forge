@@ -19,8 +19,8 @@ The CLI parser utilizes the `clap` framework to define and process user commands
 
 ```rust
 [derive(Parser)]
-#[command(name = "cowork-v2")]
-#[command(about = "AI-powered software development system V2")]
+#[command(name = "cowork")]
+#[command(about = "AI-powered software development system")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -154,7 +154,7 @@ async fn cmd_new(idea: String, config: &ModelConfig, enable_stream: bool) -> Res
 async fn execute_pipeline(pipeline: Arc<dyn adk_core::Agent>, input: &str, enable_stream: bool) -> Result<()> {
     let session_service = Arc::new(InMemorySessionService::new());
     let session = session_service.create(CreateRequest {
-        app_name: "cowork-forge-v2".to_string(),
+        app_name: "cowork-forge".to_string(),
         user_id: "cowork-user".to_string(),
         session_id: None,
         state: HashMap::new(),

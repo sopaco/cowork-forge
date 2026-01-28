@@ -14,8 +14,8 @@ use adk_core::Content;
 use futures::StreamExt;
 
 #[derive(Parser)]
-#[command(name = "cowork-v2")]
-#[command(about = "AI-powered software development system V2", long_about = None)]
+#[command(name = "cowork")]
+#[command(about = "AI-powered software development system", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -186,7 +186,7 @@ async fn execute_pipeline(pipeline: Arc<dyn adk_core::Agent>, input: &str, enabl
 
     // Create session FIRST
     let user_id = "cowork-user".to_string();
-    let app_name = "cowork-forge-v2".to_string();
+    let app_name = "cowork-forge".to_string();
     
     let session = session_service
         .create(CreateRequest {
