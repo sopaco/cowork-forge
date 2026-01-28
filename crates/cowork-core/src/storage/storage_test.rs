@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod tests {
     use crate::storage::*;
-    use crate::data::*;
     use tempfile::TempDir;
     use std::env;
 

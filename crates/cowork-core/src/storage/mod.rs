@@ -12,16 +12,16 @@ const COWORK_DIR: &str = ".cowork";
 /// Get the .cowork directory path, create if not exists
 pub fn get_cowork_dir() -> Result<PathBuf> {
     let path = PathBuf::from(COWORK_DIR);
-    if !path.exists() {
-        fs::create_dir_all(&path)
-            .with_context(|| format!("Failed to create .cowork directory at {:?}", path))?;
-        
-        // Create subdirectories
-        fs::create_dir_all(path.join("data"))?;
-        fs::create_dir_all(path.join("artifacts"))?;
-        fs::create_dir_all(path.join("session"))?;
-        fs::create_dir_all(path.join("logs"))?;
-    }
+    
+    // Create main directory and subdirectories (create_dir_all is idempotent and safe for concurrent calls)
+    // We don't need to check if it exists first - create_dir_all handles that
+    fs::create_dir_all(&path)
+        .with_context(|| format!("Failed to create .cowork directory at {:?}", path))?;
+    fs::create_dir_all(path.join("data"))?;
+    fs::create_dir_all(path.join("artifacts"))?;
+    fs::create_dir_all(path.join("session"))?;
+    fs::create_dir_all(path.join("logs"))?;
+    
     Ok(path)
 }
 
