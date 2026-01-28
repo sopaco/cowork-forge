@@ -28,7 +28,7 @@
 
 <strong>Cowork Forge</strong> is a complete, production-ready framework for automating software development through intelligent multi-agent collaboration. It moves beyond simple code generation, providing a comprehensive system that orchestrates specialized AI agents to handle every stage of the software development lifecycle.
 
-Powered by Rust and LLMs, Cowork Forge coordinates 8 specialized agents that work together to transform your ideas into production-ready code. From requirement gathering and PRD generation to technical design, implementation planning, coding, and quality verification—Cowork Forge manages it all with human-in-the-loop validation at critical decision points.
+Powered by Rust and LLMs, Cowork Forge coordinates 7 specialized agents that work together to transform your ideas into production-ready code. From requirement gathering and PRD generation to technical design, implementation planning, coding, and quality verification—Cowork Forge manages it all with human-in-the-loop validation at critical decision points.
 
 <p align="center">
   <strong>Transform your development workflow with AI agents that think, plan, and collaborate like a real development team.</strong>
@@ -95,15 +95,14 @@ Cowork Forge stands out in the AI development tools landscape through its unique
 Unlike code completion tools that only assist with writing individual lines of code, Cowork Forge manages the entire software development process—from initial idea gathering to final delivery. This comprehensive approach ensures consistency and traceability across all stages.
 
 ### 2. Multi-Agent Collaboration
-Cowork Forge's 8 specialized agents work together like a real development team:
-- <strong>IdeaIntakeAgent</strong>: Structures user requirements
-- <strong>PrdAgent</strong>: Generates comprehensive PRDs
-- <strong>DesignAgent</strong>: Creates technical architecture (C4 models)
-- <strong>PlanAgent</strong>: Breaks down implementation tasks
-- <strong>CodingStageAgent</strong>: Plans and executes code changes
-- <strong>CheckAgent</strong>: Verifies code quality and runs tests
-- <strong>FeedbackAgent</strong>: Analyzes user feedback and determines rework
-- <strong>DeliveryAgent</strong>: Generates delivery reports
+Cowork Forge's 7 specialized agents work together like a real development team:
+- <strong>Idea Agent</strong>: Captures and structures user requirements
+- <strong>PRD Loop Agent</strong>: Generates comprehensive PRDs with actor-critic refinement
+- <strong>Design Loop Agent</strong>: Creates technical architecture with actor-critic refinement
+- <strong>Plan Loop Agent</strong>: Breaks down implementation tasks with actor-critic refinement
+- <strong>Coding Loop Agent</strong>: Plans and executes code changes with actor-critic refinement
+- <strong>Check Agent</strong>: Verifies code quality and completeness
+- <strong>Delivery Agent</strong>: Generates comprehensive delivery reports
 
 ### 3. Human-in-the-Loop Validation
 Critical outputs require human confirmation before proceeding, ensuring:
@@ -128,8 +127,8 @@ Multi-layer security checks prevent:
 
 # 🌠 Features & Capabilities
 
-- <strong>8-Stage Development Workflow:</strong> Comprehensive workflow covering Idea Intake → PRD Generation → Technical Design → Implementation Plan → Coding → Checking → Feedback → Delivery.
-- <strong>Specialized AI Agents:</strong> Each stage handled by a dedicated agent with domain-specific expertise and tools.
+- <strong>7-Stage Development Workflow:</strong> Comprehensive workflow covering Idea Intake → PRD Generation → Technical Design → Implementation Plan → Coding → Quality Check → Delivery.
+- <strong>Specialized AI Agents:</strong> Each stage handled by a dedicated agent with domain-specific expertise. Four critical stages (PRD, Design, Plan, Coding) use actor-critic loops for iterative refinement.
 - <strong>Intelligent Code Planning:</strong> Analyzes project structure, dependencies, and generates precise code change plans.
 - <strong>Incremental Code Updates:</strong> Smart delta analysis updates only affected files, preserving existing modifications.
 - <strong>Automated Quality Verification:</strong> Multi-language build/test integration with comprehensive error analysis and reporting.
@@ -155,14 +154,13 @@ graph TB
     end
     
     subgraph "Agent Layer"
-        IDEA[IdeaIntakeAgent]
-        PRD[PrdAgent]
-        DESIGN[DesignAgent]
-        PLAN[PlanAgent]
-        CODING[CodingStageAgent]
-        CHECK[CheckAgent]
-        FEEDBACK[FeedbackAgent]
-        DELIVERY[DeliveryAgent]
+        IDEA[Idea Agent]
+        PRD[PRD Loop Agent]
+        DESIGN[Design Loop Agent]
+        PLAN[Plan Loop Agent]
+        CODING[Coding Loop Agent]
+        CHECK[Check Agent]
+        DELIVERY[Delivery Agent]
     end
     
     subgraph "Infrastructure Layer"
@@ -187,7 +185,6 @@ graph TB
     Exec --> PLAN
     Exec --> CODING
     Exec --> CHECK
-    Exec --> FEEDBACK
     Exec --> DELIVERY
     
     IDEA --> TOOLS
@@ -196,15 +193,6 @@ graph TB
     
     CHECK --> VERIFY
     CODING --> VERIFY
-    
-    IDEA --> MEMORY
-    PRD --> MEMORY
-    DESIGN --> MEMORY
-    PLAN --> MEMORY
-    CODING --> MEMORY
-    CHECK --> MEMORY
-    FEEDBACK --> MEMORY
-    DELIVERY --> MEMORY
     
     Exec --> HITL
     
@@ -226,7 +214,7 @@ The central coordinator that manages session lifecycle, stage dependencies, and 
 Provides a unified execution framework for all agents with consistent error handling and state management.
 
 ### AI Agents
-Eight specialized agents, each responsible for a specific stage of the development lifecycle.
+Seven specialized agents, each responsible for a specific stage of the development lifecycle. Four agents (PRD, Design, Plan, Coding) use actor-critic loop patterns for iterative refinement with human feedback.
 
 ### Tools Module
 Safe file operations and command execution with security checks and resource limits.
@@ -316,43 +304,11 @@ cargo build --release
 Cowork Forge uses a `config.toml` file for configuration. Create one in your project directory or use `--config` to specify a path:
 
 ```toml
-# -----------------------------------------------------------------------------
-# OpenAI LLM Configuration
-# -----------------------------------------------------------------------------
+# LLM Configuration
 [llm]
 api_base_url = "https://api.openai.com/v1"
 api_key = "sk-your-openai-api-key"
-model = "gpt-4o"
-temperature = 0.7
-max_tokens = 8192
-
-# -----------------------------------------------------------------------------
-# Workspace Configuration
-# -----------------------------------------------------------------------------
-[workspace]
-project_root = "."  # Root directory of your project
-artifacts_dir = ".cowork/artifacts"  # Where to store generated artifacts
-
-# -----------------------------------------------------------------------------
-# HITL (Human-in-the-Loop) Configuration
-# -----------------------------------------------------------------------------
-[hitl]
-enabled = true
-editor_command = "code"  # External editor to use for validation
-
-# -----------------------------------------------------------------------------
-# Safety Configuration
-# -----------------------------------------------------------------------------
-[safety]
-block_dangerous_commands = true
-allowed_build_tools = ["cargo", "npm", "pip", "make", "mvn", "gradle"]
-
-# -----------------------------------------------------------------------------
-# Logging Configuration
-# -----------------------------------------------------------------------------
-[logging]
-level = "info"
-file = ".cowork/logs/cowork.log"
+model_name = "gpt-5-codex"
 ```
 
 # 🚀 Usage
@@ -360,37 +316,36 @@ file = ".cowork/logs/cowork.log"
 ### Starting a New Development Session
 
 ```sh
-# Start a new session with an idea
-cowork start "Build a REST API for a task management application"
+# Start a new project with an idea
+cowork new "Build a REST API for a task management application"
 
 # Start with a configuration file
-cowork start "Create a web dashboard" --config ./config.toml
+cowork new "Create a web dashboard" --config ./config.toml
 
-# Resume an existing session
-cowork resume <session-id>
+# Resume an existing project
+cowork resume
 ```
 
 ### Session Workflow
 
-When you start a session, Cowork Forge will guide you through the 8-stage workflow:
+When you start a session, Cowork Forge will guide you through the 7-stage workflow:
 
-1. **Idea Intake**: Your idea is structured into a formal specification
-2. **PRD Generation**: A comprehensive Product Requirements Document is created
-3. **Technical Design**: C4 architecture diagrams and technical specifications
-4. **Implementation Plan**: Task breakdown with milestones and dependencies
-5. **Coding**: Code is planned and executed with incremental updates
-6. **Checking**: Build, test, and quality verification
-7. **Feedback**: Review results and request changes if needed
-8. **Delivery**: Final delivery report with implementation summary
+1. **Idea Intake**: Your idea is structured into a formal specification (idea.md)
+2. **PRD Generation**: A comprehensive Product Requirements Document with actor-critic refinement
+3. **Technical Design**: Architecture design with component specifications and actor-critic refinement
+4. **Implementation Plan**: Task breakdown with dependencies and actor-critic refinement
+5. **Coding**: Code implementation with actor-critic refinement and human validation
+6. **Quality Check**: Verification of feature coverage and code completeness
+7. **Delivery**: Final delivery report with implementation summary
 
 At each critical stage, you'll be prompted to review and confirm the output before proceeding.
 
 ### Example Session Flow
 
 ```sh
-$ cowork start "Build a CLI tool for file conversion"
+$ cowork new "Build a CLI tool for file conversion"
 
-[Stage 1/8] Idea Intake Agent
+[Stage 1/7] Idea Agent
 Analyzing your requirement...
 Generated IdeaSpec: "A command-line tool for converting files between formats"
 
@@ -422,9 +377,9 @@ Do you want to:
   [3] Regenerate
 > 1
 
-... (continues through all 8 stages)
+... (continues through all 7 stages)
 
-[Delivery] Session Complete!
+[Delivery] Project Complete!
 Delivery report: .cowork/artifacts/session-001/delivery.md
 
 Summary:
@@ -435,31 +390,30 @@ Summary:
 - Tests: 15/15 PASSED
 ```
 
-### Managing Sessions
+### Managing Projects
 
 ```sh
-# List all sessions
-cowork list
+# View project status
+cowork status
 
-# View session status
-cowork status <session-id>
-
-# View artifacts from a session
-cowork artifacts <session-id>
-
-# Delete a session
-cowork delete <session-id>
+# Modify from a specific stage
+cowork modify --from prd
+cowork modify --from design
+cowork modify --from plan
+cowork modify --from coding
 ```
 
 ### Configuration Management
 
 ```sh
-# Show current configuration
-cowork config show
+# Initialize configuration file
+cowork init
 
-# Update configuration
-cowork config set llm.model gpt-4-turbo
-cowork config set hitl.enabled false
+# Use verbose logging
+cowork new "your idea" --verbose
+
+# Enable LLM streaming output
+cowork new "your idea" --stream
 ```
 
 # 🌐 The Cowork Forge Ecosystem
