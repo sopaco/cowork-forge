@@ -52,10 +52,9 @@ pub fn create_cowork_pipeline(config: &ModelConfig) -> Result<Arc<dyn Agent>> {
 /// This function intelligently determines which stage to resume from
 /// by checking what data files already exist.
 pub fn create_resume_pipeline(config: &ModelConfig) -> Result<Arc<dyn Agent>> {
-    use crate::storage::*;
     use std::path::Path;
     
-    let llm = create_llm_client(&config.llm)?;
+    let _llm = create_llm_client(&config.llm)?;
 
     // Determine which stage to start from based on existing data
     let start_stage = if Path::new(".cowork/artifacts/delivery_report.md").exists() {
