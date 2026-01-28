@@ -3,16 +3,27 @@ mod tests {
     use crate::storage::*;
     use tempfile::TempDir;
     use std::env;
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+    
+    // Use a global mutex to serialize tests that modify current directory
+    static TEST_MUTEX: Mutex<()> = Mutex::new(());
 
-    fn setup_test_env() -> TempDir {
+    fn setup_test_env() -> (TempDir, PathBuf) {
+        let original_dir = env::current_dir().unwrap();
         let temp_dir = TempDir::new().unwrap();
         env::set_current_dir(temp_dir.path()).unwrap();
-        temp_dir
+        (temp_dir, original_dir)
+    }
+
+    fn cleanup_test_env(original_dir: PathBuf) {
+        let _ = env::set_current_dir(original_dir);
     }
 
     #[test]
     fn test_get_cowork_dir_creates_structure() {
-        let _temp = setup_test_env();
+        let _guard = TEST_MUTEX.lock().unwrap();
+        let (_temp, original_dir) = setup_test_env();
         
         let dir = get_cowork_dir().unwrap();
         assert!(dir.exists());
@@ -20,11 +31,14 @@ mod tests {
         assert!(dir.join("artifacts").exists());
         assert!(dir.join("session").exists());
         assert!(dir.join("logs").exists());
+        
+        cleanup_test_env(original_dir);
     }
 
     #[test]
     fn test_save_and_load_requirements() {
-        let _temp = setup_test_env();
+        let _guard = TEST_MUTEX.lock().unwrap();
+        let (_temp, original_dir) = setup_test_env();
         get_cowork_dir().unwrap();
 
         let mut reqs = Requirements::new();
@@ -44,11 +58,14 @@ mod tests {
         assert_eq!(loaded.requirements.len(), 1);
         assert_eq!(loaded.requirements[0].id, "REQ-001");
         assert_eq!(loaded.requirements[0].title, "Test Requirement");
+        
+        cleanup_test_env(original_dir);
     }
 
     #[test]
     fn test_save_and_load_feature_list() {
-        let _temp = setup_test_env();
+        let _guard = TEST_MUTEX.lock().unwrap();
+        let (_temp, original_dir) = setup_test_env();
         get_cowork_dir().unwrap();
 
         let mut features = FeatureList::new();
@@ -70,14 +87,19 @@ mod tests {
 
         assert_eq!(loaded.features.len(), 1);
         assert_eq!(loaded.features[0].id, "FEAT-001");
+        
+        cleanup_test_env(original_dir);
     }
 
     #[test]
     fn test_cowork_dir_exists() {
-        let _temp = setup_test_env();
+        let _guard = TEST_MUTEX.lock().unwrap();
+        let (_temp, original_dir) = setup_test_env();
         
         assert!(!cowork_dir_exists());
         get_cowork_dir().unwrap();
         assert!(cowork_dir_exists());
+        
+        cleanup_test_env(original_dir);
     }
 }
