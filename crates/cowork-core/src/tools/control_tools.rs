@@ -1,4 +1,4 @@
-// Control tools - provide_feedback, ask_user, etc.
+// Control tools - provide_feedback, ask_user, etc. (Session-scoped)
 use crate::data::*;
 use crate::storage::*;
 use adk_core::{Tool, ToolContext};
@@ -12,7 +12,15 @@ use std::sync::Arc;
 // ProvideFeedbackTool
 // ============================================================================
 
-pub struct ProvideFeedbackTool;
+pub struct ProvideFeedbackTool {
+    session_id: String,
+}
+
+impl ProvideFeedbackTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for ProvideFeedbackTool {
@@ -69,7 +77,7 @@ impl Tool for ProvideFeedbackTool {
             timestamp: chrono::Utc::now(),
         };
 
-        append_feedback(&feedback).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+        append_feedback(&self.session_id, &feedback).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
 
         Ok(json!({
             "status": "feedback_recorded",

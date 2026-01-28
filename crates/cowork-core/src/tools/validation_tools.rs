@@ -1,4 +1,4 @@
-// Validation tools for checking data quality
+// Validation tools for checking data quality (Session-scoped)
 use crate::storage::*;
 use adk_core::{Tool, ToolContext};
 
@@ -10,7 +10,15 @@ use std::sync::Arc;
 // CheckDataFormatTool
 // ============================================================================
 
-pub struct CheckDataFormatTool;
+pub struct CheckDataFormatTool {
+    session_id: String,
+}
+
+impl CheckDataFormatTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for CheckDataFormatTool {
@@ -40,10 +48,10 @@ impl Tool for CheckDataFormatTool {
         let data_type = args["data_type"].as_str().unwrap();
 
         let errors = match data_type {
-            "requirements" => validate_requirements_schema(),
-            "features" => validate_features_schema(),
-            "design" => validate_design_schema(),
-            "plan" => validate_plan_schema(),
+            "requirements" => self.validate_requirements_schema(),
+            "features" => self.validate_features_schema(),
+            "design" => self.validate_design_schema(),
+            "plan" => self.validate_plan_schema(),
             _ => return Ok(json!({"status": "error", "message": "Unknown data type"})),
         };
 
@@ -61,73 +69,83 @@ impl Tool for CheckDataFormatTool {
     }
 }
 
-fn validate_requirements_schema() -> Vec<String> {
-    let mut errors = vec![];
-    match load_requirements() {
-        Ok(requirements) => {
-            for req in &requirements.requirements {
-                if req.title.is_empty() {
-                    errors.push(format!("{}: title is empty", req.id));
-                }
-                if req.acceptance_criteria.is_empty() {
-                    errors.push(format!("{}: missing acceptance criteria", req.id));
+impl CheckDataFormatTool {
+    fn validate_requirements_schema(&self) -> Vec<String> {
+        let mut errors = vec![];
+        match load_requirements(&self.session_id) {
+            Ok(requirements) => {
+                for req in &requirements.requirements {
+                    if req.title.is_empty() {
+                        errors.push(format!("{}: title is empty", req.id));
+                    }
+                    if req.acceptance_criteria.is_empty() {
+                        errors.push(format!("{}: missing acceptance criteria", req.id));
+                    }
                 }
             }
+            Err(e) => errors.push(format!("Failed to load requirements: {}", e)),
         }
-        Err(e) => errors.push(format!("Failed to load requirements: {}", e)),
+        errors
     }
-    errors
-}
 
-fn validate_features_schema() -> Vec<String> {
-    let mut errors = vec![];
-    match load_feature_list() {
-        Ok(features) => {
-            for feat in &features.features {
-                if feat.name.is_empty() {
-                    errors.push(format!("{}: name is empty", feat.id));
+    fn validate_features_schema(&self) -> Vec<String> {
+        let mut errors = vec![];
+        match load_feature_list(&self.session_id) {
+            Ok(features) => {
+                for feat in &features.features {
+                    if feat.name.is_empty() {
+                        errors.push(format!("{}: name is empty", feat.id));
+                    }
+                    if feat.requirement_ids.is_empty() {
+                        errors.push(format!("{}: not linked to any requirement", feat.id));
+                    }
                 }
-                if feat.requirement_ids.is_empty() {
-                    errors.push(format!("{}: not linked to any requirement", feat.id));
+            }
+            Err(e) => errors.push(format!("Failed to load features: {}", e)),
+        }
+        errors
+    }
+
+    fn validate_design_schema(&self) -> Vec<String> {
+        let mut errors = vec![];
+        match load_design_spec(&self.session_id) {
+            Ok(design) => {
+                if design.architecture.components.is_empty() {
+                    errors.push("No components defined".to_string());
                 }
             }
+            Err(e) => errors.push(format!("Failed to load design: {}", e)),
         }
-        Err(e) => errors.push(format!("Failed to load features: {}", e)),
+        errors
     }
-    errors
-}
 
-fn validate_design_schema() -> Vec<String> {
-    let mut errors = vec![];
-    match load_design_spec() {
-        Ok(design) => {
-            if design.architecture.components.is_empty() {
-                errors.push("No components defined".to_string());
+    fn validate_plan_schema(&self) -> Vec<String> {
+        let mut errors = vec![];
+        match load_implementation_plan(&self.session_id) {
+            Ok(plan) => {
+                if plan.tasks.is_empty() {
+                    errors.push("No tasks defined".to_string());
+                }
             }
+            Err(e) => errors.push(format!("Failed to load plan: {}", e)),
         }
-        Err(e) => errors.push(format!("Failed to load design: {}", e)),
+        errors
     }
-    errors
-}
-
-fn validate_plan_schema() -> Vec<String> {
-    let mut errors = vec![];
-    match load_implementation_plan() {
-        Ok(plan) => {
-            if plan.tasks.is_empty() {
-                errors.push("No tasks defined".to_string());
-            }
-        }
-        Err(e) => errors.push(format!("Failed to load plan: {}", e)),
-    }
-    errors
 }
 
 // ============================================================================
 // CheckFeatureCoverageTool
 // ============================================================================
 
-pub struct CheckFeatureCoverageTool;
+pub struct CheckFeatureCoverageTool {
+    session_id: String,
+}
+
+impl CheckFeatureCoverageTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for CheckFeatureCoverageTool {
@@ -144,8 +162,8 @@ impl Tool for CheckFeatureCoverageTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
-        let features = load_feature_list().map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
-        let design = load_design_spec().map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+        let features = load_feature_list(&self.session_id).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+        let design = load_design_spec(&self.session_id).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
 
         let uncovered: Vec<String> = features
             .features
@@ -179,7 +197,15 @@ impl Tool for CheckFeatureCoverageTool {
 // CheckTaskDependenciesTool
 // ============================================================================
 
-pub struct CheckTaskDependenciesTool;
+pub struct CheckTaskDependenciesTool {
+    session_id: String,
+}
+
+impl CheckTaskDependenciesTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for CheckTaskDependenciesTool {
@@ -196,7 +222,7 @@ impl Tool for CheckTaskDependenciesTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
-        let plan = load_implementation_plan().map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+        let plan = load_implementation_plan(&self.session_id).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
 
         // Build dependency graph
         let mut graph: std::collections::HashMap<String, Vec<String>> =

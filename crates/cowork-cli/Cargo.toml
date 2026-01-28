@@ -47,5 +47,9 @@ toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
+# Time
+chrono = { workspace = true }
+
 # File system
+walkdir = "2.5"
 dirs = "6.0"

@@ -1,4 +1,4 @@
-// Artifact operation tools for Delivery Agent
+// Artifact operation tools for Delivery Agent (Session-scoped)
 use crate::storage::*;
 use adk_core::{Tool, ToolContext};
 use async_trait::async_trait;
@@ -9,7 +9,15 @@ use std::sync::Arc;
 // SaveDeliveryReportTool
 // ============================================================================
 
-pub struct SaveDeliveryReportTool;
+pub struct SaveDeliveryReportTool {
+    session_id: String,
+}
+
+impl SaveDeliveryReportTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for SaveDeliveryReportTool {
@@ -35,9 +43,11 @@ impl Tool for SaveDeliveryReportTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let content = args["content"].as_str().unwrap();
+        let content = args["content"].as_str()
+            .or_else(|| args[" content"].as_str()) // Handle LLM adding space before key
+            .ok_or_else(|| adk_core::AdkError::Tool("Missing 'content' parameter".to_string()))?;
         
-        save_delivery_report(content)
+        save_delivery_report(&self.session_id, content)
             .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
 
         Ok(json!({
@@ -51,7 +61,15 @@ impl Tool for SaveDeliveryReportTool {
 // SavePrdDocTool
 // ============================================================================
 
-pub struct SavePrdDocTool;
+pub struct SavePrdDocTool {
+    session_id: String,
+}
+
+impl SavePrdDocTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for SavePrdDocTool {
@@ -77,9 +95,11 @@ impl Tool for SavePrdDocTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let content = args["content"].as_str().unwrap();
+        let content = args["content"].as_str()
+            .or_else(|| args[" content"].as_str()) // Handle LLM adding space before key
+            .ok_or_else(|| adk_core::AdkError::Tool("Missing 'content' parameter".to_string()))?;
         
-        save_prd_doc(content)
+        save_prd_doc(&self.session_id, content)
             .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
 
         Ok(json!({
@@ -93,7 +113,15 @@ impl Tool for SavePrdDocTool {
 // SaveDesignDocTool
 // ============================================================================
 
-pub struct SaveDesignDocTool;
+pub struct SaveDesignDocTool {
+    session_id: String,
+}
+
+impl SaveDesignDocTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for SaveDesignDocTool {
@@ -119,9 +147,11 @@ impl Tool for SaveDesignDocTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let content = args["content"].as_str().unwrap();
+        let content = args["content"].as_str()
+            .or_else(|| args[" content"].as_str()) // Handle LLM adding space before key
+            .ok_or_else(|| adk_core::AdkError::Tool("Missing 'content' parameter".to_string()))?;
         
-        save_design_doc(content)
+        save_design_doc(&self.session_id, content)
             .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
 
         Ok(json!({
@@ -135,7 +165,15 @@ impl Tool for SaveDesignDocTool {
 // LoadFeedbackHistoryTool
 // ============================================================================
 
-pub struct LoadFeedbackHistoryTool;
+pub struct LoadFeedbackHistoryTool {
+    session_id: String,
+}
+
+impl LoadFeedbackHistoryTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for LoadFeedbackHistoryTool {
@@ -155,7 +193,7 @@ impl Tool for LoadFeedbackHistoryTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
-        let history = load_feedback_history()
+        let history = load_feedback_history(&self.session_id)
             .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
 
         Ok(serde_json::to_value(history)

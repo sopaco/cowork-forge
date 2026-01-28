@@ -136,13 +136,29 @@ impl Tool for ListFilesTool {
 
         if recursive {
             // Recursive listing with max depth
+            let cwd = std::env::current_dir()
+                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get current dir: {}", e)))?;
+
             for entry in WalkDir::new(&safe_path)
                 .max_depth(max_depth)
+                .follow_links(false)
                 .into_iter()
+                .filter_entry(|e| {
+                    // Prune hidden directories early (except the root itself)
+                    if let Some(name) = e.file_name().to_str() {
+                        if name.starts_with('.') && name != "." {
+                            return false;
+                        }
+                    }
+                    true
+                })
                 .filter_map(|e| e.ok())
             {
-                let path_str = entry.path().display().to_string();
-                
+                // Convert to relative path for stable ignore matching
+                let rel = entry.path().strip_prefix(&cwd).unwrap_or(entry.path());
+                let rel_str = rel.to_string_lossy();
+                let path_str = format!("./{}", rel_str.trim_start_matches("./"));
+
                 // Skip hidden files and common ignore patterns
                 if should_ignore(&path_str) {
                     continue;
@@ -156,12 +172,26 @@ impl Tool for ListFilesTool {
             }
         } else {
             // Non-recursive listing
+            let cwd = std::env::current_dir()
+                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get current dir: {}", e)))?;
+
             let entries = fs::read_dir(&safe_path)
                 .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read directory: {}", e)))?;
 
             for entry in entries {
                 let entry = entry.map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
-                let path_str = entry.path().display().to_string();
+
+                // Skip hidden at top-level
+                if let Some(name) = entry.file_name().to_str() {
+                    if name.starts_with('.') {
+                        continue;
+                    }
+                }
+
+                let full = entry.path().to_path_buf();
+                let rel = full.strip_prefix(&cwd).unwrap_or(&full);
+                let rel_str = rel.to_string_lossy();
+                let path_str = format!("./{}", rel_str.trim_start_matches("./"));
 
                 if should_ignore(&path_str) {
                     continue;
@@ -187,10 +217,22 @@ impl Tool for ListFilesTool {
 }
 
 fn should_ignore(path: &str) -> bool {
-    let ignore_patterns = vec![
-        "/.git/", "/target/", "/node_modules/", "/.cowork/", "/.litho/",
-        "/.idea/", "/.vscode/", "/dist/", "/build/", "/docs/", "/tests/",
-        ".DS_Store", "Thumbs.db"
+    // Normalize: we mostly work with "./..." relative paths now
+
+    // 1) Hide dotfiles / dot-directories broadly
+    // (We still keep root path "." out of this function; callers handle it)
+    if let Some(name) = Path::new(path).file_name().and_then(|n| n.to_str()) {
+        if name.starts_with('.') {
+            return true;
+        }
+    }
+
+    // 2) Common ignore patterns
+    let ignore_patterns = [
+        "./.git", "./target", "./node_modules", "./.cowork", "./.litho",
+        "./.idea", "./.vscode", "./dist", "./build", "./docs", "./tests",
+        "./.archived",
+        ".DS_Store", "Thumbs.db",
     ];
 
     ignore_patterns.iter().any(|pattern| path.contains(pattern))

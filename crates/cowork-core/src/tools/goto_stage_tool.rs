@@ -1,4 +1,4 @@
-// Goto Stage tool for Check Agent
+// Goto Stage tool for Check Agent (Session-scoped)
 use crate::data::*;
 use crate::storage::*;
 use adk_core::{Tool, ToolContext};
@@ -6,7 +6,15 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::sync::Arc;
 
-pub struct GotoStageTool;
+pub struct GotoStageTool {
+    session_id: String,
+}
+
+impl GotoStageTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for GotoStageTool {
@@ -56,10 +64,10 @@ impl Tool for GotoStageTool {
         };
 
         // Load or create session meta
-        let mut meta = load_session_meta()
+        let mut meta = load_session_meta(&self.session_id)
             .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?
             .unwrap_or_else(|| SessionMeta {
-                session_id: uuid::Uuid::new_v4().to_string(),
+                session_id: self.session_id.clone(),
                 created_at: chrono::Utc::now(),
                 current_stage: Some(Stage::Check),
                 restart_reason: None,
@@ -70,15 +78,14 @@ impl Tool for GotoStageTool {
         meta.restart_reason = Some(reason.to_string());
 
         // Save session meta
-        save_session_meta(&meta)
+        save_session_meta(&self.session_id, &meta)
             .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
 
         Ok(json!({
             "status": "restart_scheduled",
             "stage": stage_str,
             "reason": reason,
-            "message": format!("Pipeline will restart from {} stage. User should re-run with 'modify --from {}' command.", stage_str, stage_str)
+            "message": format!("Pipeline will restart from {} stage. User should re-run with 'cowork revert --from {}' command.", stage_str, stage_str)
         }))
     }
 }
-

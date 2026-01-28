@@ -1,4 +1,4 @@
-// Data operation tools - Create and modify structured data
+// Data operation tools - Create and modify structured data (Session-scoped)
 use crate::data::*;
 use crate::storage::*;
 use adk_core::{Tool, ToolContext, AdkError};
@@ -10,7 +10,15 @@ use std::sync::Arc;
 // CreateRequirementTool
 // ============================================================================
 
-pub struct CreateRequirementTool;
+pub struct CreateRequirementTool {
+    session_id: String,
+}
+
+impl CreateRequirementTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for CreateRequirementTool {
@@ -57,7 +65,7 @@ impl Tool for CreateRequirementTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let mut reqs = load_requirements().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut reqs = load_requirements(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;
 
         let req_id = generate_id("REQ", reqs.requirements.len());
 
@@ -91,9 +99,8 @@ impl Tool for CreateRequirementTool {
 
         reqs.requirements.push(requirement.clone());
         reqs.updated_at = chrono::Utc::now();
-        save_requirements(&reqs).map_err(|e| AdkError::Tool(e.to_string()))?;
+        save_requirements(&self.session_id, &reqs).map_err(|e| AdkError::Tool(e.to_string()))?;
 
-        // Log for user visibility
         println!("✅ Created: {} - {}", req_id, requirement.title);
 
         Ok(json!({
@@ -108,7 +115,15 @@ impl Tool for CreateRequirementTool {
 // AddFeatureTool
 // ============================================================================
 
-pub struct AddFeatureTool;
+pub struct AddFeatureTool {
+    session_id: String,
+}
+
+impl AddFeatureTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for AddFeatureTool {
@@ -150,7 +165,7 @@ impl Tool for AddFeatureTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let mut features = load_feature_list().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut features = load_feature_list(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;
 
         let feat_id = generate_id("FEAT", features.features.len());
 
@@ -178,7 +193,7 @@ impl Tool for AddFeatureTool {
         };
 
         features.features.push(feature);
-        save_feature_list(&features).map_err(|e| AdkError::Tool(e.to_string()))?;
+        save_feature_list(&self.session_id, &features).map_err(|e| AdkError::Tool(e.to_string()))?;
 
         Ok(json!({
             "status": "success",
@@ -192,7 +207,15 @@ impl Tool for AddFeatureTool {
 // CreateDesignComponentTool
 // ============================================================================
 
-pub struct CreateDesignComponentTool;
+pub struct CreateDesignComponentTool {
+    session_id: String,
+}
+
+impl CreateDesignComponentTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for CreateDesignComponentTool {
@@ -239,11 +262,10 @@ impl Tool for CreateDesignComponentTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let mut design = load_design_spec().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut design = load_design_spec(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;
 
         let comp_id = generate_id("COMP", design.architecture.components.len());
 
-        // Parse component_type with error handling
         let component_type = args.get("component_type")
             .and_then(|v| v.as_str())
             .ok_or_else(|| AdkError::Tool("Missing or invalid 'component_type' parameter".to_string()))?;
@@ -256,7 +278,6 @@ impl Tool for CreateDesignComponentTool {
             other => ComponentType::Other(other.to_string()),
         };
 
-        // Parse required fields with error handling
         let name = args.get("name")
             .and_then(|v| v.as_str())
             .ok_or_else(|| AdkError::Tool("Missing or invalid 'name' parameter".to_string()))?
@@ -267,7 +288,6 @@ impl Tool for CreateDesignComponentTool {
             .ok_or_else(|| AdkError::Tool("Missing or invalid 'technology' parameter".to_string()))?
             .to_string();
 
-        // Parse responsibilities array with error handling
         let responsibilities = args.get("responsibilities")
             .and_then(|v| v.as_array())
             .ok_or_else(|| AdkError::Tool("Missing or invalid 'responsibilities' parameter (must be an array)".to_string()))?
@@ -279,7 +299,6 @@ impl Tool for CreateDesignComponentTool {
             return Err(AdkError::Tool("'responsibilities' array cannot be empty".to_string()));
         }
 
-        // Parse optional related_features
         let related_features = args.get("related_features")
             .and_then(|v| v.as_array())
             .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
@@ -296,9 +315,8 @@ impl Tool for CreateDesignComponentTool {
         };
 
         design.architecture.components.push(component.clone());
-        save_design_spec(&design).map_err(|e| AdkError::Tool(e.to_string()))?;
+        save_design_spec(&self.session_id, &design).map_err(|e| AdkError::Tool(e.to_string()))?;
 
-        // Log for user visibility
         println!("🏗️  Created component: {} - {}", comp_id, component.name);
 
         Ok(json!({
@@ -313,7 +331,15 @@ impl Tool for CreateDesignComponentTool {
 // CreateTaskTool
 // ============================================================================
 
-pub struct CreateTaskTool;
+pub struct CreateTaskTool {
+    session_id: String,
+}
+
+impl CreateTaskTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for CreateTaskTool {
@@ -353,7 +379,7 @@ impl Tool for CreateTaskTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let mut plan = load_implementation_plan().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut plan = load_implementation_plan(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;
 
         let task_id = generate_id("TASK", plan.tasks.len());
 
@@ -385,7 +411,7 @@ impl Tool for CreateTaskTool {
         };
 
         plan.tasks.push(task);
-        save_implementation_plan(&plan).map_err(|e| AdkError::Tool(e.to_string()))?;
+        save_implementation_plan(&self.session_id, &plan).map_err(|e| AdkError::Tool(e.to_string()))?;
 
         Ok(json!({
             "status": "success",
@@ -399,7 +425,15 @@ impl Tool for CreateTaskTool {
 // Update Status Tools
 // ============================================================================
 
-pub struct UpdateFeatureStatusTool;
+pub struct UpdateFeatureStatusTool {
+    session_id: String,
+}
+
+impl UpdateFeatureStatusTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for UpdateFeatureStatusTool {
@@ -427,7 +461,7 @@ impl Tool for UpdateFeatureStatusTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let mut features = load_feature_list().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut features = load_feature_list(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;
 
         let feature_id = args["feature_id"].as_str().unwrap();
         let new_status_str = args["new_status"].as_str().unwrap();
@@ -445,7 +479,7 @@ impl Tool for UpdateFeatureStatusTool {
             if new_status_str == "completed" {
                 feature.completed_at = Some(chrono::Utc::now());
             }
-            save_feature_list(&features).map_err(|e| AdkError::Tool(e.to_string()))?;
+            save_feature_list(&self.session_id, &features).map_err(|e| AdkError::Tool(e.to_string()))?;
 
             Ok(json!({
                 "status": "success",
@@ -462,7 +496,15 @@ impl Tool for UpdateFeatureStatusTool {
     }
 }
 
-pub struct UpdateTaskStatusTool;
+pub struct UpdateTaskStatusTool {
+    session_id: String,
+}
+
+impl UpdateTaskStatusTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for UpdateTaskStatusTool {
@@ -489,9 +531,8 @@ impl Tool for UpdateTaskStatusTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let mut plan = load_implementation_plan().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut plan = load_implementation_plan(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;
 
-        // Parse parameters with error handling
         let task_id = args.get("task_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| AdkError::Tool("Missing or invalid 'task_id' parameter".to_string()))?;
@@ -515,9 +556,8 @@ impl Tool for UpdateTaskStatusTool {
                 "completed" => task.completed_at = Some(chrono::Utc::now()),
                 _ => {}
             }
-            save_implementation_plan(&plan).map_err(|e| AdkError::Tool(e.to_string()))?;
+            save_implementation_plan(&self.session_id, &plan).map_err(|e| AdkError::Tool(e.to_string()))?;
 
-            // Log for user visibility
             println!("✓ Task {} → {}", task_id, new_status_str);
 
             Ok(json!({
@@ -538,7 +578,15 @@ impl Tool for UpdateTaskStatusTool {
 // Get/Read Tools
 // ============================================================================
 
-pub struct GetRequirementsTool;
+pub struct GetRequirementsTool {
+    session_id: String,
+}
+
+impl GetRequirementsTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for GetRequirementsTool {
@@ -558,8 +606,8 @@ impl Tool for GetRequirementsTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
-        let requirements = load_requirements().map_err(|e| AdkError::Tool(e.to_string()))?;
-        let features = load_feature_list().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let requirements = load_requirements(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;
+        let features = load_feature_list(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;
 
         Ok(json!({
             "requirements": requirements.requirements,
@@ -568,7 +616,15 @@ impl Tool for GetRequirementsTool {
     }
 }
 
-pub struct GetDesignTool;
+pub struct GetDesignTool {
+    session_id: String,
+}
+
+impl GetDesignTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for GetDesignTool {
@@ -585,12 +641,20 @@ impl Tool for GetDesignTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
-        let design = load_design_spec().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let design = load_design_spec(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;
         Ok(serde_json::to_value(design).map_err(|e| AdkError::Tool(e.to_string()))?)
     }
 }
 
-pub struct GetPlanTool;
+pub struct GetPlanTool {
+    session_id: String,
+}
+
+impl GetPlanTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
 
 #[async_trait]
 impl Tool for GetPlanTool {
@@ -603,39 +667,11 @@ impl Tool for GetPlanTool {
     }
 
     fn parameters_schema(&self) -> Option<Value> {
-        Some(json!({
-            "type": "object",
-            "properties": {
-                "status_filter": {
-                    "type": "string",
-                    "enum": ["pending", "in_progress", "completed"],
-                    "description": "Optional: only return tasks with this status"
-                }
-            }
-        }))
+        Some(json!({"type": "object", "properties": {}}))
     }
 
-    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let plan = load_implementation_plan().map_err(|e| AdkError::Tool(e.to_string()))?;
-
-        if let Some(status_filter) = args.get("status_filter").and_then(|v| v.as_str()) {
-            let status = match status_filter {
-                "pending" => TaskStatus::Pending,
-                "in_progress" => TaskStatus::InProgress,
-                "completed" => TaskStatus::Completed,
-                _ => TaskStatus::Pending,
-            };
-
-            let filtered_tasks: Vec<&Task> = plan.tasks.iter()
-                .filter(|t| t.status == status)
-                .collect();
-
-            Ok(json!({
-                "tasks": filtered_tasks,
-                "milestones": plan.milestones
-            }))
-        } else {
-            Ok(serde_json::to_value(plan).map_err(|e| AdkError::Tool(e.to_string()))?)
-        }
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
+        let plan = load_implementation_plan(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;
+        Ok(serde_json::to_value(plan).map_err(|e| AdkError::Tool(e.to_string()))?)
     }
 }
