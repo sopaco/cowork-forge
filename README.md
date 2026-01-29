@@ -11,27 +11,33 @@
 </p>
 
 <p align="center">
-    <strong>🤖 The AI-native multi-agent framework for automated software development 🤖</strong>
+    <strong>🤖 Full-Stack AI Development Team - Complete Collaboration from Idea to Delivery 🤖</strong>
 </p>
-<p align="center">Built with Rust, Cowork Forge orchestrates intelligent agents to automate the entire software development lifecycle—from requirements to delivery.</p>
+<p align="center">Cowork Forge is not just a code generator, but a complete virtual development team. It includes professional roles like Product Manager, Architect, Project Manager, and Engineer, working together through AI agent collaboration to transform your ideas into production-ready software systems.</p>
 
 <p align="center">
-  <a href="https://github.com/sopaco/cowork-forge/tree/main/litho.docs/en"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-Docs-green?logo=Gitbook&color=%23008a60">
-  <a href="https://github.com/sopaco/cowork-forge/tree/main/litho.docs/zh"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-中文-green?logo=Gitbook&color=%23008a60">
-  <a href="https://github.com/sopaco/cowork-forge"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/sopaco/cowork-forge/rust.yml?label=Build">
-  <a href="./LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue.svg?label=LICENSE" />
+  <a href="https://github.com/sopaco/cowork-forge/tree/main/litho.docs/en"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-Docs-green?logo=Gitbook&color=%23008a60"/></a>
+  <a href="https://github.com/sopaco/cowork-forge/tree/main/litho.docs/zh"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-中文-green?logo=Gitbook&color=%23008a60"/></a>
+  <a href="https://github.com/sopaco/cowork-forge"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/sopaco/cowork-forge/rust.yml?label=Build"/></a>
+  <a href="./LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue.svg?label=LICENSE" /></a>
 </p>
 
 <hr />
 
 # 👋 What is Cowork Forge?
 
-<strong>Cowork Forge</strong> is a complete, production-ready framework for automating software development through intelligent multi-agent collaboration. It moves beyond simple code generation, providing a comprehensive system that orchestrates specialized AI agents to handle every stage of the software development lifecycle.
+<strong>Cowork Forge</strong> is a complete AI-powered development team system that simulates how real software teams collaborate. AI agents take on roles as Product Manager, Architect, Project Manager, and Engineer, working together to complete everything from ideation to delivery.
 
-Powered by Rust and LLMs, Cowork Forge coordinates 7 specialized agents that work together to transform your ideas into production-ready code. From requirement gathering and PRD generation to technical design, implementation planning, coding, and quality verification—Cowork Forge manages it all with human-in-the-loop validation at critical decision points.
+Unlike AI coding assistants that only generate code snippets, Cowork Forge provides end-to-end development lifecycle management:
+- **Product Manager AI**: Transforms your ideas into detailed Product Requirements Documents (PRD)
+- **Architect AI**: Designs complete technical architecture and system components
+- **Project Manager AI**: Breaks down tasks, plans dependencies, and defines implementation paths
+- **Engineer AI**: Implements code, ensures quality, and generates delivery reports
+
+Each role uses Actor-Critic patterns for self-review and optimization, with human validation at critical decision points to ensure output quality and direction.
 
 <p align="center">
-  <strong>Transform your development workflow with AI agents that think, plan, and collaborate like a real development team.</strong>
+  <strong>One person can have a complete development team - Cowork Forge makes AI agents work for you like a real team.</strong>
 </p>
 
 <div style="text-align: center; margin: 30px 0;">
@@ -42,23 +48,23 @@ Powered by Rust and LLMs, Cowork Forge coordinates 7 specialized agents that wor
     </tr>
     <tr>
       <td style="padding: 15px; border: 1px solid #e9ecef; vertical-align: top;">
-        <p style="font-size: 14px; color: #6c757d; margin-bottom: 10px;"><strong>Manual, Fragmented Process</strong></p>
+        <p style="font-size: 14px; color: #6c757d; margin-bottom: 10px;"><strong>Requires Multiple Roles and Tools</strong></p>
         <ul style="font-size: 13px; color: #6c757d; line-height: 1.6;">
-          <li>Manual requirement gathering and documentation</li>
-          <li>Separate tools for design, coding, and testing</li>
-          <li>Time-consuming code reviews and iterations</li>
-          <li>Siloed knowledge and communication gaps</li>
-          <li>Repetitive boilerplate code writing</li>
+          <li>Need Product Manager to write PRD</li>
+          <li>Need Architect to design technical solution</li>
+          <li>Need Project Manager to break down tasks</li>
+          <li>Need Engineer to write code</li>
+          <li>High cost and long cycle for multi-role collaboration</li>
         </ul>
       </td>
       <td style="padding: 15px; border: 1px solid #e9ecef; vertical-align: top;">
-        <p style="font-size: 14px; color: #6c757d; margin-bottom: 10px;"><strong>AI-Powered Collaborative Development</strong></p>
+        <p style="font-size: 14px; color: #6c757d; margin-bottom: 10px;"><strong>One System Covers All Roles</strong></p>
         <ul style="font-size: 13px; color: #6c757d; line-height: 1.6;">
-          <li>Automated requirement analysis and PRD generation</li>
-          <li>Integrated agents for design, coding, and verification</li>
-          <li>Intelligent code planning with incremental updates</li>
-          <li>Shared context across all development stages</li>
-          <li>Human validation at critical decision points</li>
+          <li>AI Product Manager auto-generates professional PRD</li>
+          <li>AI Architect designs complete technical solution</li>
+          <li>AI Project Manager intelligently breaks down tasks</li>
+          <li>AI Engineer implements high-quality code</li>
+          <li>Full-process collaboration, human only validates key decisions</li>
         </ul>
       </td>
     </tr>
@@ -91,11 +97,18 @@ Cowork Forge stands out in the AI development tools landscape through its unique
 
 ## Key Differentiators
 
-### 1. Complete Development Lifecycle
-Unlike code completion tools that only assist with writing individual lines of code, Cowork Forge manages the entire software development process—from initial idea gathering to final delivery. This comprehensive approach ensures consistency and traceability across all stages.
+### 1. Complete Virtual Development Team
+
+Unlike tools that only assist with writing code, Cowork Forge provides complete development team role coverage:
+- **Product Manager Role**: Transforms vague ideas into structured Product Requirements Documents
+- **Architect Role**: Designs complete technical architecture and system components
+- **Project Manager Role**: Breaks down tasks, plans dependencies, and implementation paths
+- **Engineer Role**: Implements code and performs quality verification
+
+This full-role coverage ensures end-to-end continuity and professionalism from requirements analysis to code implementation.
 
 ### 2. Multi-Agent Collaboration
-Cowork Forge's 7 specialized agents work together like a real development team:
+Cowork Forge's specialized agents work together like a real development team:
 - <strong>Idea Agent</strong>: Captures and structures user requirements
 - <strong>PRD Loop Agent</strong>: Generates comprehensive PRDs with actor-critic refinement
 - <strong>Design Loop Agent</strong>: Creates technical architecture with actor-critic refinement
@@ -103,6 +116,9 @@ Cowork Forge's 7 specialized agents work together like a real development team:
 - <strong>Coding Loop Agent</strong>: Plans and executes code changes with actor-critic refinement
 - <strong>Check Agent</strong>: Verifies code quality and completeness
 - <strong>Delivery Agent</strong>: Generates comprehensive delivery reports
+- <strong>Modify Agent</strong>: Analyzes and handles incremental change requests
+- <strong>Code Patch Agent</strong>: Implements precise code patches
+- <strong>Modify Delivery Agent</strong>: Generates modification delivery reports
 
 ### 3. Human-in-the-Loop Validation
 Critical outputs require human confirmation before proceeding, ensuring:
@@ -127,8 +143,8 @@ Multi-layer security checks prevent:
 
 # 🌠 Features & Capabilities
 
-- <strong>7-Stage Development Workflow:</strong> Comprehensive workflow covering Idea Intake → PRD Generation → Technical Design → Implementation Plan → Coding → Quality Check → Delivery.
-- <strong>Specialized AI Agents:</strong> Each stage handled by a dedicated agent with domain-specific expertise. Four critical stages (PRD, Design, Plan, Coding) use actor-critic loops for iterative refinement.
+- <strong>7-Stage Development Workflow:</strong> Comprehensive workflow covering Idea Intake → PRD Generation → Technical Design → Implementation Plan → Coding → Quality Check → Delivery, corresponding to the complete process of a real development team.
+- <strong>Specialized AI Agents:</strong> Each stage handled by a dedicated agent with domain expertise. Four critical stages (PRD, Design, Plan, Coding) use actor-critic loops for iterative refinement, ensuring output quality meets professional standards.
 - <strong>Intelligent Code Planning:</strong> Analyzes project structure, dependencies, and generates precise code change plans.
 - <strong>Incremental Code Updates:</strong> Smart delta analysis updates only affected files, preserving existing modifications.
 - <strong>Automated Quality Verification:</strong> Multi-language build/test integration with comprehensive error analysis and reporting.
@@ -207,26 +223,26 @@ graph TB
 
 ## Key Components
 
-### Orchestrator
-The central coordinator that manages session lifecycle, stage dependencies, and workflow execution.
-
-### StageExecutor
-Provides a unified execution framework for all agents with consistent error handling and state management.
+### Pipeline Orchestrator
+Manages session lifecycle, stage dependencies, and workflow execution with support for full and partial pipeline assembly.
 
 ### AI Agents
-Seven specialized agents, each responsible for a specific stage of the development lifecycle. Four agents (PRD, Design, Plan, Coding) use actor-critic loop patterns for iterative refinement with human feedback.
+Specialized agents work collaboratively, each responsible for a specific stage of the development lifecycle. Four agents (PRD, Design, Plan, Coding) use actor-critic loop patterns for iterative refinement with human feedback. Includes: Idea, PRD, Design, Plan, Coding, Check, Delivery, Modify, CodePatch, ModifyDelivery.
+
+### Instruction Templates
+Provides specialized prompt templates for each agent, defining their behavior and output format.
 
 ### Tools Module
 Safe file operations and command execution with security checks and resource limits.
 
-### Verification Module
-Project type detection, code validation, and comprehensive error analysis.
+### LLM Integration Layer
+Manages interactions with large language models, including rate limiting, API clients, and request optimization.
 
-### HITL Controller
-Manages human-in-the-loop interactions, including content review and editing.
+### Data Module
+Defines system data models and session management mechanisms.
 
-### Artifact Store
-Versioned storage of all stage outputs in JSON and Markdown formats.
+### Storage Module
+Provides persistent data management and retrieval capabilities.
 
 # 🧠 How It Works
 
@@ -355,7 +371,7 @@ Do you want to:
   [3] Regenerate
 > 1
 
-[Stage 2/8] PRD Generation Agent
+[Stage 2/7] PRD Generation Agent
 Generating Product Requirements Document...
 Created PRD with 12 requirements and 5 user stories
 
@@ -366,7 +382,7 @@ Do you want to:
   [3] Regenerate
 > 1
 
-[Stage 3/8] Design Agent
+[Stage 3/7] Design Agent
 Creating technical architecture...
 Generated C4 system context and container diagrams
 
@@ -451,14 +467,13 @@ graph TD
 
 <strong>cowork-core</strong> is organized into the following domain modules:
 
-- <strong>`orchestrator`</strong>: Central workflow coordinator managing session lifecycle and stage execution.
-- <strong>`agents`</strong>: 8 specialized AI agents (IdeaIntake, PRD, Design, Plan, Coding, Check, Feedback, Delivery).
+- <strong>`pipeline`</strong>: Workflow pipeline orchestration managing session lifecycle and stage execution.
+- <strong>`agents`</strong>: Specialized AI agents (Idea, PRD, Design, Plan, Coding, Check, Delivery, Modify, CodePatch, ModifyDelivery).
+- <strong>`instructions`</strong>: Prompt templates for each agent.
 - <strong>`tools`</strong>: File operations and command execution with safety checks.
-- <strong>`verification`</strong>: Project detection, code validation, and security checking.
-- <strong>`hitl`</strong>: Human-in-the-loop interaction controller.
-- <strong>`artifacts`</strong>: Artifact storage and management system.
-- <strong>`memory`</strong>: Data persistence and retrieval.
-- <strong>`config`</strong>: Configuration management.
+- <strong>`llm`</strong>: LLM integration layer including rate limiting and API clients.
+- <strong>`data`</strong>: Data models and session management.
+- <strong>`storage`</strong>: Data persistence and retrieval.
 
 
 # 🔒 Security

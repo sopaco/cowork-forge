@@ -832,6 +832,7 @@ dependencies = [
  "adk-runner",
  "adk-session",
  "anyhow",
+ "chrono",
  "clap",
  "console",
  "cowork-core",
@@ -846,6 +847,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "walkdir",
 ]
 
 [[package]]
