@@ -11,27 +11,33 @@
 </p>
 
 <p align="center">
-    <strong>🤖 基于 AI 多智能体架构的自动化软件开发框架 🤖</strong>
+    <strong>🤖 全流程智能开发团队 - 从构思到交付的完整 AI 协作系统 🤖</strong>
 </p>
-<p align="center">使用 Rust 构建，Cowork Forge 通过协调智能 AI 智能体，实现从需求到交付的完整软件开发生命周期自动化。</p>
+<p align="center">Cowork Forge 不只是代码生成工具，而是一个完整的虚拟开发团队。它包含产品经理、架构师、项目经理和工程师等多个专业角色，通过 AI 智能体协作，将你的想法转化为生产就绪的软件系统。</p>
 
 <p align="center">
-  <a href="https://github.com/sopaco/cowork-forge/tree/main/litho.docs/en"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-Docs-green?logo=Gitbook&color=%23008a60">
-  <a href="https://github.com/sopaco/cowork-forge/tree/main/litho.docs/zh"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-中文-green?logo=Gitbook&color=%23008a60">
-  <a href="https://github.com/sopaco/cowork-forge"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/sopaco/cowork-forge/rust.yml?label=Build">
-  <a href="./LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue.svg?label=LICENSE" />
+  <a href="https://github.com/sopaco/cowork-forge/tree/main/litho.docs/en"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-Docs-green?logo=Gitbook&color=%23008a60"/></a>
+  <a href="https://github.com/sopaco/cowork-forge/tree/main/litho.docs/zh"><img alt="Litho Docs" src="https://img.shields.io/badge/Litho-中文-green?logo=Gitbook&color=%23008a60"/></a>
+  <a href="https://github.com/sopaco/cowork-forge"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/sopaco/cowork-forge/rust.yml?label=Build"/></a>
+  <a href="./LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue.svg?label=LICENSE" /></a>
 </p>
 
 <hr />
 
 # 👋 什么是 Cowork Forge？
 
-<strong>Cowork Forge</strong> 是一个完整的、生产就绪的框架，通过智能多智能体协作实现软件开发自动化。它超越了简单的代码生成，提供了一个全面的系统，协调专业的 AI 智能体处理软件开发生命周期的每个阶段。
+<strong>Cowork Forge</strong> 是一个完整的 AI 驱动开发团队系统，它模拟真实软件团队的协作方式，让 AI 智能体分别扮演产品经理、架构师、项目经理和工程师等角色，协同完成从构思到交付的全部工作。
 
-由 Rust 和 LLM 驱动,Cowork Forge 通过专业智能体协同工作,将你的想法转化为生产就绪的代码。从需求收集和 PRD 生成,到技术设计、实施计划、编码和质量验证——Cowork Forge 全部管理,并在关键决策点进行人工验证。
+与只能生成代码片段的 AI 编程助手不同，Cowork Forge 提供端到端的开发生命周期管理：
+- **产品经理 AI**：将你的想法转化为详细的产品需求文档（PRD）
+- **架构师 AI**：设计完整的技术架构和系统组件
+- **项目经理 AI**：拆解任务、规划依赖关系和实施路径
+- **工程师 AI**：实现代码、保证质量并生成交付报告
+
+每个角色都采用 Actor-Critic 模式进行自我审查和优化，关键决策点引入人工验证，确保输出质量和方向正确。
 
 <p align="center">
-  <strong>让你的开发工作流程通过像真实开发团队一样思考、规划和协作的 AI 智能体得到变革。</strong>
+  <strong>一个人也能拥有完整的开发团队 - Cowork Forge 让 AI 智能体像真实团队一样为你工作。</strong>
 </p>
 
 <div style="text-align: center; margin: 30px 0;">
@@ -42,23 +48,23 @@
     </tr>
     <tr>
       <td style="padding: 15px; border: 1px solid #e9ecef; vertical-align: top;">
-        <p style="font-size: 14px; color: #6c757d; margin-bottom: 10px;"><strong>手动、碎片化的流程</strong></p>
+        <p style="font-size: 14px; color: #6c757d; margin-bottom: 10px;"><strong>需要多个角色和工具</strong></p>
         <ul style="font-size: 13px; color: #6c757d; line-height: 1.6;">
-          <li>手动需求收集和文档编写</li>
-          <li>设计、编码和测试使用分离的工具</li>
-          <li>耗时的代码审查和迭代</li>
-          <li>知识孤岛和沟通鸿沟</li>
-          <li>重复的样板代码编写</li>
+          <li>需要产品经理编写 PRD</li>
+          <li>需要架构师设计技术方案</li>
+          <li>需要项目经理拆解任务</li>
+          <li>需要工程师编写代码</li>
+          <li>多角色协作成本高、周期长</li>
         </ul>
       </td>
       <td style="padding: 15px; border: 1px solid #e9ecef; vertical-align: top;">
-        <p style="font-size: 14px; color: #6c757d; margin-bottom: 10px;"><strong>AI 驱动的协作开发</strong></p>
+        <p style="font-size: 14px; color: #6c757d; margin-bottom: 10px;"><strong>一个系统覆盖所有角色</strong></p>
         <ul style="font-size: 13px; color: #6c757d; line-height: 1.6;">
-          <li>自动化需求分析和 PRD 生成</li>
-          <li>集成智能体处理设计、编码和验证</li>
-          <li>智能代码规划，支持增量更新</li>
-          <li>所有开发阶段共享上下文</li>
-          <li>关键决策点的人工验证</li>
+          <li>AI 产品经理自动生成专业 PRD</li>
+          <li>AI 架构师设计完整技术方案</li>
+          <li>AI 项目经理智能拆解任务</li>
+          <li>AI 工程师实现高质量代码</li>
+          <li>全流程协同，人工仅需关键验证</li>
         </ul>
       </td>
     </tr>
@@ -101,8 +107,14 @@ Cowork Forge 在 AI 开发工具领域通过其独特的多智能体架构和全
 
 ## 核心差异化优势
 
-### 1. 完整的开发生命周期
-与仅协助编写单行代码的代码补全工具不同，Cowork Forge 管理整个软件开发过程——从初始想法收集到最终交付。这种全面的方法确保所有阶段的一致性和可追溯性。
+### 1. 完整的虚拟开发团队
+与仅协助编写代码的工具不同，Cowork Forge 提供完整的开发团队角色覆盖：
+- **产品经理角色**：将模糊的想法转化为结构化的产品需求文档
+- **架构师角色**：设计完整的技术架构和系统组件
+- **项目经理角色**：拆解任务、规划依赖关系和实施路径
+- **工程师角色**：实现代码并进行质量验证
+
+这种全角色覆盖确保了从需求分析到代码实现的全流程连贯性和专业性。
 
 ### 2. 多智能体协作
 Cowork Forge 的专业智能体像真实开发团队一样协同工作:
@@ -142,7 +154,7 @@ Cowork Forge 的专业智能体像真实开发团队一样协同工作:
 # 🌠 功能与特性
 
 - <strong>7 阶段开发工作流：</strong> 涵盖需求采集 → PRD 生成 → 技术设计 → 实施计划 → 编码 → 质量检查 → 交付的完整工作流。
-- <strong>专业 AI 智能体：</strong> 每个阶段由具有领域特定专业知识的专用智能体处理。4 个关键阶段（PRD、设计、规划、编码）使用演员-评论家循环进行迭代优化。
+- <strong>专业 AI 智能体:</strong> 每个阶段由专门的智能体处理，具备领域专业知识。四个关键阶段（PRD、设计、计划、编码）使用演员-评论家循环进行迭代优化，确保输出质量达到专业水准。
 - <strong>智能代码规划：</strong> 分析项目结构、依赖关系，生成精确的代码变更计划。
 - <strong>增量代码更新：</strong> 智能增量分析只更新受影响的文件，保留现有修改。
 - <strong>自动化质量验证：</strong> 多语言构建/测试集成，包含全面的错误分析和报告。
