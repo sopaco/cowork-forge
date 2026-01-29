@@ -84,14 +84,14 @@ HITL (Human-in-the-Loop) Tools are the primary mechanism for user intervention, 
 **Interaction Flow:**
 ```mermaid
 graph TD
-    A[Agent generates PRD] --> B[ReviewWithFeedbackTool]
-    B --> C{User Input}
-    C -->|\"edit\"| D[Open Editor]
-    D --> E[User edits and saves]
-    E --> F[File updated on disk]
-    C -->|\"pass\"| G[Continue workflow]
-    C -->|\"Add a login page\"| H[Feedback stored as text]
-    H --> I[Agent uses feedback in next iteration]
+    A[Agent生成PRD] --> B[ReviewWithFeedbackTool]
+    B --> C{用户输入}
+    C -->|"edit"| D[打开编辑器]
+    D --> E[用户编辑并保存]
+    E --> F[文件更新到磁盘]
+    C -->|"pass"| G[继续工作流]
+    C -->|"Add a login page"| H[反馈存储为文本]
+    H --> I[Agent在下次迭代中使用反馈]
 ```
 
 ### 4. Control Tools: Enabling Adaptive Workflow and Agent Recovery
