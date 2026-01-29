@@ -1,30 +1,30 @@
 # Project Analysis Summary Report (Full Version)
 
-Generation Time: 2026-01-29 11:44:51 UTC
+Generation Time: 2026-01-29 13:15:44 UTC
 
 ## Execution Timing Statistics
 
-- **Total Execution Time**: 817.47 seconds
-- **Preprocessing Phase**: 1.20 seconds (0.1%)
-- **Research Phase**: 132.22 seconds (16.2%)
-- **Document Generation Phase**: 684.05 seconds (83.7%)
+- **Total Execution Time**: 673.97 seconds
+- **Preprocessing Phase**: 0.97 seconds (0.1%)
+- **Research Phase**: 294.67 seconds (43.7%)
+- **Document Generation Phase**: 378.33 seconds (56.1%)
 - **Output Phase**: 0.00 seconds (0.0%)
-- **Summary Generation Time**: 0.000 seconds
+- **Summary Generation Time**: 0.001 seconds
 
 ## Cache Performance Statistics and Savings
 
 ### Performance Metrics
-- **Cache Hit Rate**: 87.8%
-- **Total Operations**: 82
-- **Cache Hits**: 72 times
-- **Cache Misses**: 10 times
-- **Cache Writes**: 11 times
+- **Cache Hit Rate**: 76.2%
+- **Total Operations**: 84
+- **Cache Hits**: 64 times
+- **Cache Misses**: 20 times
+- **Cache Writes**: 21 times
 
 ### Savings
-- **Inference Time Saved**: 374.6 seconds
-- **Tokens Saved**: 203055 input + 46357 output = 249412 total
-- **Estimated Cost Savings**: $0.1060
-- **Performance Improvement**: 87.8%
+- **Inference Time Saved**: 318.4 seconds
+- **Tokens Saved**: 95015 input + 36810 output = 131825 total
+- **Estimated Cost Savings**: $0.0640
+- **Performance Improvement**: 76.2%
 - **Efficiency Improvement Ratio**: 0.5x (saved time / actual execution time)
 
 ## Core Research Data Summary
@@ -36,77 +36,77 @@ Provides core objectives, user roles, and system boundary information for the pr
 
 ```json
 {
-  "business_value": "通过AI智能体自动化软件开发生命周期，显著提升开发效率和质量。系统支持增量修改、版本回退和阶段重入，降低软件开发的技术门槛，使非专业用户也能快速创建高质量的软件项目。",
+  "business_value": "Cowork Forge significantly reduces the cognitive load and manual effort required to initiate, plan, implement, and deliver software projects by automating repetitive and structured tasks while preserving human oversight. It enforces architectural simplicity, prevents scope creep by rejecting non-core requirements, and ensures traceability through session-based artifact tracking. This enables teams to deliver high-quality, minimal viable products faster, with reduced risk of misalignment between requirements and implementation.",
   "confidence_score": 0.95,
   "external_systems": [
     {
-      "description": "大型语言模型API服务（如OpenAI兼容接口）",
-      "interaction_type": "API调用",
-      "name": "LLM服务"
+      "description": "Provides the underlying large language model (LLM) capabilities used by all agents for reasoning, generation, and decision-making.",
+      "interaction_type": "API Call",
+      "name": "OpenAI API"
     },
     {
-      "description": "Git等版本控制系统用于代码版本管理",
-      "interaction_type": "文件系统操作",
-      "name": "版本控制系统"
+      "description": "Serves as the persistent storage layer for all project artifacts, session metadata, logs, and code changes. All data is stored in a hierarchical .cowork/sessions/ directory structure.",
+      "interaction_type": "File I/O",
+      "name": "Local File System"
     },
     {
-      "description": "用户默认的文本编辑器用于HITL交互",
-      "interaction_type": "进程调用",
-      "name": "文本编辑器"
+      "description": "Enables Human-in-the-Loop (HITL) interaction through CLI prompts, text editor integration (e.g., vim, code), and interactive feedback collection during review stages.",
+      "interaction_type": "Interactive Input",
+      "name": "User Terminal/Editor"
     }
   ],
-  "project_description": "Cowork Forge是一个AI驱动的软件开发系统，通过命令行界面提供完整的软件开发生命周期管理。系统采用多智能体架构，支持从项目构思到交付的全流程自动化，并集成人机协作(HITL)机制确保开发质量。",
+  "project_description": "Cowork Forge is an AI-powered software development system that orchestrates a multi-agent workflow to automate the entire software development lifecycle—from capturing user ideas to delivering production-ready code. The system uses an actor-critic architecture with Human-in-the-Loop (HITL) validation at key stages, ensuring quality, simplicity, and user alignment. It operates as a CLI-based agent framework that manages project state through session-based persistence and integrates with LLMs via a rate-limited, configurable OpenAI-compatible interface.",
   "project_name": "Cowork Forge",
   "project_type": "CLITool",
   "system_boundary": {
     "excluded_components": [
-      "代码编译和执行",
-      "数据库管理系统",
-      "部署和运维",
-      "用户界面渲染",
-      "网络服务部署"
+      "External LLM provider infrastructure (e.g., OpenAI servers)",
+      "CI/CD pipelines",
+      "Deployment infrastructure (e.g., Docker, Kubernetes)",
+      "Frontend web interfaces",
+      "Database servers (e.g., PostgreSQL, MySQL)",
+      "Testing frameworks beyond basic validation tools",
+      "Network services beyond local file I/O and API calls to LLMs"
     ],
     "included_components": [
-      "命令行界面(CLI)",
-      "多智能体工作流引擎",
-      "项目会话管理",
-      "文件操作工具",
-      "数据验证工具",
-      "HITL交互模块",
-      "LLM集成层",
-      "存储管理"
+      "cowork-cli (entry point)",
+      "cowork-core (agents, instructions, tools, pipelines, storage, data models)",
+      "LLM configuration and rate limiter",
+      "Session-based artifact storage (.cowork/sessions/)",
+      "All instruction prompts and agent logic",
+      "Tool implementations (file, data, validation, HITL, control)"
     ],
-    "scope": "AI辅助软件开发生命周期管理系统"
+    "scope": "A CLI-based AI agent framework that orchestrates software development workflows from idea to delivery using modular agents and tools. It manages session state, enforces validation rules, and interacts with external LLMs and file systems."
   },
   "target_users": [
     {
-      "description": "需要快速原型开发和项目迭代的专业开发团队",
-      "name": "软件开发团队",
+      "description": "Developers who want to accelerate the early stages of software development—idea refinement, PRD creation, design, and implementation—while maintaining control over critical decisions.",
+      "name": "Software Developers",
       "needs": [
-        "快速项目启动",
-        "自动化代码生成",
-        "标准化开发流程",
-        "版本控制和回退"
+        "Automate repetitive planning and coding tasks",
+        "Ensure architectural simplicity and minimalism",
+        "Receive structured feedback and validation at each stage",
+        "Maintain full audit trail of changes and decisions"
       ]
     },
     {
-      "description": "具备基本技术背景但希望快速验证产品创意的创业者",
-      "name": "技术创业者",
+      "description": "Product owners who need to translate high-level ideas into well-defined requirements and track their evolution into code, without deep technical involvement.",
+      "name": "Product Managers",
       "needs": [
-        "快速MVP开发",
-        "降低开发成本",
-        "简化技术复杂性",
-        "迭代式开发支持"
+        "Convert vague ideas into structured PRDs",
+        "Review and approve AI-generated artifacts",
+        "Ensure only core features are implemented",
+        "Track progress from idea to delivery"
       ]
     },
     {
-      "description": "用于软件工程教学和项目实践的培训机构",
-      "name": "教育机构",
+      "description": "Technical leads seeking to standardize development workflows, enforce quality gates, and reduce onboarding time for junior developers.",
+      "name": "Engineering Leads",
       "needs": [
-        "标准化开发流程演示",
-        "自动化代码生成教学",
-        "项目模板管理",
-        "学习进度跟踪"
+        "Enforce consistent development patterns",
+        "Prevent scope creep and over-engineering",
+        "Observe and audit AI-driven workflows",
+        "Recover from failed pipelines via HITL intervention"
       ]
     }
   ]
@@ -118,181 +118,412 @@ Provides high-level domain division, module relationships, and core business pro
 
 ```json
 {
-  "architecture_summary": "Cowork Forge采用分层架构设计，核心是基于AI智能体的工作流引擎。系统分为应用层、智能体层、工具层、数据层和基础设施层。应用层提供CLI入口，智能体层实现软件开发生命周期的各个阶段，工具层提供具体的功能操作，数据层管理项目状态和持久化，基础设施层处理LLM集成和配置管理。架构特点包括会话隔离、增量修改支持、人机协作机制和模块化工具设计。",
+  "architecture_summary": "Cowork Forge employs a modular, agent-driven architecture centered around a session-based workflow orchestration system. The system is organized into distinct functional domains: Core Workflow Orchestration, Intelligent Agent Control, Data & Artifact Management, Tooling & Operations, and Infrastructure Support. These domains interact through well-defined interfaces, with the pipeline module serving as the central coordinator. The architecture prioritizes human-in-the-loop (HITL) validation, simplicity enforcement, and state persistence via local file storage, creating a controlled, auditable AI-assisted development environment.",
   "business_flows": [
     {
-      "description": "完整的项目创建流程，从用户构思开始，通过PRD、设计、计划、编码、检查到最终交付的全生命周期管理",
-      "entry_point": "用户通过CLI输入项目构思",
-      "importance": 10.0,
-      "involved_domains_count": 5,
-      "name": "项目创建流程",
+      "description": "This process begins with user input of a project idea and guides it through structured refinement, documentation, and approval before advancing to formal requirements. It ensures alignment between user intent and system interpretation while preventing premature technical commitment.",
+      "entry_point": "main.rs entry point triggers the pipeline with 'idea' stage",
+      "importance": 9.5,
+      "involved_domains_count": 4,
+      "name": "Project Initiation and Idea Processing",
       "steps": [
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/idea.rs",
-          "domain_module": "智能体工作流域",
-          "operation": "Idea Agent处理用户构思，创建结构化摘要",
+          "code_entry_point": null,
+          "domain_module": "Intelligent Agent Control",
+          "operation": "Load Idea Agent instruction and initiate first interaction with user",
           "step": 1,
-          "sub_module": "构思处理模块"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/prd.rs",
-          "domain_module": "智能体工作流域",
-          "operation": "PRD Actor-Critic系统创建产品需求文档",
+          "code_entry_point": null,
+          "domain_module": "Tooling & Operations",
+          "operation": "Use SaveIdeaTool and LoadIdeaTool to persist and retrieve idea.md in session artifacts",
           "step": 2,
-          "sub_module": "需求管理模块"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/design.rs",
-          "domain_module": "智能体工作流域",
-          "operation": "设计Agent创建系统架构，HITL验证",
+          "code_entry_point": null,
+          "domain_module": "Intelligent Agent Control",
+          "operation": "Invoke ReviewAndEditContentTool to allow user to review and edit idea content",
           "step": 3,
-          "sub_module": "架构设计模块"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/plan.rs",
-          "domain_module": "智能体工作流域",
-          "operation": "计划Agent生成实现任务，Critic验证",
+          "code_entry_point": null,
+          "domain_module": "Data & Artifact Management",
+          "operation": "Store finalized idea as structured data model in session metadata",
           "step": 4,
-          "sub_module": "任务规划模块"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/coding.rs",
-          "domain_module": "智能体工作流域",
-          "operation": "编码Agent实现代码，Critic审查质量",
+          "code_entry_point": null,
+          "domain_module": "Core Workflow Orchestration",
+          "operation": "Transition pipeline to next stage (PRD creation) based on successful idea finalization",
           "step": 5,
-          "sub_module": "代码实现模块"
-        },
-        {
-          "code_entry_point": "crates/cowork-core/src/instructions/check.rs",
-          "domain_module": "智能体工作流域",
-          "operation": "检查Agent验证项目结构完整性",
-          "step": 6,
-          "sub_module": "质量检查模块"
-        },
-        {
-          "code_entry_point": "crates/cowork-core/src/instructions/delivery.rs",
-          "domain_module": "智能体工作流域",
-          "operation": "交付Agent生成最终交付报告",
-          "step": 7,
-          "sub_module": "项目交付模块"
+          "sub_module": null
         }
       ]
     },
     {
-      "description": "增量修改流程，支持对现有项目的修改请求分析、影响评估和代码补丁应用",
-      "entry_point": "用户提交修改请求",
+      "description": "This process transforms the approved project idea into a Product Requirements Document (PRD) and high-level system design, using actor-critic agent pairs to generate and validate content. It enforces simplicity by rejecting non-core features and requires human approval before proceeding.",
+      "entry_point": "Pipeline module initiates PRD loop after idea completion",
       "importance": 9.0,
       "involved_domains_count": 4,
-      "name": "项目修改流程",
+      "name": "PRD and Design Specification Generation",
       "steps": [
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/modify.rs",
-          "domain_module": "智能体工作流域",
-          "operation": "修改Agent分析变更范围和影响",
+          "code_entry_point": null,
+          "domain_module": "Intelligent Agent Control",
+          "operation": "Launch PRD Actor agent to draft requirements from idea",
           "step": 1,
-          "sub_module": "变更分析模块"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/code_patch.rs",
-          "domain_module": "智能体工作流域",
-          "operation": "代码补丁Agent实现增量修改",
+          "code_entry_point": null,
+          "domain_module": "Intelligent Agent Control",
+          "operation": "Invoke PRD Critic agent to validate scope, reject non-core features, and ensure minimalism",
           "step": 2,
-          "sub_module": "代码修改模块"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/modify_delivery.rs",
-          "domain_module": "智能体工作流域",
-          "operation": "修改交付Agent生成变更报告",
+          "code_entry_point": null,
+          "domain_module": "Tooling & Operations",
+          "operation": "Use SavePrdDocTool to persist PRD as markdown artifact",
           "step": 3,
-          "sub_module": "变更报告模块"
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Intelligent Agent Control",
+          "operation": "Trigger HITL review via ReviewWithFeedbackTool for user approval",
+          "step": 4,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Core Workflow Orchestration",
+          "operation": "Transition to Design Loop if PRD approved, otherwise restart PRD stage",
+          "step": 5,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Intelligent Agent Control",
+          "operation": "Launch Design Actor to create architecture plan, followed by Design Critic for validation",
+          "step": 6,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Tooling & Operations",
+          "operation": "Use SaveDesignDocTool to persist design document in session artifacts",
+          "step": 7,
+          "sub_module": null
         }
       ]
     },
     {
-      "description": "阶段重入流程，允许从特定阶段重新启动工作流，支持错误恢复和流程优化",
-      "entry_point": "用户选择重入阶段",
-      "importance": 8.0,
+      "description": "This process breaks down the approved design into discrete, executable tasks, ensuring each task is minimal, testable, and traceable. It uses a planning actor-critic pair to generate and validate task lists, preventing over-engineering and ensuring alignment with design.",
+      "entry_point": "Pipeline module initiates Plan Loop after design approval",
+      "importance": 8.5,
       "involved_domains_count": 3,
-      "name": "阶段重入流程",
+      "name": "Implementation Planning and Task Generation",
       "steps": [
         {
-          "code_entry_point": "crates/cowork-core/src/tools/goto_stage_tool.rs",
-          "domain_module": "工具功能域",
-          "operation": "阶段跳转工具验证目标阶段",
+          "code_entry_point": null,
+          "domain_module": "Intelligent Agent Control",
+          "operation": "Activate Plan Actor to decompose design into implementation tasks",
           "step": 1,
-          "sub_module": "流程控制模块"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/storage/mod.rs",
-          "domain_module": "数据存储域",
-          "operation": "加载会话元数据和状态",
+          "code_entry_point": null,
+          "domain_module": "Intelligent Agent Control",
+          "operation": "Invoke Plan Critic to validate task simplicity, completeness, and dependency integrity",
           "step": 2,
-          "sub_module": "会话管理模块"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/pipeline/mod.rs",
-          "domain_module": "智能体工作流域",
-          "operation": "创建部分管道从指定阶段继续",
+          "code_entry_point": null,
+          "domain_module": "Data & Artifact Management",
+          "operation": "Store task list in session state using structured data models",
           "step": 3,
-          "sub_module": "管道编排模块"
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Tooling & Operations",
+          "operation": "Use ReviewWithFeedbackTool to allow user to review and approve task plan",
+          "step": 4,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Core Workflow Orchestration",
+          "operation": "Transition to Coding Loop upon approval, or restart planning if rejected",
+          "step": 5,
+          "sub_module": null
+        }
+      ]
+    },
+    {
+      "description": "This process executes the approved task plan by generating, reviewing, and refining code incrementally. Each task is implemented by a Coding Actor and validated by a Coding Critic, with the ability to request replanning if fundamental issues arise.",
+      "entry_point": "Pipeline module initiates Coding Loop after plan approval",
+      "importance": 9.0,
+      "involved_domains_count": 5,
+      "name": "Code Implementation and Iterative Development",
+      "steps": [
+        {
+          "code_entry_point": null,
+          "domain_module": "Intelligent Agent Control",
+          "operation": "Launch Coding Actor to implement first task using available tools",
+          "step": 1,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Tooling & Operations",
+          "operation": "Use WriteFileTool and ReadFileTool to modify and verify code files",
+          "step": 2,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Intelligent Agent Control",
+          "operation": "Invoke Coding Critic to assess code quality, complexity, and task completion",
+          "step": 3,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Tooling & Operations",
+          "operation": "Use RequestReplanningTool if critical issues are detected, triggering pipeline restart",
+          "step": 4,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Tooling & Operations",
+          "operation": "Use ProvideFeedbackTool to record user feedback for agent learning",
+          "step": 5,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Data & Artifact Management",
+          "operation": "Update task status and code metadata in session state",
+          "step": 6,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Core Workflow Orchestration",
+          "operation": "Continue to next task until all are completed, then transition to Check phase",
+          "step": 7,
+          "sub_module": null
+        }
+      ]
+    },
+    {
+      "description": "This final process ensures that the implemented code fully satisfies all requirements before generating a delivery report. It performs minimal but critical validation of feature coverage, file existence, and task completion, preventing false delivery claims.",
+      "entry_point": "Pipeline module triggers Delivery Agent after coding completion",
+      "importance": 9.0,
+      "involved_domains_count": 4,
+      "name": "Quality Validation and Delivery Verification",
+      "steps": [
+        {
+          "code_entry_point": null,
+          "domain_module": "Intelligent Agent Control",
+          "operation": "Activate Delivery Agent to validate task completion against actual code files",
+          "step": 1,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Tooling & Operations",
+          "operation": "Use CheckFeatureCoverageTool and CheckTaskDependenciesTool to verify structural integrity",
+          "step": 2,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Data & Artifact Management",
+          "operation": "Load requirements, design, and task data to cross-reference with implemented files",
+          "step": 3,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Intelligent Agent Control",
+          "operation": "If validation fails, trigger Modify or Replan workflow; if passed, proceed to report generation",
+          "step": 4,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Tooling & Operations",
+          "operation": "Use SaveDeliveryReportTool to generate and persist final delivery documentation",
+          "step": 5,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Core Workflow Orchestration",
+          "operation": "Terminate pipeline successfully and persist session state as complete",
+          "step": 6,
+          "sub_module": null
+        }
+      ]
+    },
+    {
+      "description": "This process handles post-delivery modifications by analyzing user change requests, assessing impact, and orchestrating targeted updates without restarting the entire workflow. It enables evolutionary development while maintaining traceability.",
+      "entry_point": "User invokes pipeline with 'modify' flag or triggers modify_delivery stage",
+      "importance": 8.0,
+      "involved_domains_count": 5,
+      "name": "Change Request Processing and Incremental Modification",
+      "steps": [
+        {
+          "code_entry_point": null,
+          "domain_module": "Intelligent Agent Control",
+          "operation": "Launch Modify Triage Agent to analyze change request scope (PRD, design, plan, code)",
+          "step": 1,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Data & Artifact Management",
+          "operation": "Load base session state and current state to compute delta",
+          "step": 2,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Tooling & Operations",
+          "operation": "Use SaveChangeRequestTool to persist scope analysis and risk assessment",
+          "step": 3,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Core Workflow Orchestration",
+          "operation": "Initiate targeted pipeline segment (e.g., coding loop only) based on change scope",
+          "step": 4,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Intelligent Agent Control",
+          "operation": "Use Code Patch Agent to implement incremental changes with validation",
+          "step": 5,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Tooling & Operations",
+          "operation": "Use ModifyDeliveryAgent to generate comprehensive change report with feedback history",
+          "step": 6,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Data & Artifact Management",
+          "operation": "Update session state with new artifacts and mark as modified",
+          "step": 7,
+          "sub_module": null
+        }
+      ]
+    },
+    {
+      "description": "This process allows users to restart or resume workflows from any stage (e.g., PRD, design, coding), enabling recovery from failures or iterative refinement. It manages session metadata to preserve context and enable non-linear workflow progression.",
+      "entry_point": "User invokes CLI with --goto-stage flag",
+      "importance": 7.0,
+      "involved_domains_count": 3,
+      "name": "Pipeline Resumption and Stage Navigation",
+      "steps": [
+        {
+          "code_entry_point": null,
+          "domain_module": "Tooling & Operations",
+          "operation": "Use GotoStageTool to validate target stage and load session metadata",
+          "step": 1,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Data & Artifact Management",
+          "operation": "Restore session state from disk, including artifacts and task history",
+          "step": 2,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Core Workflow Orchestration",
+          "operation": "Reconstruct pipeline from specified stage, skipping completed steps",
+          "step": 3,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "Core Workflow Orchestration",
+          "operation": "Update session metadata to reflect new starting point and continue execution",
+          "step": 4,
+          "sub_module": null
         }
       ]
     }
   ],
-  "confidence_score": 9.2,
+  "confidence_score": 0.94,
   "domain_modules": [
     {
       "code_paths": [
-        "crates/cowork-core/src/agents/mod.rs",
-        "crates/cowork-core/src/agents/hitl.rs",
-        "crates/cowork-core/src/instructions/mod.rs",
-        "crates/cowork-core/src/instructions/idea.rs",
-        "crates/cowork-core/src/instructions/prd.rs",
-        "crates/cowork-core/src/instructions/design.rs",
-        "crates/cowork-core/src/instructions/plan.rs",
-        "crates/cowork-core/src/instructions/coding.rs",
-        "crates/cowork-core/src/instructions/check.rs",
-        "crates/cowork-core/src/instructions/delivery.rs",
-        "crates/cowork-core/src/instructions/modify.rs",
-        "crates/cowork-core/src/instructions/code_patch.rs",
-        "crates/cowork-core/src/instructions/modify_delivery.rs",
-        "crates/cowork-core/src/pipeline/mod.rs"
+        "crates/cowork-core/src/pipeline/mod.rs",
+        "crates/cowork-cli/src/main.rs"
       ],
       "complexity": 9.0,
-      "description": "负责软件开发生命周期的核心工作流编排，实现多智能体协作的Actor-Critic模式，支持全流程自动化和HITL人机协作",
-      "domain_type": "核心业务域",
+      "description": "Manages the end-to-end software development lifecycle by orchestrating agent pipelines and controlling workflow transitions. This domain defines the sequence of stages (idea → PRD → design → plan → coding → check → delivery) and enables resumption, modification, and branching workflows. It is the central nervous system of the system, coordinating all other domains.",
+      "domain_type": "Core Business Domain",
       "importance": 10.0,
-      "name": "智能体工作流域",
+      "name": "Core Workflow Orchestration",
       "sub_modules": [
         {
           "code_paths": [
             "crates/cowork-core/src/pipeline/mod.rs"
           ],
-          "description": "工作流管道编排模块，负责组装不同智能体组合形成完整或部分工作流",
+          "description": "Assembles agent sequences and manages execution flow based on user commands and session state",
           "importance": 10.0,
           "key_functions": [
-            "全项目创建管道",
-            "阶段重入管道",
-            "增量修改管道",
-            "部分工作流组装"
+            "create_full_pipeline",
+            "create_resume_pipeline",
+            "create_modify_pipeline"
           ],
-          "name": "管道编排模块"
+          "name": "Pipeline Coordinator"
         },
         {
           "code_paths": [
-            "crates/cowork-core/src/agents/mod.rs",
-            "crates/cowork-core/src/agents/hitl.rs"
+            "crates/cowork-core/src/tools/goto_stage_tool.rs"
           ],
-          "description": "智能体核心实现模块，提供多智能体协作框架和错误恢复机制",
-          "importance": 9.0,
+          "description": "Handles state transitions and session metadata updates for workflow resumption and stage skipping",
+          "importance": 8.0,
           "key_functions": [
-            "智能体创建",
-            "Actor-Critic模式",
-            "HITL错误恢复",
-            "迭代控制"
+            "GotoStageTool::execute"
           ],
-          "name": "智能体框架模块"
-        },
+          "name": "Stage Navigator"
+        }
+      ]
+    },
+    {
+      "code_paths": [
+        "crates/cowork-core/src/instructions/",
+        "crates/cowork-core/src/agents/",
+        "crates/cowork-core/src/instructions/mod.rs",
+        "crates/cowork-core/src/agents/mod.rs",
+        "crates/cowork-core/src/agents/hitl.rs"
+      ],
+      "complexity": 9.0,
+      "description": "Implements the actor-critic agent architecture with Human-in-the-Loop (HITL) validation at each stage. This domain defines the behavior, instructions, and decision logic of all AI agents involved in development tasks—from idea generation to code delivery. It ensures quality through iterative validation and user feedback.",
+      "domain_type": "Core Business Domain",
+      "importance": 10.0,
+      "name": "Intelligent Agent Control",
+      "sub_modules": [
         {
           "code_paths": [
             "crates/cowork-core/src/instructions/idea.rs",
@@ -301,313 +532,325 @@ Provides high-level domain division, module relationships, and core business pro
             "crates/cowork-core/src/instructions/plan.rs",
             "crates/cowork-core/src/instructions/coding.rs",
             "crates/cowork-core/src/instructions/check.rs",
-            "crates/cowork-core/src/instructions/delivery.rs"
-          ],
-          "description": "完整生命周期智能体指令模块，覆盖从构思到交付的全流程",
-          "importance": 10.0,
-          "key_functions": [
-            "构思处理",
-            "PRD创建",
-            "架构设计",
-            "任务规划",
-            "代码实现",
-            "质量检查",
-            "项目交付"
-          ],
-          "name": "生命周期模块"
-        },
-        {
-          "code_paths": [
+            "crates/cowork-core/src/instructions/delivery.rs",
             "crates/cowork-core/src/instructions/modify.rs",
             "crates/cowork-core/src/instructions/code_patch.rs",
             "crates/cowork-core/src/instructions/modify_delivery.rs"
           ],
-          "description": "增量修改智能体指令模块，支持项目修改和变更管理",
+          "description": "Contains prompt templates and workflow rules for all agent roles (Actor, Critic, Triage, etc.)",
+          "importance": 10.0,
+          "key_functions": [
+            "DESIGN_ACTOR_INSTRUCTION",
+            "CHECK_AGENT_INSTRUCTION",
+            "CODE_PATCH_INSTRUCTION"
+          ],
+          "name": "Agent Instructions"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/agents/hitl.rs",
+            "crates/cowork-core/src/agents/mod.rs"
+          ],
+          "description": "Manages agent lifecycle, error handling, and HITL recovery mechanisms",
           "importance": 9.0,
           "key_functions": [
-            "变更分析",
-            "代码补丁",
-            "修改交付",
-            "影响评估"
+            "ResilientStream",
+            "SequentialAgent::new"
           ],
-          "name": "修改管理模块"
+          "name": "Agent Execution Wrapper"
         }
       ]
     },
     {
       "code_paths": [
-        "crates/cowork-core/src/tools/mod.rs",
-        "crates/cowork-core/src/tools/file_tools.rs",
-        "crates/cowork-core/src/tools/validation_tools.rs",
-        "crates/cowork-core/src/tools/data_tools.rs",
-        "crates/cowork-core/src/tools/control_tools.rs",
-        "crates/cowork-core/src/tools/artifact_tools.rs",
-        "crates/cowork-core/src/tools/goto_stage_tool.rs",
-        "crates/cowork-core/src/tools/modify_tools.rs",
-        "crates/cowork-core/src/tools/hitl_tools.rs",
-        "crates/cowork-core/src/tools/hitl_content_tools.rs",
-        "crates/cowork-core/src/tools/idea_tools.rs"
+        "crates/cowork-core/src/data/models.rs",
+        "crates/cowork-core/src/data/mod.rs",
+        "crates/cowork-core/src/data/schemas.rs",
+        "crates/cowork-core/src/data/schemas/validation.rs",
+        "crates/cowork-core/src/storage/mod.rs"
+      ],
+      "complexity": 8.0,
+      "description": "Manages persistent storage and structured data models for all development artifacts. This domain ensures traceability and state recovery by maintaining session-based file storage (.cowork/sessions/), with schemas for requirements, design, tasks, feedback, and delivery reports.",
+      "domain_type": "Core Business Domain",
+      "importance": 9.0,
+      "name": "Data & Artifact Management",
+      "sub_modules": [
+        {
+          "code_paths": [
+            "crates/cowork-core/src/data/models.rs"
+          ],
+          "description": "Defines Serde-serializable structs for requirements, features, design, tasks, sessions, and feedback",
+          "importance": 9.0,
+          "key_functions": [
+            "ProjectIdea",
+            "PRD",
+            "DesignComponent",
+            "ImplementationTask",
+            "SessionMetadata"
+          ],
+          "name": "Data Models"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/storage/mod.rs"
+          ],
+          "description": "Implements file-based CRUD operations for session artifacts, logs, and metadata",
+          "importance": 9.0,
+          "key_functions": [
+            "save_artifact",
+            "load_session",
+            "update_task_status"
+          ],
+          "name": "Storage Layer"
+        }
+      ]
+    },
+    {
+      "code_paths": [
+        "crates/cowork-core/src/tools/",
+        "crates/cowork-core/src/tools/mod.rs"
       ],
       "complexity": 7.0,
-      "description": "提供具体的功能操作工具集，包括文件操作、数据验证、流程控制、HITL交互等，支持智能体的具体功能实现",
-      "domain_type": "核心业务域",
-      "importance": 9.0,
-      "name": "工具功能域",
+      "description": "Provides the functional tools that agents use to interact with the environment—file system, data validation, user interaction, and control operations. These tools are session-scoped and strictly controlled to prevent unsafe operations.",
+      "domain_type": "Tool Support Domain",
+      "importance": 8.0,
+      "name": "Tooling & Operations",
       "sub_modules": [
         {
           "code_paths": [
             "crates/cowork-core/src/tools/file_tools.rs"
           ],
-          "description": "安全文件系统操作工具，提供目录遍历防护和命令执行安全控制",
-          "importance": 9.0,
+          "description": "Secure file operations with path validation to prevent directory traversal",
+          "importance": 8.0,
           "key_functions": [
-            "文件读写",
-            "目录列表",
-            "命令执行",
-            "路径验证"
+            "ListFilesTool",
+            "ReadFileTool",
+            "WriteFileTool",
+            "RunCommandTool"
           ],
-          "name": "文件操作模块"
+          "name": "File System Tools"
         },
         {
           "code_paths": [
-            "crates/cowork-core/src/tools/data_tools.rs",
             "crates/cowork-core/src/tools/validation_tools.rs"
           ],
-          "description": "数据管理和验证工具，支持结构化数据的创建、修改和质量检查",
+          "description": "Ensures data integrity through schema and structural validation",
           "importance": 8.0,
           "key_functions": [
-            "数据创建",
-            "数据修改",
-            "格式验证",
-            "覆盖检查",
-            "依赖分析"
+            "CheckDataFormatTool",
+            "CheckFeatureCoverageTool",
+            "CheckTaskDependenciesTool"
           ],
-          "name": "数据管理模块"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/tools/control_tools.rs",
-            "crates/cowork-core/src/tools/goto_stage_tool.rs"
-          ],
-          "description": "流程控制工具，支持反馈记录、重规划请求和阶段跳转",
-          "importance": 8.0,
-          "key_functions": [
-            "反馈记录",
-            "重规划请求",
-            "用户交互",
-            "阶段跳转"
-          ],
-          "name": "流程控制模块"
+          "name": "Validation Tools"
         },
         {
           "code_paths": [
             "crates/cowork-core/src/tools/hitl_tools.rs",
             "crates/cowork-core/src/tools/hitl_content_tools.rs"
           ],
-          "description": "HITL人机协作工具，提供内容审查和编辑交互界面",
-          "importance": 7.0,
+          "description": "Enables human review and feedback via CLI and editor integration",
+          "importance": 9.0,
           "key_functions": [
-            "内容审查",
-            "编辑交互",
-            "反馈收集",
-            "用户确认"
+            "ReviewAndEditFileTool",
+            "ReviewWithFeedbackTool",
+            "ReviewAndEditContentTool"
           ],
-          "name": "人机交互模块"
+          "name": "HITL Interaction Tools"
         },
         {
           "code_paths": [
-            "crates/cowork-core/src/tools/artifact_tools.rs",
-            "crates/cowork-core/src/tools/idea_tools.rs",
+            "crates/cowork-core/src/tools/control_tools.rs"
+          ],
+          "description": "Provides agent control mechanisms like replanning, feedback, and user queries",
+          "importance": 8.0,
+          "key_functions": [
+            "RequestReplanningTool",
+            "ProvideFeedbackTool",
+            "AskUserTool"
+          ],
+          "name": "Control Tools"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/tools/artifact_tools.rs"
+          ],
+          "description": "Manages persistence of key documents like PRD, design, and delivery reports",
+          "importance": 8.0,
+          "key_functions": [
+            "SavePrdDocTool",
+            "SaveDesignDocTool",
+            "SaveDeliveryReportTool",
+            "LoadFeedbackHistoryTool"
+          ],
+          "name": "Artifact Tools"
+        },
+        {
+          "code_paths": [
             "crates/cowork-core/src/tools/modify_tools.rs"
           ],
-          "description": "工件管理工具，支持各种开发工件的保存和加载操作",
+          "description": "Handles change request analysis and persistence",
           "importance": 7.0,
           "key_functions": [
-            "工件保存",
-            "工件加载",
-            "变更请求管理",
-            "交付报告生成"
+            "SaveChangeRequestTool",
+            "LoadChangeRequestTool"
           ],
-          "name": "工件管理模块"
+          "name": "Change Management Tools"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/tools/idea_tools.rs"
+          ],
+          "description": "Manages persistence and retrieval of user project ideas",
+          "importance": 7.0,
+          "key_functions": [
+            "SaveIdeaTool",
+            "LoadIdeaTool"
+          ],
+          "name": "Idea Tools"
         }
       ]
     },
     {
       "code_paths": [
-        "crates/cowork-core/src/data/mod.rs",
-        "crates/cowork-core/src/data/models.rs",
-        "crates/cowork-core/src/data/schemas.rs",
-        "crates/cowork-core/src/data/schemas/validation.rs",
-        "crates/cowork-core/src/storage/mod.rs"
+        "crates/cowork-core/src/llm/config.rs",
+        "crates/cowork-core/src/llm/rate_limiter.rs",
+        "crates/cowork-core/src/llm/mod.rs"
       ],
       "complexity": 6.0,
-      "description": "负责数据模型定义、序列化/反序列化和持久化存储管理，采用会话隔离的架构设计",
-      "domain_type": "核心业务域",
-      "importance": 8.0,
-      "name": "数据存储域",
-      "sub_modules": [
-        {
-          "code_paths": [
-            "crates/cowork-core/src/data/models.rs"
-          ],
-          "description": "数据模型定义模块，包含需求、功能、设计、计划、代码元数据等完整的数据结构",
-          "importance": 8.0,
-          "key_functions": [
-            "模型定义",
-            "序列化支持",
-            "时间戳跟踪",
-            "会话架构"
-          ],
-          "name": "数据模型模块"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/storage/mod.rs"
-          ],
-          "description": "持久化存储模块，实现文件为基础的CRUD操作和会话状态管理",
-          "importance": 8.0,
-          "key_functions": [
-            "会话管理",
-            "文件持久化",
-            "状态跟踪",
-            "会话继承"
-          ],
-          "name": "存储管理模块"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/data/schemas.rs",
-            "crates/cowork-core/src/data/schemas/validation.rs"
-          ],
-          "description": "数据验证模块，提供JSON Schema验证和数据结构完整性检查",
-          "importance": 6.0,
-          "key_functions": [
-            "模式验证",
-            "数据完整性",
-            "格式检查"
-          ],
-          "name": "数据验证模块"
-        }
-      ]
-    },
-    {
-      "code_paths": [
-        "crates/cowork-core/src/llm/mod.rs",
-        "crates/cowork-core/src/llm/config.rs",
-        "crates/cowork-core/src/llm/rate_limiter.rs"
-      ],
-      "complexity": 5.0,
-      "description": "LLM集成基础设施，提供配置管理、API客户端创建和速率限制中间件",
-      "domain_type": "基础设施域",
+      "description": "Provides foundational services for LLM integration and rate limiting. This domain abstracts interaction with external LLM providers and ensures compliance with API usage policies.",
+      "domain_type": "Infrastructure Domain",
       "importance": 7.0,
-      "name": "LLM集成域",
+      "name": "Infrastructure Support",
       "sub_modules": [
         {
           "code_paths": [
             "crates/cowork-core/src/llm/config.rs"
           ],
-          "description": "配置管理模块，支持TOML文件和环境变量的配置加载",
+          "description": "Loads and configures OpenAI-compatible endpoints, API keys, and model settings from config files and environment",
           "importance": 7.0,
           "key_functions": [
-            "配置加载",
-            "环境变量支持",
-            "客户端创建",
-            "错误处理"
+            "load_llm_config",
+            "create_llm_client"
           ],
-          "name": "配置管理模块"
+          "name": "LLM Configuration"
         },
         {
           "code_paths": [
             "crates/cowork-core/src/llm/rate_limiter.rs"
           ],
-          "description": "速率限制中间件，为LLM API调用添加可配置的延迟控制",
-          "importance": 6.0,
+          "description": "Wraps LLM calls to enforce rate limits and prevent API throttling",
+          "importance": 7.0,
           "key_functions": [
-            "速率限制",
-            "延迟控制",
-            "中间件包装",
-            "API调用保护"
+            "RateLimiter::new",
+            "RateLimiter::call"
           ],
-          "name": "速率限制模块"
+          "name": "Rate Limiter Middleware"
         }
       ]
     },
     {
       "code_paths": [
-        "crates/cowork-cli/src/main.rs"
+        "crates/cowork-core/src/lib.rs",
+        "crates/cowork-core/src/instructions/mod.rs",
+        "crates/cowork-core/src/tools/mod.rs",
+        "crates/cowork-core/src/data/mod.rs",
+        "crates/cowork-core/src/llm/mod.rs",
+        "crates/cowork-core/src/storage/mod.rs"
       ],
       "complexity": 4.0,
-      "description": "命令行界面应用层，提供用户交互入口和项目工作流管理",
-      "domain_type": "应用层域",
-      "importance": 8.0,
-      "name": "CLI应用域",
+      "description": "Provides modular organization and re-exports to simplify external access to core functionality. This domain does not contain business logic but enables clean code organization and dependency management.",
+      "domain_type": "Infrastructure Domain",
+      "importance": 5.0,
+      "name": "Module Aggregation & Facade",
       "sub_modules": [
         {
           "code_paths": [
-            "crates/cowork-cli/src/main.rs"
+            "crates/cowork-core/src/lib.rs"
           ],
-          "description": "主入口模块，实现命令行参数解析和会话管理工作流",
-          "importance": 8.0,
-          "key_functions": [
-            "命令行接口",
-            "会话管理",
-            "工作流启动",
-            "状态监控"
+          "description": "Root library module re-exporting key submodules for external consumption",
+          "importance": 5.0,
+          "key_functions": [],
+          "name": "Core Library Facade"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/instructions/mod.rs",
+            "crates/cowork-core/src/tools/mod.rs",
+            "crates/cowork-core/src/data/mod.rs",
+            "crates/cowork-core/src/llm/mod.rs",
+            "crates/cowork-core/src/storage/mod.rs"
           ],
-          "name": "主入口模块"
+          "description": "Aggregates and exposes submodules for cleaner imports",
+          "importance": 5.0,
+          "key_functions": [],
+          "name": "Module Re-exporters"
         }
       ]
     }
   ],
   "domain_relations": [
     {
-      "description": "智能体工作流域依赖工具功能域提供具体的操作能力，如文件操作、数据验证等",
-      "from_domain": "智能体工作流域",
-      "relation_type": "服务调用",
+      "description": "Pipeline orchestrates agent execution by loading and invoking instruction sets from the agent control domain. Each pipeline stage triggers specific agent workflows.",
+      "from_domain": "Core Workflow Orchestration",
+      "relation_type": "Service Call",
+      "strength": 10.0,
+      "to_domain": "Intelligent Agent Control"
+    },
+    {
+      "description": "Pipeline depends on session state and artifact persistence to maintain context across stages and support resumption. All workflow decisions rely on loaded data models.",
+      "from_domain": "Core Workflow Orchestration",
+      "relation_type": "Data Dependency",
+      "strength": 10.0,
+      "to_domain": "Data & Artifact Management"
+    },
+    {
+      "description": "Pipeline invokes tool functions (file, validation, HITL) during agent execution to interact with the environment and enforce validation rules.",
+      "from_domain": "Core Workflow Orchestration",
+      "relation_type": "Service Call",
       "strength": 9.0,
-      "to_domain": "工具功能域"
+      "to_domain": "Tooling & Operations"
     },
     {
-      "description": "工具功能域依赖数据存储域进行数据持久化和状态管理",
-      "from_domain": "工具功能域",
-      "relation_type": "数据依赖",
+      "description": "Agents rely on tools to perform operations like reading/writing files, validating data, and interacting with users. Tools are the primary interface between agents and the system.",
+      "from_domain": "Intelligent Agent Control",
+      "relation_type": "Service Call",
+      "strength": 9.0,
+      "to_domain": "Tooling & Operations"
+    },
+    {
+      "description": "Agents read and write structured data models (PRD, design, tasks) to persist and retrieve state. Data models define the contract for agent inputs and outputs.",
+      "from_domain": "Intelligent Agent Control",
+      "relation_type": "Data Dependency",
       "strength": 8.0,
-      "to_domain": "数据存储域"
+      "to_domain": "Data & Artifact Management"
     },
     {
-      "description": "智能体工作流域依赖数据存储域进行会话状态管理和项目数据持久化",
-      "from_domain": "智能体工作流域",
-      "relation_type": "数据依赖",
+      "description": "Tools interact with the storage layer to persist and retrieve artifacts. For example, SavePrdDocTool writes to session directories managed by the storage module.",
+      "from_domain": "Tooling & Operations",
+      "relation_type": "Data Dependency",
       "strength": 8.0,
-      "to_domain": "数据存储域"
+      "to_domain": "Data & Artifact Management"
     },
     {
-      "description": "智能体工作流域依赖LLM集成域提供AI能力支持，用于智能决策和内容生成",
-      "from_domain": "智能体工作流域",
-      "relation_type": "服务调用",
+      "description": "Tools that require LLM interaction (e.g., agent instructions) depend on the LLM configuration and rate limiter to make API calls.",
+      "from_domain": "Tooling & Operations",
+      "relation_type": "Service Call",
       "strength": 7.0,
-      "to_domain": "LLM集成域"
+      "to_domain": "Infrastructure Support"
     },
     {
-      "description": "CLI应用域依赖智能体工作流域执行具体的软件开发生命周期工作流",
-      "from_domain": "CLI应用域",
-      "relation_type": "服务调用",
-      "strength": 9.0,
-      "to_domain": "智能体工作流域"
-    },
-    {
-      "description": "工具功能域依赖LLM集成域的配置信息进行工具参数设置",
-      "from_domain": "工具功能域",
-      "relation_type": "配置依赖",
-      "strength": 6.0,
-      "to_domain": "LLM集成域"
-    },
-    {
-      "description": "数据存储域为所有其他域提供统一的数据访问接口和持久化服务",
-      "from_domain": "数据存储域",
-      "relation_type": "数据服务",
+      "description": "Agent instructions rely on the configured LLM client to generate responses. The rate limiter ensures compliance with API usage limits during agent reasoning.",
+      "from_domain": "Infrastructure Support",
+      "relation_type": "Service Call",
       "strength": 8.0,
-      "to_domain": "智能体工作流域"
+      "to_domain": "Intelligent Agent Control"
+    },
+    {
+      "description": "Module re-exporters provide a clean API surface for external crates (e.g., cowork-cli) to import core functionality without deep module knowledge.",
+      "from_domain": "Module Aggregation & Facade",
+      "relation_type": "Tool Support",
+      "strength": 6.0,
+      "to_domain": "All Other Domains"
     }
   ]
 }
@@ -619,25 +862,20 @@ Contains static analysis results of the codebase and business process analysis.
 ```json
 {
   "main_workflow": {
-    "description": "这是Cowork Forge系统的核心工作流，实现了从项目构思到最终交付的完整软件开发生命周期。该工作流采用多智能体协作的Actor-Critic模式，结合Human-in-the-Loop(HITL)人机协作机制，确保开发过程的质量控制和用户参与。",
-    "flowchart_mermaid": "graph TD\n    A[用户输入项目构思] --> B[Idea Agent处理构思]\n    B --> C[PRD Actor-Critic系统]\n    C --> D{用户审核批准?}\n    D -->|否| C\n    D -->|是| E[设计Agent创建架构]\n    E --> F{用户审核批准?}\n    F -->|否| E\n    F -->|是| G[计划Agent生成任务]\n    G --> H[计划Critic验证任务]\n    H --> I{用户审核批准?}\n    I -->|否| G\n    I -->|是| J[编码Agent实现代码]\n    J --> K[编码Critic审查质量]\n    K --> L{质量检查通过?}\n    L -->|否| J\n    L -->|是| M[检查Agent验证结构]\n    M --> N{结构完整性通过?}\n    N -->|否| O[重新规划或修复]\n    O --> J\n    N -->|是| P[交付Agent生成报告]\n    P --> Q[项目交付完成]\n    \n    style A fill:#e1f5fe\n    style Q fill:#c8e6c9",
-    "name": "项目创建完整工作流"
+    "description": "The primary workflow orchestrates the complete software development lifecycle from user idea to final delivery, using a sequence of AI agents with Human-in-the-Loop (HITL) validation at each stage. It begins with capturing and refining the user's project idea, progresses through structured PRD creation, system design, implementation planning, iterative coding, quality validation, and concludes with delivery reporting. Each stage is governed by an actor-critic agent pair that generates and validates outputs, ensuring simplicity, completeness, and alignment with user intent. The system enforces strict validation rules and requires explicit human approval before advancing, preventing scope creep and ensuring traceability through persistent session artifacts.",
+    "flowchart_mermaid": "graph TD\n    A[Start: User Provides Project Idea] --> B[Idea Agent: Capture & Summarize Idea]\n    B --> C[ReviewAndEditContentTool: User Edits/Approves Idea]\n    C --> D[PRD Actor: Generate Requirements]\n    D --> E[PRD Critic: Validate Scope, Reject Non-Core Features]\n    E --> F[ReviewWithFeedbackTool: User Approves PRD]\n    F --> G[Design Actor: Create System Architecture]\n    G --> H[Design Critic: Validate Simplicity & Completeness]\n    H --> I[ReviewWithFeedbackTool: User Approves Design]\n    I --> J[Plan Actor: Decompose Design into Tasks]\n    J --> K[Plan Critic: Verify Task Simplicity & Dependencies]\n    K --> L[ReviewWithFeedbackTool: User Approves Plan]\n    L --> M[Coding Actor: Implement First Task]\n    M --> N[WriteFileTool/ReadFileTool: Modify Code Files]\n    N --> O[Coding Critic: Review Code Quality & Task Completion]\n    O --> P{Critical Issue Detected?}\n    P -- Yes --> Q[RequestReplanningTool: Trigger Replanning]\n    Q --> J\n    P -- No --> R[ProvideFeedbackTool: Record User Feedback]\n    R --> S[Update Task Status in Session]\n    S --> T{All Tasks Completed?}\n    T -- No --> M\n    T -- Yes --> U[Delivery Agent: Validate Feature Coverage & File Existence]\n    U --> V[CheckFeatureCoverageTool/CheckTaskDependenciesTool: Structural Validation]\n    V --> W{Validation Passed?}\n    W -- No --> X[Modify or Replan Workflow]\n    W -- Yes --> Y[SaveDeliveryReportTool: Generate Final Report]\n    Y --> Z[Pipeline Complete: Session Marked as Delivered]",
+    "name": "Project Initiation and Delivery Lifecycle"
   },
   "other_important_workflows": [
     {
-      "description": "支持对现有项目的修改请求处理，包括变更分析、影响评估和代码补丁应用，确保修改过程的可控性和可追溯性。",
-      "flowchart_mermaid": "graph TD\n    A[用户提交修改请求] --> B[修改Agent分析变更]\n    B --> C[确定变更范围PRD/设计/计划/代码]\n    C --> D[评估影响和风险]\n    D --> E[生成ChangeRequest对象]\n    E --> F[代码补丁Agent实施修改]\n    F --> G[修改交付Agent生成报告]\n    G --> H[变更完成]\n    \n    style A fill:#fff3e0\n    style H fill:#c8e6c9",
-      "name": "增量修改工作流"
+      "description": "This workflow handles post-delivery modifications by analyzing user change requests, assessing their impact across PRD, design, plan, and code layers, and applying targeted updates without restarting the full lifecycle. A Change Triage Agent determines the scope of change, persists a ChangeRequest object, and initiates a specialized pipeline segment (e.g., only the Coding Loop) to implement incremental changes. A Code Patch Agent then applies modifications with validation, followed by a Modify Delivery Agent that generates a comprehensive change report integrating feedback history and session context, preserving traceability and enabling evolutionary development.",
+      "flowchart_mermaid": "graph TD\n    A[User Submits Change Request] --> B[Modify Triage Agent: Analyze Scope (PRD/Design/Plan/Code)]\n    B --> C[Load Base Session & Current State to Compute Delta]\n    C --> D[SaveChangeRequestTool: Persist Scope, Risk, and Impact Analysis]\n    D --> E{Change Scope Affects PRD/Design?}\n    E -- Yes --> F[Restart PRD/Design/Plan Loop as Needed]\n    E -- No --> G[Initiate Code Patch Pipeline]\n    G --> H[Code Patch Agent: Implement Incremental Changes]\n    H --> I[WriteFileTool/ReadFileTool: Modify Affected Files]\n    I --> J[ReviewWithFeedbackTool: User Validates Changes]\n    J --> K[ModifyDeliveryAgent: Generate Pull Request-Style Change Report]\n    K --> L[Update Session State with New Artifacts]\n    L --> M[Change Process Complete: New Version Marked as Modified]",
+      "name": "Change Request Processing and Incremental Modification"
     },
     {
-      "description": "支持从特定阶段重新启动工作流，用于错误恢复、流程优化或用户主动干预的情况。",
-      "flowchart_mermaid": "graph TD\n    A[用户选择重入阶段] --> B[阶段跳转工具验证]\n    B --> C[加载会话元数据]\n    C --> D[确定重启阶段prd/design/plan/coding]\n    D --> E[创建部分工作流管道]\n    E --> F[从指定阶段继续执行]\n    F --> G[流程恢复正常]\n    \n    style A fill:#f3e5f5\n    style G fill:#c8e6c9",
-      "name": "阶段重入工作流"
-    },
-    {
-      "description": "人机协作交互流程，确保关键决策点都有用户参与和批准，提高系统的可靠性和用户满意度。",
-      "flowchart_mermaid": "graph TD\n    A[Agent生成内容] --> B[内容展示给用户]\n    B --> C{用户选择操作方式}\n    C -->|编辑模式| D[打开文本编辑器]\n    C -->|通过模式| E[继续下一步]\n    C -->|反馈模式| F[提供文本反馈]\n    D --> G[用户编辑内容]\n    G --> H[保存修改]\n    F --> I[反馈传递给Agent]\n    H --> J[继续流程]\n    I --> K[Agent根据反馈调整]\n    K --> J\n    E --> J\n    \n    style A fill:#e8f5e8\n    style J fill:#c8e6c9",
-      "name": "Human-in-the-Loop交互工作流"
+      "description": "This workflow enables users to resume or restart the development pipeline from any stage (e.g., PRD, design, coding) to recover from failures, refine prior outputs, or iterate on specific components. The GotoStageTool validates the target stage, loads the session state from persistent artifacts, and reconstructs the pipeline by skipping completed stages. This non-linear progression supports iterative refinement and error recovery without losing context, ensuring that all prior approvals, artifacts, and feedback remain intact while allowing focused rework at the selected stage.",
+      "flowchart_mermaid": "graph TD\n    A[User Invokes CLI with --goto-stage <stage>] --> B[GotoStageTool: Validate Target Stage and Load Session Metadata]\n    B --> C[LoadSession: Restore All Artifacts (PRD, Design, Tasks, Feedback, etc.)]\n    C --> D[Reconstruct Pipeline: Skip Completed Stages Before Target]\n    D --> E[Start Execution from Specified Stage]\n    E --> F[Continue Normal Workflow from Chosen Stage]\n    F --> G[Update Session Metadata: Mark New Starting Point]\n    G --> H[Pipeline Continues Until Completion or Next Interruption]",
+      "name": "Pipeline Resumption and Stage Navigation"
     }
   ]
 }
@@ -5239,23 +5477,24 @@ Code analysis results from preprocessing phase, including definitions of functio
 
 ## Memory Storage Statistics
 
-**Total Storage Size**: 590762 bytes
+**Total Storage Size**: 703574 bytes
 
-- **preprocess**: 412529 bytes (69.8%)
-- **studies_research**: 65773 bytes (11.1%)
-- **documentation**: 112425 bytes (19.0%)
+- **preprocess**: 411341 bytes (58.5%)
+- **documentation**: 192326 bytes (27.3%)
 - **timing**: 35 bytes (0.0%)
+- **studies_research**: 99872 bytes (14.2%)
 
 ## Generated Documents Statistics
 
-Number of Generated Documents: 9
+Number of Generated Documents: 10
 
+- Key Modules and Components Research Report_Data & Artifact Management
+- Key Modules and Components Research Report_Tooling & Operations
+- Key Modules and Components Research Report_Infrastructure Support
+- Key Modules and Components Research Report_Core Workflow Orchestration
+- Key Modules and Components Research Report_Intelligent Agent Control
 - Boundary Interfaces
-- Architecture Description
-- Core Workflows
-- Key Modules and Components Research Report_CLI应用域
-- Key Modules and Components Research Report_工具功能域
-- Key Modules and Components Research Report_智能体工作流域
-- Key Modules and Components Research Report_LLM集成域
-- Key Modules and Components Research Report_数据存储域
 - Project Overview
+- Core Workflows
+- Architecture Description
+- Key Modules and Components Research Report_Module Aggregation & Facade
