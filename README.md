@@ -28,7 +28,7 @@
 
 <strong>Cowork Forge</strong> is a complete, production-ready framework for automating software development through intelligent multi-agent collaboration. It moves beyond simple code generation, providing a comprehensive system that orchestrates specialized AI agents to handle every stage of the software development lifecycle.
 
-Powered by Rust and LLMs, Cowork Forge coordinates 7 specialized agents that work together to transform your ideas into production-ready code. From requirement gathering and PRD generation to technical design, implementation planning, coding, and quality verification—Cowork Forge manages it all with human-in-the-loop validation at critical decision points.
+Powered by Rust and LLMs, Cowork Forge coordinates specialized agents that work together to transform your ideas into production-ready code. From requirement gathering and PRD generation to technical design, implementation planning, coding, and quality verification—Cowork Forge manages it all with human-in-the-loop validation at critical decision points.
 
 <p align="center">
   <strong>Transform your development workflow with AI agents that think, plan, and collaborate like a real development team.</strong>
@@ -95,7 +95,7 @@ Cowork Forge stands out in the AI development tools landscape through its unique
 Unlike code completion tools that only assist with writing individual lines of code, Cowork Forge manages the entire software development process—from initial idea gathering to final delivery. This comprehensive approach ensures consistency and traceability across all stages.
 
 ### 2. Multi-Agent Collaboration
-Cowork Forge's 7 specialized agents work together like a real development team:
+Cowork Forge's specialized agents work together like a real development team:
 - <strong>Idea Agent</strong>: Captures and structures user requirements
 - <strong>PRD Loop Agent</strong>: Generates comprehensive PRDs with actor-critic refinement
 - <strong>Design Loop Agent</strong>: Creates technical architecture with actor-critic refinement
@@ -103,6 +103,9 @@ Cowork Forge's 7 specialized agents work together like a real development team:
 - <strong>Coding Loop Agent</strong>: Plans and executes code changes with actor-critic refinement
 - <strong>Check Agent</strong>: Verifies code quality and completeness
 - <strong>Delivery Agent</strong>: Generates comprehensive delivery reports
+- <strong>Modify Agent</strong>: Analyzes and handles incremental change requests
+- <strong>Code Patch Agent</strong>: Implements precise code patches
+- <strong>Modify Delivery Agent</strong>: Generates modification delivery reports
 
 ### 3. Human-in-the-Loop Validation
 Critical outputs require human confirmation before proceeding, ensuring:
@@ -207,26 +210,26 @@ graph TB
 
 ## Key Components
 
-### Orchestrator
-The central coordinator that manages session lifecycle, stage dependencies, and workflow execution.
-
-### StageExecutor
-Provides a unified execution framework for all agents with consistent error handling and state management.
+### Pipeline Orchestrator
+Manages session lifecycle, stage dependencies, and workflow execution with support for full and partial pipeline assembly.
 
 ### AI Agents
-Seven specialized agents, each responsible for a specific stage of the development lifecycle. Four agents (PRD, Design, Plan, Coding) use actor-critic loop patterns for iterative refinement with human feedback.
+Specialized agents work collaboratively, each responsible for a specific stage of the development lifecycle. Four agents (PRD, Design, Plan, Coding) use actor-critic loop patterns for iterative refinement with human feedback. Includes: Idea, PRD, Design, Plan, Coding, Check, Delivery, Modify, CodePatch, ModifyDelivery.
+
+### Instruction Templates
+Provides specialized prompt templates for each agent, defining their behavior and output format.
 
 ### Tools Module
 Safe file operations and command execution with security checks and resource limits.
 
-### Verification Module
-Project type detection, code validation, and comprehensive error analysis.
+### LLM Integration Layer
+Manages interactions with large language models, including rate limiting, API clients, and request optimization.
 
-### HITL Controller
-Manages human-in-the-loop interactions, including content review and editing.
+### Data Module
+Defines system data models and session management mechanisms.
 
-### Artifact Store
-Versioned storage of all stage outputs in JSON and Markdown formats.
+### Storage Module
+Provides persistent data management and retrieval capabilities.
 
 # 🧠 How It Works
 
@@ -355,7 +358,7 @@ Do you want to:
   [3] Regenerate
 > 1
 
-[Stage 2/8] PRD Generation Agent
+[Stage 2/7] PRD Generation Agent
 Generating Product Requirements Document...
 Created PRD with 12 requirements and 5 user stories
 
@@ -366,7 +369,7 @@ Do you want to:
   [3] Regenerate
 > 1
 
-[Stage 3/8] Design Agent
+[Stage 3/7] Design Agent
 Creating technical architecture...
 Generated C4 system context and container diagrams
 
@@ -451,14 +454,13 @@ graph TD
 
 <strong>cowork-core</strong> is organized into the following domain modules:
 
-- <strong>`orchestrator`</strong>: Central workflow coordinator managing session lifecycle and stage execution.
-- <strong>`agents`</strong>: 8 specialized AI agents (IdeaIntake, PRD, Design, Plan, Coding, Check, Feedback, Delivery).
+- <strong>`pipeline`</strong>: Workflow pipeline orchestration managing session lifecycle and stage execution.
+- <strong>`agents`</strong>: Specialized AI agents (Idea, PRD, Design, Plan, Coding, Check, Delivery, Modify, CodePatch, ModifyDelivery).
+- <strong>`instructions`</strong>: Prompt templates for each agent.
 - <strong>`tools`</strong>: File operations and command execution with safety checks.
-- <strong>`verification`</strong>: Project detection, code validation, and security checking.
-- <strong>`hitl`</strong>: Human-in-the-loop interaction controller.
-- <strong>`artifacts`</strong>: Artifact storage and management system.
-- <strong>`memory`</strong>: Data persistence and retrieval.
-- <strong>`config`</strong>: Configuration management.
+- <strong>`llm`</strong>: LLM integration layer including rate limiting and API clients.
+- <strong>`data`</strong>: Data models and session management.
+- <strong>`storage`</strong>: Data persistence and retrieval.
 
 
 # 🔒 Security
