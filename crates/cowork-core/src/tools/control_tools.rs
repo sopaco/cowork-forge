@@ -201,23 +201,36 @@ impl Tool for ProvideFeedbackTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let feedback_type = match args["feedback_type"].as_str().unwrap() {
+        let feedback_type_str = args.get("feedback_type")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("Missing required parameter 'feedback_type'".to_string()))?;
+        
+        let feedback_type = match feedback_type_str {
             "build_error" => FeedbackType::BuildError,
             "quality_issue" => FeedbackType::QualityIssue,
             "missing_requirement" => FeedbackType::MissingRequirement,
             _ => FeedbackType::Suggestion,
         };
 
-        let severity = match args["severity"].as_str().unwrap() {
+        let severity_str = args.get("severity")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("Missing required parameter 'severity'".to_string()))?;
+        
+        let severity = match severity_str {
             "critical" => Severity::Critical,
             "major" => Severity::Major,
             _ => Severity::Minor,
         };
 
+        let details = args.get("details")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("Missing required parameter 'details'".to_string()))?
+            .to_string();
+
         let feedback = Feedback {
             feedback_type,
             severity,
-            details: args["details"].as_str().unwrap().to_string(),
+            details,
             suggested_fix: args
                 .get("suggested_fix")
                 .and_then(|v| v.as_str())

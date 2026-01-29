@@ -1,31 +1,31 @@
 # Project Analysis Summary Report (Full Version)
 
-Generation Time: 2026-01-29 06:45:09 UTC
+Generation Time: 2026-01-29 07:41:01 UTC
 
 ## Execution Timing Statistics
 
-- **Total Execution Time**: 1175.83 seconds
-- **Preprocessing Phase**: 0.88 seconds (0.1%)
-- **Research Phase**: 460.11 seconds (39.1%)
-- **Document Generation Phase**: 714.84 seconds (60.8%)
+- **Total Execution Time**: 1403.36 seconds
+- **Preprocessing Phase**: 137.21 seconds (9.8%)
+- **Research Phase**: 449.56 seconds (32.0%)
+- **Document Generation Phase**: 816.59 seconds (58.2%)
 - **Output Phase**: 0.00 seconds (0.0%)
 - **Summary Generation Time**: 0.000 seconds
 
 ## Cache Performance Statistics and Savings
 
 ### Performance Metrics
-- **Cache Hit Rate**: 76.7%
-- **Total Operations**: 86
-- **Cache Hits**: 66 times
-- **Cache Misses**: 20 times
-- **Cache Writes**: 21 times
+- **Cache Hit Rate**: 74.4%
+- **Total Operations**: 82
+- **Cache Hits**: 61 times
+- **Cache Misses**: 21 times
+- **Cache Writes**: 22 times
 
 ### Savings
-- **Inference Time Saved**: 326.7 seconds
-- **Tokens Saved**: 109131 input + 42700 output = 151831 total
-- **Estimated Cost Savings**: $0.0780
-- **Performance Improvement**: 76.7%
-- **Efficiency Improvement Ratio**: 0.3x (saved time / actual execution time)
+- **Inference Time Saved**: 285.4 seconds
+- **Tokens Saved**: 83015 input + 31978 output = 114993 total
+- **Estimated Cost Savings**: $0.0520
+- **Performance Improvement**: 74.4%
+- **Efficiency Improvement Ratio**: 0.2x (saved time / actual execution time)
 
 ## Core Research Data Summary
 
@@ -36,78 +36,79 @@ Provides core objectives, user roles, and system boundary information for the pr
 
 ```json
 {
-  "business_value": "通过AI智能体自动化完成软件开发中重复性、流程化的工作（如需求分析、架构设计、任务规划、代码实现与交付验证），显著降低开发者的认知负荷与手动操作成本。系统强调‘最小可行架构’原则，强制拒绝过度设计，提升开发效率与代码质量一致性。支持增量修改与历史回溯，使团队能以轻量级方式快速迭代产品原型或小型项目，特别适用于初创团队、独立开发者和敏捷开发场景。",
+  "business_value": "通过AI智能体自动化软件开发流程，显著提高开发效率和质量；通过人机协作模式确保开发过程的可控性和准确性；支持项目全生命周期管理和增量修改，降低软件开发门槛和维护成本。",
   "confidence_score": 0.95,
   "external_systems": [
     {
-      "description": "作为底层大语言模型（LLM）服务提供方，负责执行智能体的推理与生成任务。系统通过自定义配置连接OpenAI兼容的API端点，支持模型参数与速率限制控制。",
+      "description": "提供大语言模型API服务的第三方平台（如OpenAI等）",
       "interaction_type": "API调用",
-      "name": "OpenAI API"
+      "name": "LLM服务提供商"
     },
     {
-      "description": "作为持久化存储介质，用于保存所有开发会话数据、项目文件、结构化文档（JSON/Markdown）与中间产物。系统严格限制操作范围在项目根目录内，防止越权访问。",
-      "interaction_type": "文件读写",
+      "description": "操作系统提供的文件存储和管理服务",
+      "interaction_type": "文件读写操作",
       "name": "本地文件系统"
     },
     {
-      "description": "作为人机交互的主要接口，用户通过命令行输入指令启动项目、提供反馈、编辑内容或中断流程。系统通过交互式工具（如ReviewAndEditContentTool）实现与用户的双向沟通。",
-      "interaction_type": "命令行交互",
-      "name": "用户终端（CLI）"
+      "description": "用户通过终端与系统交互的操作环境",
+      "interaction_type": "命令行输入输出",
+      "name": "命令行环境"
     }
   ],
-  "project_description": "Cowork Forge 是一个基于AI的软件开发编排系统，通过多智能体协作流程（Idea → PRD → Design → Plan → Coding → Check → Delivery）自动化完成从需求构思到代码交付的完整软件开发周期。系统采用人类参与循环（HITL）机制，在关键节点引入人工审核与干预，确保开发过程符合简洁性原则并避免过度工程化。核心由Rust语言构建，采用模块化架构，包含CLI入口、核心智能体引擎、工具集与持久化存储，支持项目创建、阶段恢复、增量修改与交付报告生成。",
+  "project_description": "一个基于AI的软件开发编排系统，通过多智能体协作和人工介入循环（HITL）实现从需求收集到代码交付的完整软件开发流程自动化。系统采用Rust语言构建，具有模块化架构和会话管理能力。",
   "project_name": "Cowork Forge",
   "project_type": "CLITool",
   "system_boundary": {
     "excluded_components": [
-      "Web前端界面",
-      "移动应用",
-      "云服务部署系统",
-      "CI/CD流水线（如GitHub Actions）",
-      "数据库服务（如PostgreSQL、MongoDB）",
-      "测试框架（如Rust tests）",
-      "监控系统",
-      "第三方API网关"
+      "代码编译和构建系统",
+      "测试框架和自动化测试",
+      "部署和运维工具",
+      "版本控制系统集成",
+      "用户界面开发",
+      "数据库管理系统",
+      "网络服务和API网关"
     ],
     "included_components": [
-      "cowork-cli（命令行入口）",
-      "cowork-core（核心智能体、工具、存储、指令集）",
-      "LLM配置与速率限制模块",
-      "文件系统操作工具",
-      "JSON/Markdown持久化存储",
-      "HITL交互工具"
+      "命令行接口(CLI)",
+      "会话管理和状态跟踪",
+      "多智能体工作流引擎",
+      "LLM集成和配置管理",
+      "文件操作和安全管理",
+      "数据模型和持久化存储",
+      "验证工具和质量管理",
+      "人工介入循环(HITL)机制"
     ],
-    "scope": "Cowork Forge CLI 工具及其核心智能体引擎，不包含任何前端界面、Web服务、数据库服务或持续集成/部署（CI/CD）系统。"
+    "scope": "AI驱动的软件开发编排系统，涵盖从需求分析到代码交付的完整开发流程"
   },
   "target_users": [
     {
-      "description": "缺乏团队支持的个人开发者，希望快速将想法转化为可运行的代码，但缺乏时间或精力处理繁琐的开发流程。",
-      "name": "独立开发者",
+      "description": "具备基础编程知识的技术人员，希望通过AI辅助提高开发效率",
+      "name": "软件开发工程师",
       "needs": [
-        "自动化完成从想法到代码的全流程",
-        "避免过度设计，专注于核心功能",
-        "获得结构化交付报告以用于展示或存档",
-        "支持中途修改与恢复工作"
+        "快速原型开发",
+        "自动化代码生成",
+        "项目规范化管理",
+        "增量修改支持"
       ]
     },
     {
-      "description": "小型创业团队，资源有限，需要快速验证产品可行性，对开发流程的规范性与效率有较高要求。",
-      "name": "初创团队",
+      "description": "负责项目规划和管理的技术管理者",
+      "name": "技术项目经理",
       "needs": [
-        "标准化开发流程以减少沟通成本",
-        "通过AI辅助确保需求与实现的一致性",
-        "生成可交付的文档与代码包",
-        "支持轻量级迭代与变更追踪"
+        "项目进度跟踪",
+        "需求文档自动生成",
+        "设计规范检查",
+        "交付质量保证"
       ]
     },
     {
-      "description": "熟悉敏捷方法的开发者，希望借助AI工具提升开发效率，但不愿放弃对关键决策的控制权。",
-      "name": "敏捷开发工程师",
+      "description": "资源有限但需要快速验证产品概念的团队领导者",
+      "name": "初创团队技术负责人",
       "needs": [
-        "在关键节点保留人工审核权限（HITL）",
-        "灵活控制开发流程的启动与回退",
-        "获取清晰的变更影响分析报告",
-        "避免AI生成冗余代码或测试"
+        "快速MVP开发",
+        "成本控制",
+        "技术债务管理",
+        "团队协作支持"
       ]
     }
   ]
@@ -119,696 +120,501 @@ Provides high-level domain division, module relationships, and core business pro
 
 ```json
 {
-  "architecture_summary": "Cowork Forge 采用模块化分层架构，以 CLI 入口为触发点，核心由智能体编排引擎、工具集与持久化存储构成，形成“指令驱动-工具执行-数据持久化”的闭环开发流程。系统遵循“最小可行架构”原则，通过人类参与循环（HITL）机制在关键节点引入人工审核，确保开发过程简洁高效。整体架构为典型的“编排层-智能体层-工具层-数据层”四层结构，各层职责清晰，依赖单向下行，具备良好的可扩展性与可维护性。",
+  "architecture_summary": "Cowork Forge采用分层架构设计，核心是基于AI智能体的工作流编排系统。整体架构分为基础设施层、核心业务层和用户接口层，采用模块化设计支持高内聚低耦合。系统以会话管理为核心，通过多智能体协作实现从需求到交付的完整开发流程自动化。",
   "business_flows": [
     {
-      "description": "从用户输入初始想法开始，依次触发Idea、PRD、Design、Plan、Coding、Check、Delivery七个智能体阶段，完成从需求构思到交付报告的完整开发闭环。每个阶段均包含智能体执行与HITL审核，确保输出符合简洁性原则。流程结束时生成完整的交付文档与代码包。",
-      "entry_point": "用户执行 `cowork-cli create` 命令，触发 main.rs 中的项目创建逻辑，进而调用 pipeline 模块的 full_pipeline 函数",
+      "description": "完整的软件开发生命周期管理流程，从用户需求输入到最终代码交付，包含多个智能体协作阶段和人工介入环节",
+      "entry_point": "命令行接口接收用户项目创建或修改指令",
       "importance": 10.0,
       "involved_domains_count": 5,
-      "name": "全新项目创建流程",
+      "name": "全项目开发流程",
       "steps": [
         {
-          "code_entry_point": null,
-          "domain_module": "入口与编排域",
-          "operation": "解析 CLI 命令参数，初始化会话目录结构，加载全局配置",
+          "code_entry_point": "crates/cowork-cli/src/main.rs",
+          "domain_module": "工作流编排域",
+          "operation": "解析命令行参数，初始化会话管理",
           "step": 1,
-          "sub_module": null
+          "sub_module": "CLI入口模块"
         },
         {
-          "code_entry_point": null,
+          "code_entry_point": "crates/cowork-core/src/instructions/idea.rs",
           "domain_module": "智能体指令域",
-          "operation": "加载 IdeaAgent 指令模板，启动首个智能体捕获并结构化用户原始想法",
+          "operation": "Idea智能体捕获和结构化用户需求",
           "step": 2,
-          "sub_module": null
+          "sub_module": "需求捕获模块"
         },
         {
-          "code_entry_point": null,
+          "code_entry_point": "crates/cowork-core/src/instructions/prd.rs",
           "domain_module": "智能体指令域",
-          "operation": "加载 PRD 指令模板，启动 PRD Actor-Critic 循环，生成产品需求文档",
+          "operation": "PRD智能体创建产品需求文档",
           "step": 3,
-          "sub_module": null
+          "sub_module": "需求分析模块"
         },
         {
-          "code_entry_point": null,
+          "code_entry_point": "crates/cowork-core/src/instructions/design.rs",
           "domain_module": "智能体指令域",
-          "operation": "加载 Design 指令模板，启动 Design Actor-Critic 循环，生成最小化架构设计",
+          "operation": "设计智能体生成系统架构设计",
           "step": 4,
-          "sub_module": null
+          "sub_module": "架构设计模块"
         },
         {
-          "code_entry_point": null,
+          "code_entry_point": "crates/cowork-core/src/instructions/plan.rs",
           "domain_module": "智能体指令域",
-          "operation": "加载 Plan 指令模板，启动 Plan Actor-Critic 循环，生成仅含核心功能的任务清单",
+          "operation": "计划智能体制定实施计划",
           "step": 5,
-          "sub_module": null
+          "sub_module": "任务规划模块"
         },
         {
-          "code_entry_point": null,
+          "code_entry_point": "crates/cowork-core/src/instructions/coding.rs",
           "domain_module": "智能体指令域",
-          "operation": "加载 Coding 指令模板，启动 Coding Actor-Critic 循环，实现功能代码",
+          "operation": "编码智能体实现代码生成",
           "step": 6,
-          "sub_module": null
+          "sub_module": "代码实现模块"
         },
         {
-          "code_entry_point": null,
-          "domain_module": "工具执行域",
-          "operation": "调用 file_tools 读写代码文件，调用 data_tools 持久化任务与需求状态",
+          "code_entry_point": "crates/cowork-core/src/instructions/check.rs",
+          "domain_module": "智能体指令域",
+          "operation": "检查智能体进行质量验证",
           "step": 7,
-          "sub_module": null
+          "sub_module": "质量检查模块"
         },
         {
-          "code_entry_point": null,
+          "code_entry_point": "crates/cowork-core/src/instructions/delivery.rs",
           "domain_module": "智能体指令域",
-          "operation": "加载 CheckAgent 指令，验证代码结构完整性与任务覆盖率，仅拒绝严重缺失",
+          "operation": "交付智能体生成最终交付报告",
           "step": 8,
-          "sub_module": null
-        },
-        {
-          "code_entry_point": null,
-          "domain_module": "智能体指令域",
-          "operation": "加载 DeliveryAgent 指令，整合所有文档与代码，生成交付报告",
-          "step": 9,
-          "sub_module": null
-        },
-        {
-          "code_entry_point": null,
-          "domain_module": "工具执行域",
-          "operation": "调用 artifact_tools 保存交付报告、PRD、设计文档等产物至会话目录",
-          "step": 10,
-          "sub_module": null
+          "sub_module": "项目交付模块"
         }
       ]
     },
     {
-      "description": "在已有项目基础上，根据用户变更请求（ChangeRequest）触发修改流程。系统先通过 Modify Triage Agent 分析变更范围，再决定是否需要回退至 PRD、Design、Plan 或直接进入 Coding 阶段进行代码修补，最终由 Modify Delivery Agent 生成变更报告。流程支持任意阶段的回溯与重启动。",
-      "entry_point": "用户执行 `cowork-cli modify` 命令，触发 main.rs 中的修改逻辑，调用 pipeline 模块的 modify_pipeline 函数",
+      "description": "增量修改工作流程，支持对现有项目的局部修改和调整，包含变更分析、影响评估和代码修补",
+      "entry_point": "用户提交变更请求",
       "importance": 9.0,
-      "involved_domains_count": 5,
-      "name": "增量修改流程",
-      "steps": [
-        {
-          "code_entry_point": null,
-          "domain_module": "入口与编排域",
-          "operation": "解析 CLI 修改命令，加载当前会话状态与历史数据",
-          "step": 1,
-          "sub_module": null
-        },
-        {
-          "code_entry_point": null,
-          "domain_module": "智能体指令域",
-          "operation": "加载 Modify Triage Agent 指令，分析用户变更请求，确定影响范围（PRD/Design/Plan/Code）",
-          "step": 2,
-          "sub_module": null
-        },
-        {
-          "code_entry_point": null,
-          "domain_module": "工具执行域",
-          "operation": "调用 modify_tools 加载/保存 ChangeRequest 对象，记录变更范围与风险评估",
-          "step": 3,
-          "sub_module": null
-        },
-        {
-          "code_entry_point": null,
-          "domain_module": "入口与编排域",
-          "operation": "根据变更影响，选择性回退至 PRD、Design 或 Plan 阶段，调用对应 pipeline",
-          "step": 4,
-          "sub_module": null
-        },
-        {
-          "code_entry_point": null,
-          "domain_module": "智能体指令域",
-          "operation": "若无需回退，直接启动 Coding Agent 执行代码修补",
-          "step": 5,
-          "sub_module": null
-        },
-        {
-          "code_entry_point": null,
-          "domain_module": "工具执行域",
-          "operation": "调用 file_tools、data_tools 更新代码与结构化数据",
-          "step": 6,
-          "sub_module": null
-        },
-        {
-          "code_entry_point": null,
-          "domain_module": "智能体指令域",
-          "operation": "启动 Modify Delivery Agent，整合变更前后状态、反馈历史与代码差异，生成变更报告",
-          "step": 7,
-          "sub_module": null
-        },
-        {
-          "code_entry_point": null,
-          "domain_module": "工具执行域",
-          "operation": "调用 artifact_tools 保存变更报告至会话目录",
-          "step": 8,
-          "sub_module": null
-        }
-      ]
-    },
-    {
-      "description": "允许用户在任意开发阶段中断后，从指定节点（如 PRD、Design、Plan）重新开始，跳过已完成阶段。系统通过加载历史会话数据恢复上下文，确保流程连续性。该流程是支持增量修改与敏捷迭代的核心支撑机制。",
-      "entry_point": "用户执行 `cowork-cli resume --stage <stage>` 命令，触发 main.rs 中的恢复逻辑，调用 pipeline 模块的 resume_pipeline 函数",
-      "importance": 8.0,
       "involved_domains_count": 4,
-      "name": "阶段恢复流程",
+      "name": "项目修改流程",
       "steps": [
         {
-          "code_entry_point": null,
-          "domain_module": "入口与编排域",
-          "operation": "解析恢复命令与目标阶段，验证阶段有效性",
-          "step": 1,
-          "sub_module": null
-        },
-        {
-          "code_entry_point": null,
-          "domain_module": "持久化存储域",
-          "operation": "从 .cowork/sessions/<id>/ 目录加载对应阶段的元数据与中间产物",
-          "step": 2,
-          "sub_module": null
-        },
-        {
-          "code_entry_point": null,
-          "domain_module": "入口与编排域",
-          "operation": "构建从指定阶段开始的子流程，跳过已执行的上游阶段",
-          "step": 3,
-          "sub_module": null
-        },
-        {
-          "code_entry_point": null,
+          "code_entry_point": "crates/cowork-core/src/instructions/modify.rs",
           "domain_module": "智能体指令域",
-          "operation": "加载目标阶段及后续所有阶段的指令模板，启动智能体流水线",
-          "step": 4,
-          "sub_module": null
+          "operation": "变更分析智能体评估修改范围和影响",
+          "step": 1,
+          "sub_module": "变更分析模块"
         },
         {
-          "code_entry_point": null,
-          "domain_module": "工具执行域",
-          "operation": "在后续阶段执行中，调用 data_tools、file_tools 持续更新状态与文件",
-          "step": 5,
-          "sub_module": null
+          "code_entry_point": "crates/cowork-core/src/instructions/code_patch.rs",
+          "domain_module": "智能体指令域",
+          "operation": "代码修补智能体实施增量修改",
+          "step": 2,
+          "sub_module": "代码修改模块"
         },
         {
-          "code_entry_point": null,
-          "domain_module": "入口与编排域",
-          "operation": "流程结束后，更新会话元数据，标记已执行阶段",
-          "step": 6,
-          "sub_module": null
+          "code_entry_point": "crates/cowork-core/src/instructions/modify_delivery.rs",
+          "domain_module": "智能体指令域",
+          "operation": "修改交付智能体生成变更报告",
+          "step": 3,
+          "sub_module": "变更报告模块"
         }
       ]
     },
     {
-      "description": "在智能体执行过程中，当遇到不确定性、错误或需要决策时，系统通过 HITL 工具主动请求用户介入。支持内容编辑、文件审查、提供反馈、请求重规划等多种交互方式，确保开发过程可控且符合用户意图。",
-      "entry_point": "智能体执行期间触发 error 或需要 human_input 时，由 ResilientAgent 或 ControlTools 主动调用 HITL 工具",
+      "description": "人工介入循环流程，在关键决策点引入用户反馈和审批，确保系统输出的准确性和可控性",
+      "entry_point": "智能体执行过程中遇到关键决策点",
       "importance": 8.0,
       "involved_domains_count": 3,
-      "name": "人机交互反馈流程",
+      "name": "人工审核流程",
       "steps": [
         {
-          "code_entry_point": null,
+          "code_entry_point": "crates/cowork-core/src/agents/hitl.rs",
           "domain_module": "智能体执行域",
-          "operation": "智能体检测到 Max Iterations 错误或需人工决策，调用 ResilientAgent 包装器",
+          "operation": "HITL包装器检测需要人工介入的场景",
           "step": 1,
-          "sub_module": null
+          "sub_module": "人工介入模块"
         },
         {
-          "code_entry_point": null,
-          "domain_module": "工具执行域",
-          "operation": "调用 ReviewAndEditContentTool 或 ReviewWithFeedbackTool 请求用户编辑或反馈",
+          "code_entry_point": "crates/cowork-core/src/tools/hitl_tools.rs",
+          "domain_module": "工具功能域",
+          "operation": "交互工具提供用户反馈界面",
           "step": 2,
-          "sub_module": null
+          "sub_module": "用户交互模块"
         },
         {
-          "code_entry_point": null,
-          "domain_module": "工具执行域",
-          "operation": "调用 ProvideFeedbackTool 或 RequestReplanningTool 收集结构化反馈并持久化",
+          "code_entry_point": "crates/cowork-core/src/tools/control_tools.rs",
+          "domain_module": "工具功能域",
+          "operation": "控制工具处理用户输入并继续流程",
           "step": 3,
-          "sub_module": null
-        },
-        {
-          "code_entry_point": null,
-          "domain_module": "智能体执行域",
-          "operation": "ResilientAgent 根据用户反馈决定：重试、继续或中止流程",
-          "step": 4,
-          "sub_module": null
-        },
-        {
-          "code_entry_point": null,
-          "domain_module": "持久化存储域",
-          "operation": "将用户反馈记录写入 session 的 feedback_history.json 文件，供后续阶段参考",
-          "step": 5,
-          "sub_module": null
+          "sub_module": "流程控制模块"
         }
       ]
     }
   ],
-  "confidence_score": 0.97,
+  "confidence_score": 9.2,
   "domain_modules": [
     {
       "code_paths": [
-        "crates/cowork-cli/src/main.rs",
-        "crates/cowork-core/src/pipeline/mod.rs"
-      ],
-      "complexity": 7.0,
-      "description": "负责系统启动、流程编排与会话控制。作为用户与系统交互的唯一入口，该域解析 CLI 命令，协调各智能体阶段的执行顺序，并管理流程的启动、恢复、中断与重定向。其核心价值在于将复杂的多智能体协作流程封装为可复用的流水线，实现开发流程的自动化与标准化。",
-      "domain_type": "Core Business Domain",
-      "importance": 10.0,
-      "name": "入口与编排域",
-      "sub_modules": [
-        {
-          "code_paths": [
-            "crates/cowork-cli/src/main.rs"
-          ],
-          "description": "命令行参数解析与会话初始化入口，负责接收用户指令并触发对应流程",
-          "importance": 9.0,
-          "key_functions": [
-            "main",
-            "create_project",
-            "modify_project",
-            "resume_project"
-          ],
-          "name": "CLI 入口"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/pipeline/mod.rs"
-          ],
-          "description": "定义并执行不同阶段组合的开发流程（如 full_pipeline、modify_pipeline、resume_pipeline），是流程自动化的核心控制器",
-          "importance": 10.0,
-          "key_functions": [
-            "full_pipeline",
-            "modify_pipeline",
-            "resume_pipeline",
-            "create_pipeline"
-          ],
-          "name": "流水线编排"
-        }
-      ]
-    },
-    {
-      "code_paths": [
-        "crates/cowork-core/src/instructions/mod.rs",
-        "crates/cowork-core/src/instructions/idea.rs",
-        "crates/cowork-core/src/instructions/prd.rs",
-        "crates/cowork-core/src/instructions/design.rs",
-        "crates/cowork-core/src/instructions/plan.rs",
-        "crates/cowork-core/src/instructions/coding.rs",
-        "crates/cowork-core/src/instructions/check.rs",
-        "crates/cowork-core/src/instructions/delivery.rs",
-        "crates/cowork-core/src/instructions/modify.rs",
-        "crates/cowork-core/src/instructions/code_patch.rs",
-        "crates/cowork-core/src/instructions/modify_delivery.rs"
+        "crates/cowork-core/src/instructions/",
+        "crates/cowork-core/src/agents/"
       ],
       "complexity": 9.0,
-      "description": "定义所有智能体的行为逻辑与决策规则。该域包含10个独立的指令模块，每个模块为一个智能体（如IdeaAgent、PRD Actor）提供详细的提示词（prompt）模板，规定其角色、任务、输出格式、可用工具与终止条件。该域是系统智能的核心，决定了AI如何理解任务、执行工作与自我校验。",
-      "domain_type": "Core Business Domain",
+      "description": "负责定义和执行AI智能体的行为逻辑，包含完整的软件开发生命周期指令集",
+      "domain_type": "核心业务域",
       "importance": 10.0,
       "name": "智能体指令域",
       "sub_modules": [
         {
           "code_paths": [
-            "crates/cowork-core/src/instructions/idea.rs",
-            "crates/cowork-core/src/instructions/prd.rs",
-            "crates/cowork-core/src/instructions/design.rs",
-            "crates/cowork-core/src/instructions/plan.rs",
-            "crates/cowork-core/src/instructions/coding.rs",
-            "crates/cowork-core/src/instructions/check.rs",
-            "crates/cowork-core/src/instructions/delivery.rs",
-            "crates/cowork-core/src/instructions/modify.rs",
-            "crates/cowork-core/src/instructions/code_patch.rs",
-            "crates/cowork-core/src/instructions/modify_delivery.rs"
+            "crates/cowork-core/src/instructions/idea.rs"
           ],
-          "description": "每个指令文件定义一个或一组智能体（Actor-Critic）的完整工作流程与约束",
-          "importance": 10.0,
+          "description": "需求捕获和结构化处理",
+          "importance": 9.0,
           "key_functions": [
-            "IDEA_AGENT_INSTRUCTION",
-            "PRD_ACTOR_INSTRUCTION",
-            "DESIGN_ACTOR_INSTRUCTION",
-            "PLAN_ACTOR_INSTRUCTION",
-            "CODING_ACTOR_INSTRUCTION",
-            "CHECK_AGENT_INSTRUCTION",
-            "DELIVERY_AGENT_INSTRUCTION",
-            "MODIFY_TRIAGE_INSTRUCTION",
-            "CODE_PATCH_INSTRUCTION",
-            "MODIFY_DELIVERY_INSTRUCTION"
+            "需求理解",
+            "结构化保存",
+            "用户审核"
           ],
-          "name": "智能体模板"
+          "name": "需求捕获模块"
         },
         {
           "code_paths": [
-            "crates/cowork-core/src/instructions/mod.rs"
+            "crates/cowork-core/src/instructions/prd.rs"
           ],
-          "description": "通过 mod.rs 文件统一暴露所有指令模块，为智能体引擎提供便捷访问接口",
+          "description": "产品需求文档生成和验证",
+          "importance": 9.0,
+          "key_functions": [
+            "PRD创建",
+            "需求验证",
+            "文档生成"
+          ],
+          "name": "需求分析模块"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/instructions/design.rs"
+          ],
+          "description": "系统架构设计和评审",
+          "importance": 9.0,
+          "key_functions": [
+            "架构设计",
+            "设计评审",
+            "组件规划"
+          ],
+          "name": "架构设计模块"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/instructions/plan.rs"
+          ],
+          "description": "实施计划制定和任务分解",
+          "importance": 9.0,
+          "key_functions": [
+            "任务规划",
+            "依赖分析",
+            "计划验证"
+          ],
+          "name": "任务规划模块"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/instructions/coding.rs",
+            "crates/cowork-core/src/instructions/code_patch.rs"
+          ],
+          "description": "代码生成和修改实现",
+          "importance": 9.0,
+          "key_functions": [
+            "代码生成",
+            "代码修改",
+            "质量检查"
+          ],
+          "name": "代码实现模块"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/instructions/check.rs"
+          ],
+          "description": "质量验证和完整性检查",
           "importance": 8.0,
           "key_functions": [
-            "re-exports"
+            "质量检查",
+            "完整性验证",
+            "问题检测"
           ],
-          "name": "指令聚合"
-        }
-      ]
-    },
-    {
-      "code_paths": [
-        "crates/cowork-core/src/agents/mod.rs",
-        "crates/cowork-core/src/agents/hitl.rs"
-      ],
-      "complexity": 8.0,
-      "description": "负责实例化、调用与管理智能体的运行时行为。该域通过 agent/mod.rs 构建 LLM Agent 实例，并通过 hitl.rs 实现容错与人机交互的封装。其核心价值在于将静态指令转化为动态执行流，并通过 ResilientAgent 实现关键错误的自动恢复，确保流程鲁棒性。",
-      "domain_type": "Core Business Domain",
-      "importance": 9.0,
-      "name": "智能体执行域",
-      "sub_modules": [
-        {
-          "code_paths": [
-            "crates/cowork-core/src/agents/mod.rs"
-          ],
-          "description": "定义创建各类智能体（包括Actor-Critic对）的工厂函数，封装LLM客户端与工具绑定逻辑",
-          "importance": 9.0,
-          "key_functions": [
-            "build_idea_agent",
-            "build_prd_agent",
-            "build_design_agent",
-            "build_plan_agent",
-            "build_coding_agent",
-            "build_check_agent",
-            "build_delivery_agent"
-          ],
-          "name": "智能体构建器"
+          "name": "质量检查模块"
         },
         {
           "code_paths": [
-            "crates/cowork-core/src/agents/hitl.rs"
+            "crates/cowork-core/src/instructions/delivery.rs",
+            "crates/cowork-core/src/instructions/modify_delivery.rs"
           ],
-          "description": "封装 ResilientAgent，拦截智能体执行中的失败，提供重试、引导或中止的恢复选项，是HITL机制的核心实现",
-          "importance": 9.0,
+          "description": "项目交付和变更报告生成",
+          "importance": 8.0,
           "key_functions": [
-            "ResilientAgent",
-            "ResilientStream"
+            "交付验证",
+            "报告生成",
+            "变更文档"
           ],
-          "name": "人机交互封装"
+          "name": "项目交付模块"
         }
       ]
     },
     {
       "code_paths": [
-        "crates/cowork-core/src/tools/mod.rs",
-        "crates/cowork-core/src/tools/file_tools.rs",
-        "crates/cowork-core/src/tools/validation_tools.rs",
-        "crates/cowork-core/src/tools/hitl_content_tools.rs",
-        "crates/cowork-core/src/tools/idea_tools.rs",
-        "crates/cowork-core/src/tools/data_tools.rs",
-        "crates/cowork-core/src/tools/hitl_tools.rs",
-        "crates/cowork-core/src/tools/goto_stage_tool.rs",
-        "crates/cowork-core/src/tools/modify_tools.rs",
-        "crates/cowork-core/src/tools/control_tools.rs",
-        "crates/cowork-core/src/tools/artifact_tools.rs"
+        "crates/cowork-core/src/tools/",
+        "crates/cowork-core/src/llm/"
       ],
       "complexity": 8.0,
-      "description": "提供智能体执行所需的具体操作能力。该域包含11个工具模块，每个工具封装一个原子化操作（如读写文件、验证数据、保存报告、获取反馈），通过统一的 Tool trait 接口被智能体调用。其核心价值在于将复杂操作标准化、安全化，使智能体无需关心底层实现细节。",
-      "domain_type": "Tool Support Domain",
+      "description": "提供系统运行所需的基础工具和服务，包括文件操作、数据管理、LLM集成等支持功能",
+      "domain_type": "基础设施域",
       "importance": 9.0,
-      "name": "工具执行域",
+      "name": "工具功能域",
       "sub_modules": [
         {
           "code_paths": [
             "crates/cowork-core/src/tools/file_tools.rs"
           ],
-          "description": "提供安全的文件读写、目录遍历与命令执行能力，严格限制路径范围，防止越权访问",
-          "importance": 8.0,
+          "description": "安全文件系统操作和命令执行",
+          "importance": 9.0,
           "key_functions": [
-            "ListFilesTool",
-            "ReadFileTool",
-            "WriteFileTool",
-            "RunCommandTool"
+            "文件读写",
+            "目录遍历",
+            "命令执行"
           ],
-          "name": "文件操作工具"
+          "name": "文件操作模块"
         },
         {
           "code_paths": [
             "crates/cowork-core/src/tools/data_tools.rs"
           ],
-          "description": "提供对需求、设计、计划等结构化数据的增删改查能力，依赖 data 模块的模型进行序列化",
+          "description": "结构化数据管理和持久化",
           "importance": 9.0,
           "key_functions": [
-            "SaveRequirementsTool",
-            "LoadRequirementsTool",
-            "SaveImplementationPlanTool",
-            "DeleteTaskTool"
+            "数据存储",
+            "数据检索",
+            "数据验证"
           ],
-          "name": "数据操作工具"
+          "name": "数据管理模块"
         },
         {
           "code_paths": [
             "crates/cowork-core/src/tools/validation_tools.rs"
           ],
-          "description": "提供数据格式、特征覆盖、任务依赖等质量验证能力，确保开发产物符合预期结构",
+          "description": "数据质量验证和依赖分析",
           "importance": 8.0,
           "key_functions": [
-            "CheckDataFormatTool",
-            "CheckFeatureCoverageTool",
-            "CheckTaskDependenciesTool"
+            "格式验证",
+            "覆盖检查",
+            "依赖分析"
           ],
-          "name": "验证工具"
+          "name": "验证工具模块"
         },
         {
           "code_paths": [
-            "crates/cowork-core/src/tools/hitl_content_tools.rs",
+            "crates/cowork-core/src/llm/config.rs",
+            "crates/cowork-core/src/llm/rate_limiter.rs"
+          ],
+          "description": "大语言模型集成和配置管理",
+          "importance": 9.0,
+          "key_functions": [
+            "LLM配置",
+            "速率限制",
+            "API调用"
+          ],
+          "name": "LLM集成模块"
+        },
+        {
+          "code_paths": [
             "crates/cowork-core/src/tools/hitl_tools.rs",
             "crates/cowork-core/src/tools/control_tools.rs"
           ],
-          "description": "提供与用户交互的界面，支持内容编辑、文件审查与反馈收集",
-          "importance": 9.0,
-          "key_functions": [
-            "ReviewAndEditContentTool",
-            "ReviewWithFeedbackContentTool",
-            "ReviewAndEditFileTool",
-            "ReviewWithFeedbackTool",
-            "ProvideFeedbackTool",
-            "RequestReplanningTool",
-            "AskUserTool"
-          ],
-          "name": "HITL交互工具"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/tools/goto_stage_tool.rs",
-            "crates/cowork-core/src/tools/modify_tools.rs",
-            "crates/cowork-core/src/tools/artifact_tools.rs"
-          ],
-          "description": "提供会话状态管理能力，如跳转到指定阶段、保存/加载变更请求与交付报告",
+          "description": "人工介入交互和流程控制",
           "importance": 8.0,
           "key_functions": [
-            "GotoStageTool",
-            "SaveChangeRequestTool",
-            "LoadChangeRequestTool",
-            "SaveDeliveryReportTool",
-            "SavePrdDocTool",
-            "SaveDesignDocTool",
-            "LoadFeedbackHistoryTool"
+            "用户交互",
+            "反馈收集",
+            "流程控制"
           ],
-          "name": "会话控制工具"
+          "name": "交互控制模块"
         }
       ]
     },
     {
       "code_paths": [
-        "crates/cowork-core/src/storage/mod.rs",
-        "crates/cowork-core/src/data/mod.rs",
-        "crates/cowork-core/src/data/models.rs",
-        "crates/cowork-core/src/data/schemas.rs",
-        "crates/cowork-core/src/data/schemas/validation.rs"
+        "crates/cowork-core/src/pipeline/",
+        "crates/cowork-core/src/agents/mod.rs"
+      ],
+      "complexity": 8.0,
+      "description": "负责工作流编排和智能体执行管理，支持完整项目和增量修改的不同流程组合",
+      "domain_type": "核心业务域",
+      "importance": 9.0,
+      "name": "工作流编排域",
+      "sub_modules": [
+        {
+          "code_paths": [
+            "crates/cowork-core/src/pipeline/mod.rs"
+          ],
+          "description": "工作流管道组合和配置",
+          "importance": 9.0,
+          "key_functions": [
+            "流程组装",
+            "阶段管理",
+            "会话控制"
+          ],
+          "name": "管道管理模块"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/agents/mod.rs"
+          ],
+          "description": "智能体创建和执行管理",
+          "importance": 9.0,
+          "key_functions": [
+            "智能体创建",
+            "执行控制",
+            "错误处理"
+          ],
+          "name": "智能体执行模块"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/agents/hitl.rs"
+          ],
+          "description": "人工介入循环支持和错误恢复",
+          "importance": 8.0,
+          "key_functions": [
+            "错误恢复",
+            "人工介入",
+            "流程重启"
+          ],
+          "name": "人工介入模块"
+        }
+      ]
+    },
+    {
+      "code_paths": [
+        "crates/cowork-core/src/storage/",
+        "crates/cowork-core/src/data/"
       ],
       "complexity": 7.0,
-      "description": "负责所有开发产物与会话状态的持久化管理。该域以会话为单位，在项目根目录下创建 .cowork 目录，使用JSON文件存储模型数据、配置、反馈历史与中间产物。其核心价值在于实现开发流程的可恢复性、可追溯性与状态隔离，是支持增量修改与历史回溯的基石。",
-      "domain_type": "Infrastructure Domain",
-      "importance": 9.0,
-      "name": "持久化存储域",
+      "description": "负责数据模型定义、持久化存储和会话管理，支持项目状态跟踪和版本控制",
+      "domain_type": "数据管理域",
+      "importance": 8.0,
+      "name": "数据存储域",
       "sub_modules": [
         {
           "code_paths": [
             "crates/cowork-core/src/storage/mod.rs"
           ],
-          "description": "管理 .cowork/sessions/<id>/ 目录结构，负责创建、复制、加载会话目录与元数据",
-          "importance": 9.0,
+          "description": "会话存储和文件系统管理",
+          "importance": 8.0,
           "key_functions": [
-            "create_session_dir",
-            "load_session_metadata",
-            "save_session_metadata",
-            "copy_session_state"
+            "会话管理",
+            "文件存储",
+            "状态持久化"
           ],
-          "name": "会话存储"
+          "name": "存储管理模块"
         },
         {
           "code_paths": [
             "crates/cowork-core/src/data/models.rs"
           ],
-          "description": "定义所有结构化数据的 Rust 结构体（如 Requirement、Feature、DesignComponent、Task），支持 Serde 序列化",
-          "importance": 9.0,
-          "key_functions": [
-            "Requirement",
-            "Feature",
-            "DesignComponent",
-            "ImplementationTask",
-            "SessionMetadata",
-            "ChangeRequest"
-          ],
-          "name": "数据模型"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/data/schemas.rs",
-            "crates/cowork-core/src/data/schemas/validation.rs"
-          ],
-          "description": "定义JSON Schema验证规则，用于验证存储数据的结构完整性（当前为占位符）",
-          "importance": 5.0,
-          "key_functions": [],
-          "name": "数据模式"
-        }
-      ]
-    },
-    {
-      "code_paths": [
-        "crates/cowork-core/src/llm/mod.rs",
-        "crates/cowork-core/src/llm/config.rs",
-        "crates/cowork-core/src/llm/rate_limiter.rs"
-      ],
-      "complexity": 6.0,
-      "description": "负责与大语言模型服务的对接与优化。该域通过配置管理与速率限制中间件，确保LLM调用的稳定性与合规性。其核心价值在于屏蔽底层LLM API的差异，提供统一、安全、可控的推理接口。",
-      "domain_type": "Infrastructure Domain",
-      "importance": 7.0,
-      "name": "LLM集成域",
-      "sub_modules": [
-        {
-          "code_paths": [
-            "crates/cowork-core/src/llm/config.rs"
-          ],
-          "description": "加载并解析配置文件与环境变量，创建OpenAI客户端实例，支持自定义API端点与认证",
+          "description": "数据模型定义和序列化",
           "importance": 8.0,
           "key_functions": [
-            "load_llm_config",
-            "create_llm_client"
+            "模型定义",
+            "序列化",
+            "数据验证"
           ],
-          "name": "LLM配置"
+          "name": "数据模型模块"
         },
         {
           "code_paths": [
-            "crates/cowork-core/src/llm/rate_limiter.rs"
+            "crates/cowork-core/src/data/schemas/"
           ],
-          "description": "实现对LLM API调用的延迟控制，防止超出速率限制，提升系统稳定性",
-          "importance": 7.0,
+          "description": "数据模式验证和约束定义",
+          "importance": 6.0,
           "key_functions": [
-            "RateLimiter"
+            "模式验证",
+            "数据约束",
+            "格式检查"
           ],
-          "name": "速率限制"
+          "name": "模式验证模块"
         }
       ]
     },
     {
       "code_paths": [
-        "crates/cowork-core/src/lib.rs",
-        "crates/cowork-core/src/instructions/mod.rs",
-        "crates/cowork-core/src/tools/mod.rs",
-        "crates/cowork-core/src/llm/mod.rs",
-        "crates/cowork-core/src/storage/mod.rs",
-        "crates/cowork-core/src/data/mod.rs"
+        "crates/cowork-cli/src/"
       ],
-      "complexity": 3.0,
-      "description": "作为Rust模块系统的组织层，通过 mod.rs 文件统一暴露各子模块的接口，降低外部依赖的复杂性。该域不包含业务逻辑，仅作为架构的组织与封装层，提升代码可读性与模块化程度。",
-      "domain_type": "Tool Support Domain",
-      "importance": 5.0,
-      "name": "模块聚合域",
+      "complexity": 6.0,
+      "description": "提供命令行用户接口，负责用户交互和系统入口点管理",
+      "domain_type": "用户接口域",
+      "importance": 7.0,
+      "name": "用户接口域",
       "sub_modules": [
         {
           "code_paths": [
-            "crates/cowork-core/src/lib.rs"
+            "crates/cowork-cli/src/main.rs"
           ],
-          "description": "cowork-core 的根模块，聚合所有子模块，为外部提供统一入口",
-          "importance": 6.0,
+          "description": "系统主入口和命令行解析",
+          "importance": 7.0,
           "key_functions": [
-            "re-exports"
+            "参数解析",
+            "会话初始化",
+            "流程启动"
           ],
-          "name": "核心库聚合"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/instructions/mod.rs",
-            "crates/cowork-core/src/tools/mod.rs",
-            "crates/cowork-core/src/llm/mod.rs",
-            "crates/cowork-core/src/storage/mod.rs",
-            "crates/cowork-core/src/data/mod.rs"
-          ],
-          "description": "各功能域的 mod.rs 文件，用于聚合内部子模块，提供清晰的模块边界",
-          "importance": 5.0,
-          "key_functions": [
-            "re-exports"
-          ],
-          "name": "子模块聚合"
+          "name": "CLI入口模块"
         }
       ]
     }
   ],
   "domain_relations": [
     {
-      "description": "流水线编排模块根据流程类型，调用智能体指令域中对应的指令模板来初始化智能体，是流程驱动的核心依赖",
-      "from_domain": "入口与编排域",
-      "relation_type": "Service Call",
+      "description": "工作流编排域依赖智能体指令域提供具体的行为逻辑和执行指令",
+      "from_domain": "工作流编排域",
+      "relation_type": "服务调用",
       "strength": 9.0,
       "to_domain": "智能体指令域"
     },
     {
-      "description": "流水线编排模块通过智能体执行域的构建器函数创建智能体实例，并启动其执行流程",
-      "from_domain": "入口与编排域",
-      "relation_type": "Service Call",
-      "strength": 9.0,
-      "to_domain": "智能体执行域"
-    },
-    {
-      "description": "智能体在执行过程中，通过调用工具执行域中的工具（Tool trait）来完成文件读写、数据操作、用户交互等原子任务",
-      "from_domain": "智能体执行域",
-      "relation_type": "Service Call",
-      "strength": 9.0,
-      "to_domain": "工具执行域"
-    },
-    {
-      "description": "工具执行域中的所有数据操作工具（如data_tools、artifact_tools）均依赖持久化存储域的数据模型与会话存储，用于序列化与持久化数据",
-      "from_domain": "工具执行域",
-      "relation_type": "Data Dependency",
-      "strength": 8.0,
-      "to_domain": "持久化存储域"
-    },
-    {
-      "description": "智能体执行域在构建智能体时，依赖LLM集成域提供的配置与速率限制LLM客户端",
-      "from_domain": "智能体执行域",
-      "relation_type": "Service Call",
-      "strength": 8.0,
-      "to_domain": "LLM集成域"
-    },
-    {
-      "description": "LLM配置模块加载的配置文件（config.toml）存储于项目根目录，与会话存储共享文件系统上下文",
-      "from_domain": "LLM集成域",
-      "relation_type": "Data Dependency",
-      "strength": 6.0,
-      "to_domain": "持久化存储域"
-    },
-    {
-      "description": "入口模块在启动流程前，需依赖持久化存储域创建或加载会话目录，以确保上下文隔离",
-      "from_domain": "入口与编排域",
-      "relation_type": "Data Dependency",
-      "strength": 7.0,
-      "to_domain": "持久化存储域"
-    },
-    {
-      "description": "工具执行域通过模块聚合域的mod.rs文件对外暴露工具接口，便于被其他域调用",
-      "from_domain": "工具执行域",
-      "relation_type": "Tool Support",
-      "strength": 6.0,
-      "to_domain": "模块聚合域"
-    },
-    {
-      "description": "智能体指令域通过模块聚合域的mod.rs文件统一暴露指令模板，供智能体执行域导入",
+      "description": "智能体指令域依赖工具功能域提供文件操作、数据管理和LLM集成等基础服务",
       "from_domain": "智能体指令域",
-      "relation_type": "Tool Support",
-      "strength": 6.0,
-      "to_domain": "模块聚合域"
+      "relation_type": "服务调用",
+      "strength": 9.0,
+      "to_domain": "工具功能域"
+    },
+    {
+      "description": "工具功能域依赖数据存储域进行数据持久化和会话状态管理",
+      "from_domain": "工具功能域",
+      "relation_type": "数据依赖",
+      "strength": 8.0,
+      "to_domain": "数据存储域"
+    },
+    {
+      "description": "工作流编排域依赖数据存储域进行会话状态跟踪和流程恢复",
+      "from_domain": "工作流编排域",
+      "relation_type": "数据依赖",
+      "strength": 8.0,
+      "to_domain": "数据存储域"
+    },
+    {
+      "description": "用户接口域依赖工作流编排域启动和管理开发流程",
+      "from_domain": "用户接口域",
+      "relation_type": "服务调用",
+      "strength": 9.0,
+      "to_domain": "工作流编排域"
+    },
+    {
+      "description": "工具功能域通过LLM集成模块依赖外部LLM服务提供商",
+      "from_domain": "工具功能域",
+      "relation_type": "外部服务依赖",
+      "strength": 8.0,
+      "to_domain": "外部系统"
+    },
+    {
+      "description": "智能体指令域通过人工介入模块依赖用户交互进行决策审批",
+      "from_domain": "智能体指令域",
+      "relation_type": "用户交互依赖",
+      "strength": 7.0,
+      "to_domain": "外部系统"
     }
   ]
 }
@@ -820,25 +626,25 @@ Contains static analysis results of the codebase and business process analysis.
 ```json
 {
   "main_workflow": {
-    "description": "从用户输入初始想法开始，依次触发Idea、PRD、Design、Plan、Coding、Check、Delivery七个智能体阶段，完成从需求构思到交付报告的完整开发闭环。每个阶段均包含智能体执行与HITL审核，确保输出符合简洁性原则。流程结束时生成完整的交付文档与代码包。",
-    "flowchart_mermaid": "graph TD\n    A[用户执行cowork-cli create命令] --> B[解析CLI参数并初始化会话]\n    B --> C[IdeaAgent捕获并结构化用户想法]\n    C --> D[PRD Actor-Critic循环生成需求文档]\n    D --> E[Design Actor-Critic循环生成架构设计]\n    E --> F[Plan Actor-Critic循环生成任务清单]\n    F --> G[Coding Actor-Critic循环实现代码]\n    G --> H[文件工具读写代码文件]\n    H --> I[CheckAgent验证代码结构完整性]\n    I --> J[DeliveryAgent生成交付报告]\n    J --> K[保存交付产物至会话目录]\n    \n    C --> C1{HITL审核}\n    D --> D1{HITL审核}\n    E --> E1{HITL审核}\n    F --> F1{HITL审核}\n    G --> G1{HITL审核}\n    \n    C1 -->|通过| D\n    D1 -->|通过| E\n    E1 -->|通过| F\n    F1 -->|通过| G\n    G1 -->|通过| I\n    \n    C1 -->|需修改| C\n    D1 -->|需修改| D\n    E1 -->|需修改| E\n    F1 -->|需修改| F\n    G1 -->|需修改| G",
-    "name": "全新项目创建流程"
+    "description": "这是Cowork Forge系统的核心工作流程，从用户需求输入到代码交付的完整软件开发生命周期管理。该流程通过多智能体协作实现自动化开发，并在关键节点引入人工介入循环(HITL)确保质量可控。",
+    "flowchart_mermaid": "graph TD\n    A[用户输入项目需求] --> B[Idea智能体需求捕获]\n    B --> C[PRD智能体需求分析]\n    C --> D{HITL用户审核}\n    D -->|通过| E[设计智能体架构设计]\n    D -->|修改| C\n    E --> F{HITL设计评审}\n    F -->|通过| G[计划智能体任务规划]\n    F -->|修改| E\n    G --> H{HITL计划确认}\n    H -->|通过| I[编码智能体代码实现]\n    H -->|修改| G\n    I --> J[检查智能体质量验证]\n    J --> K{验证结果}\n    K -->|通过| L[交付智能体项目交付]\n    K -->|失败| M[重新规划或修改]\n    M --> G\n    L --> N[生成交付报告]\n    N --> O[项目完成]",
+    "name": "AI驱动的完整软件开发工作流"
   },
   "other_important_workflows": [
     {
-      "description": "在已有项目基础上，根据用户变更请求（ChangeRequest）触发修改流程。系统先通过Modify Triage Agent分析变更范围，再决定是否需要回退至PRD、Design、Plan或直接进入Coding阶段进行代码修补，最终由Modify Delivery Agent生成变更报告。流程支持任意阶段的回溯与重启动。",
-      "flowchart_mermaid": "graph TD\n    A[用户执行cowork-cli modify命令] --> B[加载当前会话状态与历史数据]\n    B --> C[Modify Triage Agent分析变更范围]\n    C --> D{变更影响分析}\n    D -->|影响PRD| E[回退至PRD阶段重新生成需求]\n    D -->|影响Design| F[回退至Design阶段重新设计]\n    D -->|影响Plan| G[回退至Plan阶段重新规划]\n    D -->|仅影响代码| H[直接进入代码修补阶段]\n    \n    E --> I[执行PRD到Delivery完整流程]\n    F --> J[执行Design到Delivery完整流程]\n    G --> K[执行Plan到Delivery完整流程]\n    H --> L[Coding Agent执行代码修补]\n    \n    I --> M[Modify Delivery Agent生成变更报告]\n    J --> M\n    K --> M\n    L --> M\n    \n    M --> N[保存变更报告至会话目录]",
-      "name": "增量修改流程"
+      "description": "针对现有项目的局部修改流程，通过变更分析、代码修补和变更报告生成实现安全的增量修改。",
+      "flowchart_mermaid": "graph TD\n    A[用户提交变更请求] --> B[变更分析智能体]\n    B --> C[范围影响评估]\n    C --> D{修改类型判断}\n    D -->|需求级| E[PRD修改流程]\n    D -->|设计级| F[设计修改流程]\n    D -->|计划级| G[计划修改流程]\n    D -->|代码级| H[代码修补流程]\n    E --> I[代码修补智能体]\n    F --> I\n    G --> I\n    H --> I\n    I --> J[修改交付智能体]\n    J --> K[生成变更报告]\n    K --> L[修改完成]",
+      "name": "增量修改工作流"
     },
     {
-      "description": "允许用户在任意开发阶段中断后，从指定节点（如PRD、Design、Plan）重新开始，跳过已完成阶段。系统通过加载历史会话数据恢复上下文，确保流程连续性。该流程是支持增量修改与敏捷迭代的核心支撑机制。",
-      "flowchart_mermaid": "graph TD\n    A[用户执行cowork-cli resume命令] --> B[解析目标阶段参数]\n    B --> C[验证阶段有效性]\n    C --> D[加载会话元数据与中间产物]\n    D --> E[构建从指定阶段开始的子流程]\n    E --> F[启动目标阶段及后续智能体流水线]\n    F --> G[持续更新状态与文件]\n    G --> H[更新会话元数据标记执行阶段]",
-      "name": "阶段恢复流程"
+      "description": "在关键决策点引入用户反馈和审批的流程，确保AI生成内容的准确性和符合用户预期。",
+      "flowchart_mermaid": "graph TD\n    A[智能体执行] --> B{需要用户介入}\n    B -->|是| C[HITL包装器检测]\n    C --> D[展示当前结果]\n    D --> E[用户选择操作]\n    E --> F{用户操作类型}\n    F -->|批准通过| G[继续后续流程]\n    F -->|提供修改意见| H[重新执行智能体]\n    F -->|终止流程| I[流程中止]\n    H --> A\n    G --> J[流程继续]\n    B -->|否| J",
+      "name": "人工介入循环(HITL)工作流"
     },
     {
-      "description": "在智能体执行过程中，当遇到不确定性、错误或需要决策时，系统通过HITL工具主动请求用户介入。支持内容编辑、文件审查、提供反馈、请求重规划等多种交互方式，确保开发过程可控且符合用户意图。",
-      "flowchart_mermaid": "graph TD\n    A[智能体检测到错误或需决策] --> B[调用ResilientAgent包装器]\n    B --> C[调用HITL交互工具请求用户介入]\n    C --> D{用户选择操作}\n    D -->|编辑内容| E[ReviewAndEditContentTool]\n    D -->|提供反馈| F[ProvideFeedbackTool]\n    D -->|请求重规划| G[RequestReplanningTool]\n    \n    E --> H[收集用户输入并持久化]\n    F --> H\n    G --> H\n    \n    H --> I{ResilientAgent决策}\n    I -->|重试| J[重置计数器并重试智能体]\n    I -->|继续| K[继续执行后续流程]\n    I -->|中止| L[中止当前流程]\n    \n    J --> B\n    K --> M[流程继续]\n    L --> N[流程终止]",
-      "name": "人机交互反馈流程"
+      "description": "当流程执行出现错误或需要重新开始时的工作流，支持从特定阶段重新启动开发流程。",
+      "flowchart_mermaid": "graph TD\n    A[流程执行错误] --> B[HITL错误检测]\n    B --> C[用户选择恢复方式]\n    C --> D{恢复选项}\n    D -->|重试当前步骤| E[重置计数器重试]\n    D -->|提供指导后重试| F[用户指导后重试]\n    D -->|重启特定阶段| G[阶段重启工具]\n    E --> H[重新执行当前智能体]\n    F --> H\n    G --> I[加载阶段状态]\n    I --> H\n    H --> J[继续正常流程]",
+      "name": "错误恢复和重启工作流"
     }
   ]
 }
@@ -1364,7 +1170,7 @@ Code analysis results from preprocessing phase, including definitions of functio
   {
     "code_dossier": {
       "code_purpose": "agent",
-      "description": "Intelligent Agent component implementing Actor-Critic pattern with Human-in-the-Loop for project implementation planning",
+      "description": "Implementation plan agent instructions for Actor and Critic roles with human-in-the-loop feedback",
       "file_path": "crates/cowork-core/src/instructions/plan.rs",
       "functions": [
         "PLAN_ACTOR_INSTRUCTION",
@@ -1373,23 +1179,24 @@ Code analysis results from preprocessing phase, including definitions of functio
       "importance_score": 0.8,
       "interfaces": [],
       "name": "plan.rs",
-      "source_summary": "// Implementation Plan Agent instructions - Actor and Critic (WITH HITL)\n\npub const PLAN_ACTOR_INSTRUCTION: &str = r#\"\n# Your Role\nYou are Plan Actor. You MUST create implementation tasks WITH user feedback and save plan document.\n\n# CRITICAL PRINCIPLE: SIMPLE TASKS, NO TESTING/OPTIMIZATION\n**Tasks MUST focus ONLY on implementing core features:**\n- ✅ Tasks that implement business logic and user-facing features\n- ✅ Simple, straightforward implementation tasks\n- ❌ NO unit test tasks (unless explicitly requested in requirements)\n- ❌ NO integration test tasks\n- ❌ NO performance optimization tasks\n- ❌ NO deployment/DevOps tasks (unless explicitly in requirements)\n- ❌ NO monitoring/logging setup tasks\n- ❌ NO documentation tasks (beyond inline code comments)\n\n**Examples:**\n- ✅ GOOD: \"Implement user login API endpoint\"\n- ❌ BAD: \"Write unit tests for login endpoint\"\n- ✅ GOOD: \"Create simple SQLite database schema\"\n- ❌ BAD: \"Set up database connection pooling and optimize query performance\"\n\n**Task Count:**\n- Keep it minimal: 5-12 tasks for simple projects\n- Each task should be clear and focused\n- Avoid creating separate tasks for testing/optimization\n\n# CRITICAL: You MUST complete ALL steps below. Do NOT skip any step!\n\n## Step 1: Load Design (MANDATORY)\n1. Call `get_design()` to read all components\n2. **STOP** if components are empty - report error and exit\n3. (Optional) Call `get_requirements()` for additional context\n4. Analyze design to plan 5-12 **SIMPLE** implementation tasks (core functionality only)\n\n## Step 2: Create Task Draft (MANDATORY)\n3. Write a draft task list in markdown:\n   ```markdown\n   # Implementation Plan Draft (SIMPLE & CORE ONLY)\n\n   ## Tasks (5-12 items - NO testing/optimization tasks)\n   1. TASK-001: [Title - core functionality]\n      - Feature: FEAT-001\n      - Component: COMP-001\n      - Dependencies: []\n      - Files: [actual implementation files ONLY]\n      - Note: Focus on implementing feature, NOT testing/optimizing it\n   ...\n   \n   ## Excluded (DO NOT create tasks for):\n   - Unit tests (unless explicitly in requirements)\n   - Integration tests\n   - Performance optimization\n   - Deployment scripts\n   - Monitoring setup\n   - CI/CD pipelines\n   ```\n   **You MUST create this draft before proceeding!**\n\n## Step 3: User Review (MANDATORY - HITL)\n4. **MUST** call `review_with_feedback_content(title=\"Review Task Plan\", content=<draft>, prompt=\"请审查任务计划：edit 编辑 / pass 继续 / 或直接输入修改建议\")`\n5. Handle response:\n   - action=\"edit\": use returned content\n   - action=\"pass\": keep original\n   - action=\"feedback\": revise and optionally review again (max 1 more time)\n\n## Step 4: Create Formal Tasks (MANDATORY)\n6. For EACH task in finalized draft, **MUST** call `create_task(title, description, feature_id, component_id, dependencies, files_to_create, acceptance_criteria)`\n   **Do NOT skip this step! All tasks must be created!**\n\n## Step 5: Verify (MANDATORY)\n7. Call `get_plan()` to verify all tasks were created\n8. Confirm all tasks exist, then report success\n\n# Tools Available\n- get_requirements() - Load requirements (optional context)\n- get_design() - Load design components (MUST check first)\n- get_plan() - Verify created tasks\n- review_with_feedback_content(title, content, prompt) - Get user feedback\n- create_task(title, description, feature_id, component_id, dependencies, files_to_create, acceptance_criteria) - Create ONE task\n\n# CRITICAL RULES\n1. SIMPLICITY FIRST: Only create tasks for core feature implementation\n2. NO testing tasks (unless explicitly in requirements)\n3. NO optimization tasks (performance, scalability, etc.)\n4. NO deployment/infrastructure tasks (unless explicitly in requirements)\n5. STOP if get_design() returns empty components\n6. You MUST call review_with_feedback_content in Step 3\n7. You MUST call create_task for EACH task\n8. Keep dependencies clean and tasks actionable\n9. Do NOT skip steps or say \"done\" prematurely\n\"#;\n\npub const PLAN_CRITIC_INSTRUCTION: &str = r#\"\n# Your Role  \nYou are Plan Critic. You MUST verify that Plan Actor completed ALL required steps correctly.\n\n# CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!\n\n# SIMPLICITY CHECK - NEW PRIORITY\nBefore other checks, verify that tasks are SIMPLE and focus on CORE implementation:\n- ❌ REJECT if you see: test tasks, optimization tasks, deployment tasks (unless in requirements)\n- ❌ REJECT if tasks include: \"write unit tests\", \"performance tuning\", \"CI/CD setup\"\n- ✅ APPROVE only CORE feature implementation tasks\n\n## Mandatory Checks (You MUST perform ALL of these)\n\n### Check 1: Verify Plan Data Exists\n1. Call `get_plan()` to load all tasks\n2. **FAIL** if tasks array is empty\n3. Expected: 5-12 tasks (CORE implementation only)\n\n### Check 2: Verify SIMPLICITY (NEW - CRITICAL)\n4. For each task, check:\n   - ❌ Does title/description mention \"test\", \"unit test\", \"integration test\"? → REJECT\n   - ❌ Does it mention \"optimize\", \"performance tuning\", \"caching\"? → REJECT\n   - ❌ Does it mention \"deploy\", \"CI/CD\", \"pipeline\", \"docker\"? → REJECT (unless in requirements)\n   - ❌ Does it mention \"monitoring\", \"logging\", \"metrics\"? → REJECT (unless in requirements)\n   - ✅ Does it focus on implementing CORE business logic? → APPROVE\n\n5. If ANY non-core tasks found:\n   - **MUST** call `provide_feedback(feedback_type=\"incomplete\", severity=\"critical\", details=\"Tasks include non-core items: [list them]\", suggested_fix=\"Remove all testing, optimization, deployment tasks. Keep ONLY core feature implementation tasks\")`\n\n### Check 3: Verify Task Dependencies\n6. Call `check_task_dependencies()` to verify:\n   - No circular dependencies\n   - All referenced dependencies exist\n   - Dependency graph is valid\n7. **FAIL** if circular dependencies detected\n\n### Check 4: Verify Feature Coverage\n8. Compare tasks against features from requirements\n9. **FAIL** if any feature has NO tasks assigned\n10. Each feature should have at least 1-3 implementation tasks\n\n### Check 5: Data Quality Assessment\n11. For each task:\n   - Has clear title and description?\n   - Linked to a valid feature_id?\n   - Linked to a valid component_id?\n   - Has files_to_create list (implementation files ONLY, not test files)?\n   - Has acceptance criteria (functional, not performance metrics)?\n12. Dependencies are reasonable (not too many, not circular)?\n\n### Check 6: Implementation Completeness\n13. Tasks cover all components from design?\n14. Task breakdown is granular enough (not too big)?\n15. Task order makes sense (dependencies logical)?\n16. Tasks are SIMPLE and focused on core functionality?\n\n## Response Actions (You MUST follow these rules)\n\n### If ANY check fails:\n1. **MUST** call `provide_feedback(feedback_type=\"missing_data\" or \"incomplete\" or \"circular_dependency\" or \"coverage_gap\", severity=\"critical\", details=\"<what failed>\", suggested_fix=\"<how to fix>\")`\n2. Clearly state what Actor must redo\n3. **DO NOT** give approval\n\n### If all checks pass:\n1. State: \"✅ Plan verification passed: X CORE implementation tasks created, all Y features covered, dependencies valid\"\n2. State: \"✅ SIMPLICITY check passed: No testing/optimization/deployment tasks found\"\n3. Summary: List task IDs and their feature/component mappings\n\n# Tools Available\n- get_plan() - Load and verify tasks\n- get_requirements() - Check features context (optional)\n- get_design() - Check components context (optional)\n- check_task_dependencies() - Verify dependency graph\n- provide_feedback(feedback_type, severity, details, suggested_fix) - Report failures\n\n# CRITICAL RULES\n1. SIMPLICITY FIRST: Reject testing/optimization/deployment tasks\n2. You MUST check: tasks data + dependencies + feature coverage + SIMPLICITY\n3. Empty tasks = CRITICAL FAILURE\n4. Circular dependencies = CRITICAL FAILURE\n5. Uncovered features = CRITICAL FAILURE\n6. Non-core tasks (testing/optimization) = CRITICAL FAILURE\n7. You are the LAST line of defense - be strict!\n8. If Actor skipped steps, you MUST catch it and report via provide_feedback\n\n# Example Failure Response - Complexity\n\"❌ Plan verification FAILED:\n- Found non-core tasks: TASK-005 (Write unit tests), TASK-008 (Performance optimization)\n- These are NOT core feature implementation\n- Expected: ONLY implementation tasks for business logic\n\nCalling provide_feedback to request removal of testing/optimization tasks.\"\n\"#;\n"
+      "source_summary": "// Implementation Plan Agent instructions - Actor and Critic (WITH HITL)\n\npub const PLAN_ACTOR_INSTRUCTION: &str = r#\"\n# Your Role\nYou are Plan Actor. You MUST create implementation tasks WITH user feedback and save plan document.\n\n# CRITICAL PRINCIPLE: SIMPLE TASKS, NO TESTING/OPTIMIZATION\n**Tasks MUST focus ONLY on implementing core features:**\n- ✅ Tasks that implement business logic and user-facing features\n- ✅ Simple, straightforward implementation tasks\n- ❌ NO unit test tasks (unless explicitly requested in requirements)\n- ❌ NO integration test tasks\n- ❌ NO performance optimization tasks\n- ❌ NO deployment/DevOps tasks (unless explicitly in requirements)\n- ❌ NO monitoring/logging setup tasks\n- ❌ NO documentation tasks (beyond inline code comments)\n\n**Examples:**\n- ✅ GOOD: \"Implement user login API endpoint\"\n- ❌ BAD: \"Write unit tests for login endpoint\"\n- ✅ GOOD: \"Create simple SQLite database schema\"\n- ❌ BAD: \"Set up database connection pooling and optimize query performance\"\n\n**Task Count:**\n- Keep it minimal: 5-12 tasks for simple projects\n- Each task should be clear and focused\n- Avoid creating separate tasks for testing/optimization\n\n# CRITICAL: You MUST complete ALL steps below. Do NOT skip any step!\n\n## Step 1: Load Design (MANDATORY)\n1. Call `get_design()` to read all components\n2. **STOP** if components are empty - report error and exit\n3. (Optional) Call `get_requirements()` for additional context\n4. Analyze design to plan 5-12 **SIMPLE** implementation tasks (core functionality only)\n\n## Step 2: Create Task Draft (MANDATORY)\n3. Write a draft task list in markdown:\n   ```markdown\n   # Implementation Plan Draft (SIMPLE & CORE ONLY)\n\n   ## Tasks (5-12 items - NO testing/optimization tasks)\n   1. TASK-001: [Title - core functionality]\n      - Feature: FEAT-001\n      - Component: COMP-001\n      - Dependencies: []\n      - Files: [actual implementation files ONLY]\n      - Note: Focus on implementing feature, NOT testing/optimizing it\n   ...\n   \n   ## Excluded (DO NOT create tasks for):\n   - Unit tests (unless explicitly in requirements)\n   - Integration tests\n   - Performance optimization\n   - Deployment scripts\n   - Monitoring setup\n   - CI/CD pipelines\n   ```\n   **You MUST create this draft before proceeding!**\n\n## Step 3: User Review (MANDATORY - HITL)\n4. **MUST** call `review_with_feedback_content(title=\"Review Task Plan\", content=<draft>, prompt=\"请审查任务计划：edit 编辑 / pass 继续 / 或直接输入修改建议\")`\n5. Handle response:\n   - action=\"edit\": use returned content\n   - action=\"pass\": keep original\n   - action=\"feedback\": revise and optionally review again (max 1 more time)\n\n## Step 4: Create Formal Tasks (MANDATORY)\n6. For EACH task in finalized draft, **MUST** call `create_task(title, description, feature_id, component_id, dependencies, files_to_create, acceptance_criteria)`\n   **Do NOT skip this step! All tasks must be created!**\n\n## Step 5: Verify (MANDATORY)\n7. Call `get_plan()` to verify all tasks were created\n8. Confirm all tasks exist, then report success\n\n## Step 6: Handle Critic Feedback (IF NEEDED)\n**NEW - IMPORTANT**: If Critic calls `provide_feedback` saying you have non-core tasks:\n1. Read the feedback carefully - it will list specific task IDs to remove\n2. For EACH task ID mentioned in the feedback:\n   - Call `delete_task(task_id=\"TASK-XXX\", reason=\"Removing non-core task per Critic feedback: <copy feedback details>\")`\n3. After deleting all problematic tasks, call `get_plan()` to verify\n4. Report: \"✅ Removed X non-core tasks per Critic feedback. Remaining tasks focus on core implementation only.\"\n5. **DO NOT** recreate deleted tasks - Critic rejected them for good reason\n\n# Tools Available\n- get_requirements() - Load requirements (optional context)\n- get_design() - Load design components (MUST check first)\n- get_plan() - Verify created tasks\n- review_with_feedback_content(title, content, prompt) - Get user feedback\n- create_task(title, description, feature_id, component_id, dependencies, files_to_create, acceptance_criteria) - Create ONE task\n- delete_task(task_id, reason) - Delete a task (use when Critic rejects it) ← NEW\n- update_task(task_id, reason, ...) - Update task properties ← NEW (if needed)\n\n# CRITICAL RULES\n1. SIMPLICITY FIRST: Only create tasks for core feature implementation\n2. NO testing tasks (unless explicitly in requirements)\n3. NO optimization tasks (performance, scalability, etc.)\n4. NO deployment/infrastructure tasks (unless explicitly in requirements)\n5. STOP if get_design() returns empty components\n6. You MUST call review_with_feedback_content in Step 3\n7. You MUST call create_task for EACH task\n8. If Critic provides feedback about non-core tasks, you MUST delete them (don't defend or recreate)\n9. Keep dependencies clean and tasks actionable\n10. Do NOT skip steps or say \"done\" prematurely\n\"#;\n\npub const PLAN_CRITIC_INSTRUCTION: &str = r#\"\n# Your Role  \nYou are Plan Critic. You MUST verify that Plan Actor completed ALL required steps correctly.\n\n# CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!\n\n# SIMPLICITY CHECK - NEW PRIORITY\nBefore other checks, verify that tasks are SIMPLE and focus on CORE implementation:\n- ❌ REJECT if you see: test tasks, optimization tasks, deployment tasks (unless in requirements)\n- ❌ REJECT if tasks include: \"write unit tests\", \"performance tuning\", \"CI/CD setup\"\n- ✅ APPROVE only CORE feature implementation tasks\n\n## Mandatory Checks (You MUST perform ALL of these)\n\n### Check 1: Verify Plan Data Exists\n1. Call `get_plan()` to load all tasks\n2. **FAIL** if tasks array is empty\n3. Expected: 5-12 tasks (CORE implementation only)\n\n### Check 2: Verify SIMPLICITY (NEW - CRITICAL)\n4. For each task, check:\n   - ❌ Does title/description mention \"test\", \"unit test\", \"integration test\"? → REJECT\n   - ❌ Does it mention \"optimize\", \"performance tuning\", \"caching\"? → REJECT\n   - ❌ Does it mention \"deploy\", \"CI/CD\", \"pipeline\", \"docker\"? → REJECT (unless in requirements)\n   - ❌ Does it mention \"monitoring\", \"logging\", \"metrics\"? → REJECT (unless in requirements)\n   - ✅ Does it focus on implementing CORE business logic? → APPROVE\n\n5. If ANY non-core tasks found:\n   - **MUST** call `provide_feedback(feedback_type=\"incomplete\", severity=\"critical\", details=\"Tasks include non-core items: [list them]\", suggested_fix=\"Remove all testing, optimization, deployment tasks. Keep ONLY core feature implementation tasks\")`\n\n### Check 3: Verify Task Dependencies\n6. Call `check_task_dependencies()` to verify:\n   - No circular dependencies\n   - All referenced dependencies exist\n   - Dependency graph is valid\n7. **FAIL** if circular dependencies detected\n\n### Check 4: Verify Feature Coverage\n8. Compare tasks against features from requirements\n9. **FAIL** if any feature has NO tasks assigned\n10. Each feature should have at least 1-3 implementation tasks\n\n### Check 5: Data Quality Assessment\n11. For each task:\n   - Has clear title and description?\n   - Linked to a valid feature_id?\n   - Linked to a valid component_id?\n   - Has files_to_create list (implementation files ONLY, not test files)?\n   - Has acceptance criteria (functional, not performance metrics)?\n12. Dependencies are reasonable (not too many, not circular)?\n\n### Check 6: Implementation Completeness\n13. Tasks cover all components from design?\n14. Task breakdown is granular enough (not too big)?\n15. Task order makes sense (dependencies logical)?\n16. Tasks are SIMPLE and focused on core functionality?\n\n## Response Actions (You MUST follow these rules)\n\n### If ANY check fails:\n1. **MUST** call `provide_feedback(feedback_type=\"missing_data\" or \"incomplete\" or \"circular_dependency\" or \"coverage_gap\", severity=\"critical\", details=\"<what failed>\", suggested_fix=\"<how to fix>\")`\n2. Clearly state what Actor must redo\n3. **DO NOT** give approval\n\n### If all checks pass:\n1. State: \"✅ Plan verification passed: X CORE implementation tasks created, all Y features covered, dependencies valid\"\n2. State: \"✅ SIMPLICITY check passed: No testing/optimization/deployment tasks found\"\n3. Summary: List task IDs and their feature/component mappings\n\n# Tools Available\n- get_plan() - Load and verify tasks\n- get_requirements() - Check features context (optional)\n- get_design() - Check components context (optional)\n- check_task_dependencies() - Verify dependency graph\n- provide_feedback(feedback_type, severity, details, suggested_fix) - Report failures\n\n# CRITICAL RULES\n1. SIMPLICITY FIRST: Reject testing/optimization/deployment tasks\n2. You MUST check: tasks data + dependencies + feature coverage + SIMPLICITY\n3. Empty tasks = CRITICAL FAILURE\n4. Circular dependencies = CRITICAL FAILURE\n5. Uncovered features = CRITICAL FAILURE\n6. Non-core tasks (testing/optimization) = CRITICAL FAILURE\n7. You are the LAST line of defense - be strict!\n8. If Actor skipped steps, you MUST catch it and report via provide_feedback\n\n# Example Failure Response - Complexity\n\"❌ Plan verification FAILED:\n- Found non-core tasks: TASK-005 (Write unit tests), TASK-008 (Performance optimization)\n- These are NOT core feature implementation\n- Expected: ONLY implementation tasks for business logic\n\nCalling provide_feedback to request removal of testing/optimization tasks.\"\n\"#;\n"
     },
     "complexity_metrics": {
-      "cyclomatic_complexity": 16.0,
-      "lines_of_code": 188,
+      "cyclomatic_complexity": 18.0,
+      "lines_of_code": 200,
       "number_of_classes": 0,
       "number_of_functions": 2
     },
     "dependencies": [],
-    "detailed_description": "This component serves as an intelligent planning coordinator that implements an Actor-Critic pattern with Human-in-the-Loop (HITL) validation. The Plan Actor creates implementation task lists focused exclusively on core functionality implementation, while the Plan Critic acts as a gatekeeper to verify task quality, simplicity, and adherence to core implementation principles. The system enforces strict rules against including testing, optimization, deployment, or monitoring tasks unless explicitly required.",
+    "detailed_description": "This component implements an intelligent agent system for software implementation planning with human-in-the-loop feedback. It defines two distinct roles: Plan Actor responsible for creating task plans based on design specifications, and Plan Critic responsible for validating and ensuring quality of the created plan. The system enforces simplicity-first approach by strictly prohibiting testing, optimization, deployment, and monitoring tasks unless explicitly required. The Actor follows a 6-step mandatory process including design loading, task drafting, user review, formal task creation, verification, and critic feedback handling. The Critic performs 6 mandatory checks including plan existence verification, simplicity validation, dependency checking, feature coverage assessment, data quality evaluation, and implementation completeness verification.",
     "interfaces": [],
     "responsibilities": [
-      "Generate implementation task drafts focusing exclusively on core business logic features",
-      "Validate task plans through human review and automated verification",
-      "Enforce simplicity principles by rejecting testing/optimization/deployment tasks",
-      "Maintain task dependency integrity and feature coverage",
-      "Coordinate between design components, requirements, and implementation tasks"
+      "Define Actor instructions for creating implementation task plans",
+      "Define Critic instructions for plan validation and quality assurance",
+      "Enforce simplicity-first approach by filtering non-core tasks",
+      "Implement human-in-the-loop feedback mechanism for plan review",
+      "Provide task dependency management and validation",
+      "Ensure comprehensive feature coverage in implementation plans"
     ]
   },
   {
@@ -3973,7 +3780,7 @@ Code analysis results from preprocessing phase, including definitions of functio
   {
     "code_dossier": {
       "code_purpose": "agent",
-      "description": null,
+      "description": "Agents module providing factory functions for intelligent agents using adk-rust framework",
       "file_path": "crates/cowork-core/src/agents/mod.rs",
       "functions": [
         "create_idea_agent",
@@ -3986,113 +3793,245 @@ Code analysis results from preprocessing phase, including definitions of functio
       ],
       "importance_score": 0.8,
       "interfaces": [
-        "ResilientAgent"
+        "create_idea_agent",
+        "create_prd_loop",
+        "create_design_loop",
+        "create_plan_loop",
+        "create_coding_loop",
+        "create_check_agent",
+        "create_delivery_agent"
       ],
       "name": "mod.rs",
-      "source_summary": "// Agents module - Agent builders using adk-rust\n// \n// IMPORTANT: This file solves a CRITICAL bug where SequentialAgent stops after\n// the first LoopAgent completes. \n//\n// PROBLEM: When a sub-agent in LoopAgent calls exit_loop(), it terminates the\n// ENTIRE SequentialAgent, not just the LoopAgent. This is adk-rust's design.\n//\n// SOLUTION: Remove exit_loop tools and use max_iterations=1 to let LoopAgent\n// complete naturally, allowing SequentialAgent to continue to next agent.\n\nuse crate::instructions::*;\nuse crate::tools::*;\nuse adk_agent::{LlmAgentBuilder, LoopAgent};\nuse adk_core::{Llm, IncludeContents};\nuse anyhow::Result;\nuse std::sync::Arc;\n\nmod hitl;\nuse hitl::ResilientAgent;\n\n// ============================================================================\n// IdeaAgent - Simple agent to capture initial idea\n// ============================================================================\n\npub fn create_idea_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let agent = LlmAgentBuilder::new(\"idea_agent\")\n        .instruction(IDEA_AGENT_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(SaveIdeaTool::new(session_id.to_string())))\n        .tool(Arc::new(LoadIdeaTool::new(session_id.to_string())))\n        .tool(Arc::new(ReviewAndEditContentTool))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    Ok(Arc::new(agent))\n}\n\n// ============================================================================\n// PRD Loop - Actor + Critic with LoopAgent\n// ============================================================================\n\npub fn create_prd_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let prd_actor = LlmAgentBuilder::new(\"prd_actor\")\n        .instruction(PRD_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(LoadIdeaTool::new(session.clone())))\n        .tool(Arc::new(ReviewWithFeedbackContentTool))\n        .tool(Arc::new(CreateRequirementTool::new(session.clone())))\n        .tool(Arc::new(AddFeatureTool::new(session.clone())))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(SavePrdDocTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let prd_critic = LlmAgentBuilder::new(\"prd_critic\")\n        .instruction(PRD_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\n        \"prd_loop\",\n        vec![Arc::new(prd_actor), Arc::new(prd_critic)],\n    );\n    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts for Actor to fix issues\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Design Loop - Actor + Critic\n// ============================================================================\n\npub fn create_design_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let design_actor = LlmAgentBuilder::new(\"design_actor\")\n        .instruction(DESIGN_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(ReviewWithFeedbackContentTool))\n        .tool(Arc::new(CreateDesignComponentTool::new(session.clone())))\n        .tool(Arc::new(SaveDesignDocTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let design_critic = LlmAgentBuilder::new(\"design_critic\")\n        .instruction(DESIGN_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(CheckFeatureCoverageTool::new(session.clone())))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\"design_loop\", vec![Arc::new(design_actor), Arc::new(design_critic)]);\n    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Plan Loop - Actor + Critic\n// ============================================================================\n\npub fn create_plan_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let plan_actor = LlmAgentBuilder::new(\"plan_actor\")\n        .instruction(PLAN_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(ReviewWithFeedbackContentTool))\n        .tool(Arc::new(CreateTaskTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let plan_critic = LlmAgentBuilder::new(\"plan_critic\")\n        .instruction(PLAN_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(CheckTaskDependenciesTool::new(session.clone())))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\"plan_loop\", vec![Arc::new(plan_actor), Arc::new(plan_critic)]);\n    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Coding Loop - Actor + Critic\n// ============================================================================\n\npub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let coding_actor = LlmAgentBuilder::new(\"coding_actor\")\n        .instruction(CODING_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(UpdateTaskStatusTool::new(session.clone())))\n        .tool(Arc::new(UpdateFeatureStatusTool::new(session.clone())))\n        // Task management tools - NEW\n        .tool(Arc::new(CreateTaskTool::new(session.clone())))\n        .tool(Arc::new(UpdateTaskTool::new(session.clone())))\n        .tool(Arc::new(DeleteTaskTool::new(session.clone())))\n        // File operations\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(WriteFileTool))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(RunCommandTool))\n        .tool(Arc::new(CheckTestsTool))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let coding_critic = LlmAgentBuilder::new(\"coding_critic\")\n        .instruction(CODING_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(RunCommandTool))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        // Replanning request - NEW\n        .tool(Arc::new(RequestReplanningTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\"coding_loop\", vec![Arc::new(coding_actor), Arc::new(coding_critic)]);\n    loop_agent = loop_agent.with_max_iterations(5);\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Check Agent - Quality assurance\n// ============================================================================\n\npub fn create_check_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let agent = LlmAgentBuilder::new(\"check_agent\")\n        .instruction(CHECK_AGENT_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(CheckDataFormatTool::new(session.clone())))\n        .tool(Arc::new(CheckFeatureCoverageTool::new(session.clone())))\n        .tool(Arc::new(CheckTaskDependenciesTool::new(session.clone())))\n        .tool(Arc::new(RunCommandTool))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(CheckTestsTool))\n        .tool(Arc::new(CheckLintTool))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .tool(Arc::new(GotoStageTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    Ok(Arc::new(agent))\n}\n\n// ============================================================================\n// Delivery Agent - Final report generation\n// ============================================================================\n\npub fn create_delivery_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let agent = LlmAgentBuilder::new(\"delivery_agent\")\n        .instruction(DELIVERY_AGENT_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(LoadFeedbackHistoryTool::new(session.clone())))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(SaveDeliveryReportTool::new(session.clone())))\n        .tool(Arc::new(SavePrdDocTool::new(session.clone())))\n        .tool(Arc::new(SaveDesignDocTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    Ok(Arc::new(agent))\n}\n"
+      "source_summary": "// Agents module - Agent builders using adk-rust\n// \n// IMPORTANT: This file solves a CRITICAL bug where SequentialAgent stops after\n// the first LoopAgent completes. \n//\n// PROBLEM: When a sub-agent in LoopAgent calls exit_loop(), it terminates the\n// ENTIRE SequentialAgent, not just the LoopAgent. This is adk-rust's design.\n//\n// SOLUTION: Remove exit_loop tools and use max_iterations=1 to let LoopAgent\n// complete naturally, allowing SequentialAgent to continue to next agent.\n\nuse crate::instructions::*;\nuse crate::tools::*;\nuse adk_agent::{LlmAgentBuilder, LoopAgent};\nuse adk_core::{Llm, IncludeContents};\nuse anyhow::Result;\nuse std::sync::Arc;\n\nmod hitl;\nuse hitl::ResilientAgent;\n\n// ============================================================================\n// IdeaAgent - Simple agent to capture initial idea\n// ============================================================================\n\npub fn create_idea_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let agent = LlmAgentBuilder::new(\"idea_agent\")\n        .instruction(IDEA_AGENT_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(SaveIdeaTool::new(session_id.to_string())))\n        .tool(Arc::new(LoadIdeaTool::new(session_id.to_string())))\n        .tool(Arc::new(ReviewAndEditContentTool))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    Ok(Arc::new(agent))\n}\n\n// ============================================================================\n// PRD Loop - Actor + Critic with LoopAgent\n// ============================================================================\n\npub fn create_prd_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let prd_actor = LlmAgentBuilder::new(\"prd_actor\")\n        .instruction(PRD_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(LoadIdeaTool::new(session.clone())))\n        .tool(Arc::new(ReviewWithFeedbackContentTool))\n        .tool(Arc::new(CreateRequirementTool::new(session.clone())))\n        .tool(Arc::new(AddFeatureTool::new(session.clone())))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(SavePrdDocTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let prd_critic = LlmAgentBuilder::new(\"prd_critic\")\n        .instruction(PRD_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\n        \"prd_loop\",\n        vec![Arc::new(prd_actor), Arc::new(prd_critic)],\n    );\n    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts for Actor to fix issues\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Design Loop - Actor + Critic\n// ============================================================================\n\npub fn create_design_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let design_actor = LlmAgentBuilder::new(\"design_actor\")\n        .instruction(DESIGN_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(ReviewWithFeedbackContentTool))\n        .tool(Arc::new(CreateDesignComponentTool::new(session.clone())))\n        .tool(Arc::new(SaveDesignDocTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let design_critic = LlmAgentBuilder::new(\"design_critic\")\n        .instruction(DESIGN_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(CheckFeatureCoverageTool::new(session.clone())))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\"design_loop\", vec![Arc::new(design_actor), Arc::new(design_critic)]);\n    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Plan Loop - Actor + Critic\n// ============================================================================\n\npub fn create_plan_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let plan_actor = LlmAgentBuilder::new(\"plan_actor\")\n        .instruction(PLAN_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(ReviewWithFeedbackContentTool))\n        .tool(Arc::new(CreateTaskTool::new(session.clone())))\n        // Add task management tools so Actor can respond to Critic feedback\n        .tool(Arc::new(UpdateTaskTool::new(session.clone())))\n        .tool(Arc::new(DeleteTaskTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let plan_critic = LlmAgentBuilder::new(\"plan_critic\")\n        .instruction(PLAN_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(CheckTaskDependenciesTool::new(session.clone())))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\"plan_loop\", vec![Arc::new(plan_actor), Arc::new(plan_critic)]);\n    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Coding Loop - Actor + Critic\n// ============================================================================\n\npub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let coding_actor = LlmAgentBuilder::new(\"coding_actor\")\n        .instruction(CODING_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(UpdateTaskStatusTool::new(session.clone())))\n        .tool(Arc::new(UpdateFeatureStatusTool::new(session.clone())))\n        // Task management tools - NEW\n        .tool(Arc::new(CreateTaskTool::new(session.clone())))\n        .tool(Arc::new(UpdateTaskTool::new(session.clone())))\n        .tool(Arc::new(DeleteTaskTool::new(session.clone())))\n        // File operations\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(WriteFileTool))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(RunCommandTool))\n        .tool(Arc::new(CheckTestsTool))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let coding_critic = LlmAgentBuilder::new(\"coding_critic\")\n        .instruction(CODING_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(RunCommandTool))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        // Replanning request - NEW\n        .tool(Arc::new(RequestReplanningTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\"coding_loop\", vec![Arc::new(coding_actor), Arc::new(coding_critic)]);\n    loop_agent = loop_agent.with_max_iterations(5);\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Check Agent - Quality assurance\n// ============================================================================\n\npub fn create_check_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let agent = LlmAgentBuilder::new(\"check_agent\")\n        .instruction(CHECK_AGENT_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(CheckDataFormatTool::new(session.clone())))\n        .tool(Arc::new(CheckFeatureCoverageTool::new(session.clone())))\n        .tool(Arc::new(CheckTaskDependenciesTool::new(session.clone())))\n        .tool(Arc::new(RunCommandTool))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(CheckTestsTool))\n        .tool(Arc::new(CheckLintTool))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .tool(Arc::new(GotoStageTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    Ok(Arc::new(agent))\n}\n\n// ============================================================================\n// Delivery Agent - Final report generation\n// ============================================================================\n\npub fn create_delivery_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let agent = LlmAgentBuilder::new(\"delivery_agent\")\n        .instruction(DELIVERY_AGENT_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(LoadFeedbackHistoryTool::new(session.clone())))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(SaveDeliveryReportTool::new(session.clone())))\n        .tool(Arc::new(SavePrdDocTool::new(session.clone())))\n        .tool(Arc::new(SaveDesignDocTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    Ok(Arc::new(agent))\n}\n"
     },
     "complexity_metrics": {
       "cyclomatic_complexity": 2.0,
-      "lines_of_code": 243,
-      "number_of_classes": 1,
+      "lines_of_code": 246,
+      "number_of_classes": 0,
       "number_of_functions": 7
     },
     "dependencies": [
       {
-        "dependency_type": "internal",
-        "is_external": false,
-        "line_number": null,
-        "name": "crate::instructions",
-        "path": null,
-        "version": null
-      },
-      {
-        "dependency_type": "internal",
-        "is_external": false,
-        "line_number": null,
-        "name": "crate::tools",
-        "path": null,
-        "version": null
-      },
-      {
-        "dependency_type": "external",
+        "dependency_type": "framework",
         "is_external": true,
-        "line_number": null,
+        "line_number": 9,
         "name": "adk_agent",
         "path": null,
         "version": null
       },
       {
-        "dependency_type": "external",
+        "dependency_type": "framework",
         "is_external": true,
-        "line_number": null,
+        "line_number": 10,
         "name": "adk_core",
         "path": null,
         "version": null
       },
       {
-        "dependency_type": "external",
+        "dependency_type": "error_handling",
         "is_external": true,
-        "line_number": null,
+        "line_number": 11,
         "name": "anyhow",
         "path": null,
         "version": null
       },
       {
-        "dependency_type": "external",
-        "is_external": true,
-        "line_number": null,
+        "dependency_type": "standard_library",
+        "is_external": false,
+        "line_number": 12,
         "name": "std::sync::Arc",
         "path": null,
         "version": null
       },
       {
-        "dependency_type": "internal",
+        "dependency_type": "internal_module",
         "is_external": false,
-        "line_number": null,
+        "line_number": 14,
         "name": "hitl",
+        "path": "crates/cowork-core/src/agents/hitl.rs",
+        "version": null
+      },
+      {
+        "dependency_type": "internal_module",
+        "is_external": false,
+        "line_number": 8,
+        "name": "crate::instructions",
         "path": null,
         "version": null
       },
       {
-        "dependency_type": "external",
-        "is_external": true,
-        "line_number": null,
-        "name": "async_trait",
+        "dependency_type": "internal_module",
+        "is_external": false,
+        "line_number": 8,
+        "name": "crate::tools",
         "path": null,
+        "version": null
+      },
+      {
+        "dependency_type": "internal_component",
+        "is_external": false,
+        "line_number": 15,
+        "name": "ResilientAgent",
+        "path": "crates/cowork-core/src/agents/hitl.rs",
         "version": null
       }
     ],
-    "detailed_description": "This component implements a suite of intelligent agent builders for a collaborative AI workflow system. It defines seven high-level agent creation functions that construct LLM-based agents using the adk-rust framework. Each agent serves a distinct phase in a multi-stage development lifecycle: Idea capture, PRD generation, Design, Planning, Coding, Quality Check, and Delivery. The agents are structured as either simple LLM agents or LoopAgents (actor-critic pairs) with max_iterations=3 or 5 to enable iterative refinement. A critical bug fix is implemented by replacing exit_loop() calls with max_iterations limits to prevent premature termination of parent SequentialAgents. The ResilientAgent wrapper from the hitl module provides human-in-the-loop (HITL) recovery for loop iteration failures, allowing user intervention via CLI prompts to retry, provide guidance, or abort.",
+    "detailed_description": "This component serves as the main agents module for the cowork-core system, implementing a sophisticated multi-agent workflow for software development. It creates intelligent agents that follow an actor-critic pattern with loop-based iteration control. The module specifically addresses a critical bug in the ADK framework where SequentialAgent would terminate prematurely when sub-agents called exit_loop(). The solution involves removing exit_loop tools and using max_iterations=1 to allow natural completion of LoopAgents. The module implements a complete software development lifecycle including idea capture, PRD creation, design, planning, coding, quality checking, and delivery stages.",
     "interfaces": [
       {
-        "description": "A wrapper agent that provides human-in-the-loop recovery for agent execution failures, particularly when LoopAgent exceeds max_iterations. It intercepts errors, presents CLI options to the user, and allows retrying with or without guidance.",
-        "interface_type": "struct",
-        "name": "ResilientAgent",
+        "description": "Creates an agent for capturing initial project ideas",
+        "interface_type": "function",
+        "name": "create_idea_agent",
         "parameters": [
           {
             "description": null,
             "is_optional": false,
-            "name": "inner",
-            "param_type": "Arc<dyn Agent>"
+            "name": "model",
+            "param_type": "Arc<dyn Llm>"
           },
           {
             "description": null,
             "is_optional": false,
-            "name": "subs",
-            "param_type": "Vec<Arc<dyn Agent>>"
+            "name": "session_id",
+            "param_type": "&str"
           }
         ],
-        "return_type": null,
+        "return_type": "Result<Arc<dyn adk_core::Agent>>",
+        "visibility": "public"
+      },
+      {
+        "description": "Creates PRD generation loop with actor-critic agents",
+        "interface_type": "function",
+        "name": "create_prd_loop",
+        "parameters": [
+          {
+            "description": null,
+            "is_optional": false,
+            "name": "model",
+            "param_type": "Arc<dyn Llm>"
+          },
+          {
+            "description": null,
+            "is_optional": false,
+            "name": "session_id",
+            "param_type": "&str"
+          }
+        ],
+        "return_type": "Result<Arc<dyn adk_core::Agent>>",
+        "visibility": "public"
+      },
+      {
+        "description": "Creates design phase loop with actor-critic agents",
+        "interface_type": "function",
+        "name": "create_design_loop",
+        "parameters": [
+          {
+            "description": null,
+            "is_optional": false,
+            "name": "model",
+            "param_type": "Arc<dyn Llm>"
+          },
+          {
+            "description": null,
+            "is_optional": false,
+            "name": "session_id",
+            "param_type": "&str"
+          }
+        ],
+        "return_type": "Result<Arc<dyn adk_core::Agent>>",
+        "visibility": "public"
+      },
+      {
+        "description": "Creates planning phase loop with task management",
+        "interface_type": "function",
+        "name": "create_plan_loop",
+        "parameters": [
+          {
+            "description": null,
+            "is_optional": false,
+            "name": "model",
+            "param_type": "Arc<dyn Llm>"
+          },
+          {
+            "description": null,
+            "is_optional": false,
+            "name": "session_id",
+            "param_type": "&str"
+          }
+        ],
+        "return_type": "Result<Arc<dyn adk_core::Agent>>",
+        "visibility": "public"
+      },
+      {
+        "description": "Creates coding phase loop with file operations",
+        "interface_type": "function",
+        "name": "create_coding_loop",
+        "parameters": [
+          {
+            "description": null,
+            "is_optional": false,
+            "name": "model",
+            "param_type": "Arc<dyn Llm>"
+          },
+          {
+            "description": null,
+            "is_optional": false,
+            "name": "session_id",
+            "param_type": "&str"
+          }
+        ],
+        "return_type": "Result<Arc<dyn adk_core::Agent>>",
+        "visibility": "public"
+      },
+      {
+        "description": "Creates quality assurance agent",
+        "interface_type": "function",
+        "name": "create_check_agent",
+        "parameters": [
+          {
+            "description": null,
+            "is_optional": false,
+            "name": "model",
+            "param_type": "Arc<dyn Llm>"
+          },
+          {
+            "description": null,
+            "is_optional": false,
+            "name": "session_id",
+            "param_type": "&str"
+          }
+        ],
+        "return_type": "Result<Arc<dyn adk_core::Agent>>",
+        "visibility": "public"
+      },
+      {
+        "description": "Creates final delivery and reporting agent",
+        "interface_type": "function",
+        "name": "create_delivery_agent",
+        "parameters": [
+          {
+            "description": null,
+            "is_optional": false,
+            "name": "model",
+            "param_type": "Arc<dyn Llm>"
+          },
+          {
+            "description": null,
+            "is_optional": false,
+            "name": "session_id",
+            "param_type": "&str"
+          }
+        ],
+        "return_type": "Result<Arc<dyn adk_core::Agent>>",
         "visibility": "public"
       }
     ],
     "responsibilities": [
-      "Construct LLM-based agents for each phase of the software development lifecycle",
-      "Implement iterative actor-critic loops using LoopAgent with max_iterations to avoid premature termination",
-      "Provide resilient agent execution via HITL recovery mechanisms",
-      "Encapsulate domain-specific tools and instructions for each agent type",
-      "Maintain session state consistency across agent invocations using session_id"
+      "Agent factory creation for software development workflow",
+      "LoopAgent orchestration with actor-critic pattern",
+      "Error resilience through ResilientAgent wrapper",
+      "Session management across multiple agent types",
+      "Tool integration and configuration management"
     ]
   },
   {
@@ -4870,25 +4809,23 @@ Code analysis results from preprocessing phase, including definitions of functio
 
 ## Memory Storage Statistics
 
-**Total Storage Size**: 609269 bytes
+**Total Storage Size**: 563315 bytes
 
-- **studies_research**: 88837 bytes (14.6%)
-- **preprocess**: 403395 bytes (66.2%)
-- **documentation**: 117000 bytes (19.2%)
-- **timing**: 37 bytes (0.0%)
+- **studies_research**: 61869 bytes (11.0%)
+- **documentation**: 104412 bytes (18.5%)
+- **timing**: 39 bytes (0.0%)
+- **preprocess**: 396995 bytes (70.5%)
 
 ## Generated Documents Statistics
 
-Number of Generated Documents: 11
+Number of Generated Documents: 9
 
-- Key Modules and Components Research Report_持久化存储域
-- Key Modules and Components Research Report_智能体执行域
-- Key Modules and Components Research Report_LLM集成域
-- Key Modules and Components Research Report_智能体指令域
-- Key Modules and Components Research Report_工具执行域
-- Core Workflows
-- Architecture Description
-- Key Modules and Components Research Report_模块聚合域
+- Key Modules and Components Research Report_用户接口域
 - Project Overview
-- Key Modules and Components Research Report_入口与编排域
+- Architecture Description
+- Key Modules and Components Research Report_工具功能域
+- Key Modules and Components Research Report_工作流编排域
+- Key Modules and Components Research Report_数据存储域
+- Key Modules and Components Research Report_智能体指令域
+- Core Workflows
 - Boundary Interfaces
