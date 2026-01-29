@@ -499,3 +499,75 @@ pub fn mark_session_failed(session_id: &str) -> Result<()> {
     save_project_index(&index)?;
     Ok(())
 }
+
+// ============================================================================
+// Feature Status Auto-Update Logic
+// ============================================================================
+
+/// Update feature status based on its tasks' completion status
+/// Called automatically when a task is marked as completed
+pub fn update_feature_status_if_needed(session_id: &str, feature_id: &str) -> Result<()> {
+    let plan = load_implementation_plan(session_id)?;
+    let mut features = load_feature_list(session_id)?;
+    
+    // Find the feature
+    let feature_idx = match features.features.iter().position(|f| f.id == feature_id) {
+        Some(idx) => idx,
+        None => {
+            // Feature not found, maybe it's an old task - just skip
+            return Ok(());
+        }
+    };
+    
+    // Get all tasks for this feature
+    let feature_tasks: Vec<&Task> = plan.tasks.iter()
+        .filter(|t| t.feature_id == feature_id)
+        .collect();
+    
+    if feature_tasks.is_empty() {
+        // No tasks for this feature - keep as pending
+        return Ok(());
+    }
+    
+    // Check task statuses
+    let all_completed = feature_tasks.iter().all(|t| t.status == TaskStatus::Completed);
+    let any_in_progress = feature_tasks.iter().any(|t| t.status == TaskStatus::InProgress);
+    let any_blocked = feature_tasks.iter().any(|t| t.status == TaskStatus::Blocked);
+    
+    // Determine new feature status
+    let new_status = if all_completed {
+        FeatureStatus::Completed
+    } else if any_blocked {
+        FeatureStatus::Blocked
+    } else if any_in_progress {
+        FeatureStatus::InProgress
+    } else {
+        FeatureStatus::Pending
+    };
+    
+    // Update feature if status changed
+    let feature = &mut features.features[feature_idx];
+    if feature.status != new_status {
+        let old_status = feature.status;
+        feature.status = new_status;
+        
+        // Set completed_at if transitioning to completed
+        if new_status == FeatureStatus::Completed {
+            feature.completed_at = Some(chrono::Utc::now());
+            println!("✅ Feature {} completed: {}", feature_id, feature.name);
+        }
+        
+        // Clear completed_at if moving away from completed
+        if old_status == FeatureStatus::Completed && new_status != FeatureStatus::Completed {
+            feature.completed_at = None;
+        }
+        
+        save_feature_list(session_id, &features)?;
+        
+        if new_status != FeatureStatus::Completed {
+            println!("ℹ️  Feature {} status: {:?} → {:?}", feature_id, old_status, new_status);
+        }
+    }
+    
+    Ok(())
+}

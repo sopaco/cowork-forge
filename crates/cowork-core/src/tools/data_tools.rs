@@ -549,28 +549,37 @@ impl Tool for UpdateTaskStatusTool {
             _ => return Err(AdkError::Tool(format!("Invalid status: {}. Must be one of: pending, in_progress, completed, blocked", new_status_str))),
         };
 
-        if let Some(task) = plan.tasks.iter_mut().find(|t| t.id == task_id) {
+        // Find and update task
+        let feature_id = if let Some(task) = plan.tasks.iter_mut().find(|t| t.id == task_id) {
             task.status = new_status;
             match new_status_str {
                 "in_progress" => task.started_at = Some(chrono::Utc::now()),
                 "completed" => task.completed_at = Some(chrono::Utc::now()),
                 _ => {}
             }
+            
+            let fid = task.feature_id.clone();
             save_implementation_plan(&self.session_id, &plan).map_err(|e| AdkError::Tool(e.to_string()))?;
 
             println!("✓ Task {} → {}", task_id, new_status_str);
-
-            Ok(json!({
-                "status": "success",
-                "task_id": task_id,
-                "new_status": new_status_str
-            }))
+            fid
         } else {
-            Ok(json!({
+            return Ok(json!({
                 "status": "error",
                 "message": format!("Task {} not found", task_id)
-            }))
+            }));
+        };
+
+        // Update corresponding feature status
+        if new_status == TaskStatus::Completed {
+            update_feature_status_if_needed(&self.session_id, &feature_id).map_err(|e| AdkError::Tool(e.to_string()))?;
         }
+
+        Ok(json!({
+            "status": "success",
+            "task_id": task_id,
+            "new_status": new_status_str
+        }))
     }
 }
 
