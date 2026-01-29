@@ -1,31 +1,31 @@
 # Project Analysis Summary Report (Full Version)
 
-Generation Time: 2026-01-28 11:22:56 UTC
+Generation Time: 2026-01-29 06:45:09 UTC
 
 ## Execution Timing Statistics
 
-- **Total Execution Time**: 1530.49 seconds
-- **Preprocessing Phase**: 1.04 seconds (0.1%)
-- **Research Phase**: 465.73 seconds (30.4%)
-- **Document Generation Phase**: 1063.72 seconds (69.5%)
+- **Total Execution Time**: 1175.83 seconds
+- **Preprocessing Phase**: 0.88 seconds (0.1%)
+- **Research Phase**: 460.11 seconds (39.1%)
+- **Document Generation Phase**: 714.84 seconds (60.8%)
 - **Output Phase**: 0.00 seconds (0.0%)
-- **Summary Generation Time**: 0.001 seconds
+- **Summary Generation Time**: 0.000 seconds
 
 ## Cache Performance Statistics and Savings
 
 ### Performance Metrics
-- **Cache Hit Rate**: 68.1%
-- **Total Operations**: 94
-- **Cache Hits**: 64 times
-- **Cache Misses**: 30 times
-- **Cache Writes**: 31 times
+- **Cache Hit Rate**: 76.7%
+- **Total Operations**: 86
+- **Cache Hits**: 66 times
+- **Cache Misses**: 20 times
+- **Cache Writes**: 21 times
 
 ### Savings
-- **Inference Time Saved**: 306.5 seconds
-- **Tokens Saved**: 85275 input + 34443 output = 119718 total
-- **Estimated Cost Savings**: $0.0580
-- **Performance Improvement**: 68.1%
-- **Efficiency Improvement Ratio**: 0.2x (saved time / actual execution time)
+- **Inference Time Saved**: 326.7 seconds
+- **Tokens Saved**: 109131 input + 42700 output = 151831 total
+- **Estimated Cost Savings**: $0.0780
+- **Performance Improvement**: 76.7%
+- **Efficiency Improvement Ratio**: 0.3x (saved time / actual execution time)
 
 ## Core Research Data Summary
 
@@ -36,74 +36,78 @@ Provides core objectives, user roles, and system boundary information for the pr
 
 ```json
 {
-  "business_value": "通过AI代理协作和人类监督相结合的方式，显著提升软件开发效率和质量。系统能够自动化处理软件开发流程中的重复性任务，同时通过人类专家参与确保关键决策的质量，为软件开发团队提供高效、可靠的开发编排工具。",
+  "business_value": "通过AI智能体自动化完成软件开发中重复性、流程化的工作（如需求分析、架构设计、任务规划、代码实现与交付验证），显著降低开发者的认知负荷与手动操作成本。系统强调‘最小可行架构’原则，强制拒绝过度设计，提升开发效率与代码质量一致性。支持增量修改与历史回溯，使团队能以轻量级方式快速迭代产品原型或小型项目，特别适用于初创团队、独立开发者和敏捷开发场景。",
   "confidence_score": 0.95,
   "external_systems": [
     {
-      "description": "提供大语言模型服务用于智能代理的决策和代码生成",
+      "description": "作为底层大语言模型（LLM）服务提供方，负责执行智能体的推理与生成任务。系统通过自定义配置连接OpenAI兼容的API端点，支持模型参数与速率限制控制。",
       "interaction_type": "API调用",
       "name": "OpenAI API"
     },
     {
-      "description": "Git等版本控制系统用于代码版本管理和变更跟踪",
-      "interaction_type": "文件系统操作",
-      "name": "版本控制系统"
+      "description": "作为持久化存储介质，用于保存所有开发会话数据、项目文件、结构化文档（JSON/Markdown）与中间产物。系统严格限制操作范围在项目根目录内，防止越权访问。",
+      "interaction_type": "文件读写",
+      "name": "本地文件系统"
     },
     {
-      "description": "用户默认文本编辑器用于HITL环节的内容编辑",
-      "interaction_type": "进程调用",
-      "name": "文本编辑器"
+      "description": "作为人机交互的主要接口，用户通过命令行输入指令启动项目、提供反馈、编辑内容或中断流程。系统通过交互式工具（如ReviewAndEditContentTool）实现与用户的双向沟通。",
+      "interaction_type": "命令行交互",
+      "name": "用户终端（CLI）"
     }
   ],
-  "project_description": "一个AI驱动的软件开发编排系统，通过智能代理和人类参与循环(HITL)实现从创意到交付的完整软件开发流程自动化。系统采用命令行界面作为主要交互方式，包含需求分析、架构设计、实现规划、编码实施、质量检查和交付报告等完整开发阶段。",
+  "project_description": "Cowork Forge 是一个基于AI的软件开发编排系统，通过多智能体协作流程（Idea → PRD → Design → Plan → Coding → Check → Delivery）自动化完成从需求构思到代码交付的完整软件开发周期。系统采用人类参与循环（HITL）机制，在关键节点引入人工审核与干预，确保开发过程符合简洁性原则并避免过度工程化。核心由Rust语言构建，采用模块化架构，包含CLI入口、核心智能体引擎、工具集与持久化存储，支持项目创建、阶段恢复、增量修改与交付报告生成。",
   "project_name": "Cowork Forge",
   "project_type": "CLITool",
   "system_boundary": {
     "excluded_components": [
-      "具体的业务逻辑实现",
-      "用户界面开发",
-      "部署和运维功能",
-      "第三方服务集成开发"
+      "Web前端界面",
+      "移动应用",
+      "云服务部署系统",
+      "CI/CD流水线（如GitHub Actions）",
+      "数据库服务（如PostgreSQL、MongoDB）",
+      "测试框架（如Rust tests）",
+      "监控系统",
+      "第三方API网关"
     ],
     "included_components": [
-      "命令行界面(CLI)",
-      "智能代理系统(Agent)",
-      "工作流管道(Pipeline)",
-      "数据存储层(Storage)",
-      "工具集(Tools)",
-      "LLM集成模块"
+      "cowork-cli（命令行入口）",
+      "cowork-core（核心智能体、工具、存储、指令集）",
+      "LLM配置与速率限制模块",
+      "文件系统操作工具",
+      "JSON/Markdown持久化存储",
+      "HITL交互工具"
     ],
-    "scope": "软件开发流程编排和自动化"
+    "scope": "Cowork Forge CLI 工具及其核心智能体引擎，不包含任何前端界面、Web服务、数据库服务或持续集成/部署（CI/CD）系统。"
   },
   "target_users": [
     {
-      "description": "需要高效开发软件项目的技术团队，包括项目经理、架构师和开发人员",
-      "name": "软件开发团队",
-      "needs": [
-        "自动化开发流程",
-        "标准化开发规范",
-        "团队协作支持",
-        "质量保证机制"
-      ]
-    },
-    {
-      "description": "个人开发者或小型团队，需要系统化的开发工具来管理项目生命周期",
+      "description": "缺乏团队支持的个人开发者，希望快速将想法转化为可运行的代码，但缺乏时间或精力处理繁琐的开发流程。",
       "name": "独立开发者",
       "needs": [
-        "简化开发流程",
-        "减少重复工作",
-        "确保代码质量",
-        "项目文档自动化"
+        "自动化完成从想法到代码的全流程",
+        "避免过度设计，专注于核心功能",
+        "获得结构化交付报告以用于展示或存档",
+        "支持中途修改与恢复工作"
       ]
     },
     {
-      "description": "负责项目管理和技术决策的管理人员",
-      "name": "技术项目经理",
+      "description": "小型创业团队，资源有限，需要快速验证产品可行性，对开发流程的规范性与效率有较高要求。",
+      "name": "初创团队",
       "needs": [
-        "项目进度可视化",
-        "质量检查自动化",
-        "变更管理支持",
-        "交付文档生成"
+        "标准化开发流程以减少沟通成本",
+        "通过AI辅助确保需求与实现的一致性",
+        "生成可交付的文档与代码包",
+        "支持轻量级迭代与变更追踪"
+      ]
+    },
+    {
+      "description": "熟悉敏捷方法的开发者，希望借助AI工具提升开发效率，但不愿放弃对关键决策的控制权。",
+      "name": "敏捷开发工程师",
+      "needs": [
+        "在关键节点保留人工审核权限（HITL）",
+        "灵活控制开发流程的启动与回退",
+        "获取清晰的变更影响分析报告",
+        "避免AI生成冗余代码或测试"
       ]
     }
   ]
@@ -115,456 +119,392 @@ Provides high-level domain division, module relationships, and core business pro
 
 ```json
 {
-  "architecture_summary": "Cowork Forge采用分层架构设计，核心是基于AI代理的软件开发编排系统。架构分为应用层（CLI）、编排层（Pipeline）、代理层（Agents）、指令层（Instructions）、工具层（Tools）、数据层（Data/Storage）和基础设施层（LLM）。系统采用Actor-Critic模式结合Human-in-the-Loop机制，实现从创意到交付的完整软件开发流程自动化。技术栈主要基于Rust语言，采用模块化设计支持可扩展性。",
+  "architecture_summary": "Cowork Forge 采用模块化分层架构，以 CLI 入口为触发点，核心由智能体编排引擎、工具集与持久化存储构成，形成“指令驱动-工具执行-数据持久化”的闭环开发流程。系统遵循“最小可行架构”原则，通过人类参与循环（HITL）机制在关键节点引入人工审核，确保开发过程简洁高效。整体架构为典型的“编排层-智能体层-工具层-数据层”四层结构，各层职责清晰，依赖单向下行，具备良好的可扩展性与可维护性。",
   "business_flows": [
     {
-      "description": "新项目创建流程，从用户创意输入开始，经过需求分析、架构设计、实现规划、编码实施、质量检查到最终交付的完整开发周期",
-      "entry_point": "main.rs命令行接口",
+      "description": "从用户输入初始想法开始，依次触发Idea、PRD、Design、Plan、Coding、Check、Delivery七个智能体阶段，完成从需求构思到交付报告的完整开发闭环。每个阶段均包含智能体执行与HITL审核，确保输出符合简洁性原则。流程结束时生成完整的交付文档与代码包。",
+      "entry_point": "用户执行 `cowork-cli create` 命令，触发 main.rs 中的项目创建逻辑，进而调用 pipeline 模块的 full_pipeline 函数",
       "importance": 10.0,
-      "involved_domains_count": 6,
-      "name": "新项目开发流程",
+      "involved_domains_count": 5,
+      "name": "全新项目创建流程",
       "steps": [
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/idea.rs",
-          "domain_module": "需求管理域",
-          "operation": "创意采集和结构化处理",
+          "code_entry_point": null,
+          "domain_module": "入口与编排域",
+          "operation": "解析 CLI 命令参数，初始化会话目录结构，加载全局配置",
           "step": 1,
-          "sub_module": "创意代理"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/prd.rs",
-          "domain_module": "需求管理域",
-          "operation": "产品需求文档生成和验证",
+          "code_entry_point": null,
+          "domain_module": "智能体指令域",
+          "operation": "加载 IdeaAgent 指令模板，启动首个智能体捕获并结构化用户原始想法",
           "step": 2,
-          "sub_module": "PRD代理"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/design.rs",
-          "domain_module": "设计管理域",
-          "operation": "系统架构设计和评审",
+          "code_entry_point": null,
+          "domain_module": "智能体指令域",
+          "operation": "加载 PRD 指令模板，启动 PRD Actor-Critic 循环，生成产品需求文档",
           "step": 3,
-          "sub_module": "设计代理"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/plan.rs",
-          "domain_module": "规划管理域",
-          "operation": "实现任务规划和依赖分析",
+          "code_entry_point": null,
+          "domain_module": "智能体指令域",
+          "operation": "加载 Design 指令模板，启动 Design Actor-Critic 循环，生成最小化架构设计",
           "step": 4,
-          "sub_module": "规划代理"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/coding.rs",
-          "domain_module": "编码实施域",
-          "operation": "代码实现和质量检查",
+          "code_entry_point": null,
+          "domain_module": "智能体指令域",
+          "operation": "加载 Plan 指令模板，启动 Plan Actor-Critic 循环，生成仅含核心功能的任务清单",
           "step": 5,
-          "sub_module": "编码代理"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/delivery.rs",
-          "domain_module": "交付管理域",
-          "operation": "项目交付验证和报告生成",
+          "code_entry_point": null,
+          "domain_module": "智能体指令域",
+          "operation": "加载 Coding 指令模板，启动 Coding Actor-Critic 循环，实现功能代码",
           "step": 6,
-          "sub_module": "交付代理"
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "工具执行域",
+          "operation": "调用 file_tools 读写代码文件，调用 data_tools 持久化任务与需求状态",
+          "step": 7,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "智能体指令域",
+          "operation": "加载 CheckAgent 指令，验证代码结构完整性与任务覆盖率，仅拒绝严重缺失",
+          "step": 8,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "智能体指令域",
+          "operation": "加载 DeliveryAgent 指令，整合所有文档与代码，生成交付报告",
+          "step": 9,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "工具执行域",
+          "operation": "调用 artifact_tools 保存交付报告、PRD、设计文档等产物至会话目录",
+          "step": 10,
+          "sub_module": null
         }
       ]
     },
     {
-      "description": "增量修改流程，处理现有项目的变更请求，包括变更分析、影响评估、代码修改和变更报告生成",
-      "entry_point": "main.rs修改命令",
+      "description": "在已有项目基础上，根据用户变更请求（ChangeRequest）触发修改流程。系统先通过 Modify Triage Agent 分析变更范围，再决定是否需要回退至 PRD、Design、Plan 或直接进入 Coding 阶段进行代码修补，最终由 Modify Delivery Agent 生成变更报告。流程支持任意阶段的回溯与重启动。",
+      "entry_point": "用户执行 `cowork-cli modify` 命令，触发 main.rs 中的修改逻辑，调用 pipeline 模块的 modify_pipeline 函数",
       "importance": 9.0,
       "involved_domains_count": 5,
-      "name": "项目修改流程",
+      "name": "增量修改流程",
       "steps": [
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/modify.rs",
-          "domain_module": "变更管理域",
-          "operation": "变更请求分析和范围确定",
+          "code_entry_point": null,
+          "domain_module": "入口与编排域",
+          "operation": "解析 CLI 修改命令，加载当前会话状态与历史数据",
           "step": 1,
-          "sub_module": "变更分析代理"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/code_patch.rs",
-          "domain_module": "编码实施域",
-          "operation": "增量代码修改实施",
+          "code_entry_point": null,
+          "domain_module": "智能体指令域",
+          "operation": "加载 Modify Triage Agent 指令，分析用户变更请求，确定影响范围（PRD/Design/Plan/Code）",
           "step": 2,
-          "sub_module": "代码补丁代理"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/instructions/modify_delivery.rs",
-          "domain_module": "交付管理域",
-          "operation": "变更报告生成和交付",
+          "code_entry_point": null,
+          "domain_module": "工具执行域",
+          "operation": "调用 modify_tools 加载/保存 ChangeRequest 对象，记录变更范围与风险评估",
           "step": 3,
-          "sub_module": "修改交付代理"
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "入口与编排域",
+          "operation": "根据变更影响，选择性回退至 PRD、Design 或 Plan 阶段，调用对应 pipeline",
+          "step": 4,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "智能体指令域",
+          "operation": "若无需回退，直接启动 Coding Agent 执行代码修补",
+          "step": 5,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "工具执行域",
+          "operation": "调用 file_tools、data_tools 更新代码与结构化数据",
+          "step": 6,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "智能体指令域",
+          "operation": "启动 Modify Delivery Agent，整合变更前后状态、反馈历史与代码差异，生成变更报告",
+          "step": 7,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "工具执行域",
+          "operation": "调用 artifact_tools 保存变更报告至会话目录",
+          "step": 8,
+          "sub_module": null
         }
       ]
     },
     {
-      "description": "工作流恢复和阶段跳转流程，支持从特定阶段重新开始工作流，用于错误恢复和流程调整",
-      "entry_point": "goto_stage_tool工具",
-      "importance": 7.0,
-      "involved_domains_count": 3,
-      "name": "流程恢复流程",
+      "description": "允许用户在任意开发阶段中断后，从指定节点（如 PRD、Design、Plan）重新开始，跳过已完成阶段。系统通过加载历史会话数据恢复上下文，确保流程连续性。该流程是支持增量修改与敏捷迭代的核心支撑机制。",
+      "entry_point": "用户执行 `cowork-cli resume --stage <stage>` 命令，触发 main.rs 中的恢复逻辑，调用 pipeline 模块的 resume_pipeline 函数",
+      "importance": 8.0,
+      "involved_domains_count": 4,
+      "name": "阶段恢复流程",
       "steps": [
         {
-          "code_entry_point": "crates/cowork-core/src/tools/goto_stage_tool.rs",
-          "domain_module": "编排管理域",
-          "operation": "阶段验证和会话元数据加载",
+          "code_entry_point": null,
+          "domain_module": "入口与编排域",
+          "operation": "解析恢复命令与目标阶段，验证阶段有效性",
           "step": 1,
-          "sub_module": "阶段跳转工具"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/pipeline/mod.rs",
-          "domain_module": "编排管理域",
-          "operation": "工作流管道重新组装",
+          "code_entry_point": null,
+          "domain_module": "持久化存储域",
+          "operation": "从 .cowork/sessions/<id>/ 目录加载对应阶段的元数据与中间产物",
           "step": 2,
-          "sub_module": "管道编排器"
+          "sub_module": null
         },
         {
-          "code_entry_point": "crates/cowork-core/src/agents/mod.rs",
-          "domain_module": "代理管理域",
-          "operation": "代理实例重新创建",
+          "code_entry_point": null,
+          "domain_module": "入口与编排域",
+          "operation": "构建从指定阶段开始的子流程，跳过已执行的上游阶段",
           "step": 3,
-          "sub_module": "代理工厂"
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "智能体指令域",
+          "operation": "加载目标阶段及后续所有阶段的指令模板，启动智能体流水线",
+          "step": 4,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "工具执行域",
+          "operation": "在后续阶段执行中，调用 data_tools、file_tools 持续更新状态与文件",
+          "step": 5,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "入口与编排域",
+          "operation": "流程结束后，更新会话元数据，标记已执行阶段",
+          "step": 6,
+          "sub_module": null
+        }
+      ]
+    },
+    {
+      "description": "在智能体执行过程中，当遇到不确定性、错误或需要决策时，系统通过 HITL 工具主动请求用户介入。支持内容编辑、文件审查、提供反馈、请求重规划等多种交互方式，确保开发过程可控且符合用户意图。",
+      "entry_point": "智能体执行期间触发 error 或需要 human_input 时，由 ResilientAgent 或 ControlTools 主动调用 HITL 工具",
+      "importance": 8.0,
+      "involved_domains_count": 3,
+      "name": "人机交互反馈流程",
+      "steps": [
+        {
+          "code_entry_point": null,
+          "domain_module": "智能体执行域",
+          "operation": "智能体检测到 Max Iterations 错误或需人工决策，调用 ResilientAgent 包装器",
+          "step": 1,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "工具执行域",
+          "operation": "调用 ReviewAndEditContentTool 或 ReviewWithFeedbackTool 请求用户编辑或反馈",
+          "step": 2,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "工具执行域",
+          "operation": "调用 ProvideFeedbackTool 或 RequestReplanningTool 收集结构化反馈并持久化",
+          "step": 3,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "智能体执行域",
+          "operation": "ResilientAgent 根据用户反馈决定：重试、继续或中止流程",
+          "step": 4,
+          "sub_module": null
+        },
+        {
+          "code_entry_point": null,
+          "domain_module": "持久化存储域",
+          "operation": "将用户反馈记录写入 session 的 feedback_history.json 文件，供后续阶段参考",
+          "step": 5,
+          "sub_module": null
         }
       ]
     }
   ],
-  "confidence_score": 9.2,
+  "confidence_score": 0.97,
   "domain_modules": [
     {
       "code_paths": [
-        "crates/cowork-core/src/instructions/idea.rs",
-        "crates/cowork-core/src/instructions/prd.rs",
-        "crates/cowork-core/src/data/tools/data_tools.rs"
-      ],
-      "complexity": 8.0,
-      "description": "负责项目需求的采集、分析、结构化和管理，包括创意处理、PRD生成、需求验证和变更管理",
-      "domain_type": "核心业务域",
-      "importance": 9.0,
-      "name": "需求管理域",
-      "sub_modules": [
-        {
-          "code_paths": [
-            "crates/cowork-core/src/instructions/idea.rs",
-            "crates/cowork-core/src/tools/idea_tools.rs"
-          ],
-          "description": "创意采集和结构化处理模块",
-          "importance": 8.0,
-          "key_functions": [
-            "创意理解",
-            "结构化保存",
-            "用户评审"
-          ],
-          "name": "创意代理模块"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/instructions/prd.rs",
-            "crates/cowork-core/src/tools/data_tools.rs"
-          ],
-          "description": "产品需求文档生成和验证模块",
-          "importance": 9.0,
-          "key_functions": [
-            "需求分析",
-            "PRD生成",
-            "用户验证",
-            "文档保存"
-          ],
-          "name": "PRD代理模块"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/instructions/modify.rs",
-            "crates/cowork-core/src/tools/modify_tools.rs"
-          ],
-          "description": "变更请求分析和范围确定模块",
-          "importance": 8.0,
-          "key_functions": [
-            "变更分析",
-            "影响评估",
-            "风险分析",
-            "接受标准提取"
-          ],
-          "name": "变更分析模块"
-        }
-      ]
-    },
-    {
-      "code_paths": [
-        "crates/cowork-core/src/instructions/design.rs",
-        "crates/cowork-core/src/tools/validation_tools.rs"
-      ],
-      "complexity": 9.0,
-      "description": "负责系统架构设计、技术方案制定、设计验证和架构文档管理",
-      "domain_type": "核心业务域",
-      "importance": 9.0,
-      "name": "设计管理域",
-      "sub_modules": [
-        {
-          "code_paths": [
-            "crates/cowork-core/src/instructions/design.rs",
-            "crates/cowork-core/src/tools/hitl_content_tools.rs"
-          ],
-          "description": "系统架构设计和评审模块",
-          "importance": 9.0,
-          "key_functions": [
-            "架构设计",
-            "设计评审",
-            "用户反馈整合",
-            "设计文档保存"
-          ],
-          "name": "设计代理模块"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/tools/validation_tools.rs"
-          ],
-          "description": "设计验证和覆盖率检查模块",
-          "importance": 7.0,
-          "key_functions": [
-            "设计验证",
-            "特征覆盖率检查",
-            "架构完整性评估"
-          ],
-          "name": "设计验证模块"
-        }
-      ]
-    },
-    {
-      "code_paths": [
-        "crates/cowork-core/src/instructions/plan.rs",
-        "crates/cowork-core/src/tools/validation_tools.rs"
+        "crates/cowork-cli/src/main.rs",
+        "crates/cowork-core/src/pipeline/mod.rs"
       ],
       "complexity": 7.0,
-      "description": "负责实现任务规划、依赖分析、任务分配和计划验证",
-      "domain_type": "核心业务域",
-      "importance": 8.0,
-      "name": "规划管理域",
+      "description": "负责系统启动、流程编排与会话控制。作为用户与系统交互的唯一入口，该域解析 CLI 命令，协调各智能体阶段的执行顺序，并管理流程的启动、恢复、中断与重定向。其核心价值在于将复杂的多智能体协作流程封装为可复用的流水线，实现开发流程的自动化与标准化。",
+      "domain_type": "Core Business Domain",
+      "importance": 10.0,
+      "name": "入口与编排域",
       "sub_modules": [
         {
           "code_paths": [
-            "crates/cowork-core/src/instructions/plan.rs",
-            "crates/cowork-core/src/tools/data_tools.rs"
+            "crates/cowork-cli/src/main.rs"
           ],
-          "description": "实现任务规划和验证模块",
-          "importance": 8.0,
-          "key_functions": [
-            "任务创建",
-            "依赖分析",
-            "用户评审",
-            "计划验证"
-          ],
-          "name": "规划代理模块"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/tools/validation_tools.rs"
-          ],
-          "description": "任务依赖和循环检测模块",
-          "importance": 6.0,
-          "key_functions": [
-            "依赖分析",
-            "循环检测",
-            "任务完整性检查"
-          ],
-          "name": "依赖分析模块"
-        }
-      ]
-    },
-    {
-      "code_paths": [
-        "crates/cowork-core/src/instructions/coding.rs",
-        "crates/cowork-core/src/instructions/code_patch.rs",
-        "crates/cowork-core/src/instructions/check.rs"
-      ],
-      "complexity": 9.0,
-      "description": "负责代码实现、质量检查、代码修改和基础验证",
-      "domain_type": "核心业务域",
-      "importance": 9.0,
-      "name": "编码实施域",
-      "sub_modules": [
-        {
-          "code_paths": [
-            "crates/cowork-core/src/instructions/coding.rs",
-            "crates/cowork-core/src/tools/file_tools.rs"
-          ],
-          "description": "代码实现和质量检查模块",
+          "description": "命令行参数解析与会话初始化入口，负责接收用户指令并触发对应流程",
           "importance": 9.0,
           "key_functions": [
-            "代码生成",
-            "质量验证",
-            "简单代码原则",
-            "任务完成检查"
+            "main",
+            "create_project",
+            "modify_project",
+            "resume_project"
           ],
-          "name": "编码代理模块"
+          "name": "CLI 入口"
         },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/instructions/code_patch.rs",
-            "crates/cowork-core/src/tools/modify_tools.rs"
-          ],
-          "description": "增量代码修改模块",
-          "importance": 8.0,
-          "key_functions": [
-            "代码修改",
-            "变更实施",
-            "最佳实践指导"
-          ],
-          "name": "代码补丁模块"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/instructions/check.rs",
-            "crates/cowork-core/src/tools/validation_tools.rs"
-          ],
-          "description": "最小质量验证模块",
-          "importance": 7.0,
-          "key_functions": [
-            "结构完整性检查",
-            "基础验证",
-            "问题检测"
-          ],
-          "name": "质量检查模块"
-        }
-      ]
-    },
-    {
-      "code_paths": [
-        "crates/cowork-core/src/instructions/delivery.rs",
-        "crates/cowork-core/src/instructions/modify_delivery.rs",
-        "crates/cowork-core/src/tools/artifact_tools.rs"
-      ],
-      "complexity": 6.0,
-      "description": "负责项目交付验证、报告生成、文档管理和变更报告",
-      "domain_type": "核心业务域",
-      "importance": 8.0,
-      "name": "交付管理域",
-      "sub_modules": [
-        {
-          "code_paths": [
-            "crates/cowork-core/src/instructions/delivery.rs",
-            "crates/cowork-core/src/tools/artifact_tools.rs"
-          ],
-          "description": "项目交付验证和报告生成模块",
-          "importance": 8.0,
-          "key_functions": [
-            "交付验证",
-            "报告生成",
-            "文档保存",
-            "完整性检查"
-          ],
-          "name": "交付代理模块"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/instructions/modify_delivery.rs",
-            "crates/cowork-core/src/tools/artifact_tools.rs"
-          ],
-          "description": "变更报告生成模块",
-          "importance": 7.0,
-          "key_functions": [
-            "变更分析",
-            "报告生成",
-            "修改文档化",
-            "会话跟踪"
-          ],
-          "name": "修改交付模块"
-        }
-      ]
-    },
-    {
-      "code_paths": [
-        "crates/cowork-core/src/pipeline/mod.rs",
-        "crates/cowork-core/src/tools/goto_stage_tool.rs"
-      ],
-      "complexity": 8.0,
-      "description": "负责工作流编排、管道管理、阶段控制和流程恢复",
-      "domain_type": "编排协调域",
-      "importance": 8.0,
-      "name": "编排管理域",
-      "sub_modules": [
         {
           "code_paths": [
             "crates/cowork-core/src/pipeline/mod.rs"
           ],
-          "description": "工作流管道编排模块",
-          "importance": 9.0,
+          "description": "定义并执行不同阶段组合的开发流程（如 full_pipeline、modify_pipeline、resume_pipeline），是流程自动化的核心控制器",
+          "importance": 10.0,
           "key_functions": [
-            "管道创建",
-            "阶段检测",
-            "条件工作流组装",
-            "流程管理"
+            "full_pipeline",
+            "modify_pipeline",
+            "resume_pipeline",
+            "create_pipeline"
           ],
-          "name": "管道编排器"
+          "name": "流水线编排"
+        }
+      ]
+    },
+    {
+      "code_paths": [
+        "crates/cowork-core/src/instructions/mod.rs",
+        "crates/cowork-core/src/instructions/idea.rs",
+        "crates/cowork-core/src/instructions/prd.rs",
+        "crates/cowork-core/src/instructions/design.rs",
+        "crates/cowork-core/src/instructions/plan.rs",
+        "crates/cowork-core/src/instructions/coding.rs",
+        "crates/cowork-core/src/instructions/check.rs",
+        "crates/cowork-core/src/instructions/delivery.rs",
+        "crates/cowork-core/src/instructions/modify.rs",
+        "crates/cowork-core/src/instructions/code_patch.rs",
+        "crates/cowork-core/src/instructions/modify_delivery.rs"
+      ],
+      "complexity": 9.0,
+      "description": "定义所有智能体的行为逻辑与决策规则。该域包含10个独立的指令模块，每个模块为一个智能体（如IdeaAgent、PRD Actor）提供详细的提示词（prompt）模板，规定其角色、任务、输出格式、可用工具与终止条件。该域是系统智能的核心，决定了AI如何理解任务、执行工作与自我校验。",
+      "domain_type": "Core Business Domain",
+      "importance": 10.0,
+      "name": "智能体指令域",
+      "sub_modules": [
+        {
+          "code_paths": [
+            "crates/cowork-core/src/instructions/idea.rs",
+            "crates/cowork-core/src/instructions/prd.rs",
+            "crates/cowork-core/src/instructions/design.rs",
+            "crates/cowork-core/src/instructions/plan.rs",
+            "crates/cowork-core/src/instructions/coding.rs",
+            "crates/cowork-core/src/instructions/check.rs",
+            "crates/cowork-core/src/instructions/delivery.rs",
+            "crates/cowork-core/src/instructions/modify.rs",
+            "crates/cowork-core/src/instructions/code_patch.rs",
+            "crates/cowork-core/src/instructions/modify_delivery.rs"
+          ],
+          "description": "每个指令文件定义一个或一组智能体（Actor-Critic）的完整工作流程与约束",
+          "importance": 10.0,
+          "key_functions": [
+            "IDEA_AGENT_INSTRUCTION",
+            "PRD_ACTOR_INSTRUCTION",
+            "DESIGN_ACTOR_INSTRUCTION",
+            "PLAN_ACTOR_INSTRUCTION",
+            "CODING_ACTOR_INSTRUCTION",
+            "CHECK_AGENT_INSTRUCTION",
+            "DELIVERY_AGENT_INSTRUCTION",
+            "MODIFY_TRIAGE_INSTRUCTION",
+            "CODE_PATCH_INSTRUCTION",
+            "MODIFY_DELIVERY_INSTRUCTION"
+          ],
+          "name": "智能体模板"
         },
         {
           "code_paths": [
-            "crates/cowork-core/src/tools/goto_stage_tool.rs"
+            "crates/cowork-core/src/instructions/mod.rs"
           ],
-          "description": "阶段跳转和流程恢复模块",
-          "importance": 7.0,
+          "description": "通过 mod.rs 文件统一暴露所有指令模块，为智能体引擎提供便捷访问接口",
+          "importance": 8.0,
           "key_functions": [
-            "阶段验证",
-            "会话管理",
-            "重启信息更新",
-            "元数据操作"
+            "re-exports"
           ],
-          "name": "阶段控制模块"
+          "name": "指令聚合"
         }
       ]
     },
     {
       "code_paths": [
         "crates/cowork-core/src/agents/mod.rs",
-        "crates/cowork-core/src/agents/hitl.rs",
-        "crates/cowork-core/src/instructions/mod.rs"
+        "crates/cowork-core/src/agents/hitl.rs"
       ],
-      "complexity": 7.0,
-      "description": "负责智能代理的创建、管理、错误恢复和指令模板管理",
-      "domain_type": "代理管理域",
-      "importance": 8.0,
-      "name": "代理管理域",
+      "complexity": 8.0,
+      "description": "负责实例化、调用与管理智能体的运行时行为。该域通过 agent/mod.rs 构建 LLM Agent 实例，并通过 hitl.rs 实现容错与人机交互的封装。其核心价值在于将静态指令转化为动态执行流，并通过 ResilientAgent 实现关键错误的自动恢复，确保流程鲁棒性。",
+      "domain_type": "Core Business Domain",
+      "importance": 9.0,
+      "name": "智能体执行域",
       "sub_modules": [
         {
           "code_paths": [
             "crates/cowork-core/src/agents/mod.rs"
           ],
-          "description": "代理工厂和生命周期管理模块",
-          "importance": 8.0,
+          "description": "定义创建各类智能体（包括Actor-Critic对）的工厂函数，封装LLM客户端与工具绑定逻辑",
+          "importance": 9.0,
           "key_functions": [
-            "代理创建",
-            "流程编排",
-            "生命周期管理",
-            "错误处理"
+            "build_idea_agent",
+            "build_prd_agent",
+            "build_design_agent",
+            "build_plan_agent",
+            "build_coding_agent",
+            "build_check_agent",
+            "build_delivery_agent"
           ],
-          "name": "代理工厂模块"
+          "name": "智能体构建器"
         },
         {
           "code_paths": [
             "crates/cowork-core/src/agents/hitl.rs"
           ],
-          "description": "人类参与循环错误恢复模块",
-          "importance": 7.0,
+          "description": "封装 ResilientAgent，拦截智能体执行中的失败，提供重试、引导或中止的恢复选项，是HITL机制的核心实现",
+          "importance": 9.0,
           "key_functions": [
-            "错误拦截",
-            "用户干预",
-            "恢复选项",
-            "流处理包装"
+            "ResilientAgent",
+            "ResilientStream"
           ],
-          "name": "HITL恢复模块"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/instructions/mod.rs"
-          ],
-          "description": "指令模板聚合和管理模块",
-          "importance": 6.0,
-          "key_functions": [
-            "指令聚合",
-            "统一访问",
-            "模块组织"
-          ],
-          "name": "指令管理模块"
+          "name": "人机交互封装"
         }
       ]
     },
@@ -572,100 +512,156 @@ Provides high-level domain division, module relationships, and core business pro
       "code_paths": [
         "crates/cowork-core/src/tools/mod.rs",
         "crates/cowork-core/src/tools/file_tools.rs",
-        "crates/cowork-core/src/tools/control_tools.rs"
+        "crates/cowork-core/src/tools/validation_tools.rs",
+        "crates/cowork-core/src/tools/hitl_content_tools.rs",
+        "crates/cowork-core/src/tools/idea_tools.rs",
+        "crates/cowork-core/src/tools/data_tools.rs",
+        "crates/cowork-core/src/tools/hitl_tools.rs",
+        "crates/cowork-core/src/tools/goto_stage_tool.rs",
+        "crates/cowork-core/src/tools/modify_tools.rs",
+        "crates/cowork-core/src/tools/control_tools.rs",
+        "crates/cowork-core/src/tools/artifact_tools.rs"
       ],
-      "complexity": 6.0,
-      "description": "提供各类功能工具，包括文件操作、用户交互、数据验证和内容管理",
-      "domain_type": "工具支持域",
-      "importance": 7.0,
-      "name": "工具支持域",
+      "complexity": 8.0,
+      "description": "提供智能体执行所需的具体操作能力。该域包含11个工具模块，每个工具封装一个原子化操作（如读写文件、验证数据、保存报告、获取反馈），通过统一的 Tool trait 接口被智能体调用。其核心价值在于将复杂操作标准化、安全化，使智能体无需关心底层实现细节。",
+      "domain_type": "Tool Support Domain",
+      "importance": 9.0,
+      "name": "工具执行域",
       "sub_modules": [
         {
           "code_paths": [
             "crates/cowork-core/src/tools/file_tools.rs"
           ],
-          "description": "安全文件操作工具模块",
+          "description": "提供安全的文件读写、目录遍历与命令执行能力，严格限制路径范围，防止越权访问",
           "importance": 8.0,
           "key_functions": [
-            "文件列表",
-            "文件读写",
-            "命令执行",
-            "路径安全验证"
+            "ListFilesTool",
+            "ReadFileTool",
+            "WriteFileTool",
+            "RunCommandTool"
           ],
-          "name": "文件工具模块"
+          "name": "文件操作工具"
         },
         {
           "code_paths": [
-            "crates/cowork-core/src/tools/control_tools.rs",
-            "crates/cowork-core/src/tools/hitl_tools.rs"
-          ],
-          "description": "用户交互和控制工具模块",
-          "importance": 7.0,
-          "key_functions": [
-            "反馈收集",
-            "用户查询",
-            "内容评审",
-            "交互处理"
-          ],
-          "name": "控制工具模块"
-        },
-        {
-          "code_paths": [
-            "crates/cowork-core/src/tools/validation_tools.rs",
             "crates/cowork-core/src/tools/data_tools.rs"
           ],
-          "description": "数据验证和管理工具模块",
-          "importance": 7.0,
+          "description": "提供对需求、设计、计划等结构化数据的增删改查能力，依赖 data 模块的模型进行序列化",
+          "importance": 9.0,
           "key_functions": [
-            "数据验证",
-            "格式检查",
-            "覆盖率分析",
-            "依赖检测"
+            "SaveRequirementsTool",
+            "LoadRequirementsTool",
+            "SaveImplementationPlanTool",
+            "DeleteTaskTool"
           ],
-          "name": "验证工具模块"
+          "name": "数据操作工具"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/tools/validation_tools.rs"
+          ],
+          "description": "提供数据格式、特征覆盖、任务依赖等质量验证能力，确保开发产物符合预期结构",
+          "importance": 8.0,
+          "key_functions": [
+            "CheckDataFormatTool",
+            "CheckFeatureCoverageTool",
+            "CheckTaskDependenciesTool"
+          ],
+          "name": "验证工具"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/tools/hitl_content_tools.rs",
+            "crates/cowork-core/src/tools/hitl_tools.rs",
+            "crates/cowork-core/src/tools/control_tools.rs"
+          ],
+          "description": "提供与用户交互的界面，支持内容编辑、文件审查与反馈收集",
+          "importance": 9.0,
+          "key_functions": [
+            "ReviewAndEditContentTool",
+            "ReviewWithFeedbackContentTool",
+            "ReviewAndEditFileTool",
+            "ReviewWithFeedbackTool",
+            "ProvideFeedbackTool",
+            "RequestReplanningTool",
+            "AskUserTool"
+          ],
+          "name": "HITL交互工具"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/tools/goto_stage_tool.rs",
+            "crates/cowork-core/src/tools/modify_tools.rs",
+            "crates/cowork-core/src/tools/artifact_tools.rs"
+          ],
+          "description": "提供会话状态管理能力，如跳转到指定阶段、保存/加载变更请求与交付报告",
+          "importance": 8.0,
+          "key_functions": [
+            "GotoStageTool",
+            "SaveChangeRequestTool",
+            "LoadChangeRequestTool",
+            "SaveDeliveryReportTool",
+            "SavePrdDocTool",
+            "SaveDesignDocTool",
+            "LoadFeedbackHistoryTool"
+          ],
+          "name": "会话控制工具"
         }
       ]
     },
     {
       "code_paths": [
         "crates/cowork-core/src/storage/mod.rs",
+        "crates/cowork-core/src/data/mod.rs",
         "crates/cowork-core/src/data/models.rs",
-        "crates/cowork-core/src/data/mod.rs"
+        "crates/cowork-core/src/data/schemas.rs",
+        "crates/cowork-core/src/data/schemas/validation.rs"
       ],
       "complexity": 7.0,
-      "description": "负责数据持久化、会话管理、模型定义和存储架构",
-      "domain_type": "数据存储域",
-      "importance": 7.0,
-      "name": "数据存储域",
+      "description": "负责所有开发产物与会话状态的持久化管理。该域以会话为单位，在项目根目录下创建 .cowork 目录，使用JSON文件存储模型数据、配置、反馈历史与中间产物。其核心价值在于实现开发流程的可恢复性、可追溯性与状态隔离，是支持增量修改与历史回溯的基石。",
+      "domain_type": "Infrastructure Domain",
+      "importance": 9.0,
+      "name": "持久化存储域",
       "sub_modules": [
         {
           "code_paths": [
             "crates/cowork-core/src/storage/mod.rs"
           ],
-          "description": "会话范围文件存储模块",
-          "importance": 8.0,
+          "description": "管理 .cowork/sessions/<id>/ 目录结构，负责创建、复制、加载会话目录与元数据",
+          "importance": 9.0,
           "key_functions": [
-            "CRUD操作",
-            "会话管理",
-            "文件存储",
-            "事务完整性"
+            "create_session_dir",
+            "load_session_metadata",
+            "save_session_metadata",
+            "copy_session_state"
           ],
-          "name": "存储引擎模块"
+          "name": "会话存储"
         },
         {
           "code_paths": [
-            "crates/cowork-core/src/data/models.rs",
-            "crates/cowork-core/src/data/mod.rs"
+            "crates/cowork-core/src/data/models.rs"
           ],
-          "description": "数据模型定义和管理模块",
-          "importance": 7.0,
+          "description": "定义所有结构化数据的 Rust 结构体（如 Requirement、Feature、DesignComponent、Task），支持 Serde 序列化",
+          "importance": 9.0,
           "key_functions": [
-            "模型定义",
-            "序列化",
-            "时间戳跟踪",
-            "架构支持"
+            "Requirement",
+            "Feature",
+            "DesignComponent",
+            "ImplementationTask",
+            "SessionMetadata",
+            "ChangeRequest"
           ],
-          "name": "数据模型模块"
+          "name": "数据模型"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/data/schemas.rs",
+            "crates/cowork-core/src/data/schemas/validation.rs"
+          ],
+          "description": "定义JSON Schema验证规则，用于验证存储数据的结构完整性（当前为占位符）",
+          "importance": 5.0,
+          "key_functions": [],
+          "name": "数据模式"
         }
       ]
     },
@@ -675,153 +671,144 @@ Provides high-level domain division, module relationships, and core business pro
         "crates/cowork-core/src/llm/config.rs",
         "crates/cowork-core/src/llm/rate_limiter.rs"
       ],
-      "complexity": 5.0,
-      "description": "负责大语言模型集成、配置管理和API调用优化",
-      "domain_type": "基础设施域",
-      "importance": 6.0,
+      "complexity": 6.0,
+      "description": "负责与大语言模型服务的对接与优化。该域通过配置管理与速率限制中间件，确保LLM调用的稳定性与合规性。其核心价值在于屏蔽底层LLM API的差异，提供统一、安全、可控的推理接口。",
+      "domain_type": "Infrastructure Domain",
+      "importance": 7.0,
       "name": "LLM集成域",
       "sub_modules": [
         {
           "code_paths": [
             "crates/cowork-core/src/llm/config.rs"
           ],
-          "description": "LLM配置管理模块",
-          "importance": 6.0,
+          "description": "加载并解析配置文件与环境变量，创建OpenAI客户端实例，支持自定义API端点与认证",
+          "importance": 8.0,
           "key_functions": [
-            "配置加载",
-            "环境变量管理",
-            "客户端创建",
-            "错误处理"
+            "load_llm_config",
+            "create_llm_client"
           ],
-          "name": "配置管理模块"
+          "name": "LLM配置"
         },
         {
           "code_paths": [
             "crates/cowork-core/src/llm/rate_limiter.rs"
           ],
-          "description": "API速率限制中间件模块",
-          "importance": 5.0,
+          "description": "实现对LLM API调用的延迟控制，防止超出速率限制，提升系统稳定性",
+          "importance": 7.0,
           "key_functions": [
-            "速率限制",
-            "延迟控制",
-            "API调用包装",
-            "流量管理"
+            "RateLimiter"
           ],
-          "name": "速率限制模块"
+          "name": "速率限制"
         }
       ]
     },
     {
       "code_paths": [
-        "crates/cowork-cli/src/main.rs"
+        "crates/cowork-core/src/lib.rs",
+        "crates/cowork-core/src/instructions/mod.rs",
+        "crates/cowork-core/src/tools/mod.rs",
+        "crates/cowork-core/src/llm/mod.rs",
+        "crates/cowork-core/src/storage/mod.rs",
+        "crates/cowork-core/src/data/mod.rs"
       ],
-      "complexity": 4.0,
-      "description": "提供命令行界面，作为系统的主要用户交互入口",
-      "domain_type": "应用接口域",
-      "importance": 6.0,
-      "name": "CLI接口域",
+      "complexity": 3.0,
+      "description": "作为Rust模块系统的组织层，通过 mod.rs 文件统一暴露各子模块的接口，降低外部依赖的复杂性。该域不包含业务逻辑，仅作为架构的组织与封装层，提升代码可读性与模块化程度。",
+      "domain_type": "Tool Support Domain",
+      "importance": 5.0,
+      "name": "模块聚合域",
       "sub_modules": [
         {
           "code_paths": [
-            "crates/cowork-cli/src/main.rs"
+            "crates/cowork-core/src/lib.rs"
           ],
-          "description": "命令行界面主入口模块",
+          "description": "cowork-core 的根模块，聚合所有子模块，为外部提供统一入口",
           "importance": 6.0,
           "key_functions": [
-            "命令解析",
-            "会话管理",
-            "管道协调",
-            "状态跟踪"
+            "re-exports"
           ],
-          "name": "CLI主模块"
+          "name": "核心库聚合"
+        },
+        {
+          "code_paths": [
+            "crates/cowork-core/src/instructions/mod.rs",
+            "crates/cowork-core/src/tools/mod.rs",
+            "crates/cowork-core/src/llm/mod.rs",
+            "crates/cowork-core/src/storage/mod.rs",
+            "crates/cowork-core/src/data/mod.rs"
+          ],
+          "description": "各功能域的 mod.rs 文件，用于聚合内部子模块，提供清晰的模块边界",
+          "importance": 5.0,
+          "key_functions": [
+            "re-exports"
+          ],
+          "name": "子模块聚合"
         }
       ]
     }
   ],
   "domain_relations": [
     {
-      "description": "CLI接口域通过调用编排管理域来启动和管理整个软件开发工作流",
-      "from_domain": "CLI接口域",
-      "relation_type": "服务调用",
+      "description": "流水线编排模块根据流程类型，调用智能体指令域中对应的指令模板来初始化智能体，是流程驱动的核心依赖",
+      "from_domain": "入口与编排域",
+      "relation_type": "Service Call",
       "strength": 9.0,
-      "to_domain": "编排管理域"
+      "to_domain": "智能体指令域"
     },
     {
-      "description": "编排管理域依赖代理管理域来创建和管理各个开发阶段的智能代理实例",
-      "from_domain": "编排管理域",
-      "relation_type": "服务调用",
+      "description": "流水线编排模块通过智能体执行域的构建器函数创建智能体实例，并启动其执行流程",
+      "from_domain": "入口与编排域",
+      "relation_type": "Service Call",
       "strength": 9.0,
-      "to_domain": "代理管理域"
+      "to_domain": "智能体执行域"
     },
     {
-      "description": "代理管理域通过指令模板调用各个业务域的功能模块执行具体开发任务",
-      "from_domain": "代理管理域",
-      "relation_type": "服务调用",
+      "description": "智能体在执行过程中，通过调用工具执行域中的工具（Tool trait）来完成文件读写、数据操作、用户交互等原子任务",
+      "from_domain": "智能体执行域",
+      "relation_type": "Service Call",
+      "strength": 9.0,
+      "to_domain": "工具执行域"
+    },
+    {
+      "description": "工具执行域中的所有数据操作工具（如data_tools、artifact_tools）均依赖持久化存储域的数据模型与会话存储，用于序列化与持久化数据",
+      "from_domain": "工具执行域",
+      "relation_type": "Data Dependency",
       "strength": 8.0,
-      "to_domain": "需求管理域"
+      "to_domain": "持久化存储域"
     },
     {
-      "description": "需求管理域为设计管理域提供结构化的产品需求作为设计输入",
-      "from_domain": "需求管理域",
-      "relation_type": "数据依赖",
-      "strength": 9.0,
-      "to_domain": "设计管理域"
-    },
-    {
-      "description": "设计管理域为规划管理域提供系统架构设计作为任务规划的基础",
-      "from_domain": "设计管理域",
-      "relation_type": "数据依赖",
-      "strength": 9.0,
-      "to_domain": "规划管理域"
-    },
-    {
-      "description": "规划管理域为编码实施域提供详细的实现任务和依赖关系",
-      "from_domain": "规划管理域",
-      "relation_type": "数据依赖",
-      "strength": 9.0,
-      "to_domain": "编码实施域"
-    },
-    {
-      "description": "编码实施域为交付管理域提供实现的代码文件和相关元数据",
-      "from_domain": "编码实施域",
-      "relation_type": "数据依赖",
-      "strength": 9.0,
-      "to_domain": "交付管理域"
-    },
-    {
-      "description": "所有业务域都依赖工具支持域提供各种功能工具来执行具体操作",
-      "from_domain": "需求管理域",
-      "relation_type": "工具依赖",
+      "description": "智能体执行域在构建智能体时，依赖LLM集成域提供的配置与速率限制LLM客户端",
+      "from_domain": "智能体执行域",
+      "relation_type": "Service Call",
       "strength": 8.0,
-      "to_domain": "工具支持域"
-    },
-    {
-      "description": "工具支持域依赖数据存储域进行数据持久化和会话状态管理",
-      "from_domain": "工具支持域",
-      "relation_type": "数据依赖",
-      "strength": 7.0,
-      "to_domain": "数据存储域"
-    },
-    {
-      "description": "代理管理域依赖LLM集成域提供智能决策和代码生成能力",
-      "from_domain": "代理管理域",
-      "relation_type": "服务调用",
-      "strength": 7.0,
       "to_domain": "LLM集成域"
     },
     {
-      "description": "变更管理流程涉及需求、设计、规划和编码多个域的协同工作",
-      "from_domain": "变更管理域",
-      "relation_type": "流程协作",
-      "strength": 8.0,
-      "to_domain": "需求管理域"
+      "description": "LLM配置模块加载的配置文件（config.toml）存储于项目根目录，与会话存储共享文件系统上下文",
+      "from_domain": "LLM集成域",
+      "relation_type": "Data Dependency",
+      "strength": 6.0,
+      "to_domain": "持久化存储域"
     },
     {
-      "description": "流程恢复功能需要编排管理域与代理管理域的紧密协作",
-      "from_domain": "编排管理域",
-      "relation_type": "流程协作",
-      "strength": 8.0,
-      "to_domain": "代理管理域"
+      "description": "入口模块在启动流程前，需依赖持久化存储域创建或加载会话目录，以确保上下文隔离",
+      "from_domain": "入口与编排域",
+      "relation_type": "Data Dependency",
+      "strength": 7.0,
+      "to_domain": "持久化存储域"
+    },
+    {
+      "description": "工具执行域通过模块聚合域的mod.rs文件对外暴露工具接口，便于被其他域调用",
+      "from_domain": "工具执行域",
+      "relation_type": "Tool Support",
+      "strength": 6.0,
+      "to_domain": "模块聚合域"
+    },
+    {
+      "description": "智能体指令域通过模块聚合域的mod.rs文件统一暴露指令模板，供智能体执行域导入",
+      "from_domain": "智能体指令域",
+      "relation_type": "Tool Support",
+      "strength": 6.0,
+      "to_domain": "模块聚合域"
     }
   ]
 }
@@ -833,25 +820,25 @@ Contains static analysis results of the codebase and business process analysis.
 ```json
 {
   "main_workflow": {
-    "description": "完整的软件开发生命周期流程，从创意采集到项目交付的全自动化处理。该流程采用Actor-Critic模式结合Human-in-the-Loop机制，确保每个阶段的质量控制和用户参与。",
-    "flowchart_mermaid": "graph TD\n    A[用户创意输入] --> B[创意代理处理]\n    B --> C[PRD生成和验证]\n    C --> D[系统架构设计]\n    D --> E[实现任务规划]\n    E --> F[代码实现和质量检查]\n    F --> G[项目交付验证]\n    G --> H[交付报告生成]\n    \n    C --> C1[用户评审]\n    D --> D1[架构评审]\n    E --> E1[计划评审]\n    \n    C1 --> C\n    D1 --> D\n    E1 --> E\n    \n    style A fill:#e1f5fe\n    style H fill:#c8e6c9",
-    "name": "新项目开发流程"
+    "description": "从用户输入初始想法开始，依次触发Idea、PRD、Design、Plan、Coding、Check、Delivery七个智能体阶段，完成从需求构思到交付报告的完整开发闭环。每个阶段均包含智能体执行与HITL审核，确保输出符合简洁性原则。流程结束时生成完整的交付文档与代码包。",
+    "flowchart_mermaid": "graph TD\n    A[用户执行cowork-cli create命令] --> B[解析CLI参数并初始化会话]\n    B --> C[IdeaAgent捕获并结构化用户想法]\n    C --> D[PRD Actor-Critic循环生成需求文档]\n    D --> E[Design Actor-Critic循环生成架构设计]\n    E --> F[Plan Actor-Critic循环生成任务清单]\n    F --> G[Coding Actor-Critic循环实现代码]\n    G --> H[文件工具读写代码文件]\n    H --> I[CheckAgent验证代码结构完整性]\n    I --> J[DeliveryAgent生成交付报告]\n    J --> K[保存交付产物至会话目录]\n    \n    C --> C1{HITL审核}\n    D --> D1{HITL审核}\n    E --> E1{HITL审核}\n    F --> F1{HITL审核}\n    G --> G1{HITL审核}\n    \n    C1 -->|通过| D\n    D1 -->|通过| E\n    E1 -->|通过| F\n    F1 -->|通过| G\n    G1 -->|通过| I\n    \n    C1 -->|需修改| C\n    D1 -->|需修改| D\n    E1 -->|需修改| E\n    F1 -->|需修改| F\n    G1 -->|需修改| G",
+    "name": "全新项目创建流程"
   },
   "other_important_workflows": [
     {
-      "description": "处理现有项目的增量修改请求，包括变更分析、影响评估、代码修改和变更报告生成。支持精确的变更范围控制和风险评估。",
-      "flowchart_mermaid": "graph TD\n    A[变更请求输入] --> B[变更分析代理]\n    B --> C[范围确定和风险评估]\n    C --> D[代码补丁实施]\n    D --> E[修改验证]\n    E --> F[变更报告生成]\n    \n    C --> C1[影响分析]\n    C1 --> C2[接受标准提取]\n    C2 --> C\n    \n    style A fill:#fff3e0\n    style F fill:#ffecb3",
-      "name": "项目修改流程"
+      "description": "在已有项目基础上，根据用户变更请求（ChangeRequest）触发修改流程。系统先通过Modify Triage Agent分析变更范围，再决定是否需要回退至PRD、Design、Plan或直接进入Coding阶段进行代码修补，最终由Modify Delivery Agent生成变更报告。流程支持任意阶段的回溯与重启动。",
+      "flowchart_mermaid": "graph TD\n    A[用户执行cowork-cli modify命令] --> B[加载当前会话状态与历史数据]\n    B --> C[Modify Triage Agent分析变更范围]\n    C --> D{变更影响分析}\n    D -->|影响PRD| E[回退至PRD阶段重新生成需求]\n    D -->|影响Design| F[回退至Design阶段重新设计]\n    D -->|影响Plan| G[回退至Plan阶段重新规划]\n    D -->|仅影响代码| H[直接进入代码修补阶段]\n    \n    E --> I[执行PRD到Delivery完整流程]\n    F --> J[执行Design到Delivery完整流程]\n    G --> K[执行Plan到Delivery完整流程]\n    H --> L[Coding Agent执行代码修补]\n    \n    I --> M[Modify Delivery Agent生成变更报告]\n    J --> M\n    K --> M\n    L --> M\n    \n    M --> N[保存变更报告至会话目录]",
+      "name": "增量修改流程"
     },
     {
-      "description": "工作流恢复和阶段跳转机制，支持从特定阶段重新开始工作流，用于错误恢复和流程调整。提供灵活的流程控制能力。",
-      "flowchart_mermaid": "graph TD\n    A[流程中断或错误] --> B[阶段跳转工具]\n    B --> C[阶段验证]\n    C --> D[会话元数据加载]\n    D --> E[工作流管道重新组装]\n    E --> F[代理实例重新创建]\n    F --> G[从指定阶段继续]\n    \n    C --> C1[阶段有效性检查]\n    D --> D1[状态恢复]\n    \n    style A fill:#fce4ec\n    style G fill:#e8f5e8",
-      "name": "流程恢复流程"
+      "description": "允许用户在任意开发阶段中断后，从指定节点（如PRD、Design、Plan）重新开始，跳过已完成阶段。系统通过加载历史会话数据恢复上下文，确保流程连续性。该流程是支持增量修改与敏捷迭代的核心支撑机制。",
+      "flowchart_mermaid": "graph TD\n    A[用户执行cowork-cli resume命令] --> B[解析目标阶段参数]\n    B --> C[验证阶段有效性]\n    C --> D[加载会话元数据与中间产物]\n    D --> E[构建从指定阶段开始的子流程]\n    E --> F[启动目标阶段及后续智能体流水线]\n    F --> G[持续更新状态与文件]\n    G --> H[更新会话元数据标记执行阶段]",
+      "name": "阶段恢复流程"
     },
     {
-      "description": "关键决策点的用户参与流程，确保重要决策的质量和准确性。提供编辑、反馈和审批等多种交互方式。",
-      "flowchart_mermaid": "graph TD\n    A[生成内容] --> B[用户审核触发]\n    B --> C{审核选项}\n    C --> D[编辑模式]\n    C --> E[通过模式]\n    C --> F[反馈模式]\n    \n    D --> D1[文本编辑器打开]\n    D1 --> D2[用户编辑]\n    D2 --> G[内容更新]\n    \n    E --> G\n    \n    F --> F1[反馈输入]\n    F1 --> G\n    \n    G --> H[继续流程]\n    \n    style B fill:#fff9c4\n    style H fill:#e8f5e8",
-      "name": "Human-in-the-Loop审核流程"
+      "description": "在智能体执行过程中，当遇到不确定性、错误或需要决策时，系统通过HITL工具主动请求用户介入。支持内容编辑、文件审查、提供反馈、请求重规划等多种交互方式，确保开发过程可控且符合用户意图。",
+      "flowchart_mermaid": "graph TD\n    A[智能体检测到错误或需决策] --> B[调用ResilientAgent包装器]\n    B --> C[调用HITL交互工具请求用户介入]\n    C --> D{用户选择操作}\n    D -->|编辑内容| E[ReviewAndEditContentTool]\n    D -->|提供反馈| F[ProvideFeedbackTool]\n    D -->|请求重规划| G[RequestReplanningTool]\n    \n    E --> H[收集用户输入并持久化]\n    F --> H\n    G --> H\n    \n    H --> I{ResilientAgent决策}\n    I -->|重试| J[重置计数器并重试智能体]\n    I -->|继续| K[继续执行后续流程]\n    I -->|中止| L[中止当前流程]\n    \n    J --> B\n    K --> M[流程继续]\n    L --> N[流程终止]",
+      "name": "人机交互反馈流程"
     }
   ]
 }
@@ -1198,8 +1185,8 @@ Code analysis results from preprocessing phase, including definitions of functio
   },
   {
     "code_dossier": {
-      "code_purpose": "agent",
-      "description": "Design Agent instructions implementing Actor-Critic pattern with Human-in-the-Loop for system architecture design workflow",
+      "code_purpose": "config",
+      "description": "Configuration file containing instructions for Design Actor and Design Critic roles in a human-in-the-loop (HITL) design system",
       "file_path": "crates/cowork-core/src/instructions/design.rs",
       "functions": [
         "DESIGN_ACTOR_INSTRUCTION",
@@ -1208,105 +1195,23 @@ Code analysis results from preprocessing phase, including definitions of functio
       "importance_score": 0.8,
       "interfaces": [],
       "name": "design.rs",
-      "source_summary": "// Design Agent instructions - Actor and Critic (WITH HITL)\n\npub const DESIGN_ACTOR_INSTRUCTION: &str = r#\"\n# Your Role\nYou are Design Actor. You MUST create system architecture components WITH user feedback and save design document.\n\n# CRITICAL: You MUST complete ALL steps below. Do NOT skip any step!\n\n## Step 1: Load Requirements (MANDATORY)\n1. Call `get_requirements()` to read all requirements and features\n2. **STOP** if requirements or features are empty - report error and exit\n3. Analyze requirements to plan 3-6 components\n\n## Step 2: Create Architecture Draft (MANDATORY)\n2. Write a draft architecture outline in markdown:\n   ```markdown\n   # Architecture Draft\n   \n   ## Components (3-6 items)\n   1. COMP-001: [Name] ([Type]) - [Responsibilities]\n      - Technology: [Stack]\n      - Implements: FEAT-001, FEAT-002\n   ...\n\n   ## Technology Stack\n   - Frontend: ...\n   - Backend: ...\n   - Database: ...\n   ```\n   **You MUST create this draft before proceeding!**\n\n## Step 3: User Review (MANDATORY - HITL)\n3. **MUST** call `review_with_feedback_content(title=\"Review Architecture Draft\", content=<draft>, prompt=\"请审查架构草案：edit 编辑 / pass 继续 / 或直接输入修改建议\")`\n4. Handle response:\n   - action=\"edit\": use returned content\n   - action=\"pass\": keep original\n   - action=\"feedback\": revise and optionally review again (max 1 more time)\n\n## Step 4: Create Formal Design (MANDATORY)\n5. For EACH component in finalized draft, **MUST** call `create_design_component(name, component_type, responsibilities, technology, related_features)`\n   **Do NOT skip this step! All components must be created!**\n\n## Step 5: Save Design Document (MANDATORY)\n6. Generate a complete Design Document markdown including:\n   - Architecture overview\n   - All components with full details\n   - Technology stack explanation\n   - Component relationships (mermaid diagram optional)\n   - Data flow\n7. **MUST** call `save_design_doc(content=<design_markdown>)`\n   **This is CRITICAL - if you don't save, the design will be lost!**\n\n## Step 6: Verify (MANDATORY)\n8. Call `get_design()` to verify all components were created\n9. Confirm all components exist, then report success\n\n# Tools Available\n- get_requirements() - Load requirements and features\n- get_design() - Verify created components\n- review_with_feedback_content(title, content, prompt) - Get user feedback\n- create_design_component(name, component_type, responsibilities, technology, related_features) - Create ONE component\n- save_design_doc(content) - Save design markdown document\n\n# Component Types\n- frontend_component, backend_service, database, api_gateway, other\n\n# CRITICAL RULES\n1. STOP if get_requirements() returns empty arrays\n2. You MUST call review_with_feedback_content in Step 3\n3. You MUST call create_design_component for EACH component\n4. You MUST call save_design_doc in Step 5\n5. Do NOT skip steps or say \"done\" prematurely\n\"#;\n\npub const DESIGN_CRITIC_INSTRUCTION: &str = r#\"\n# Your Role  \nYou are Design Critic. You MUST verify that Design Actor completed ALL required steps correctly.\n\n# CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!\n\n## Mandatory Checks (You MUST perform ALL of these)\n\n### Check 1: Verify Design Data Exists\n1. Call `get_design()` to load all components\n2. **FAIL** if components array is empty\n3. Expected: 2-6 components\n\n### Check 2: Verify Feature Coverage\n4. Call `check_feature_coverage()` to verify all features are mapped to components\n5. **FAIL** if any feature is not covered by at least one component\n\n### Check 3: Verify Artifacts Exist\n6. Call `read_file(path=\"artifacts/design.md\")` to check if Design markdown was saved\n   - The path is relative to session directory\n7. **FAIL** if design.md does not exist or is empty\n\n### Check 4: Data Quality Assessment\n8. For each component:\n   - Has clear name and type?\n   - Has defined responsibilities?\n   - Has technology stack specified?\n   - Is related to at least one feature?\n9. Technology stack is reasonable and consistent?\n\n### Check 5: Architecture Completeness\n10. All layers covered? (frontend, backend, data, etc.)\n11. Component interactions make sense?\n12. No obvious architectural gaps?\n\n## Response Actions (You MUST follow these rules)\n\n### If ANY check fails:\n1. **MUST** call `provide_feedback(feedback_type=\"missing_data\" or \"incomplete\" or \"architecture_issue\", severity=\"critical\", details=\"<what failed>\", suggested_fix=\"<how to fix>\")`\n2. Clearly state what Actor must redo\n3. **DO NOT** give approval\n\n### If all checks pass:\n1. State: \"✅ Design verification passed: X components documented in design.md, all Y features covered\"\n2. Summary: List component IDs and their types\n\n# Tools Available\n- get_design() - Load and verify components\n- get_requirements() - Check requirements context (optional)\n- check_feature_coverage() - Verify feature mapping\n- read_file(path) - Verify design.md exists (use relative path \"artifacts/design.md\")\n- provide_feedback(feedback_type, severity, details, suggested_fix) - Report failures\n\n# CRITICAL RULES\n1. You MUST check: JSON data + markdown file + feature coverage\n2. Empty components = CRITICAL FAILURE\n3. Missing design.md file = CRITICAL FAILURE\n4. Uncovered features = CRITICAL FAILURE\n5. You are the LAST line of defense - be strict!\n6. If Actor skipped steps, you MUST catch it and report via provide_feedback\n\n# Example Failure Response\n\"❌ Design verification FAILED:\n- Components array is EMPTY (expected 2-6)\n- design.md file does NOT exist\n- Feature coverage check SKIPPED (cannot check without components)\n\nActor did NOT complete the workflow. Calling provide_feedback to block progression.\"\n\"#;\n"
+      "source_summary": "// Design Agent instructions - Actor and Critic (WITH HITL)\n\npub const DESIGN_ACTOR_INSTRUCTION: &str = r#\"\n# Your Role\nYou are Design Actor. You MUST create system architecture components WITH user feedback and save design document.\n\n# CRITICAL PRINCIPLE: SIMPLICITY & MINIMAL ARCHITECTURE\n**The architecture MUST be simple and use minimal components:**\n- ✅ Use simplest tech stack that works (prefer built-in/standard tools)\n- ✅ Minimize number of components (2-4 is ideal, 6 is maximum)\n- ✅ Use monolithic architecture when appropriate (don't over-split)\n- ❌ NO microservices unless explicitly required\n- ❌ NO complex caching layers (Redis/Memcached) unless critical\n- ❌ NO message queues unless explicitly required\n- ❌ NO service mesh, API gateway unless explicitly required\n- ❌ NO separate monitoring/logging infrastructure\n\n**Technology Stack - Keep It Simple:**\n- ✅ GOOD: \"Node.js + Express + SQLite\" or \"Python + Flask + JSON files\"\n- ❌ BAD: \"Node.js + Express + Redis + RabbitMQ + Elasticsearch + Prometheus\"\n- ✅ GOOD: \"Single-page app with vanilla JS\"\n- ❌ BAD: \"React + Redux + Redux-Saga + Webpack + Babel + TypeScript\"\n\n**Examples:**\n- ✅ GOOD: 3 components: Frontend (HTML/JS), Backend (Flask), Data (SQLite)\n- ❌ BAD: 8 components: Web UI, Mobile UI, API Gateway, Auth Service, User Service, Database, Cache, Queue\n\n# CRITICAL: You MUST complete ALL steps below. Do NOT skip any step!\n\n## Step 1: Load Requirements (MANDATORY)\n1. Call `get_requirements()` to read all requirements and features\n2. **STOP** if requirements or features are empty - report error and exit\n3. Analyze requirements to plan 2-4 **SIMPLE** components (avoid over-splitting)\n\n## Step 2: Create Architecture Draft (MANDATORY)\n2. Write a draft architecture outline in markdown:\n   ```markdown\n   # Architecture Draft (SIMPLE & MINIMAL)\n   \n   ## Components (2-4 items - keep it simple!)\n   1. COMP-001: [Name] ([Type]) - [Responsibilities]\n      - Technology: [SIMPLE stack - avoid complexity]\n      - Implements: FEAT-001, FEAT-002\n      - Note: Use built-in features, avoid external dependencies when possible\n   ...\n\n   ## Technology Stack (MINIMAL)\n   - Frontend: [Use simplest approach - vanilla JS, simple HTML, or one framework]\n   - Backend: [Use one language + one framework]\n   - Database: [SQLite, JSON files, or simple DB - avoid complex setups]\n   - NO caching layer (unless critical)\n   - NO message queue (unless critical)\n   - NO microservices (keep monolithic)\n   ```\n   **You MUST create this draft before proceeding!**\n\n## Step 3: User Review (MANDATORY - HITL)\n3. **MUST** call `review_with_feedback_content(title=\"Review Architecture Draft\", content=<draft>, prompt=\"请审查架构草案：edit 编辑 / pass 继续 / 或直接输入修改建议\")`\n4. Handle response:\n   - action=\"edit\": use returned content\n   - action=\"pass\": keep original\n   - action=\"feedback\": revise and optionally review again (max 1 more time)\n\n## Step 4: Create Formal Design (MANDATORY)\n5. For EACH component in finalized draft, **MUST** call `create_design_component(name, component_type, responsibilities, technology, related_features)`\n   **Do NOT skip this step! All components must be created!**\n\n## Step 5: Save Design Document (MANDATORY)\n6. Generate a complete Design Document markdown including:\n   - Architecture overview (emphasize simplicity)\n   - All components with full details (keep tech stack simple)\n   - Technology stack explanation (justify simplicity choices)\n   - Component relationships (mermaid diagram optional)\n   - Data flow (keep simple)\n7. **MUST** call `save_design_doc(content=<design_markdown>)`\n   **This is CRITICAL - if you don't save, the design will be lost!**\n\n## Step 6: Verify (MANDATORY)\n8. Call `get_design()` to verify all components were created\n9. Confirm all components exist, then report success\n\n# Tools Available\n- get_requirements() - Load requirements and features\n- get_design() - Verify created components\n- review_with_feedback_content(title, content, prompt) - Get user feedback\n- create_design_component(name, component_type, responsibilities, technology, related_features) - Create ONE component\n- save_design_doc(content) - Save design markdown document\n\n# Component Types\n- frontend_component, backend_service, database, api_gateway, other\n\n# CRITICAL RULES\n1. SIMPLICITY FIRST: Use minimal components, simplest tech stack\n2. STOP if get_requirements() returns empty arrays\n3. You MUST call review_with_feedback_content in Step 3\n4. You MUST call create_design_component for EACH component\n5. You MUST call save_design_doc in Step 5\n6. Do NOT over-engineer: No microservices, complex caching, message queues unless critical\n7. Do NOT skip steps or say \"done\" prematurely\n\"#;\n\npub const DESIGN_CRITIC_INSTRUCTION: &str = r#\"\n# Your Role  \nYou are Design Critic. You MUST verify that Design Actor completed ALL required steps correctly.\n\n# CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!\n\n# SIMPLICITY CHECK - NEW PRIORITY\nBefore other checks, verify that architecture is SIMPLE and MINIMAL:\n- ❌ REJECT if > 4 components (too complex)\n- ❌ REJECT if you see: microservices, service mesh, complex caching, message queues (unless critical)\n- ❌ REJECT if tech stack is overly complex (multiple frameworks, many dependencies)\n- ✅ APPROVE only SIMPLE, monolithic-friendly architectures\n\n## Mandatory Checks (You MUST perform ALL of these)\n\n### Check 1: Verify Design Data Exists\n1. Call `get_design()` to load all components\n2. **FAIL** if components array is empty\n3. Expected: 2-4 components (SIMPLE architecture)\n4. **FAIL** if > 4 components (over-engineered)\n\n### Check 2: Verify SIMPLICITY (NEW - CRITICAL)\n5. For each component and overall architecture:\n   - ❌ Does it use microservices architecture? → REJECT (unless explicitly required)\n   - ❌ Does it include Redis/Memcached for caching? → REJECT (unless critical)\n   - ❌ Does it include message queue (RabbitMQ/Kafka)? → REJECT (unless critical)\n   - ❌ Does it have separate monitoring/logging infrastructure? → REJECT\n   - ❌ Does tech stack have many frameworks/libraries? → REJECT (keep it simple)\n   - ✅ Is it simple, monolithic, with minimal dependencies? → APPROVE\n\n6. If architecture is too complex:\n   - **MUST** call `provide_feedback(feedback_type=\"architecture_issue\", severity=\"critical\", details=\"Architecture is over-engineered: [list issues]\", suggested_fix=\"Simplify to 2-4 components, use monolithic approach, remove caching/queue layers\")`\n\n### Check 3: Verify Feature Coverage\n7. Call `check_feature_coverage()` to verify all features are mapped to components\n8. **FAIL** if any feature is not covered by at least one component\n\n### Check 4: Verify Artifacts Exist\n9. Call `read_file(path=\"artifacts/design.md\")` to check if Design markdown was saved\n   - The path is relative to session directory\n10. **FAIL** if design.md does not exist or is empty\n\n### Check 5: Data Quality Assessment\n11. For each component:\n   - Has clear name and type?\n   - Has defined responsibilities?\n   - Has SIMPLE technology stack specified (not over-complex)?\n   - Is related to at least one feature?\n12. Technology stack is reasonable, consistent, and SIMPLE?\n\n### Check 6: Architecture Completeness\n13. All layers covered? (frontend, backend, data - keep minimal)\n14. Component interactions make sense?\n15. No obvious architectural gaps?\n16. Architecture is SIMPLE enough to implement easily?\n\n## Response Actions (You MUST follow these rules)\n\n### If ANY check fails:\n1. **MUST** call `provide_feedback(feedback_type=\"missing_data\" or \"incomplete\" or \"architecture_issue\", severity=\"critical\", details=\"<what failed>\", suggested_fix=\"<how to fix>\")`\n2. Clearly state what Actor must redo\n3. **DO NOT** give approval\n\n### If all checks pass:\n1. State: \"✅ Design verification passed: X SIMPLE components documented in design.md, all Y features covered\"\n2. State: \"✅ SIMPLICITY check passed: Monolithic/minimal architecture, simple tech stack\"\n3. Summary: List component IDs and their types\n\n# Tools Available\n- get_design() - Load and verify components\n- get_requirements() - Check requirements context (optional)\n- check_feature_coverage() - Verify feature mapping\n- read_file(path) - Verify design.md exists (use relative path \"artifacts/design.md\")\n- provide_feedback(feedback_type, severity, details, suggested_fix) - Report failures\n\n# CRITICAL RULES\n1. SIMPLICITY FIRST: Reject over-engineered architectures\n2. Max 4 components - more is too complex\n3. You MUST check: JSON data + markdown file + feature coverage + SIMPLICITY\n4. Empty components = CRITICAL FAILURE\n5. Missing design.md file = CRITICAL FAILURE\n6. Uncovered features = CRITICAL FAILURE\n7. Over-engineered architecture (microservices/caching/queues) = CRITICAL FAILURE\n8. You are the LAST line of defense - be strict!\n9. If Actor skipped steps, you MUST catch it and report via provide_feedback\n\n# Example Failure Response - Complexity\n\"❌ Design verification FAILED:\n- Architecture has 7 components (maximum 4 allowed)\n- Includes Redis caching layer (not needed for core functionality)\n- Uses microservices (monolithic would be simpler)\n- Technology stack too complex\n\nCalling provide_feedback to request simplification.\"\n\"#;\n"
     },
     "complexity_metrics": {
-      "cyclomatic_complexity": 10.0,
-      "lines_of_code": 143,
+      "cyclomatic_complexity": 16.0,
+      "lines_of_code": 196,
       "number_of_classes": 0,
       "number_of_functions": 2
     },
-    "dependencies": [
-      {
-        "dependency_type": "function",
-        "is_external": true,
-        "line_number": null,
-        "name": "get_requirements",
-        "path": null,
-        "version": null
-      },
-      {
-        "dependency_type": "function",
-        "is_external": true,
-        "line_number": null,
-        "name": "get_design",
-        "path": null,
-        "version": null
-      },
-      {
-        "dependency_type": "function",
-        "is_external": true,
-        "line_number": null,
-        "name": "review_with_feedback_content",
-        "path": null,
-        "version": null
-      },
-      {
-        "dependency_type": "function",
-        "is_external": true,
-        "line_number": null,
-        "name": "create_design_component",
-        "path": null,
-        "version": null
-      },
-      {
-        "dependency_type": "function",
-        "is_external": true,
-        "line_number": null,
-        "name": "save_design_doc",
-        "path": null,
-        "version": null
-      },
-      {
-        "dependency_type": "function",
-        "is_external": true,
-        "line_number": null,
-        "name": "check_feature_coverage",
-        "path": null,
-        "version": null
-      },
-      {
-        "dependency_type": "function",
-        "is_external": true,
-        "line_number": null,
-        "name": "read_file",
-        "path": null,
-        "version": null
-      },
-      {
-        "dependency_type": "function",
-        "is_external": true,
-        "line_number": null,
-        "name": "provide_feedback",
-        "path": null,
-        "version": null
-      }
-    ],
-    "detailed_description": "This component implements an intelligent design agent using the Actor-Critic pattern with Human-in-the-Loop (HITL) integration. The Design Actor orchestrates the system architecture design workflow by loading requirements, creating architecture drafts, incorporating user feedback, generating formal designs, and saving documentation. The Design Critic serves as a gatekeeper that validates the completeness and quality of the design artifacts created by the Actor, ensuring all mandatory steps are properly executed before allowing progression.",
-    "interfaces": [
-      {
-        "description": "Template defining the Design Actor's workflow with mandatory steps and tool integrations",
-        "interface_type": "instruction_template",
-        "name": "DESIGN_ACTOR_INSTRUCTION",
-        "parameters": [],
-        "return_type": "string",
-        "visibility": "public"
-      },
-      {
-        "description": "Template defining the Design Critic's validation workflow and quality gates",
-        "interface_type": "instruction_template",
-        "name": "DESIGN_CRITIC_INSTRUCTION",
-        "parameters": [],
-        "return_type": "string",
-        "visibility": "public"
-      }
-    ],
+    "dependencies": [],
+    "detailed_description": "This configuration file defines two instruction sets for a collaborative design system. DESIGN_ACTOR_INSTRUCTION provides guidance for creating system architecture components with user feedback, emphasizing simplicity and minimal architecture with a maximum of 4 components. DESIGN_CRITIC_INSTRUCTION serves as a gatekeeper role to verify that the Design Actor completed all required steps correctly, with a strong focus on rejecting over-engineered architectures. Both instructions implement a human-in-the-loop (HITL) approach where user feedback is mandatory during the design review process.",
+    "interfaces": [],
     "responsibilities": [
-      "Orchestrate system architecture design workflow with 6 mandatory steps",
-      "Implement Human-in-the-Loop validation for architecture drafts",
-      "Validate design completeness and feature coverage through critic role",
-      "Ensure design artifacts persistence and verification",
-      "Maintain strict quality gates for architecture deliverables"
+      "Define design workflow instructions for architecture creation",
+      "Enforce simplicity principles in system design",
+      "Implement human-in-the-loop review process",
+      "Provide verification criteria for design quality",
+      "Maintain configuration constants for design system"
     ]
   },
   {
@@ -1341,8 +1246,8 @@ Code analysis results from preprocessing phase, including definitions of functio
   },
   {
     "code_dossier": {
-      "code_purpose": "agent",
-      "description": "Intelligent agent instructions for coding workflow management",
+      "code_purpose": "config",
+      "description": "Configuration file containing instructions for coding agent roles (Actor and Critic) in a collaborative coding system",
       "file_path": "crates/cowork-core/src/instructions/coding.rs",
       "functions": [
         "CODING_ACTOR_INSTRUCTION",
@@ -1351,40 +1256,23 @@ Code analysis results from preprocessing phase, including definitions of functio
       "importance_score": 0.8,
       "interfaces": [],
       "name": "coding.rs",
-      "source_summary": "// Coding Agent instructions - Actor and Critic (SIMPLIFIED VERSION)\n\npub const CODING_ACTOR_INSTRUCTION: &str = r#\"\n# Your Role\nYou are Coding Actor. Implement ALL pending tasks by writing **SIMPLE, CLEAN** code.\n\n# Core Principle: SIMPLICITY\n- **Simple code**: No complex patterns, no over-engineering\n- **Minimal dependencies**: Use built-in features when possible\n- **No tests**: Don't write test files (unless explicitly required)\n- **Clear structure**: Easy to understand, easy to modify\n\n# Workflow - COMPLETE ALL TASKS\n1. Call `get_plan()` to see ALL pending tasks\n2. **Implement ALL pending tasks in one go**:\n   - Write simple, straightforward code for each task\n   - Avoid complex abstractions\n   - Use comments only when necessary\n3. Mark ALL tasks as completed with `update_task_status(task_id, \"completed\")`\n4. **IMPORTANT**: After completing all tasks, your work is done. DO NOT continue.\n\n# Exit Condition\n- When ALL tasks are marked as \"completed\", stop immediately\n- No need to wait for critic review\n\n# Tools\n- get_plan()\n- read_file(path)\n- write_file(path, content)\n- list_files(path)\n- update_task_status(task_id, status)\n- update_feature_status(feature_id, status)\n\n# Code Style - SIMPLE APPROACH\n```\n✅ GOOD (Simple):\nfunction generatePaper(grade, difficulty) {\n  const questions = questionBank.filter(q => \n    q.grade === grade && q.difficulty === difficulty\n  );\n  return questions.slice(0, 10);\n}\n\n❌ BAD (Over-engineered):\nclass PaperGenerationStrategy {\n  constructor(questionRepository, filterChain, paginationService) {...}\n  async generateWithValidation() {...}\n}\n```\n\n**REMEMBER: \n1. Implement ALL tasks at once\n2. Mark all as completed\n3. Stop when done - don't loop!**\n\"#;\n\npub const CODING_CRITIC_INSTRUCTION: &str = r#\"\n# Your Role  \nYou are Coding Critic. Check if code is **TOO COMPLEX** and **ALL TASKS ARE DONE**.\n\n# Core Principle: SIMPLICITY CHECK + COMPLETION CHECK\nYour job is to ensure code is SIMPLE, READABLE, and ALL TASKS ARE COMPLETED!\n\n# Review Criteria\n1. **All tasks completed?** (Check get_plan() - all tasks should be \"completed\")\n2. **Files exist?** (Use list_files() to verify code files were actually created)\n3. **Over-engineered?** (Complex class hierarchies, design patterns → Too complex!)\n4. **Too many files?** (Splitting into too many modules → Provide feedback)\n5. **Readable?** (Easy to understand without deep knowledge)\n\n# Decision Process\n1. Call `get_plan()` to check task status\n2. **If all tasks are completed**: \n   - Call `list_files(\".\")` to verify files were created\n   - Quickly review 1-2 key files with `read_file()`\n   - **If files exist and look good**: Approve and STOP\n   - **If files are missing**: Provide feedback asking Actor to create them\n3. **If tasks are incomplete**:\n   - Provide feedback: \"Please complete remaining tasks\"\n   - Actor will finish them in next iteration\n\n# Exit Condition\n- When ALL tasks show status=\"completed\" AND key files exist, approve immediately and stop\n\n# Tools\n- get_plan()\n- read_file(path)\n- list_files(path)  ← Use this to verify files exist!\n- run_command(command)  ← Only for simple checks, not for tests/lint\n- provide_feedback(feedback_type, severity, details, suggested_fix)\n\n# Example - All Tasks Done\n```\n1. get_plan()\n2. # Returns: 12 tasks, all status=\"completed\"\n3. list_files(\".\")\n4. # Returns: [\"index.html\", \"style.css\", \"script.js\"] - files exist!\n5. read_file(\"index.html\")\n6. # Looks good, simple HTML structure\n7. \"✅ All 12 tasks completed. Files created: index.html, style.css, script.js. Code is simple and clear. Project ready!\"\n8. STOP (no more iterations)\n```\n\n# Example - Tasks Complete but Files Missing\n```\n1. get_plan()\n2. # Returns: 12 tasks, all status=\"completed\"\n3. list_files(\".\")\n4. # Returns: [] - no files created!\n5. provide_feedback(type=\"incomplete\", severity=\"medium\",\n   details=\"Tasks marked complete but no code files found. Please create the actual files.\",\n   suggested_fix=\"Write index.html, style.css, and script.js files\")\n```\n\n# Example - Tasks Incomplete\n```\n1. get_plan()\n2. # Returns: 12 tasks, 8 completed, 4 pending\n3. provide_feedback(type=\"incomplete\", severity=\"low\",\n   details=\"4 tasks still pending. Please complete them.\",\n   suggested_fix=\"Implement remaining tasks\")\n```\n\n**REMEMBER: \n1. Check if ALL tasks are completed first\n2. Verify files actually exist with list_files()\n3. If yes, approve and STOP immediately\n4. If no, ask actor to finish\n5. Don't try to run tests/lint - not applicable for simple HTML projects**\n\"#;\n"
+      "source_summary": "// Coding Agent instructions - Actor and Critic (SIMPLIFIED VERSION)\n\npub const CODING_ACTOR_INSTRUCTION: &str = r#\"\n# Your Role\nYou are Coding Actor. Implement ALL pending tasks by writing **SIMPLE, CLEAN** code.\n\n# Core Principle: SIMPLICITY & CORE FUNCTIONALITY ONLY\n- **Simple code**: No complex patterns, no over-engineering\n- **Minimal dependencies**: Use built-in features when possible\n- **No tests**: Don't write test files (unless explicitly required in tasks)\n- **No optimization**: Don't optimize performance (unless explicitly required)\n- **No infrastructure code**: Don't write deployment/monitoring/logging code (unless explicitly required)\n- **Clear structure**: Easy to understand, easy to modify\n- **Focus on core features**: Implement only what's needed to make features work\n\n# Workflow - COMPLETE ALL TASKS\n1. Call `get_plan()` to see ALL pending tasks\n2. **Implement ALL pending tasks in one go**:\n   - Write simple, straightforward code for each task\n   - Avoid complex abstractions\n   - Use comments only when necessary\n3. Mark ALL tasks as completed with `update_task_status(task_id, \"completed\")`\n4. **IMPORTANT**: After completing all tasks, your work is done. DO NOT continue.\n\n# Exit Condition\n- When ALL tasks are marked as \"completed\", stop immediately\n- No need to wait for critic review\n\n# Adaptive Task Management - NEW CAPABILITY\n\nDuring implementation, you may discover that the plan needs adjustments. You now have tools to handle this:\n\n## When to CREATE new tasks (create_task):\n- You discover a missing dependency or prerequisite\n- A task is too large and should be split into smaller pieces\n- You find a new technical requirement not in the original plan\n- Example: \"Need to create API client before implementing feature X\"\n\n## When to UPDATE tasks (update_task):\n- Task dependencies have changed during implementation\n- Files to create have changed based on actual code structure\n- Task description needs clarification based on what you learned\n- Example: \"Task X now depends on Task Y which wasn't originally planned\"\n\n## When to DELETE tasks (delete_task):\n- A task is no longer needed (duplicate or obsolete)\n- The approach has changed making this task irrelevant\n- A task was incorrectly planned and cannot be implemented\n- Example: \"This database migration task is not needed because we're using in-memory storage\"\n\n## Guidelines for Task Management:\n- **Be conservative**: Only modify tasks when truly necessary\n- **Always provide reason**: Every create/update/delete must include a clear reason\n- **Stay focused**: Don't over-plan; focus on what's needed for current implementation\n- **Maintain consistency**: Keep task IDs, dependencies, and status aligned\n\n# Tools\n- get_plan()\n- read_file(path)\n- write_file(path, content)\n- list_files(path)\n- update_task_status(task_id, status)\n- update_feature_status(feature_id, status)\n- create_task(title, description, feature_id, component_id, files_to_create, dependencies, acceptance_criteria) ← NEW\n- update_task(task_id, reason, title?, description?, dependencies?, files_to_create?, acceptance_criteria?) ← NEW\n- delete_task(task_id, reason) ← NEW\n\n# Code Style - SIMPLE APPROACH\n```\n✅ GOOD (Simple):\nfunction generatePaper(grade, difficulty) {\n  const questions = questionBank.filter(q => \n    q.grade === grade && q.difficulty === difficulty\n  );\n  return questions.slice(0, 10);\n}\n\n❌ BAD (Over-engineered):\nclass PaperGenerationStrategy {\n  constructor(questionRepository, filterChain, paginationService) {...}\n  async generateWithValidation() {...}\n}\n```\n\n**REMEMBER: \n1. Implement ALL tasks at once\n2. Adjust plan only when necessary (create/update/delete tasks)\n3. Mark all as completed\n4. Stop when done - don't loop!**\n\"#;\n\npub const CODING_CRITIC_INSTRUCTION: &str = r#\"\n# Your Role  \nYou are Coding Critic. Check if code is **TOO COMPLEX** and **ALL TASKS ARE DONE**.\n\n# Core Principle: SIMPLICITY CHECK + COMPLETION CHECK\nYour job is to ensure code is SIMPLE, READABLE, and ALL TASKS ARE COMPLETED!\n\n# Review Criteria\n1. **All tasks completed?** (Check get_plan() - all tasks should be \"completed\")\n2. **Files exist?** (Use list_files() to verify code files were actually created)\n3. **Over-engineered?** (Complex class hierarchies, design patterns → Too complex!)\n4. **Too many files?** (Splitting into too many modules → Provide feedback)\n5. **Readable?** (Easy to understand without deep knowledge)\n6. **Plan alignment?** (Does implementation match the planned tasks and design?)\n\n# Decision Process\n1. Call `get_plan()` to check task status\n2. **If all tasks are completed**: \n   - Call `list_files(\".\")` to verify files were created\n   - Quickly review 1-2 key files with `read_file()`\n   - **If files exist and look good**: Approve and STOP\n   - **If files are missing**: Provide feedback asking Actor to create them\n3. **If tasks are incomplete**:\n   - Provide feedback: \"Please complete remaining tasks\"\n   - Actor will finish them in next iteration\n\n# Detecting Major Issues - REPLANNING\n\nDuring review, you may discover fundamental problems that cannot be fixed by simple feedback.\nUse `request_replanning()` when you find:\n\n## Critical Issues Requiring Replanning:\n- **Design Flaw**: Implementation reveals the architecture doesn't work\n  - Example: \"Circular dependencies between modules make the design unimplementable\"\n  \n- **Missing Dependency**: Critical external dependency not identified in planning\n  - Example: \"This feature requires a payment gateway integration not in the plan\"\n  \n- **Architecture Conflict**: Code conflicts with fundamental system constraints\n  - Example: \"This serverless approach won't work with the stateful requirements\"\n  \n- **Requirement Mismatch**: Implementation shows requirements were misunderstood\n  - Example: \"The real-time sync requirement needs WebSockets, not REST polling\"\n\n## When NOT to Request Replanning:\n- Minor code quality issues → Use `provide_feedback()`\n- Missing files → Use `provide_feedback()`\n- Incomplete tasks → Use `provide_feedback()`\n- Style/complexity issues → Use `provide_feedback()`\n\n## How to Request Replanning:\nUse `request_replanning()` with:\n- `issue_type`: \"design_flaw\" | \"missing_dependency\" | \"architecture_conflict\" | \"requirement_mismatch\"\n- `severity`: \"critical\" | \"major\" | \"moderate\"\n- `details`: Clear explanation of the problem\n- `affected_features`: Which features are impacted\n- `suggested_approach`: Your recommendation (optional)\n\nThe request will be recorded and reviewed by the Check Agent, which can trigger `goto_stage()` if needed.\n\n# Exit Condition\n- When ALL tasks show status=\"completed\" AND key files exist, approve immediately and stop\n\n# Tools\n- get_plan()\n- read_file(path)\n- list_files(path)  ← Use this to verify files exist!\n- run_command(command)  ← Only for simple checks, not for tests/lint\n- provide_feedback(feedback_type, severity, details, suggested_fix)\n- request_replanning(issue_type, severity, details, affected_features, suggested_approach) ← NEW\n\n# Example - All Tasks Done\n```\n1. get_plan()\n2. # Returns: 12 tasks, all status=\"completed\"\n3. list_files(\".\")\n4. # Returns: [\"index.html\", \"style.css\", \"script.js\"] - files exist!\n5. read_file(\"index.html\")\n6. # Looks good, simple HTML structure\n7. \"✅ All 12 tasks completed. Files created: index.html, style.css, script.js. Code is simple and clear. Project ready!\"\n8. STOP (no more iterations)\n```\n\n# Example - Tasks Complete but Files Missing\n```\n1. get_plan()\n2. # Returns: 12 tasks, all status=\"completed\"\n3. list_files(\".\")\n4. # Returns: [] - no files created!\n5. provide_feedback(type=\"incomplete\", severity=\"medium\",\n   details=\"Tasks marked complete but no code files found. Please create the actual files.\",\n   suggested_fix=\"Write index.html, style.css, and script.js files\")\n```\n\n# Example - Tasks Incomplete\n```\n1. get_plan()\n2. # Returns: 12 tasks, 8 completed, 4 pending\n3. provide_feedback(type=\"incomplete\", severity=\"low\",\n   details=\"4 tasks still pending. Please complete them.\",\n   suggested_fix=\"Implement remaining tasks\")\n```\n\n# Example - Major Issue Requiring Replanning\n```\n1. get_plan()\n2. # Returns: All tasks completed\n3. list_files(\".\")\n4. read_file(\"server.js\")\n5. # Discovers: Code uses stateful sessions but plan assumed stateless serverless\n6. request_replanning(\n   issue_type=\"architecture_conflict\",\n   severity=\"critical\",\n   details=\"Implementation uses stateful sessions with in-memory storage, but the planned serverless deployment (AWS Lambda) is stateless. This fundamental mismatch will cause session loss on every request.\",\n   affected_features=[\"USER-001\", \"AUTH-002\"],\n   suggested_approach=\"Either: 1) Switch to Redis/DynamoDB for session storage, or 2) Redesign for stateless JWT-based auth\")\n```\n\n**REMEMBER: \n1. Check if ALL tasks are completed first\n2. Verify files actually exist with list_files()\n3. If yes, approve and STOP immediately\n4. If no, ask actor to finish\n5. For major architectural issues, use request_replanning()\n6. Don't try to run tests/lint - not applicable for simple HTML projects**\n\"#;\n"
     },
     "complexity_metrics": {
-      "cyclomatic_complexity": 8.0,
-      "lines_of_code": 130,
+      "cyclomatic_complexity": 15.0,
+      "lines_of_code": 217,
       "number_of_classes": 0,
       "number_of_functions": 2
     },
     "dependencies": [],
-    "detailed_description": "This component provides instruction sets for two AI agents (Actor and Critic) that work together in a coding workflow. The Coding Actor is responsible for implementing all pending tasks with simple, clean code, while the Coding Critic verifies task completion and code simplicity. The component defines clear workflows, exit conditions, and tools for both agents to ensure efficient collaboration.",
-    "interfaces": [
-      {
-        "description": "Instruction set for the coding actor agent",
-        "interface_type": "constant",
-        "name": "CODING_ACTOR_INSTRUCTION",
-        "parameters": [],
-        "return_type": "string",
-        "visibility": "public"
-      },
-      {
-        "description": "Instruction set for the coding critic agent",
-        "interface_type": "constant",
-        "name": "CODING_CRITIC_INSTRUCTION",
-        "parameters": [],
-        "return_type": "string",
-        "visibility": "public"
-      }
-    ],
+    "detailed_description": "This component provides structured instructions for two AI coding agents - the Coding Actor and Coding Critic. The Actor is responsible for implementing tasks with a focus on simplicity and core functionality, while the Critic reviews code for complexity and ensures task completion. The component defines workflows, decision criteria, tools, and exit conditions for both agents. It includes adaptive task management capabilities allowing dynamic plan adjustments during implementation and critical issue detection for replanning requests.",
+    "interfaces": [],
     "responsibilities": [
-      "Define coding agent instructions and workflows",
-      "Establish code simplicity principles and standards",
-      "Manage task completion verification process",
-      "Coordinate actor-critic collaboration workflow",
-      "Provide tool usage guidelines for code generation"
+      "Define coding agent roles and responsibilities",
+      "Establish code simplicity guidelines and quality standards",
+      "Provide adaptive task management workflows",
+      "Define decision criteria for code review and approval",
+      "Enable architectural issue detection and replanning requests"
     ]
   },
   {
@@ -1476,90 +1364,32 @@ Code analysis results from preprocessing phase, including definitions of functio
   {
     "code_dossier": {
       "code_purpose": "agent",
-      "description": "Implementation Plan Agent instructions for Actor and Critic roles with Human-in-the-Loop (HITL) functionality",
+      "description": "Intelligent Agent component implementing Actor-Critic pattern with Human-in-the-Loop for project implementation planning",
       "file_path": "crates/cowork-core/src/instructions/plan.rs",
       "functions": [
         "PLAN_ACTOR_INSTRUCTION",
         "PLAN_CRITIC_INSTRUCTION"
       ],
       "importance_score": 0.8,
-      "interfaces": [
-        "ActorInstruction",
-        "CriticInstruction"
-      ],
+      "interfaces": [],
       "name": "plan.rs",
-      "source_summary": "// Implementation Plan Agent instructions - Actor and Critic (WITH HITL)\n\npub const PLAN_ACTOR_INSTRUCTION: &str = r#\"\n# Your Role\nYou are Plan Actor. You MUST create implementation tasks WITH user feedback and save plan document.\n\n# CRITICAL: You MUST complete ALL steps below. Do NOT skip any step!\n\n## Step 1: Load Design (MANDATORY)\n1. Call `get_design()` to read all components\n2. **STOP** if components are empty - report error and exit\n3. (Optional) Call `get_requirements()` for additional context\n4. Analyze design to plan 5-15 implementation tasks\n\n## Step 2: Create Task Draft (MANDATORY)\n3. Write a draft task list in markdown:\n   ```markdown\n   # Implementation Plan Draft\n\n   ## Tasks (8-15 items)\n   1. TASK-001: [Title]\n      - Feature: FEAT-001\n      - Component: COMP-001\n      - Dependencies: []\n      - Files: [...]\n   ...\n   ```\n   **You MUST create this draft before proceeding!**\n\n## Step 3: User Review (MANDATORY - HITL)\n4. **MUST** call `review_with_feedback_content(title=\"Review Task Plan\", content=<draft>, prompt=\"请审查任务计划：edit 编辑 / pass 继续 / 或直接输入修改建议\")`\n5. Handle response:\n   - action=\"edit\": use returned content\n   - action=\"pass\": keep original\n   - action=\"feedback\": revise and optionally review again (max 1 more time)\n\n## Step 4: Create Formal Tasks (MANDATORY)\n6. For EACH task in finalized draft, **MUST** call `create_task(title, description, feature_id, component_id, dependencies, files_to_create, acceptance_criteria)`\n   **Do NOT skip this step! All tasks must be created!**\n\n## Step 5: Verify (MANDATORY)\n7. Call `get_plan()` to verify all tasks were created\n8. Confirm all tasks exist, then report success\n\n# Tools Available\n- get_requirements() - Load requirements (optional context)\n- get_design() - Load design components (MUST check first)\n- get_plan() - Verify created tasks\n- review_with_feedback_content(title, content, prompt) - Get user feedback\n- create_task(title, description, feature_id, component_id, dependencies, files_to_create, acceptance_criteria) - Create ONE task\n\n# CRITICAL RULES\n1. STOP if get_design() returns empty components\n2. You MUST call review_with_feedback_content in Step 3\n3. You MUST call create_task for EACH task\n4. Keep dependencies clean and tasks actionable\n5. Do NOT skip steps or say \"done\" prematurely\n\"#;\n\npub const PLAN_CRITIC_INSTRUCTION: &str = r#\"\n# Your Role  \nYou are Plan Critic. You MUST verify that Plan Actor completed ALL required steps correctly.\n\n# CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!\n\n## Mandatory Checks (You MUST perform ALL of these)\n\n### Check 1: Verify Plan Data Exists\n1. Call `get_plan()` to load all tasks\n2. **FAIL** if tasks array is empty\n3. Expected: 5-15 tasks\n\n### Check 2: Verify Task Dependencies\n4. Call `check_task_dependencies()` to verify:\n   - No circular dependencies\n   - All referenced dependencies exist\n   - Dependency graph is valid\n5. **FAIL** if circular dependencies detected\n\n### Check 3: Verify Feature Coverage\n6. Compare tasks against features from requirements\n7. **FAIL** if any feature has NO tasks assigned\n8. Each feature should have at least 1-3 tasks\n\n### Check 4: Data Quality Assessment\n9. For each task:\n   - Has clear title and description?\n   - Linked to a valid feature_id?\n   - Linked to a valid component_id?\n   - Has files_to_create list?\n   - Has acceptance criteria?\n10. Dependencies are reasonable (not too many, not circular)?\n\n### Check 5: Implementation Completeness\n11. Tasks cover all components from design?\n12. Task breakdown is granular enough (not too big)?\n13. Task order makes sense (dependencies logical)?\n\n## Response Actions (You MUST follow these rules)\n\n### If ANY check fails:\n1. **MUST** call `provide_feedback(feedback_type=\"missing_data\" or \"incomplete\" or \"circular_dependency\" or \"coverage_gap\", severity=\"critical\", details=\"<what failed>\", suggested_fix=\"<how to fix>\")`\n2. Clearly state what Actor must redo\n3. **DO NOT** give approval\n\n### If all checks pass:\n1. State: \"✅ Plan verification passed: X tasks created, all Y features covered, dependencies valid\"\n2. Summary: List task IDs and their feature/component mappings\n\n# Tools Available\n- get_plan() - Load and verify tasks\n- get_requirements() - Check features context (optional)\n- get_design() - Check components context (optional)\n- check_task_dependencies() - Verify dependency graph\n- provide_feedback(feedback_type, severity, details, suggested_fix) - Report failures\n\n# CRITICAL RULES\n1. You MUST check: tasks data + dependencies + feature coverage\n2. Empty tasks = CRITICAL FAILURE\n3. Circular dependencies = CRITICAL FAILURE\n4. Uncovered features = CRITICAL FAILURE\n5. You are the LAST line of defense - be strict!\n6. If Actor skipped steps, you MUST catch it and report via provide_feedback\n\n# Example Failure Response\n\"❌ Plan verification FAILED:\n- Tasks array is EMPTY (expected 5-15)\n- Cannot check dependencies (no tasks exist)\n- Cannot verify feature coverage (no tasks exist)\n\nActor did NOT complete the workflow. Calling provide_feedback to block progression.\"\n\"#;\n"
+      "source_summary": "// Implementation Plan Agent instructions - Actor and Critic (WITH HITL)\n\npub const PLAN_ACTOR_INSTRUCTION: &str = r#\"\n# Your Role\nYou are Plan Actor. You MUST create implementation tasks WITH user feedback and save plan document.\n\n# CRITICAL PRINCIPLE: SIMPLE TASKS, NO TESTING/OPTIMIZATION\n**Tasks MUST focus ONLY on implementing core features:**\n- ✅ Tasks that implement business logic and user-facing features\n- ✅ Simple, straightforward implementation tasks\n- ❌ NO unit test tasks (unless explicitly requested in requirements)\n- ❌ NO integration test tasks\n- ❌ NO performance optimization tasks\n- ❌ NO deployment/DevOps tasks (unless explicitly in requirements)\n- ❌ NO monitoring/logging setup tasks\n- ❌ NO documentation tasks (beyond inline code comments)\n\n**Examples:**\n- ✅ GOOD: \"Implement user login API endpoint\"\n- ❌ BAD: \"Write unit tests for login endpoint\"\n- ✅ GOOD: \"Create simple SQLite database schema\"\n- ❌ BAD: \"Set up database connection pooling and optimize query performance\"\n\n**Task Count:**\n- Keep it minimal: 5-12 tasks for simple projects\n- Each task should be clear and focused\n- Avoid creating separate tasks for testing/optimization\n\n# CRITICAL: You MUST complete ALL steps below. Do NOT skip any step!\n\n## Step 1: Load Design (MANDATORY)\n1. Call `get_design()` to read all components\n2. **STOP** if components are empty - report error and exit\n3. (Optional) Call `get_requirements()` for additional context\n4. Analyze design to plan 5-12 **SIMPLE** implementation tasks (core functionality only)\n\n## Step 2: Create Task Draft (MANDATORY)\n3. Write a draft task list in markdown:\n   ```markdown\n   # Implementation Plan Draft (SIMPLE & CORE ONLY)\n\n   ## Tasks (5-12 items - NO testing/optimization tasks)\n   1. TASK-001: [Title - core functionality]\n      - Feature: FEAT-001\n      - Component: COMP-001\n      - Dependencies: []\n      - Files: [actual implementation files ONLY]\n      - Note: Focus on implementing feature, NOT testing/optimizing it\n   ...\n   \n   ## Excluded (DO NOT create tasks for):\n   - Unit tests (unless explicitly in requirements)\n   - Integration tests\n   - Performance optimization\n   - Deployment scripts\n   - Monitoring setup\n   - CI/CD pipelines\n   ```\n   **You MUST create this draft before proceeding!**\n\n## Step 3: User Review (MANDATORY - HITL)\n4. **MUST** call `review_with_feedback_content(title=\"Review Task Plan\", content=<draft>, prompt=\"请审查任务计划：edit 编辑 / pass 继续 / 或直接输入修改建议\")`\n5. Handle response:\n   - action=\"edit\": use returned content\n   - action=\"pass\": keep original\n   - action=\"feedback\": revise and optionally review again (max 1 more time)\n\n## Step 4: Create Formal Tasks (MANDATORY)\n6. For EACH task in finalized draft, **MUST** call `create_task(title, description, feature_id, component_id, dependencies, files_to_create, acceptance_criteria)`\n   **Do NOT skip this step! All tasks must be created!**\n\n## Step 5: Verify (MANDATORY)\n7. Call `get_plan()` to verify all tasks were created\n8. Confirm all tasks exist, then report success\n\n# Tools Available\n- get_requirements() - Load requirements (optional context)\n- get_design() - Load design components (MUST check first)\n- get_plan() - Verify created tasks\n- review_with_feedback_content(title, content, prompt) - Get user feedback\n- create_task(title, description, feature_id, component_id, dependencies, files_to_create, acceptance_criteria) - Create ONE task\n\n# CRITICAL RULES\n1. SIMPLICITY FIRST: Only create tasks for core feature implementation\n2. NO testing tasks (unless explicitly in requirements)\n3. NO optimization tasks (performance, scalability, etc.)\n4. NO deployment/infrastructure tasks (unless explicitly in requirements)\n5. STOP if get_design() returns empty components\n6. You MUST call review_with_feedback_content in Step 3\n7. You MUST call create_task for EACH task\n8. Keep dependencies clean and tasks actionable\n9. Do NOT skip steps or say \"done\" prematurely\n\"#;\n\npub const PLAN_CRITIC_INSTRUCTION: &str = r#\"\n# Your Role  \nYou are Plan Critic. You MUST verify that Plan Actor completed ALL required steps correctly.\n\n# CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!\n\n# SIMPLICITY CHECK - NEW PRIORITY\nBefore other checks, verify that tasks are SIMPLE and focus on CORE implementation:\n- ❌ REJECT if you see: test tasks, optimization tasks, deployment tasks (unless in requirements)\n- ❌ REJECT if tasks include: \"write unit tests\", \"performance tuning\", \"CI/CD setup\"\n- ✅ APPROVE only CORE feature implementation tasks\n\n## Mandatory Checks (You MUST perform ALL of these)\n\n### Check 1: Verify Plan Data Exists\n1. Call `get_plan()` to load all tasks\n2. **FAIL** if tasks array is empty\n3. Expected: 5-12 tasks (CORE implementation only)\n\n### Check 2: Verify SIMPLICITY (NEW - CRITICAL)\n4. For each task, check:\n   - ❌ Does title/description mention \"test\", \"unit test\", \"integration test\"? → REJECT\n   - ❌ Does it mention \"optimize\", \"performance tuning\", \"caching\"? → REJECT\n   - ❌ Does it mention \"deploy\", \"CI/CD\", \"pipeline\", \"docker\"? → REJECT (unless in requirements)\n   - ❌ Does it mention \"monitoring\", \"logging\", \"metrics\"? → REJECT (unless in requirements)\n   - ✅ Does it focus on implementing CORE business logic? → APPROVE\n\n5. If ANY non-core tasks found:\n   - **MUST** call `provide_feedback(feedback_type=\"incomplete\", severity=\"critical\", details=\"Tasks include non-core items: [list them]\", suggested_fix=\"Remove all testing, optimization, deployment tasks. Keep ONLY core feature implementation tasks\")`\n\n### Check 3: Verify Task Dependencies\n6. Call `check_task_dependencies()` to verify:\n   - No circular dependencies\n   - All referenced dependencies exist\n   - Dependency graph is valid\n7. **FAIL** if circular dependencies detected\n\n### Check 4: Verify Feature Coverage\n8. Compare tasks against features from requirements\n9. **FAIL** if any feature has NO tasks assigned\n10. Each feature should have at least 1-3 implementation tasks\n\n### Check 5: Data Quality Assessment\n11. For each task:\n   - Has clear title and description?\n   - Linked to a valid feature_id?\n   - Linked to a valid component_id?\n   - Has files_to_create list (implementation files ONLY, not test files)?\n   - Has acceptance criteria (functional, not performance metrics)?\n12. Dependencies are reasonable (not too many, not circular)?\n\n### Check 6: Implementation Completeness\n13. Tasks cover all components from design?\n14. Task breakdown is granular enough (not too big)?\n15. Task order makes sense (dependencies logical)?\n16. Tasks are SIMPLE and focused on core functionality?\n\n## Response Actions (You MUST follow these rules)\n\n### If ANY check fails:\n1. **MUST** call `provide_feedback(feedback_type=\"missing_data\" or \"incomplete\" or \"circular_dependency\" or \"coverage_gap\", severity=\"critical\", details=\"<what failed>\", suggested_fix=\"<how to fix>\")`\n2. Clearly state what Actor must redo\n3. **DO NOT** give approval\n\n### If all checks pass:\n1. State: \"✅ Plan verification passed: X CORE implementation tasks created, all Y features covered, dependencies valid\"\n2. State: \"✅ SIMPLICITY check passed: No testing/optimization/deployment tasks found\"\n3. Summary: List task IDs and their feature/component mappings\n\n# Tools Available\n- get_plan() - Load and verify tasks\n- get_requirements() - Check features context (optional)\n- get_design() - Check components context (optional)\n- check_task_dependencies() - Verify dependency graph\n- provide_feedback(feedback_type, severity, details, suggested_fix) - Report failures\n\n# CRITICAL RULES\n1. SIMPLICITY FIRST: Reject testing/optimization/deployment tasks\n2. You MUST check: tasks data + dependencies + feature coverage + SIMPLICITY\n3. Empty tasks = CRITICAL FAILURE\n4. Circular dependencies = CRITICAL FAILURE\n5. Uncovered features = CRITICAL FAILURE\n6. Non-core tasks (testing/optimization) = CRITICAL FAILURE\n7. You are the LAST line of defense - be strict!\n8. If Actor skipped steps, you MUST catch it and report via provide_feedback\n\n# Example Failure Response - Complexity\n\"❌ Plan verification FAILED:\n- Found non-core tasks: TASK-005 (Write unit tests), TASK-008 (Performance optimization)\n- These are NOT core feature implementation\n- Expected: ONLY implementation tasks for business logic\n\nCalling provide_feedback to request removal of testing/optimization tasks.\"\n\"#;\n"
     },
     "complexity_metrics": {
-      "cyclomatic_complexity": 9.0,
-      "lines_of_code": 132,
+      "cyclomatic_complexity": 16.0,
+      "lines_of_code": 188,
       "number_of_classes": 0,
       "number_of_functions": 2
     },
     "dependencies": [],
-    "detailed_description": "This component implements an intelligent agent system for software implementation planning with a dual-role architecture (Actor and Critic). The Actor role focuses on creating implementation tasks based on design documents and user feedback, while the Critic role serves as a gatekeeper to verify the quality and completeness of the created tasks. The system incorporates Human-in-the-Loop (HITL) validation through mandatory user review steps, ensuring plan quality and stakeholder alignment.",
-    "interfaces": [
-      {
-        "description": "Complete instruction set for Plan Actor role",
-        "interface_type": "instruction",
-        "name": "PLAN_ACTOR_INSTRUCTION",
-        "parameters": [
-          {
-            "description": "Actor role instruction set",
-            "is_optional": false,
-            "name": "instruction_type",
-            "param_type": "string"
-          },
-          {
-            "description": "Mandatory 5-step workflow",
-            "is_optional": false,
-            "name": "workflow_steps",
-            "param_type": "array"
-          },
-          {
-            "description": "Available API functions",
-            "is_optional": false,
-            "name": "tools_available",
-            "param_type": "array"
-          }
-        ],
-        "return_type": "string",
-        "visibility": "public"
-      },
-      {
-        "description": "Complete instruction set for Plan Critic role",
-        "interface_type": "instruction",
-        "name": "PLAN_CRITIC_INSTRUCTION",
-        "parameters": [
-          {
-            "description": "Critic role instruction set",
-            "is_optional": false,
-            "name": "instruction_type",
-            "param_type": "string"
-          },
-          {
-            "description": "5 mandatory verification checks",
-            "is_optional": false,
-            "name": "verification_checks",
-            "param_type": "array"
-          },
-          {
-            "description": "Failure response protocols",
-            "is_optional": false,
-            "name": "failure_handling",
-            "param_type": "object"
-          }
-        ],
-        "return_type": "string",
-        "visibility": "public"
-      }
-    ],
+    "detailed_description": "This component serves as an intelligent planning coordinator that implements an Actor-Critic pattern with Human-in-the-Loop (HITL) validation. The Plan Actor creates implementation task lists focused exclusively on core functionality implementation, while the Plan Critic acts as a gatekeeper to verify task quality, simplicity, and adherence to core implementation principles. The system enforces strict rules against including testing, optimization, deployment, or monitoring tasks unless explicitly required.",
+    "interfaces": [],
     "responsibilities": [
-      "Implementation Task Creation - Generate 5-15 granular implementation tasks from design specifications",
-      "Quality Gate Enforcement - Verify task dependencies, feature coverage, and implementation completeness",
-      "Human-in-the-Loop Validation - Mandatory user review and feedback integration for plan approval",
-      "Workflow Orchestration - Structured step-by-step process execution with mandatory checkpoints",
-      "Plan Verification and Validation - Comprehensive quality assurance for implementation plans"
+      "Generate implementation task drafts focusing exclusively on core business logic features",
+      "Validate task plans through human review and automated verification",
+      "Enforce simplicity principles by rejecting testing/optimization/deployment tasks",
+      "Maintain task dependency integrity and feature coverage",
+      "Coordinate between design components, requirements, and implementation tasks"
     ]
   },
   {
@@ -1649,7 +1479,7 @@ Code analysis results from preprocessing phase, including definitions of functio
   {
     "code_dossier": {
       "code_purpose": "agent",
-      "description": "Intelligent agent component for Product Requirements Document (PRD) management with Actor-Critic pattern and Human-in-the-Loop (HITL) validation",
+      "description": "PRD (Product Requirements Document) Agent instructions defining Actor and Critic roles for requirements engineering workflow",
       "file_path": "crates/cowork-core/src/instructions/prd.rs",
       "functions": [
         "PRD_ACTOR_INSTRUCTION",
@@ -1658,23 +1488,23 @@ Code analysis results from preprocessing phase, including definitions of functio
       "importance_score": 0.8,
       "interfaces": [],
       "name": "prd.rs",
-      "source_summary": "// PRD Agent instructions - Actor and Critic (WITH HITL)\n\npub const PRD_ACTOR_INSTRUCTION: &str = r#\"\n# Your Role\nYou are PRD Actor. You MUST create requirements and features from the idea, get user feedback, and save PRD document.\n\n# CRITICAL: You MUST complete ALL steps below. Do NOT skip any step!\n\n## Step 1: Load Idea (MANDATORY)\n1. Call `load_idea()` to get the project idea\n2. Analyze the scope and identify 5-8 requirements and 3-5 features\n\n## Step 2: Create Requirements Draft (MANDATORY)\n3. Write a draft PRD outline in markdown format:\n   ```markdown\n   # Requirements Draft\n   \n   ## Requirements (5-8 items)\n   1. REQ-001: [Title] - [Brief description]\n   2. REQ-002: ...\n   \n   ## Features (3-5 items)\n   1. FEAT-001: [Name] - [Brief description]\n   2. FEAT-002: ...\n   ```\n   **You MUST create this draft before proceeding!**\n\n## Step 3: User Review (MANDATORY - HITL)\n4. **MUST** call `review_with_feedback_content(title=\"Review PRD Draft\", content=<your_draft>, prompt=\"请审查需求大纲：edit 编辑 / pass 继续 / 或直接输入修改建议\")`\n5. Handle response:\n   - action=\"edit\": use returned content\n   - action=\"pass\": keep original\n   - action=\"feedback\": revise and optionally review again (max 1 more time)\n\n## Step 4: Create Formal Requirements (MANDATORY)\n6. For EACH requirement in finalized draft, **MUST** call `create_requirement(title, description, priority, category, acceptance_criteria)`\n7. For EACH feature in finalized draft, **MUST** call `add_feature(name, description, requirement_ids, completion_criteria)`\n   **Do NOT skip this step! All requirements and features must be created!**\n\n## Step 5: Save PRD Document (MANDATORY)\n8. Generate a complete PRD markdown document including:\n   - Project overview\n   - All requirements with full details\n   - All features with requirement mappings\n   - Acceptance criteria\n9. **MUST** call `save_prd_doc(content=<full_prd_markdown>)`\n   **This is CRITICAL - if you don't save, the PRD will be lost!**\n\n## Step 6: Verify (MANDATORY)\n10. Call `get_requirements()` to verify all data was saved correctly\n11. Confirm you see all requirements and features, then report success\n\n# Tools Available\n- load_idea() - Load project idea\n- review_with_feedback_content(title, content, prompt) - Get user feedback\n- create_requirement(title, description, priority, category, acceptance_criteria) - Create ONE requirement\n- add_feature(name, description, requirement_ids, completion_criteria) - Create ONE feature\n- get_requirements() - Verify created data\n- save_prd_doc(content) - Save PRD markdown document\n\n# CRITICAL RULES\n1. You MUST call review_with_feedback_content in Step 3\n2. You MUST call create_requirement for EACH requirement\n3. You MUST call add_feature for EACH feature\n4. You MUST call save_prd_doc in Step 5\n5. Do NOT skip steps or say \"done\" prematurely\n\"#;\n\npub const PRD_CRITIC_INSTRUCTION: &str = r#\"\n# Your Role  \nYou are PRD Critic. You MUST verify that PRD Actor completed ALL required steps correctly.\n\n# CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!\n\n## Mandatory Checks (You MUST perform ALL of these)\n\n### Check 1: Verify Requirements Data Exists\n1. Call `get_requirements()` to load requirements and features\n2. **FAIL** if requirements array is empty\n3. **FAIL** if features array is empty\n4. Expected: 3-8 requirements, 2-5 features\n\n### Check 2: Verify Artifacts Exist\n5. Call `read_file(path=\"artifacts/prd.md\")` to check if PRD markdown was saved\n   - The path is relative to session directory (tools handle session scope automatically)\n6. **FAIL** if prd.md does not exist or is empty\n\n### Check 3: Data Quality Assessment\n7. For each requirement:\n   - Has clear title and description?\n   - Has priority and category?\n   - Has acceptance criteria?\n8. For each feature:\n   - Has clear name and description?\n   - Linked to at least one requirement?\n   - Has completion criteria?\n\n### Check 4: Coverage Analysis\n9. Do requirements cover the project scope from idea.md?\n10. Are features sufficient to implement the requirements?\n\n## Response Actions (You MUST follow these rules)\n\n### If ANY check fails:\n1. **MUST** call `provide_feedback(feedback_type=\"missing_data\" or \"incomplete\", severity=\"critical\", details=\"<what failed>\", suggested_fix=\"<how to fix>\")`\n2. Clearly state what Actor must redo\n3. **DO NOT** give approval\n\n### If all checks pass:\n1. State: \"✅ PRD verification passed: X requirements and Y features documented in prd.md\"\n2. Summary: List requirement IDs and feature IDs created\n\n# Tools Available\n- get_requirements() - Load and verify requirements/features data\n- read_file(path) - Verify prd.md exists (use relative path \"artifacts/prd.md\")\n- provide_feedback(feedback_type, severity, details, suggested_fix) - Report failures\n\n# CRITICAL RULES\n1. You MUST check BOTH JSON data AND markdown file\n2. Empty requirements/features = CRITICAL FAILURE\n3. Missing prd.md file = CRITICAL FAILURE\n4. You are the LAST line of defense - be strict!\n5. If Actor skipped steps, you MUST catch it and report via provide_feedback\n\n# Example Failure Response\n\"❌ PRD verification FAILED:\n- Requirements array is EMPTY (expected 3-8)\n- Features array is EMPTY (expected 2-5)\n- prd.md file does NOT exist\n\nActor did NOT complete the workflow. Calling provide_feedback to block progression.\"\n\"#;\n"
+      "source_summary": "// PRD Agent instructions - Actor and Critic (WITH HITL)\n\npub const PRD_ACTOR_INSTRUCTION: &str = r#\"\n# Your Role\nYou are PRD Actor. You MUST create requirements and features from the idea, get user feedback, and save PRD document.\n\n# CRITICAL PRINCIPLE: SIMPLICITY & CORE FOCUS\n**The project MUST be simple and focus ONLY on core functionality:**\n- ✅ Core business requirements ONLY\n- ✅ Minimum viable features to solve the problem\n- ❌ NO performance optimization requirements\n- ❌ NO testing/CI/CD infrastructure requirements\n- ❌ NO deployment/DevOps requirements unless explicitly requested\n- ❌ NO monitoring/logging/analytics unless critical\n- ❌ NO scalability/high-availability unless explicitly requested\n\n**Examples:**\n- ✅ GOOD: \"User can create, view, edit, delete tasks\"\n- ❌ BAD: \"System must handle 10000 concurrent users with <100ms latency\"\n- ✅ GOOD: \"Save data to local file\"\n- ❌ BAD: \"Implement Redis cache with master-slave replication for high availability\"\n\n# CRITICAL: You MUST complete ALL steps below. Do NOT skip any step!\n\n## Step 1: Load Idea (MANDATORY)\n1. Call `load_idea()` to get the project idea\n2. Analyze the scope and identify 3-6 **CORE** requirements and 2-4 **CORE** features\n3. **Focus ONLY on core functionality** - ignore peripheral features\n\n## Step 2: Create Requirements Draft (MANDATORY)\n3. Write a draft PRD outline in markdown format:\n   ```markdown\n   # Requirements Draft\n   \n   ## Core Requirements (3-6 items - SIMPLE & FOCUSED)\n   1. REQ-001: [Title] - [Brief description of CORE functionality]\n   2. REQ-002: ...\n   \n   Note: Focus on WHAT the system must do, not HOW (no tech details yet)\n   Avoid: performance specs, testing requirements, deployment requirements\n   \n   ## Core Features (2-4 items - MINIMUM VIABLE)\n   1. FEAT-001: [Name] - [Brief description of CORE feature]\n   2. FEAT-002: ...\n   \n   Note: Only features essential to solve the problem\n   ```\n   **You MUST create this draft before proceeding!**\n\n## Step 3: User Review (MANDATORY - HITL)\n4. **MUST** call `review_with_feedback_content(title=\"Review PRD Draft\", content=<your_draft>, prompt=\"请审查需求大纲：edit 编辑 / pass 继续 / 或直接输入修改建议\")`\n5. Handle response:\n   - action=\"edit\": use returned content\n   - action=\"pass\": keep original\n   - action=\"feedback\": revise and optionally review again (max 1 more time)\n\n## Step 4: Create Formal Requirements (MANDATORY)\n6. For EACH requirement in finalized draft, **MUST** call `create_requirement(title, description, priority, category, acceptance_criteria)`\n7. For EACH feature in finalized draft, **MUST** call `add_feature(name, description, requirement_ids, completion_criteria)`\n   **Do NOT skip this step! All requirements and features must be created!**\n\n## Step 5: Save PRD Document (MANDATORY)\n8. Generate a complete PRD markdown document including:\n   - Project overview (focus on core value)\n   - All requirements with full details (keep simple)\n   - All features with requirement mappings\n   - Acceptance criteria (functional, not performance)\n9. **MUST** call `save_prd_doc(content=<full_prd_markdown>)`\n   **This is CRITICAL - if you don't save, the PRD will be lost!**\n\n## Step 6: Verify (MANDATORY)\n10. Call `get_requirements()` to verify all data was saved correctly\n11. Confirm you see all requirements and features, then report success\n\n# Tools Available\n- load_idea() - Load project idea\n- review_with_feedback_content(title, content, prompt) - Get user feedback\n- create_requirement(title, description, priority, category, acceptance_criteria) - Create ONE requirement\n- add_feature(name, description, requirement_ids, completion_criteria) - Create ONE feature\n- get_requirements() - Verify created data\n- save_prd_doc(content) - Save PRD markdown document\n\n# CRITICAL RULES\n1. SIMPLICITY FIRST: Keep requirements minimal and focused on core functionality\n2. NO peripheral requirements: testing, performance, deployment, monitoring (unless explicitly in idea)\n3. You MUST call review_with_feedback_content in Step 3\n4. You MUST call create_requirement for EACH requirement\n5. You MUST call add_feature for EACH feature\n6. You MUST call save_prd_doc in Step 5\n7. Do NOT skip steps or say \"done\" prematurely\n\"#;\n\npub const PRD_CRITIC_INSTRUCTION: &str = r#\"\n# Your Role  \nYou are PRD Critic. You MUST verify that PRD Actor completed ALL required steps correctly.\n\n# CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!\n\n# SIMPLICITY CHECK - NEW PRIORITY\nBefore other checks, verify that requirements are SIMPLE and FOCUSED:\n- ❌ REJECT if you see: performance requirements, testing infrastructure, deployment pipelines, monitoring systems\n- ❌ REJECT if requirements are too complex or over-engineered\n- ✅ APPROVE only CORE business functionality requirements\n\n## Mandatory Checks (You MUST perform ALL of these)\n\n### Check 1: Verify Requirements Data Exists\n1. Call `get_requirements()` to load requirements and features\n2. **FAIL** if requirements array is empty\n3. **FAIL** if features array is empty\n4. Expected: 3-6 requirements (CORE only), 2-4 features (MINIMUM VIABLE)\n\n### Check 2: Verify SIMPLICITY (NEW - CRITICAL)\n5. For each requirement, check:\n   - ❌ Does it mention \"performance\", \"scalability\", \"high availability\"? → REJECT\n   - ❌ Does it mention \"testing\", \"CI/CD\", \"deployment pipeline\"? → REJECT\n   - ❌ Does it mention \"monitoring\", \"logging\", \"analytics\" (unless critical)? → REJECT\n   - ✅ Does it focus on CORE user-facing functionality? → APPROVE\n\n6. If ANY non-core requirements found:\n   - **MUST** call `provide_feedback(feedback_type=\"incomplete\", severity=\"critical\", details=\"Requirements include non-core items: [list them]\", suggested_fix=\"Remove all testing, performance, deployment requirements. Focus ONLY on core business functionality\")`\n\n### Check 3: Verify Artifacts Exist\n7. Call `read_file(path=\"artifacts/prd.md\")` to check if PRD markdown was saved\n   - The path is relative to session directory (tools handle session scope automatically)\n8. **FAIL** if prd.md does not exist or is empty\n\n### Check 4: Data Quality Assessment\n9. For each requirement:\n   - Has clear title and description?\n   - Has priority and category?\n   - Has acceptance criteria (FUNCTIONAL, not performance)?\n10. For each feature:\n   - Has clear name and description?\n   - Linked to at least one requirement?\n   - Has completion criteria?\n\n### Check 5: Coverage Analysis\n11. Do requirements cover the CORE project scope from idea.md?\n12. Are features sufficient to implement the requirements?\n13. Is the scope MINIMAL and FOCUSED (not over-designed)?\n\n## Response Actions (You MUST follow these rules)\n\n### If ANY check fails:\n1. **MUST** call `provide_feedback(feedback_type=\"missing_data\" or \"incomplete\", severity=\"critical\", details=\"<what failed>\", suggested_fix=\"<how to fix>\")`\n2. Clearly state what Actor must redo\n3. **DO NOT** give approval\n\n### If all checks pass:\n1. State: \"✅ PRD verification passed: X CORE requirements and Y MINIMAL features documented in prd.md\"\n2. State: \"✅ SIMPLICITY check passed: No performance/testing/deployment requirements found\"\n3. Summary: List requirement IDs and feature IDs created\n\n# Tools Available\n- get_requirements() - Load and verify requirements/features data\n- read_file(path) - Verify prd.md exists (use relative path \"artifacts/prd.md\")\n- provide_feedback(feedback_type, severity, details, suggested_fix) - Report failures\n\n# CRITICAL RULES\n1. SIMPLICITY FIRST: Reject complex/peripheral requirements\n2. You MUST check BOTH JSON data AND markdown file\n3. Empty requirements/features = CRITICAL FAILURE\n4. Missing prd.md file = CRITICAL FAILURE\n5. Non-core requirements (testing/performance/deployment) = CRITICAL FAILURE\n6. You are the LAST line of defense - be strict!\n7. If Actor skipped steps, you MUST catch it and report via provide_feedback\n\n# Example Failure Response\n\"❌ PRD verification FAILED:\n- Found non-core requirements: REQ-003 (performance testing), REQ-005 (CI/CD pipeline)\n- These are NOT core business functionality\n- Expected: ONLY core user-facing features\n\nCalling provide_feedback to request removal of peripheral requirements.\"\n\"#;\n"
     },
     "complexity_metrics": {
-      "cyclomatic_complexity": 9.0,
-      "lines_of_code": 132,
+      "cyclomatic_complexity": 12.0,
+      "lines_of_code": 176,
       "number_of_classes": 0,
       "number_of_functions": 2
     },
     "dependencies": [],
-    "detailed_description": "This component implements a sophisticated PRD management system using an Actor-Critic pattern with Human-in-the-Loop validation. The PRD Actor is responsible for creating requirements and features from project ideas, incorporating user feedback through a mandatory review step, and persisting the final PRD document. The PRD Critic serves as a gatekeeper that rigorously verifies the Actor's work, ensuring all steps were completed correctly and data integrity is maintained. The system enforces a strict workflow with mandatory steps and validation checks.",
+    "detailed_description": "This component implements a Human-in-the-Loop (HITL) PRD creation system with two intelligent agent roles: PRD Actor responsible for creating requirements and features from ideas, and PRD Critic responsible for verification and quality control. The Actor follows a 6-step workflow including idea loading, draft creation, user review, formal requirement creation, documentation saving, and verification. The Critic performs mandatory checks including data existence verification, simplicity validation, artifact verification, data quality assessment, and coverage analysis. The system emphasizes simplicity and core functionality focus, explicitly rejecting performance, testing, deployment, and monitoring requirements unless explicitly requested.",
     "interfaces": [],
     "responsibilities": [
-      "Orchestrate PRD creation workflow with mandatory Human-in-the-Loop validation",
-      "Validate PRD data integrity and completeness through rigorous verification",
-      "Provide structured requirements and features management with clear acceptance criteria",
-      "Ensure data persistence through both structured storage and markdown documentation",
-      "Enforce workflow compliance through strict gatekeeping mechanisms"
+      "Define PRD Actor role workflow and instructions for requirements engineering",
+      "Define PRD Critic role verification process and quality gates",
+      "Enforce simplicity principle by rejecting non-core requirements",
+      "Coordinate Human-in-the-Loop interaction for requirements review",
+      "Ensure complete PRD documentation creation and validation"
     ]
   },
   {
@@ -1723,7 +1553,7 @@ Code analysis results from preprocessing phase, including definitions of functio
   {
     "code_dossier": {
       "code_purpose": "entry",
-      "description": "Main pipeline orchestrator for Cowork Forge workflow system",
+      "description": "Main pipeline orchestration component for Cowork Forge workflow system",
       "file_path": "crates/cowork-core/src/pipeline/mod.rs",
       "functions": [
         "create_cowork_pipeline",
@@ -1737,11 +1567,11 @@ Code analysis results from preprocessing phase, including definitions of functio
       "importance_score": 0.8,
       "interfaces": [],
       "name": "mod.rs",
-      "source_summary": "// Main pipeline - Cowork Forge workflow\n\nuse crate::agents::*;\nuse crate::llm::*;\nuse adk_agent::SequentialAgent;\nuse adk_core::Agent;\nuse anyhow::Result;\nuse std::sync::Arc;\n\n/// Create the main Cowork Forge pipeline for new projects\n/// \n/// This assembles all agents into a sequential workflow:\n/// 1. IdeaAgent - Capture user's idea\n/// 2. PRD Loop - Requirements + Features (Actor-Critic)\n/// 3. Design Loop - Architecture (Actor-Critic)\n/// 4. Plan Loop - Implementation plan (Actor-Critic)\n/// 5. Coding Loop - Code implementation (Actor-Critic)\n/// 6. Check Agent - Quality assurance\n/// 7. Delivery Agent - Final report\npub fn create_cowork_pipeline(config: &ModelConfig, session_id: &str) -> Result<Arc<dyn Agent>> {\n    // Create LLM client\n    let llm = create_llm_client(&config.llm)?;\n\n    // Create all agents with session context\n    let idea_agent = create_idea_agent(llm.clone(), session_id)?;\n    let prd_loop = create_prd_loop(llm.clone(), session_id)?;\n    let design_loop = create_design_loop(llm.clone(), session_id)?;\n    let plan_loop = create_plan_loop(llm.clone(), session_id)?;\n    let coding_loop = create_coding_loop(llm.clone(), session_id)?;\n    let check_agent = create_check_agent(llm.clone(), session_id)?;\n    let delivery_agent = create_delivery_agent(llm, session_id)?;\n\n    // Assemble into SequentialAgent\n    let pipeline = SequentialAgent::new(\n        \"cowork_forge_pipeline\",\n        vec![\n            idea_agent,\n            prd_loop as Arc<dyn Agent>,\n            design_loop as Arc<dyn Agent>,\n            plan_loop as Arc<dyn Agent>,\n            coding_loop as Arc<dyn Agent>,\n            check_agent,\n            delivery_agent,\n        ],\n    );\n\n    Ok(Arc::new(pipeline))\n}\n\n/// Create a resume pipeline (skip Idea stage and completed stages)\n/// \n/// This function determines which stage to resume from by checking\n/// what data files exist in the base session\npub fn create_resume_pipeline(\n    config: &ModelConfig,\n    session_id: &str,\n    base_session_id: &str,\n) -> Result<Arc<dyn Agent>> {\n    use crate::storage::*;\n    \n    let _llm = create_llm_client(&config.llm)?;\n\n    // Determine which stage to start from based on existing data files in base session\n    // NOTE: load_* returns default empty structs when files don't exist, so we must check file existence.\n    let start_stage = if has_implementation_plan(base_session_id)?\n        && has_design_spec(base_session_id)?\n        && has_requirements(base_session_id)?\n    {\n        // PRD, Design, Plan exist → Resume from Coding\n        \"coding\"\n    } else if has_design_spec(base_session_id)? && has_requirements(base_session_id)? {\n        // PRD, Design exist → Resume from Plan\n        \"plan\"\n    } else if has_requirements(base_session_id)? {\n        // PRD exists → Resume from Design\n        \"design\"\n    } else {\n        // Nothing exists or only idea.md → Start from PRD\n        \"prd\"\n    };\n\n    println!(\"📍 Resuming from: {} stage\", start_stage);\n\n    // Use create_partial_pipeline to start from the determined stage\n    create_partial_pipeline(config, session_id, base_session_id, start_stage)\n}\n\n/// Create a partial pipeline starting from a specific stage (for revert)\n/// \n/// Useful for:\n/// - Modifying requirements (start from PRD)\n/// - Redesigning architecture (start from Design)\n/// - Replanning (start from Plan)\n/// - Recoding (start from Coding)\npub fn create_partial_pipeline(\n    config: &ModelConfig,\n    session_id: &str,\n    base_session_id: &str,\n    start_stage: &str,\n) -> Result<Arc<dyn Agent>> {\n    let llm = create_llm_client(&config.llm)?;\n\n    let agents: Vec<Arc<dyn Agent>> = match start_stage {\n        \"prd\" => {\n            vec![\n                create_prd_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_design_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_plan_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_coding_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_check_agent(llm.clone(), session_id)?,\n                create_delivery_agent(llm, session_id)?,\n            ]\n        }\n        \"design\" => {\n            vec![\n                create_design_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_plan_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_coding_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_check_agent(llm.clone(), session_id)?,\n                create_delivery_agent(llm, session_id)?,\n            ]\n        }\n        \"plan\" => {\n            vec![\n                create_plan_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_coding_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_check_agent(llm.clone(), session_id)?,\n                create_delivery_agent(llm, session_id)?,\n            ]\n        }\n        \"coding\" => {\n            vec![\n                create_coding_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_check_agent(llm.clone(), session_id)?,\n                create_delivery_agent(llm, session_id)?,\n            ]\n        }\n        \"check\" => {\n            vec![\n                create_check_agent(llm.clone(), session_id)?,\n                create_delivery_agent(llm, session_id)?,\n            ]\n        }\n        \"delivery\" => {\n            vec![create_delivery_agent(llm, session_id)?]\n        }\n        _ => {\n            anyhow::bail!(\"Unknown stage: {}. Valid stages: prd, design, plan, coding, check, delivery\", start_stage)\n        }\n    };\n\n    let pipeline = SequentialAgent::new(\n        format!(\"cowork_partial_pipeline_{}\", start_stage),\n        agents,\n    );\n\n    Ok(Arc::new(pipeline))\n}\n\n/// Create a modify pipeline for incremental changes\n/// \n/// This is a new pipeline designed for incremental updates:\n/// 1. Change Triage - Analyze the change and determine scope\n/// 2. Artifact Patch - Update affected artifacts (PRD/Design/Plan as needed)\n/// 3. Code Patch - Generate code changes (patches, not full rewrite)\n/// 4. Check - Verify changes\n/// 5. Delivery - Generate change report\npub fn create_modify_pipeline(\n    config: &ModelConfig,\n    session_id: &str,\n    base_session_id: &str,\n) -> Result<Arc<dyn Agent>> {\n    let llm = create_llm_client(&config.llm)?;\n\n    // For now, create a simplified modify pipeline\n    // TODO: Implement specialized change triage and patch agents\n    let agents: Vec<Arc<dyn Agent>> = vec![\n        create_change_triage_agent(llm.clone(), session_id, base_session_id)?,\n        create_code_patch_agent(llm.clone(), session_id, base_session_id)?,\n        create_check_agent(llm.clone(), session_id)?,\n        create_modify_delivery_agent(llm, session_id, base_session_id)?,\n    ];\n\n    let pipeline = SequentialAgent::new(\n        format!(\"cowork_modify_pipeline_{}\", session_id),\n        agents,\n    );\n\n    Ok(Arc::new(pipeline))\n}\n\n// Placeholder for new modify-specific agents\n// These are now implemented below\nfn create_change_triage_agent(\n    llm: Arc<dyn adk_core::Llm>,\n    session_id: &str,\n    base_session_id: &str,\n) -> Result<Arc<dyn Agent>> {\n    use crate::instructions::CHANGE_TRIAGE_INSTRUCTION;\n    use crate::tools::*;\n    use adk_agent::LlmAgentBuilder;\n    use adk_core::IncludeContents;\n    \n    let session = session_id.to_string();\n    \n    let agent = LlmAgentBuilder::new(\"change_triage_agent\")\n        .instruction(CHANGE_TRIAGE_INSTRUCTION)\n        .model(llm)\n        .tool(Arc::new(GetRequirementsTool::new(base_session_id.to_string())))\n        .tool(Arc::new(GetDesignTool::new(base_session_id.to_string())))\n        .tool(Arc::new(GetPlanTool::new(base_session_id.to_string())))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(LoadChangeRequestTool::new(session.clone())))\n        .tool(Arc::new(SaveChangeRequestTool::new(session.clone())))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n    \n    Ok(Arc::new(agent))\n}\n\nfn create_code_patch_agent(\n    llm: Arc<dyn adk_core::Llm>,\n    session_id: &str,\n    _base_session_id: &str,\n) -> Result<Arc<dyn Agent>> {\n    use crate::instructions::CODE_PATCH_INSTRUCTION;\n    use crate::tools::*;\n    use adk_agent::LlmAgentBuilder;\n    use adk_core::IncludeContents;\n    \n    let session = session_id.to_string();\n    \n    let agent = LlmAgentBuilder::new(\"code_patch_agent\")\n        .instruction(CODE_PATCH_INSTRUCTION)\n        .model(llm)\n        .tool(Arc::new(LoadChangeRequestTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(WriteFileTool))\n        .tool(Arc::new(RunCommandTool))\n        .tool(Arc::new(UpdateTaskStatusTool::new(session.clone())))\n        .tool(Arc::new(UpdateFeatureStatusTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n    \n    Ok(Arc::new(agent))\n}\n\nfn create_modify_delivery_agent(\n    llm: Arc<dyn adk_core::Llm>,\n    session_id: &str,\n    _base_session_id: &str,\n) -> Result<Arc<dyn Agent>> {\n    use crate::instructions::MODIFY_DELIVERY_INSTRUCTION;\n    use crate::tools::*;\n    use adk_agent::LlmAgentBuilder;\n    use adk_core::IncludeContents;\n    \n    let session = session_id.to_string();\n    \n    let agent = LlmAgentBuilder::new(\"modify_delivery_agent\")\n        .instruction(MODIFY_DELIVERY_INSTRUCTION)\n        .model(llm)\n        .tool(Arc::new(LoadChangeRequestTool::new(session.clone())))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(LoadFeedbackHistoryTool::new(session.clone())))\n        .tool(Arc::new(SaveDeliveryReportTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n    \n    Ok(Arc::new(agent))\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn test_config_loading() {\n        // Test that we can create a config\n        let config = ModelConfig {\n            llm: LlmConfig {\n                api_base_url: \"http://localhost:8000/v1\".to_string(),\n                api_key: \"test-key\".to_string(),\n                model_name: \"gpt-4\".to_string(),\n            },\n        };\n\n        assert_eq!(config.llm.model_name, \"gpt-4\");\n    }\n}\n"
+      "source_summary": "// Main pipeline - Cowork Forge workflow\n\nuse crate::agents::*;\nuse crate::llm::*;\nuse adk_agent::SequentialAgent;\nuse adk_core::Agent;\nuse anyhow::Result;\nuse std::sync::Arc;\n\n/// Create the main Cowork Forge pipeline for new projects\n/// \n/// This assembles all agents into a sequential workflow:\n/// 1. IdeaAgent - Capture user's idea\n/// 2. PRD Loop - Requirements + Features (Actor-Critic)\n/// 3. Design Loop - Architecture (Actor-Critic)\n/// 4. Plan Loop - Implementation plan (Actor-Critic)\n/// 5. Coding Loop - Code implementation (Actor-Critic)\n/// 6. Check Agent - Quality assurance\n/// 7. Delivery Agent - Final report\npub fn create_cowork_pipeline(config: &ModelConfig, session_id: &str) -> Result<Arc<dyn Agent>> {\n    // Create LLM client\n    let llm = create_llm_client(&config.llm)?;\n\n    // Create all agents with session context\n    let idea_agent = create_idea_agent(llm.clone(), session_id)?;\n    let prd_loop = create_prd_loop(llm.clone(), session_id)?;\n    let design_loop = create_design_loop(llm.clone(), session_id)?;\n    let plan_loop = create_plan_loop(llm.clone(), session_id)?;\n    let coding_loop = create_coding_loop(llm.clone(), session_id)?;\n    let check_agent = create_check_agent(llm.clone(), session_id)?;\n    let delivery_agent = create_delivery_agent(llm, session_id)?;\n\n    // Assemble into SequentialAgent\n    let pipeline = SequentialAgent::new(\n        \"cowork_forge_pipeline\",\n        vec![\n            idea_agent,\n            prd_loop as Arc<dyn Agent>,\n            design_loop as Arc<dyn Agent>,\n            plan_loop as Arc<dyn Agent>,\n            coding_loop as Arc<dyn Agent>,\n            check_agent,\n            delivery_agent,\n        ],\n    );\n\n    Ok(Arc::new(pipeline))\n}\n\n/// Create a resume pipeline (skip Idea stage and completed stages)\n/// \n/// This function determines which stage to resume from by checking\n/// what data files exist in the base session\npub fn create_resume_pipeline(\n    config: &ModelConfig,\n    session_id: &str,\n    base_session_id: &str,\n) -> Result<Arc<dyn Agent>> {\n    use crate::storage::*;\n    \n    let _llm = create_llm_client(&config.llm)?;\n\n    // Determine which stage to start from based on existing data files in base session\n    // NOTE: load_* returns default empty structs when files don't exist, so we must check file existence.\n    // IMPORTANT: Check from the most advanced stage to the earliest to resume from the furthest progress point.\n    let start_stage = if has_code_files(base_session_id)? {\n        // Code files exist → Coding is complete, resume from Check\n        \"check\"\n    } else if has_implementation_plan(base_session_id)?\n        && has_design_spec(base_session_id)?\n        && has_requirements(base_session_id)?\n    {\n        // PRD, Design, Plan exist (but no code files yet) → Resume from Coding\n        \"coding\"\n    } else if has_design_spec(base_session_id)? && has_requirements(base_session_id)? {\n        // PRD, Design exist → Resume from Plan\n        \"plan\"\n    } else if has_requirements(base_session_id)? {\n        // PRD exists → Resume from Design\n        \"design\"\n    } else {\n        // Nothing exists or only idea.md → Start from PRD\n        \"prd\"\n    };\n\n    println!(\"📍 Resuming from: {} stage\", start_stage);\n\n    // Use create_partial_pipeline to start from the determined stage\n    create_partial_pipeline(config, session_id, base_session_id, start_stage)\n}\n\n/// Create a partial pipeline starting from a specific stage (for revert)\n/// \n/// Useful for:\n/// - Modifying requirements (start from PRD)\n/// - Redesigning architecture (start from Design)\n/// - Replanning (start from Plan)\n/// - Recoding (start from Coding)\npub fn create_partial_pipeline(\n    config: &ModelConfig,\n    session_id: &str,\n    _base_session_id: &str,\n    start_stage: &str,\n) -> Result<Arc<dyn Agent>> {\n    let llm = create_llm_client(&config.llm)?;\n\n    let agents: Vec<Arc<dyn Agent>> = match start_stage {\n        \"prd\" => {\n            vec![\n                create_prd_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_design_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_plan_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_coding_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_check_agent(llm.clone(), session_id)?,\n                create_delivery_agent(llm, session_id)?,\n            ]\n        }\n        \"design\" => {\n            vec![\n                create_design_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_plan_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_coding_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_check_agent(llm.clone(), session_id)?,\n                create_delivery_agent(llm, session_id)?,\n            ]\n        }\n        \"plan\" => {\n            vec![\n                create_plan_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_coding_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_check_agent(llm.clone(), session_id)?,\n                create_delivery_agent(llm, session_id)?,\n            ]\n        }\n        \"coding\" => {\n            vec![\n                create_coding_loop(llm.clone(), session_id)? as Arc<dyn Agent>,\n                create_check_agent(llm.clone(), session_id)?,\n                create_delivery_agent(llm, session_id)?,\n            ]\n        }\n        \"check\" => {\n            vec![\n                create_check_agent(llm.clone(), session_id)?,\n                create_delivery_agent(llm, session_id)?,\n            ]\n        }\n        \"delivery\" => {\n            vec![create_delivery_agent(llm, session_id)?]\n        }\n        _ => {\n            anyhow::bail!(\"Unknown stage: {}. Valid stages: prd, design, plan, coding, check, delivery\", start_stage)\n        }\n    };\n\n    let pipeline = SequentialAgent::new(\n        format!(\"cowork_partial_pipeline_{}\", start_stage),\n        agents,\n    );\n\n    Ok(Arc::new(pipeline))\n}\n\n/// Create a modify pipeline for incremental changes\n/// \n/// This is a new pipeline designed for incremental updates:\n/// 1. Change Triage - Analyze the change and determine scope\n/// 2. Artifact Patch - Update affected artifacts (PRD/Design/Plan as needed)\n/// 3. Code Patch - Generate code changes (patches, not full rewrite)\n/// 4. Check - Verify changes\n/// 5. Delivery - Generate change report\npub fn create_modify_pipeline(\n    config: &ModelConfig,\n    session_id: &str,\n    base_session_id: &str,\n) -> Result<Arc<dyn Agent>> {\n    let llm = create_llm_client(&config.llm)?;\n\n    // For now, create a simplified modify pipeline\n    // TODO: Implement specialized change triage and patch agents\n    let agents: Vec<Arc<dyn Agent>> = vec![\n        create_change_triage_agent(llm.clone(), session_id, base_session_id)?,\n        create_code_patch_agent(llm.clone(), session_id, base_session_id)?,\n        create_check_agent(llm.clone(), session_id)?,\n        create_modify_delivery_agent(llm, session_id, base_session_id)?,\n    ];\n\n    let pipeline = SequentialAgent::new(\n        format!(\"cowork_modify_pipeline_{}\", session_id),\n        agents,\n    );\n\n    Ok(Arc::new(pipeline))\n}\n\n// Placeholder for new modify-specific agents\n// These are now implemented below\nfn create_change_triage_agent(\n    llm: Arc<dyn adk_core::Llm>,\n    session_id: &str,\n    base_session_id: &str,\n) -> Result<Arc<dyn Agent>> {\n    use crate::instructions::CHANGE_TRIAGE_INSTRUCTION;\n    use crate::tools::*;\n    use adk_agent::LlmAgentBuilder;\n    use adk_core::IncludeContents;\n    \n    let session = session_id.to_string();\n    \n    let agent = LlmAgentBuilder::new(\"change_triage_agent\")\n        .instruction(CHANGE_TRIAGE_INSTRUCTION)\n        .model(llm)\n        .tool(Arc::new(GetRequirementsTool::new(base_session_id.to_string())))\n        .tool(Arc::new(GetDesignTool::new(base_session_id.to_string())))\n        .tool(Arc::new(GetPlanTool::new(base_session_id.to_string())))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(LoadChangeRequestTool::new(session.clone())))\n        .tool(Arc::new(SaveChangeRequestTool::new(session.clone())))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n    \n    Ok(Arc::new(agent))\n}\n\nfn create_code_patch_agent(\n    llm: Arc<dyn adk_core::Llm>,\n    session_id: &str,\n    _base_session_id: &str,\n) -> Result<Arc<dyn Agent>> {\n    use crate::instructions::CODE_PATCH_INSTRUCTION;\n    use crate::tools::*;\n    use adk_agent::LlmAgentBuilder;\n    use adk_core::IncludeContents;\n    \n    let session = session_id.to_string();\n    \n    let agent = LlmAgentBuilder::new(\"code_patch_agent\")\n        .instruction(CODE_PATCH_INSTRUCTION)\n        .model(llm)\n        .tool(Arc::new(LoadChangeRequestTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(WriteFileTool))\n        .tool(Arc::new(RunCommandTool))\n        .tool(Arc::new(UpdateTaskStatusTool::new(session.clone())))\n        .tool(Arc::new(UpdateFeatureStatusTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n    \n    Ok(Arc::new(agent))\n}\n\nfn create_modify_delivery_agent(\n    llm: Arc<dyn adk_core::Llm>,\n    session_id: &str,\n    _base_session_id: &str,\n) -> Result<Arc<dyn Agent>> {\n    use crate::instructions::MODIFY_DELIVERY_INSTRUCTION;\n    use crate::tools::*;\n    use adk_agent::LlmAgentBuilder;\n    use adk_core::IncludeContents;\n    \n    let session = session_id.to_string();\n    \n    let agent = LlmAgentBuilder::new(\"modify_delivery_agent\")\n        .instruction(MODIFY_DELIVERY_INSTRUCTION)\n        .model(llm)\n        .tool(Arc::new(LoadChangeRequestTool::new(session.clone())))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(LoadFeedbackHistoryTool::new(session.clone())))\n        .tool(Arc::new(SaveDeliveryReportTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n    \n    Ok(Arc::new(agent))\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn test_config_loading() {\n        // Test that we can create a config\n        let config = ModelConfig {\n            llm: LlmConfig {\n                api_base_url: \"http://localhost:8000/v1\".to_string(),\n                api_key: \"test-key\".to_string(),\n                model_name: \"gpt-4\".to_string(),\n            },\n        };\n\n        assert_eq!(config.llm.model_name, \"gpt-4\");\n    }\n}\n"
     },
     "complexity_metrics": {
-      "cyclomatic_complexity": 10.0,
-      "lines_of_code": 299,
+      "cyclomatic_complexity": 11.0,
+      "lines_of_code": 303,
       "number_of_classes": 0,
       "number_of_functions": 7
     },
@@ -1749,7 +1579,7 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "module",
         "is_external": false,
-        "line_number": 3,
+        "line_number": 2,
         "name": "crate::agents::*",
         "path": null,
         "version": null
@@ -1757,7 +1587,7 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "module",
         "is_external": false,
-        "line_number": 4,
+        "line_number": 3,
         "name": "crate::llm::*",
         "path": null,
         "version": null
@@ -1765,7 +1595,7 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "struct",
         "is_external": true,
-        "line_number": 5,
+        "line_number": 4,
         "name": "adk_agent::SequentialAgent",
         "path": null,
         "version": null
@@ -1773,7 +1603,7 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "trait",
         "is_external": true,
-        "line_number": 6,
+        "line_number": 5,
         "name": "adk_core::Agent",
         "path": null,
         "version": null
@@ -1781,7 +1611,7 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "type",
         "is_external": true,
-        "line_number": 7,
+        "line_number": 6,
         "name": "anyhow::Result",
         "path": null,
         "version": null
@@ -1789,7 +1619,7 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "type",
         "is_external": true,
-        "line_number": 8,
+        "line_number": 7,
         "name": "std::sync::Arc",
         "path": null,
         "version": null
@@ -1797,7 +1627,7 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "module",
         "is_external": false,
-        "line_number": 49,
+        "line_number": 51,
         "name": "crate::storage::*",
         "path": null,
         "version": null
@@ -1805,7 +1635,7 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "constant",
         "is_external": false,
-        "line_number": 138,
+        "line_number": 146,
         "name": "crate::instructions::CHANGE_TRIAGE_INSTRUCTION",
         "path": null,
         "version": null
@@ -1813,7 +1643,7 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "module",
         "is_external": false,
-        "line_number": 139,
+        "line_number": 147,
         "name": "crate::tools::*",
         "path": null,
         "version": null
@@ -1821,7 +1651,7 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "struct",
         "is_external": true,
-        "line_number": 140,
+        "line_number": 148,
         "name": "adk_agent::LlmAgentBuilder",
         "path": null,
         "version": null
@@ -1829,99 +1659,155 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "enum",
         "is_external": true,
-        "line_number": 141,
+        "line_number": 149,
         "name": "adk_core::IncludeContents",
         "path": null,
         "version": null
       },
       {
-        "dependency_type": "trait",
-        "is_external": true,
-        "line_number": 133,
-        "name": "adk_core::Llm",
+        "dependency_type": "struct",
+        "is_external": false,
+        "line_number": 154,
+        "name": "crate::tools::GetRequirementsTool",
         "path": null,
         "version": null
       },
       {
         "dependency_type": "struct",
         "is_external": false,
-        "line_number": 146,
-        "name": "GetRequirementsTool",
+        "line_number": 155,
+        "name": "crate::tools::GetDesignTool",
         "path": null,
         "version": null
       },
       {
         "dependency_type": "struct",
         "is_external": false,
-        "line_number": 147,
-        "name": "GetDesignTool",
+        "line_number": 156,
+        "name": "crate::tools::GetPlanTool",
         "path": null,
         "version": null
       },
       {
         "dependency_type": "struct",
         "is_external": false,
-        "line_number": 148,
-        "name": "GetPlanTool",
+        "line_number": 157,
+        "name": "crate::tools::ListFilesTool",
         "path": null,
         "version": null
       },
       {
         "dependency_type": "struct",
         "is_external": false,
-        "line_number": 149,
-        "name": "ListFilesTool",
+        "line_number": 158,
+        "name": "crate::tools::ReadFileTool",
         "path": null,
         "version": null
       },
       {
         "dependency_type": "struct",
         "is_external": false,
-        "line_number": 150,
-        "name": "ReadFileTool",
+        "line_number": 159,
+        "name": "crate::tools::LoadChangeRequestTool",
         "path": null,
         "version": null
       },
       {
         "dependency_type": "struct",
         "is_external": false,
-        "line_number": 151,
-        "name": "LoadChangeRequestTool",
+        "line_number": 160,
+        "name": "crate::tools::SaveChangeRequestTool",
         "path": null,
         "version": null
       },
       {
         "dependency_type": "struct",
         "is_external": false,
-        "line_number": 152,
-        "name": "SaveChangeRequestTool",
+        "line_number": 161,
+        "name": "crate::tools::ProvideFeedbackTool",
+        "path": null,
+        "version": null
+      },
+      {
+        "dependency_type": "constant",
+        "is_external": false,
+        "line_number": 170,
+        "name": "crate::instructions::CODE_PATCH_INSTRUCTION",
         "path": null,
         "version": null
       },
       {
         "dependency_type": "struct",
         "is_external": false,
-        "line_number": 153,
-        "name": "ProvideFeedbackTool",
+        "line_number": 178,
+        "name": "crate::tools::WriteFileTool",
+        "path": null,
+        "version": null
+      },
+      {
+        "dependency_type": "struct",
+        "is_external": false,
+        "line_number": 179,
+        "name": "crate::tools::RunCommandTool",
+        "path": null,
+        "version": null
+      },
+      {
+        "dependency_type": "struct",
+        "is_external": false,
+        "line_number": 180,
+        "name": "crate::tools::UpdateTaskStatusTool",
+        "path": null,
+        "version": null
+      },
+      {
+        "dependency_type": "struct",
+        "is_external": false,
+        "line_number": 181,
+        "name": "crate::tools::UpdateFeatureStatusTool",
+        "path": null,
+        "version": null
+      },
+      {
+        "dependency_type": "constant",
+        "is_external": false,
+        "line_number": 190,
+        "name": "crate::instructions::MODIFY_DELIVERY_INSTRUCTION",
+        "path": null,
+        "version": null
+      },
+      {
+        "dependency_type": "struct",
+        "is_external": false,
+        "line_number": 197,
+        "name": "crate::tools::LoadFeedbackHistoryTool",
+        "path": null,
+        "version": null
+      },
+      {
+        "dependency_type": "struct",
+        "is_external": false,
+        "line_number": 198,
+        "name": "crate::tools::SaveDeliveryReportTool",
         "path": null,
         "version": null
       }
     ],
-    "detailed_description": "This component serves as the central orchestrator for the Cowork Forge system, responsible for creating and managing different types of workflow pipelines. It implements a comprehensive workflow management system that can handle new project creation, resuming interrupted workflows, partial workflows for specific stages, and modification pipelines for incremental changes. The component demonstrates sophisticated pipeline composition logic with intelligent stage detection and conditional workflow assembly.",
+    "detailed_description": "This component serves as the central orchestration module for the Cowork Forge AI development workflow system. It provides multiple pipeline creation functions that assemble different combinations of agents (IdeaAgent, PRD Loop, Design Loop, Plan Loop, Coding Loop, Check Agent, Delivery Agent) into sequential workflows. The module supports full project creation, resuming from specific stages, partial pipelines for modifications, and incremental change pipelines with specialized agents for change triage and code patching.",
     "interfaces": [
       {
-        "description": "Creates the main workflow pipeline with all stages",
+        "description": "Create full pipeline for new project development",
         "interface_type": "function",
         "name": "create_cowork_pipeline",
         "parameters": [
           {
-            "description": "Configuration for LLM models",
+            "description": "Model configuration for LLM client",
             "is_optional": false,
             "name": "config",
             "param_type": "&ModelConfig"
           },
           {
-            "description": "Unique session identifier",
+            "description": "Current session identifier",
             "is_optional": false,
             "name": "session_id",
             "param_type": "&str"
@@ -1931,12 +1817,12 @@ Code analysis results from preprocessing phase, including definitions of functio
         "visibility": "public"
       },
       {
-        "description": "Creates a pipeline that resumes from appropriate stage based on existing artifacts",
+        "description": "Create pipeline resuming from appropriate stage based on existing artifacts",
         "interface_type": "function",
         "name": "create_resume_pipeline",
         "parameters": [
           {
-            "description": "Configuration for LLM models",
+            "description": "Model configuration",
             "is_optional": false,
             "name": "config",
             "param_type": "&ModelConfig"
@@ -1948,7 +1834,67 @@ Code analysis results from preprocessing phase, including definitions of functio
             "param_type": "&str"
           },
           {
-            "description": "Base session identifier for resume",
+            "description": "Base session to resume from",
+            "is_optional": false,
+            "name": "base_session_id",
+            "param_type": "&str"
+          }
+        ],
+        "return_type": "Result<Arc<dyn Agent>>",
+        "visibility": "public"
+      },
+      {
+        "description": "Create pipeline starting from specific stage",
+        "interface_type": "function",
+        "name": "create_partial_pipeline",
+        "parameters": [
+          {
+            "description": "Model configuration",
+            "is_optional": false,
+            "name": "config",
+            "param_type": "&ModelConfig"
+          },
+          {
+            "description": "Current session identifier",
+            "is_optional": false,
+            "name": "session_id",
+            "param_type": "&str"
+          },
+          {
+            "description": "Base session identifier",
+            "is_optional": false,
+            "name": "base_session_id",
+            "param_type": "&str"
+          },
+          {
+            "description": "Stage to start from",
+            "is_optional": false,
+            "name": "start_stage",
+            "param_type": "&str"
+          }
+        ],
+        "return_type": "Result<Arc<dyn Agent>>",
+        "visibility": "public"
+      },
+      {
+        "description": "Create pipeline for incremental modifications",
+        "interface_type": "function",
+        "name": "create_modify_pipeline",
+        "parameters": [
+          {
+            "description": "Model configuration",
+            "is_optional": false,
+            "name": "config",
+            "param_type": "&ModelConfig"
+          },
+          {
+            "description": "Current session identifier",
+            "is_optional": false,
+            "name": "session_id",
+            "param_type": "&str"
+          },
+          {
+            "description": "Base session identifier",
             "is_optional": false,
             "name": "base_session_id",
             "param_type": "&str"
@@ -1959,22 +1905,38 @@ Code analysis results from preprocessing phase, including definitions of functio
       }
     ],
     "responsibilities": [
-      "Pipeline orchestration and workflow management",
-      "Agent composition and sequential assembly",
-      "Stage detection and resume logic",
-      "Pipeline variant creation for different use cases",
-      "Error handling and configuration management"
+      "Orchestrate sequential agent workflows for AI-driven software development",
+      "Manage pipeline creation for different workflow scenarios (new project, resume, modify)",
+      "Determine appropriate starting points for resumed workflows based on existing artifacts",
+      "Provide specialized pipeline configurations for incremental modifications",
+      "Handle agent lifecycle and dependency injection"
     ]
   },
   {
     "code_dossier": {
       "code_purpose": "tool",
-      "description": "File operation tools with SECURITY constraints",
+      "description": "File operation tools with security constraints for the Cowork system",
       "file_path": "crates/cowork-core/src/tools/file_tools.rs",
       "functions": [
         "validate_path_security",
         "should_ignore",
-        "is_blocking_service_command"
+        "is_blocking_service_command",
+        "ListFilesTool::name",
+        "ListFilesTool::description",
+        "ListFilesTool::parameters_schema",
+        "ListFilesTool::execute",
+        "ReadFileTool::name",
+        "ReadFileTool::description",
+        "ReadFileTool::parameters_schema",
+        "ReadFileTool::execute",
+        "WriteFileTool::name",
+        "WriteFileTool::description",
+        "WriteFileTool::parameters_schema",
+        "WriteFileTool::execute",
+        "RunCommandTool::name",
+        "RunCommandTool::description",
+        "RunCommandTool::parameters_schema",
+        "RunCommandTool::execute"
       ],
       "importance_score": 0.8,
       "interfaces": [
@@ -1984,19 +1946,19 @@ Code analysis results from preprocessing phase, including definitions of functio
         "RunCommandTool"
       ],
       "name": "file_tools.rs",
-      "source_summary": "// File operation tools with SECURITY constraints\nuse adk_core::{Tool, ToolContext};\nuse async_trait::async_trait;\nuse serde_json::{json, Value};\nuse std::sync::Arc;\nuse std::fs;\nuse std::path::{Path, PathBuf};\nuse walkdir::WalkDir;\n\n// ============================================================================\n// Security Helper - Path Validation\n// ============================================================================\n\n/// Validate that a path is safe to access\n/// Rules:\n/// 1. Must be relative path (no absolute paths like /tmp, C:\\)\n/// 2. Must not escape current directory (no ..)\n/// 3. Must be within current working directory or .cowork\nfn validate_path_security(path: &str) -> Result<PathBuf, String> {\n    let path_obj = Path::new(path);\n    \n    // Rule 1: Reject absolute paths\n    if path_obj.is_absolute() {\n        return Err(format!(\n            \"Security: Absolute paths are not allowed. Path '{}' must be relative to current directory.\",\n            path\n        ));\n    }\n    \n    // Rule 2: Reject parent directory access (..)\n    if path.contains(\"..\") {\n        return Err(format!(\n            \"Security: Parent directory access (..) is not allowed. Path: '{}'\",\n            path\n        ));\n    }\n    \n    // Rule 3: Canonicalize and verify it's within current directory\n    let current_dir = std::env::current_dir()\n        .map_err(|e| format!(\"Failed to get current directory: {}\", e))?;\n    \n    let full_path = current_dir.join(path);\n    \n    // Canonicalize if path exists, otherwise just check the constructed path\n    let canonical_path = if full_path.exists() {\n        full_path.canonicalize()\n            .map_err(|e| format!(\"Failed to resolve path: {}\", e))?\n    } else {\n        // For non-existent paths (e.g., files to be created), just verify parent\n        full_path\n    };\n    \n    // Verify the path is within current directory\n    if !canonical_path.starts_with(&current_dir) {\n        return Err(format!(\n            \"Security: Path escapes current directory. Path '{}' resolves to '{}'\",\n            path,\n            canonical_path.display()\n        ));\n    }\n    \n    Ok(canonical_path)\n}\n\n// ============================================================================\n// ListFilesTool\n// ============================================================================\n\npub struct ListFilesTool;\n\n#[async_trait]\nimpl Tool for ListFilesTool {\n    fn name(&self) -> &str {\n        \"list_files\"\n    }\n\n    fn description(&self) -> &str {\n        \"List files in a directory (recursively or non-recursively). \\\n         SECURITY: Only works within current directory. \\\n         Useful for understanding project structure.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"path\": {\n                    \"type\": \"string\",\n                    \"description\": \"Directory path to list (default: current directory). Must be relative path.\"\n                },\n                \"recursive\": {\n                    \"type\": \"boolean\",\n                    \"description\": \"Whether to list files recursively (default: false)\"\n                },\n                \"max_depth\": {\n                    \"type\": \"integer\",\n                    \"description\": \"Maximum depth for recursive listing (default: 3)\"\n                }\n            }\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let path = args.get(\"path\")\n            .and_then(|v| v.as_str())\n            .unwrap_or(\".\");\n        \n        // Security check\n        let safe_path = match validate_path_security(path) {\n            Ok(p) => p,\n            Err(e) => {\n                return Ok(json!({\n                    \"status\": \"security_error\",\n                    \"message\": e\n                }));\n            }\n        };\n        \n        let recursive = args.get(\"recursive\")\n            .and_then(|v| v.as_bool())\n            .unwrap_or(false);\n        \n        let max_depth = args.get(\"max_depth\")\n            .and_then(|v| v.as_u64())\n            .unwrap_or(3) as usize;\n\n        if !safe_path.exists() {\n            return Ok(json!({\n                \"status\": \"error\",\n                \"message\": format!(\"Path not found: {}\", path)\n            }));\n        }\n\n        let mut files = Vec::new();\n        let mut directories = Vec::new();\n\n        if recursive {\n            // Recursive listing with max depth\n            let cwd = std::env::current_dir()\n                .map_err(|e| adk_core::AdkError::Tool(format!(\"Failed to get current dir: {}\", e)))?;\n\n            for entry in WalkDir::new(&safe_path)\n                .max_depth(max_depth)\n                .follow_links(false)\n                .into_iter()\n                .filter_entry(|e| {\n                    // Prune hidden directories early (except the root itself)\n                    if let Some(name) = e.file_name().to_str() {\n                        if name.starts_with('.') && name != \".\" {\n                            return false;\n                        }\n                    }\n                    true\n                })\n                .filter_map(|e| e.ok())\n            {\n                // Convert to relative path for stable ignore matching\n                let rel = entry.path().strip_prefix(&cwd).unwrap_or(entry.path());\n                let rel_str = rel.to_string_lossy();\n                let path_str = format!(\"./{}\", rel_str.trim_start_matches(\"./\"));\n\n                // Skip hidden files and common ignore patterns\n                if should_ignore(&path_str) {\n                    continue;\n                }\n\n                if entry.file_type().is_dir() {\n                    directories.push(path_str);\n                } else {\n                    files.push(path_str);\n                }\n            }\n        } else {\n            // Non-recursive listing\n            let cwd = std::env::current_dir()\n                .map_err(|e| adk_core::AdkError::Tool(format!(\"Failed to get current dir: {}\", e)))?;\n\n            let entries = fs::read_dir(&safe_path)\n                .map_err(|e| adk_core::AdkError::Tool(format!(\"Failed to read directory: {}\", e)))?;\n\n            for entry in entries {\n                let entry = entry.map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;\n\n                // Skip hidden at top-level\n                if let Some(name) = entry.file_name().to_str() {\n                    if name.starts_with('.') {\n                        continue;\n                    }\n                }\n\n                let full = entry.path().to_path_buf();\n                let rel = full.strip_prefix(&cwd).unwrap_or(&full);\n                let rel_str = rel.to_string_lossy();\n                let path_str = format!(\"./{}\", rel_str.trim_start_matches(\"./\"));\n\n                if should_ignore(&path_str) {\n                    continue;\n                }\n\n                if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {\n                    directories.push(path_str);\n                } else {\n                    files.push(path_str);\n                }\n            }\n        }\n\n        Ok(json!({\n            \"status\": \"success\",\n            \"path\": path,\n            \"files\": files,\n            \"directories\": directories,\n            \"total_files\": files.len(),\n            \"total_directories\": directories.len()\n        }))\n    }\n}\n\nfn should_ignore(path: &str) -> bool {\n    // Normalize: we mostly work with \"./...\" relative paths now\n\n    // 1) Hide dotfiles / dot-directories broadly\n    // (We still keep root path \".\" out of this function; callers handle it)\n    if let Some(name) = Path::new(path).file_name().and_then(|n| n.to_str()) {\n        if name.starts_with('.') {\n            return true;\n        }\n    }\n\n    // 2) Common ignore patterns\n    let ignore_patterns = [\n        \"./.git\", \"./target\", \"./node_modules\", \"./.cowork\", \"./.litho\",\n        \"./.idea\", \"./.vscode\", \"./dist\", \"./build\", \"./docs\", \"./tests\",\n        \"./.archived\",\n        \".DS_Store\", \"Thumbs.db\",\n    ];\n\n    ignore_patterns.iter().any(|pattern| path.contains(pattern))\n}\n\n// ============================================================================\n// ReadFileTool\n// ============================================================================\n\npub struct ReadFileTool;\n\n#[async_trait]\nimpl Tool for ReadFileTool {\n    fn name(&self) -> &str {\n        \"read_file\"\n    }\n\n    fn description(&self) -> &str {\n        \"Read the contents of a file. \\\n         SECURITY: Only works within current directory.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"path\": {\n                    \"type\": \"string\",\n                    \"description\": \"File path to read (must be relative path within current directory)\"\n                }\n            },\n            \"required\": [\"path\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let path = args[\"path\"].as_str().unwrap();\n\n        // Security check\n        let safe_path = match validate_path_security(path) {\n            Ok(p) => p,\n            Err(e) => {\n                return Ok(json!({\n                    \"status\": \"security_error\",\n                    \"message\": e\n                }));\n            }\n        };\n\n        if !safe_path.exists() {\n            return Ok(json!({\n                \"status\": \"error\",\n                \"message\": format!(\"File not found: {}\", path)\n            }));\n        }\n        \n        match fs::read_to_string(&safe_path) {\n            Ok(content) => Ok(json!({\n                \"status\": \"success\",\n                \"path\": path,\n                \"content\": content\n            })),\n            Err(e) => Ok(json!({\n                \"status\": \"error\",\n                \"message\": format!(\"Failed to read file: {}\", e)\n            })),\n        }\n    }\n}\n\n// ============================================================================\n// WriteFileTool\n// ============================================================================\n\npub struct WriteFileTool;\n\n#[async_trait]\nimpl Tool for WriteFileTool {\n    fn name(&self) -> &str {\n        \"write_file\"\n    }\n\n    fn description(&self) -> &str {\n        \"Write content to a file. Creates parent directories if needed. \\\n         SECURITY: Only works within current directory. Absolute paths and .. are forbidden.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"path\": {\n                    \"type\": \"string\",\n                    \"description\": \"File path to write (must be relative path within current directory)\"\n                },\n                \"content\": {\n                    \"type\": \"string\",\n                    \"description\": \"Content to write\"\n                }\n            },\n            \"required\": [\"path\", \"content\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let path = args[\"path\"].as_str().unwrap();\n        let content = args[\"content\"].as_str().unwrap();\n\n        // Security check\n        let safe_path = match validate_path_security(path) {\n            Ok(p) => p,\n            Err(e) => {\n                return Ok(json!({\n                    \"status\": \"security_error\",\n                    \"message\": e\n                }));\n            }\n        };\n\n        // Create parent directories if needed\n        if let Some(parent) = safe_path.parent() {\n            fs::create_dir_all(parent).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;\n        }\n\n        match fs::write(&safe_path, content) {\n            Ok(_) => {\n                // Log file creation for user visibility\n                println!(\"📝 Writing file: {} ({} lines)\", path, content.lines().count());\n                Ok(json!({\n                    \"status\": \"success\",\n                    \"path\": path,\n                    \"lines_written\": content.lines().count()\n                }))\n            },\n            Err(e) => Ok(json!({\n                \"status\": \"error\",\n                \"message\": format!(\"Failed to write file: {}\", e)\n            })),\n        }\n    }\n}\n\n// ============================================================================\n// RunCommandTool with blocking detection\n// ============================================================================\n\npub struct RunCommandTool;\n\n/// Detect if a command is a long-running service that would block execution\nfn is_blocking_service_command(command: &str) -> bool {\n    let blocking_patterns = vec![\n        \"http.server\",      // python -m http.server\n        \"npm run dev\",      // npm dev server\n        \"npm start\",        // npm start\n        \"yarn dev\",\n        \"yarn start\",\n        \"pnpm dev\",\n        \"pnpm start\",\n        \"uvicorn\",          // Python ASGI server\n        \"gunicorn\",         // Python WSGI server\n        \"flask run\",\n        \"django runserver\",\n        \"rails server\",\n        \"cargo run\",        // Might be a server\n        \"serve\",            // serve package\n        \"webpack-dev-server\",\n        \"vite\",\n        \"next dev\",\n    ];\n\n    blocking_patterns.iter().any(|pattern| command.contains(pattern))\n}\n\n#[async_trait]\nimpl Tool for RunCommandTool {\n    fn name(&self) -> &str {\n        \"run_command\"\n    }\n\n    fn description(&self) -> &str {\n        \"Execute a shell command and return the output. \\\n         WARNING: This tool will REJECT commands that start long-running services \\\n         (like http.server, npm dev, etc.) as they would block execution. \\\n         Use this for: building, testing, linting - NOT for starting servers.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"command\": {\n                    \"type\": \"string\",\n                    \"description\": \"Shell command to execute (must not be a blocking service command)\"\n                }\n            },\n            \"required\": [\"command\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let command = args[\"command\"].as_str().unwrap();\n\n        // Check if command would block\n        if is_blocking_service_command(command) {\n            return Ok(json!({\n                \"status\": \"rejected\",\n                \"message\": format!(\n                    \"BLOCKED: This command appears to start a long-running service: '{}'. \\\n                     Starting services would block the agent. \\\n                     If you need to verify the code works, just create the files - don't start servers.\",\n                    command\n                )\n            }));\n        }\n\n        // Execute command with timeout\n        let output = tokio::time::timeout(\n            std::time::Duration::from_secs(30),\n            tokio::process::Command::new(\"sh\")\n                .arg(\"-c\")\n                .arg(command)\n                .current_dir(std::env::current_dir().unwrap()) // Run in current dir\n                .output()\n        )\n        .await;\n\n        match output {\n            Ok(Ok(output)) => {\n                let stdout = String::from_utf8_lossy(&output.stdout).to_string();\n                let stderr = String::from_utf8_lossy(&output.stderr).to_string();\n\n                Ok(json!({\n                    \"status\": if output.status.success() { \"success\" } else { \"failed\" },\n                    \"exit_code\": output.status.code(),\n                    \"stdout\": stdout,\n                    \"stderr\": stderr\n                }))\n            }\n            Ok(Err(e)) => {\n                Ok(json!({\n                    \"status\": \"error\",\n                    \"message\": format!(\"Failed to execute command: {}\", e)\n                }))\n            }\n            Err(_) => {\n                Ok(json!({\n                    \"status\": \"timeout\",\n                    \"message\": \"Command execution timeout (30s limit)\"\n                }))\n            }\n        }\n    }\n}\n"
+      "source_summary": "// File operation tools with SECURITY constraints\nuse adk_core::{Tool, ToolContext};\nuse async_trait::async_trait;\nuse serde_json::{json, Value};\nuse std::sync::Arc;\nuse std::fs;\nuse std::path::{Path, PathBuf};\nuse walkdir::WalkDir;\n\n// ============================================================================\n// Security Helper - Path Validation\n// ============================================================================\n\n/// Validate that a path is safe to access\n/// Rules:\n/// 1. Must be relative path (no absolute paths like /tmp, C:\\)\n/// 2. Must not escape current directory (no ..)\n/// 3. Must be within current working directory or .cowork\nfn validate_path_security(path: &str) -> Result<PathBuf, String> {\n    let path_obj = Path::new(path);\n    \n    // Rule 1: Reject absolute paths\n    if path_obj.is_absolute() {\n        return Err(format!(\n            \"Security: Absolute paths are not allowed. Path '{}' must be relative to current directory.\",\n            path\n        ));\n    }\n    \n    // Rule 2: Reject parent directory access (..)\n    if path.contains(\"..\") {\n        return Err(format!(\n            \"Security: Parent directory access (..) is not allowed. Path: '{}'\",\n            path\n        ));\n    }\n    \n    // Rule 3: Canonicalize and verify it's within current directory\n    let current_dir = std::env::current_dir()\n        .map_err(|e| format!(\"Failed to get current directory: {}\", e))?;\n    \n    let full_path = current_dir.join(path);\n    \n    // Canonicalize if path exists, otherwise just check the constructed path\n    let canonical_path = if full_path.exists() {\n        full_path.canonicalize()\n            .map_err(|e| format!(\"Failed to resolve path: {}\", e))?\n    } else {\n        // For non-existent paths (e.g., files to be created), just verify parent\n        full_path\n    };\n    \n    // Verify the path is within current directory\n    if !canonical_path.starts_with(&current_dir) {\n        return Err(format!(\n            \"Security: Path escapes current directory. Path '{}' resolves to '{}'\",\n            path,\n            canonical_path.display()\n        ));\n    }\n    \n    Ok(canonical_path)\n}\n\n// ============================================================================\n// ListFilesTool\n// ============================================================================\n\npub struct ListFilesTool;\n\n#[async_trait]\nimpl Tool for ListFilesTool {\n    fn name(&self) -> &str {\n        \"list_files\"\n    }\n\n    fn description(&self) -> &str {\n        \"List files in a directory (recursively or non-recursively). \\\n         SECURITY: Only works within current directory. \\\n         Useful for understanding project structure.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"path\": {\n                    \"type\": \"string\",\n                    \"description\": \"Directory path to list (default: current directory). Must be relative path.\"\n                },\n                \"recursive\": {\n                    \"type\": \"boolean\",\n                    \"description\": \"Whether to list files recursively (default: false)\"\n                },\n                \"max_depth\": {\n                    \"type\": \"integer\",\n                    \"description\": \"Maximum depth for recursive listing (default: 3)\"\n                }\n            }\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let path = args.get(\"path\")\n            .and_then(|v| v.as_str())\n            .unwrap_or(\".\");\n        \n        // Security check\n        let safe_path = match validate_path_security(path) {\n            Ok(p) => p,\n            Err(e) => {\n                return Ok(json!({\n                    \"status\": \"security_error\",\n                    \"message\": e\n                }));\n            }\n        };\n        \n        let recursive = args.get(\"recursive\")\n            .and_then(|v| v.as_bool())\n            .unwrap_or(false);\n        \n        let max_depth = args.get(\"max_depth\")\n            .and_then(|v| v.as_u64())\n            .unwrap_or(3) as usize;\n\n        if !safe_path.exists() {\n            return Ok(json!({\n                \"status\": \"error\",\n                \"message\": format!(\"Path not found: {}\", path)\n            }));\n        }\n\n        let mut files = Vec::new();\n        let mut directories = Vec::new();\n\n        if recursive {\n            // Recursive listing with max depth\n            let cwd = std::env::current_dir()\n                .map_err(|e| adk_core::AdkError::Tool(format!(\"Failed to get current dir: {}\", e)))?;\n\n            for entry in WalkDir::new(&safe_path)\n                .max_depth(max_depth)\n                .follow_links(false)\n                .into_iter()\n                .filter_entry(|e| {\n                    // Prune hidden directories early (except the root itself)\n                    if let Some(name) = e.file_name().to_str() {\n                        if name.starts_with('.') && name != \".\" {\n                            return false;\n                        }\n                    }\n                    true\n                })\n                .filter_map(|e| e.ok())\n            {\n                // Convert to relative path for stable ignore matching\n                let rel = entry.path().strip_prefix(&cwd).unwrap_or(entry.path());\n                let rel_str = rel.to_string_lossy();\n                let path_str = format!(\"./{}\", rel_str.trim_start_matches(\"./\"));\n\n                // Skip hidden files and common ignore patterns\n                if should_ignore(&path_str) {\n                    continue;\n                }\n\n                if entry.file_type().is_dir() {\n                    directories.push(path_str);\n                } else {\n                    files.push(path_str);\n                }\n            }\n        } else {\n            // Non-recursive listing\n            let cwd = std::env::current_dir()\n                .map_err(|e| adk_core::AdkError::Tool(format!(\"Failed to get current dir: {}\", e)))?;\n\n            let entries = fs::read_dir(&safe_path)\n                .map_err(|e| adk_core::AdkError::Tool(format!(\"Failed to read directory: {}\", e)))?;\n\n            for entry in entries {\n                let entry = entry.map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;\n\n                // Skip hidden at top-level\n                if let Some(name) = entry.file_name().to_str() {\n                    if name.starts_with('.') {\n                        continue;\n                    }\n                }\n\n                let full = entry.path().to_path_buf();\n                let rel = full.strip_prefix(&cwd).unwrap_or(&full);\n                let rel_str = rel.to_string_lossy();\n                let path_str = format!(\"./{}\", rel_str.trim_start_matches(\"./\"));\n\n                if should_ignore(&path_str) {\n                    continue;\n                }\n\n                if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {\n                    directories.push(path_str);\n                } else {\n                    files.push(path_str);\n                }\n            }\n        }\n\n        Ok(json!({\n            \"status\": \"success\",\n            \"path\": path,\n            \"files\": files,\n            \"directories\": directories,\n            \"total_files\": files.len(),\n            \"total_directories\": directories.len()\n        }))\n    }\n}\n\nfn should_ignore(path: &str) -> bool {\n    // Normalize: we mostly work with \"./...\" relative paths now\n\n    // 1) Hide dotfiles / dot-directories broadly\n    // (We still keep root path \".\" out of this function; callers handle it)\n    if let Some(name) = Path::new(path).file_name().and_then(|n| n.to_str()) {\n        if name.starts_with('.') {\n            return true;\n        }\n    }\n\n    // 2) Common ignore patterns\n    let ignore_patterns = [\n        \"./.git\", \"./target\", \"./node_modules\", \"./.cowork\", \"./.litho\",\n        \"./.idea\", \"./.vscode\", \"./dist\", \"./build\", \"./docs\", \"./tests\",\n        \"__tests__\", \"./.archived\",\n        \".DS_Store\", \"Thumbs.db\",\n    ];\n\n    ignore_patterns.iter().any(|pattern| path.contains(pattern))\n}\n\n// ============================================================================\n// ReadFileTool\n// ============================================================================\n\npub struct ReadFileTool;\n\n#[async_trait]\nimpl Tool for ReadFileTool {\n    fn name(&self) -> &str {\n        \"read_file\"\n    }\n\n    fn description(&self) -> &str {\n        \"Read the contents of a file. \\\n         SECURITY: Only works within current directory.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"path\": {\n                    \"type\": \"string\",\n                    \"description\": \"File path to read (must be relative path within current directory)\"\n                }\n            },\n            \"required\": [\"path\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let path = args[\"path\"].as_str().unwrap();\n\n        // Security check\n        let safe_path = match validate_path_security(path) {\n            Ok(p) => p,\n            Err(e) => {\n                return Ok(json!({\n                    \"status\": \"security_error\",\n                    \"message\": e\n                }));\n            }\n        };\n\n        if !safe_path.exists() {\n            return Ok(json!({\n                \"status\": \"error\",\n                \"message\": format!(\"File not found: {}\", path)\n            }));\n        }\n        \n        match fs::read_to_string(&safe_path) {\n            Ok(content) => Ok(json!({\n                \"status\": \"success\",\n                \"path\": path,\n                \"content\": content\n            })),\n            Err(e) => Ok(json!({\n                \"status\": \"error\",\n                \"message\": format!(\"Failed to read file: {}\", e)\n            })),\n        }\n    }\n}\n\n// ============================================================================\n// WriteFileTool\n// ============================================================================\n\npub struct WriteFileTool;\n\n#[async_trait]\nimpl Tool for WriteFileTool {\n    fn name(&self) -> &str {\n        \"write_file\"\n    }\n\n    fn description(&self) -> &str {\n        \"Write content to a file. Creates parent directories if needed. \\\n         SECURITY: Only works within current directory. Absolute paths and .. are forbidden.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"path\": {\n                    \"type\": \"string\",\n                    \"description\": \"File path to write (must be relative path within current directory)\"\n                },\n                \"content\": {\n                    \"type\": \"string\",\n                    \"description\": \"Content to write\"\n                }\n            },\n            \"required\": [\"path\", \"content\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let path = args[\"path\"].as_str().unwrap();\n        let content = args[\"content\"].as_str().unwrap();\n\n        // Security check\n        let safe_path = match validate_path_security(path) {\n            Ok(p) => p,\n            Err(e) => {\n                return Ok(json!({\n                    \"status\": \"security_error\",\n                    \"message\": e\n                }));\n            }\n        };\n\n        // Create parent directories if needed\n        if let Some(parent) = safe_path.parent() {\n            fs::create_dir_all(parent).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;\n        }\n\n        match fs::write(&safe_path, content) {\n            Ok(_) => {\n                // Log file creation for user visibility\n                println!(\"📝 Writing file: {} ({} lines)\", path, content.lines().count());\n                Ok(json!({\n                    \"status\": \"success\",\n                    \"path\": path,\n                    \"lines_written\": content.lines().count()\n                }))\n            },\n            Err(e) => Ok(json!({\n                \"status\": \"error\",\n                \"message\": format!(\"Failed to write file: {}\", e)\n            })),\n        }\n    }\n}\n\n// ============================================================================\n// RunCommandTool with blocking detection\n// ============================================================================\n\npub struct RunCommandTool;\n\n/// Detect if a command is a long-running service that would block execution\nfn is_blocking_service_command(command: &str) -> bool {\n    let blocking_patterns = vec![\n        \"http.server\",      // python -m http.server\n        \"npm run dev\",      // npm dev server\n        \"npm start\",        // npm start\n        \"yarn dev\",\n        \"yarn start\",\n        \"pnpm dev\",\n        \"pnpm start\",\n        \"uvicorn\",          // Python ASGI server\n        \"gunicorn\",         // Python WSGI server\n        \"flask run\",\n        \"django runserver\",\n        \"rails server\",\n        \"cargo run\",        // Might be a server\n        \"serve\",            // serve package\n        \"webpack-dev-server\",\n        \"vite\",\n        \"next dev\",\n    ];\n\n    blocking_patterns.iter().any(|pattern| command.contains(pattern))\n}\n\n#[async_trait]\nimpl Tool for RunCommandTool {\n    fn name(&self) -> &str {\n        \"run_command\"\n    }\n\n    fn description(&self) -> &str {\n        \"Execute a shell command and return the output. \\\n         WARNING: This tool will REJECT commands that start long-running services \\\n         (like http.server, npm dev, etc.) as they would block execution. \\\n         Use this for: building, testing, linting - NOT for starting servers.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"command\": {\n                    \"type\": \"string\",\n                    \"description\": \"Shell command to execute (must not be a blocking service command)\"\n                }\n            },\n            \"required\": [\"command\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let command = args[\"command\"].as_str().unwrap();\n\n        // Check if command would block\n        if is_blocking_service_command(command) {\n            return Ok(json!({\n                \"status\": \"rejected\",\n                \"message\": format!(\n                    \"BLOCKED: This command appears to start a long-running service: '{}'. \\\n                     Starting services would block the agent. \\\n                     If you need to verify the code works, just create the files - don't start servers.\",\n                    command\n                )\n            }));\n        }\n\n        // Execute command with timeout\n        let output = tokio::time::timeout(\n            std::time::Duration::from_secs(30),\n            tokio::process::Command::new(\"sh\")\n                .arg(\"-c\")\n                .arg(command)\n                .current_dir(std::env::current_dir().unwrap()) // Run in current dir\n                .output()\n        )\n        .await;\n\n        match output {\n            Ok(Ok(output)) => {\n                let stdout = String::from_utf8_lossy(&output.stdout).to_string();\n                let stderr = String::from_utf8_lossy(&output.stderr).to_string();\n\n                Ok(json!({\n                    \"status\": if output.status.success() { \"success\" } else { \"failed\" },\n                    \"exit_code\": output.status.code(),\n                    \"stdout\": stdout,\n                    \"stderr\": stderr\n                }))\n            }\n            Ok(Err(e)) => {\n                Ok(json!({\n                    \"status\": \"error\",\n                    \"message\": format!(\"Failed to execute command: {}\", e)\n                }))\n            }\n            Err(_) => {\n                Ok(json!({\n                    \"status\": \"timeout\",\n                    \"message\": \"Command execution timeout (30s limit)\"\n                }))\n            }\n        }\n    }\n}\n"
     },
     "complexity_metrics": {
       "cyclomatic_complexity": 43.0,
       "lines_of_code": 488,
       "number_of_classes": 4,
-      "number_of_functions": 7
+      "number_of_functions": 19
     },
     "dependencies": [
       {
         "dependency_type": "library",
         "is_external": true,
-        "line_number": 2,
+        "line_number": 3,
         "name": "adk_core",
         "path": null,
         "version": null
@@ -2004,7 +1966,7 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "library",
         "is_external": true,
-        "line_number": 3,
+        "line_number": 4,
         "name": "async_trait",
         "path": null,
         "version": null
@@ -2012,7 +1974,7 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "library",
         "is_external": true,
-        "line_number": 4,
+        "line_number": 5,
         "name": "serde_json",
         "path": null,
         "version": null
@@ -2020,115 +1982,122 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "standard_library",
         "is_external": false,
-        "line_number": 5,
-        "name": "std",
+        "line_number": 6,
+        "name": "std::sync::Arc",
+        "path": null,
+        "version": null
+      },
+      {
+        "dependency_type": "standard_library",
+        "is_external": false,
+        "line_number": 7,
+        "name": "std::fs",
+        "path": null,
+        "version": null
+      },
+      {
+        "dependency_type": "standard_library",
+        "is_external": false,
+        "line_number": 8,
+        "name": "std::path",
         "path": null,
         "version": null
       },
       {
         "dependency_type": "library",
         "is_external": true,
-        "line_number": 7,
+        "line_number": 9,
         "name": "walkdir",
         "path": null,
         "version": null
-      },
-      {
-        "dependency_type": "library",
-        "is_external": true,
-        "line_number": null,
-        "name": "tokio",
-        "path": null,
-        "version": null
       }
     ],
-    "detailed_description": "This component provides secure file operation tools for the cowork-core system. It implements four main tools: ListFilesTool (recursive/non-recursive directory listing with security constraints), ReadFileTool (secure file reading within current directory), WriteFileTool (secure file writing with parent directory creation), and RunCommandTool (safe command execution with blocking service detection). The component emphasizes security through path validation that prevents absolute paths, parent directory traversal, and directory escaping. It includes intelligent features like hidden file filtering, common ignore patterns, and blocking command detection to prevent long-running service execution that would block the agent.",
+    "detailed_description": "This component provides secure file system operations and command execution capabilities for the Cowork system. It implements security constraints to prevent directory traversal attacks by validating all paths are relative and within the current working directory. The component includes four main tools: ListFilesTool for directory listing (recursive/non-recursive), ReadFileTool for file reading, WriteFileTool for file writing with automatic directory creation, and RunCommandTool for safe command execution with blocking service detection. Security is a core focus, with path validation, hidden file filtering, and command blocking for long-running services.",
     "interfaces": [
       {
-        "description": "List files in a directory (recursively or non-recursively) with security constraints",
+        "description": "Tool for listing files in directories with security constraints",
         "interface_type": "struct",
         "name": "ListFilesTool",
-        "parameters": [
-          {
-            "description": "Directory path to list (default: current directory). Must be relative path.",
-            "is_optional": true,
-            "name": "path",
-            "param_type": "string"
-          },
-          {
-            "description": "Whether to list files recursively (default: false)",
-            "is_optional": true,
-            "name": "recursive",
-            "param_type": "boolean"
-          },
-          {
-            "description": "Maximum depth for recursive listing (default: 3)",
-            "is_optional": true,
-            "name": "max_depth",
-            "param_type": "integer"
-          }
-        ],
-        "return_type": "Value",
+        "parameters": [],
+        "return_type": null,
         "visibility": "public"
       },
       {
-        "description": "Read the contents of a file with security constraints",
+        "description": "Tool for reading file contents with path validation",
         "interface_type": "struct",
         "name": "ReadFileTool",
-        "parameters": [
-          {
-            "description": "File path to read (must be relative path within current directory)",
-            "is_optional": false,
-            "name": "path",
-            "param_type": "string"
-          }
-        ],
-        "return_type": "Value",
+        "parameters": [],
+        "return_type": null,
         "visibility": "public"
       },
       {
-        "description": "Write content to a file with parent directory creation and security constraints",
+        "description": "Tool for writing files with automatic directory creation",
         "interface_type": "struct",
         "name": "WriteFileTool",
-        "parameters": [
-          {
-            "description": "File path to write (must be relative path within current directory)",
-            "is_optional": false,
-            "name": "path",
-            "param_type": "string"
-          },
-          {
-            "description": "Content to write",
-            "is_optional": false,
-            "name": "content",
-            "param_type": "string"
-          }
-        ],
-        "return_type": "Value",
+        "parameters": [],
+        "return_type": null,
         "visibility": "public"
       },
       {
-        "description": "Execute a shell command with timeout protection and blocking service detection",
+        "description": "Tool for executing commands with blocking service detection",
         "interface_type": "struct",
         "name": "RunCommandTool",
+        "parameters": [],
+        "return_type": null,
+        "visibility": "public"
+      },
+      {
+        "description": "Validates path security according to security rules",
+        "interface_type": "function",
+        "name": "validate_path_security",
         "parameters": [
           {
-            "description": "Shell command to execute (must not be a blocking service command)",
+            "description": "Path to validate for security",
             "is_optional": false,
-            "name": "command",
-            "param_type": "string"
+            "name": "path",
+            "param_type": "&str"
           }
         ],
-        "return_type": "Value",
-        "visibility": "public"
+        "return_type": "Result<PathBuf, String>",
+        "visibility": "private"
+      },
+      {
+        "description": "Determines if a path should be ignored based on patterns",
+        "interface_type": "function",
+        "name": "should_ignore",
+        "parameters": [
+          {
+            "description": "Path to check against ignore patterns",
+            "is_optional": false,
+            "name": "path",
+            "param_type": "&str"
+          }
+        ],
+        "return_type": "bool",
+        "visibility": "private"
+      },
+      {
+        "description": "Detects if a command is a long-running blocking service",
+        "interface_type": "function",
+        "name": "is_blocking_service_command",
+        "parameters": [
+          {
+            "description": "Command to check for blocking patterns",
+            "is_optional": false,
+            "name": "command",
+            "param_type": "&str"
+          }
+        ],
+        "return_type": "bool",
+        "visibility": "private"
       }
     ],
     "responsibilities": [
-      "Provide secure file system operations with enforced security constraints",
-      "Implement directory listing with recursive/non-recursive options and intelligent filtering",
-      "Enable safe file reading and writing within constrained directory boundaries",
-      "Execute shell commands safely with timeout protection and blocking service detection",
-      "Maintain security boundaries by preventing path traversal and unauthorized access"
+      "Secure file system operations with path validation and access control",
+      "Directory and file listing with recursive capabilities and security constraints",
+      "File content reading and writing with automatic directory creation",
+      "Safe command execution with blocking service detection and timeout protection",
+      "Security policy enforcement including hidden file filtering and path traversal prevention"
     ]
   },
   {
@@ -2710,61 +2679,99 @@ Code analysis results from preprocessing phase, including definitions of functio
   {
     "code_dossier": {
       "code_purpose": "tool",
-      "description": "Data operation tools for managing structured development artifacts (requirements, features, design components, tasks) within a session scope",
+      "description": null,
       "file_path": "crates/cowork-core/src/tools/data_tools.rs",
       "functions": [
-        "create_requirement",
-        "add_feature",
-        "create_design_component",
-        "create_task",
-        "update_feature_status",
-        "update_task_status",
-        "get_requirements",
-        "get_design",
-        "get_plan"
+        "CreateRequirementTool::new",
+        "CreateRequirementTool::name",
+        "CreateRequirementTool::description",
+        "CreateRequirementTool::parameters_schema",
+        "CreateRequirementTool::execute",
+        "AddFeatureTool::new",
+        "AddFeatureTool::name",
+        "AddFeatureTool::description",
+        "AddFeatureTool::parameters_schema",
+        "AddFeatureTool::execute",
+        "CreateDesignComponentTool::new",
+        "CreateDesignComponentTool::name",
+        "CreateDesignComponentTool::description",
+        "CreateDesignComponentTool::parameters_schema",
+        "CreateDesignComponentTool::execute",
+        "CreateTaskTool::new",
+        "CreateTaskTool::name",
+        "CreateTaskTool::description",
+        "CreateTaskTool::parameters_schema",
+        "CreateTaskTool::execute",
+        "UpdateFeatureStatusTool::new",
+        "UpdateFeatureStatusTool::name",
+        "UpdateFeatureStatusTool::description",
+        "UpdateFeatureStatusTool::parameters_schema",
+        "UpdateFeatureStatusTool::execute",
+        "UpdateTaskStatusTool::new",
+        "UpdateTaskStatusTool::name",
+        "UpdateTaskStatusTool::description",
+        "UpdateTaskStatusTool::parameters_schema",
+        "UpdateTaskStatusTool::execute",
+        "UpdateTaskTool::new",
+        "UpdateTaskTool::name",
+        "UpdateTaskTool::description",
+        "UpdateTaskTool::parameters_schema",
+        "UpdateTaskTool::execute",
+        "DeleteTaskTool::new",
+        "DeleteTaskTool::name",
+        "DeleteTaskTool::description",
+        "DeleteTaskTool::parameters_schema",
+        "DeleteTaskTool::execute",
+        "GetRequirementsTool::new",
+        "GetRequirementsTool::name",
+        "GetRequirementsTool::description",
+        "GetRequirementsTool::parameters_schema",
+        "GetRequirementsTool::execute",
+        "GetDesignTool::new",
+        "GetDesignTool::name",
+        "GetDesignTool::description",
+        "GetDesignTool::parameters_schema",
+        "GetDesignTool::execute",
+        "GetPlanTool::new",
+        "GetPlanTool::name",
+        "GetPlanTool::description",
+        "GetPlanTool::parameters_schema",
+        "GetPlanTool::execute"
       ],
       "importance_score": 0.8,
       "interfaces": [
-        "CreateRequirementTool",
-        "AddFeatureTool",
-        "CreateDesignComponentTool",
-        "CreateTaskTool",
-        "UpdateFeatureStatusTool",
-        "UpdateTaskStatusTool",
-        "GetRequirementsTool",
-        "GetDesignTool",
-        "GetPlanTool"
+        "Tool"
       ],
       "name": "data_tools.rs",
-      "source_summary": "// Data operation tools - Create and modify structured data (Session-scoped)\nuse crate::data::*;\nuse crate::storage::*;\nuse adk_core::{Tool, ToolContext, AdkError};\nuse async_trait::async_trait;\nuse serde_json::{json, Value};\nuse std::sync::Arc;\n\n// ============================================================================\n// CreateRequirementTool\n// ============================================================================\n\npub struct CreateRequirementTool {\n    session_id: String,\n}\n\nimpl CreateRequirementTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for CreateRequirementTool {\n    fn name(&self) -> &str {\n        \"create_requirement\"\n    }\n\n    fn description(&self) -> &str {\n        \"Create a new requirement in requirements.json. Requirements define what \\\n         the system must do. Each requirement should be SMART (Specific, Measurable, \\\n         Achievable, Relevant, Time-bound) with clear acceptance criteria.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"title\": {\n                    \"type\": \"string\",\n                    \"description\": \"Brief requirement title\"\n                },\n                \"description\": {\n                    \"type\": \"string\",\n                    \"description\": \"Detailed description of the requirement\"\n                },\n                \"priority\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"high\", \"medium\", \"low\"],\n                    \"description\": \"Priority level\"\n                },\n                \"category\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"functional\", \"non_functional\"],\n                    \"description\": \"Requirement category\"\n                },\n                \"acceptance_criteria\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"List of acceptance criteria\"\n                }\n            },\n            \"required\": [\"title\", \"description\", \"priority\", \"category\", \"acceptance_criteria\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let mut reqs = load_requirements(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        let req_id = generate_id(\"REQ\", reqs.requirements.len());\n\n        let priority = match args[\"priority\"].as_str().unwrap() {\n            \"high\" => Priority::High,\n            \"medium\" => Priority::Medium,\n            \"low\" => Priority::Low,\n            _ => Priority::Medium,\n        };\n\n        let category = match args[\"category\"].as_str().unwrap() {\n            \"functional\" => RequirementCategory::Functional,\n            \"non_functional\" => RequirementCategory::NonFunctional,\n            _ => RequirementCategory::Functional,\n        };\n\n        let requirement = Requirement {\n            id: req_id.clone(),\n            title: args[\"title\"].as_str().unwrap().to_string(),\n            description: args[\"description\"].as_str().unwrap().to_string(),\n            priority,\n            category,\n            acceptance_criteria: args[\"acceptance_criteria\"]\n                .as_array()\n                .unwrap()\n                .iter()\n                .map(|v| v.as_str().unwrap().to_string())\n                .collect(),\n            related_features: vec![],\n        };\n\n        reqs.requirements.push(requirement.clone());\n        reqs.updated_at = chrono::Utc::now();\n        save_requirements(&self.session_id, &reqs).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        println!(\"✅ Created: {} - {}\", req_id, requirement.title);\n\n        Ok(json!({\n            \"status\": \"success\",\n            \"requirement_id\": req_id,\n            \"message\": format!(\"Requirement {} created successfully\", req_id)\n        }))\n    }\n}\n\n// ============================================================================\n// AddFeatureTool\n// ============================================================================\n\npub struct AddFeatureTool {\n    session_id: String,\n}\n\nimpl AddFeatureTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for AddFeatureTool {\n    fn name(&self) -> &str {\n        \"add_feature\"\n    }\n\n    fn description(&self) -> &str {\n        \"Add a new feature to feature_list.json. Features are concrete \\\n         functionalities that implement one or more requirements. Each \\\n         feature will later be broken down into implementation tasks.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"name\": {\n                    \"type\": \"string\",\n                    \"description\": \"Feature name\"\n                },\n                \"description\": {\n                    \"type\": \"string\",\n                    \"description\": \"Detailed description\"\n                },\n                \"requirement_ids\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"IDs of requirements this feature implements\"\n                },\n                \"completion_criteria\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"Criteria for feature completion\"\n                }\n            },\n            \"required\": [\"name\", \"description\", \"requirement_ids\", \"completion_criteria\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let mut features = load_feature_list(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        let feat_id = generate_id(\"FEAT\", features.features.len());\n\n        let feature = Feature {\n            id: feat_id.clone(),\n            name: args[\"name\"].as_str().unwrap().to_string(),\n            description: args[\"description\"].as_str().unwrap().to_string(),\n            requirement_ids: args[\"requirement_ids\"]\n                .as_array()\n                .unwrap()\n                .iter()\n                .map(|v| v.as_str().unwrap().to_string())\n                .collect(),\n            status: FeatureStatus::Pending,\n            assigned_to_tasks: vec![],\n            completion_criteria: args[\"completion_criteria\"]\n                .as_array()\n                .unwrap()\n                .iter()\n                .map(|v| v.as_str().unwrap().to_string())\n                .collect(),\n            created_at: chrono::Utc::now(),\n            completed_at: None,\n            metadata: FeatureMetadata::default(),\n        };\n\n        features.features.push(feature);\n        save_feature_list(&self.session_id, &features).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        Ok(json!({\n            \"status\": \"success\",\n            \"feature_id\": feat_id,\n            \"message\": format!(\"Feature {} created successfully\", feat_id)\n        }))\n    }\n}\n\n// ============================================================================\n// CreateDesignComponentTool\n// ============================================================================\n\npub struct CreateDesignComponentTool {\n    session_id: String,\n}\n\nimpl CreateDesignComponentTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for CreateDesignComponentTool {\n    fn name(&self) -> &str {\n        \"create_design_component\"\n    }\n\n    fn description(&self) -> &str {\n        \"Create a new component in design_spec.json. Components are the \\\n         architectural building blocks (services, modules, UI components) \\\n         that implement features.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"name\": {\n                    \"type\": \"string\",\n                    \"description\": \"Component name\"\n                },\n                \"component_type\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"backend_service\", \"frontend_component\", \"database\", \"api_gateway\"],\n                    \"description\": \"Type of component\"\n                },\n                \"responsibilities\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"List of responsibilities\"\n                },\n                \"technology\": {\n                    \"type\": \"string\",\n                    \"description\": \"Technology stack\"\n                },\n                \"related_features\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"Related feature IDs\"\n                }\n            },\n            \"required\": [\"name\", \"component_type\", \"responsibilities\", \"technology\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let mut design = load_design_spec(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        let comp_id = generate_id(\"COMP\", design.architecture.components.len());\n\n        let component_type = args.get(\"component_type\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| AdkError::Tool(\"Missing or invalid 'component_type' parameter\".to_string()))?;\n        \n        let component_type = match component_type {\n            \"backend_service\" => ComponentType::BackendService,\n            \"frontend_component\" => ComponentType::FrontendComponent,\n            \"database\" => ComponentType::Database,\n            \"api_gateway\" => ComponentType::ApiGateway,\n            other => ComponentType::Other(other.to_string()),\n        };\n\n        let name = args.get(\"name\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| AdkError::Tool(\"Missing or invalid 'name' parameter\".to_string()))?\n            .to_string();\n\n        let technology = args.get(\"technology\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| AdkError::Tool(\"Missing or invalid 'technology' parameter\".to_string()))?\n            .to_string();\n\n        let responsibilities = args.get(\"responsibilities\")\n            .and_then(|v| v.as_array())\n            .ok_or_else(|| AdkError::Tool(\"Missing or invalid 'responsibilities' parameter (must be an array)\".to_string()))?\n            .iter()\n            .filter_map(|v| v.as_str().map(|s| s.to_string()))\n            .collect::<Vec<String>>();\n\n        if responsibilities.is_empty() {\n            return Err(AdkError::Tool(\"'responsibilities' array cannot be empty\".to_string()));\n        }\n\n        let related_features = args.get(\"related_features\")\n            .and_then(|v| v.as_array())\n            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())\n            .unwrap_or_default();\n\n        let component = DesignComponent {\n            id: comp_id.clone(),\n            name,\n            component_type,\n            responsibilities,\n            technology,\n            interfaces: vec![],\n            related_features,\n        };\n\n        design.architecture.components.push(component.clone());\n        save_design_spec(&self.session_id, &design).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        println!(\"🏗️  Created component: {} - {}\", comp_id, component.name);\n\n        Ok(json!({\n            \"status\": \"success\",\n            \"component_id\": comp_id,\n            \"message\": format!(\"Component {} created successfully\", comp_id)\n        }))\n    }\n}\n\n// ============================================================================\n// CreateTaskTool\n// ============================================================================\n\npub struct CreateTaskTool {\n    session_id: String,\n}\n\nimpl CreateTaskTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for CreateTaskTool {\n    fn name(&self) -> &str {\n        \"create_task\"\n    }\n\n    fn description(&self) -> &str {\n        \"Create an implementation task in implementation_plan.json. Tasks \\\n         are concrete coding work items that implement features.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"title\": {\"type\": \"string\"},\n                \"description\": {\"type\": \"string\"},\n                \"feature_id\": {\"type\": \"string\"},\n                \"component_id\": {\"type\": \"string\"},\n                \"files_to_create\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"}\n                },\n                \"dependencies\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"Task IDs that must be completed first\"\n                },\n                \"acceptance_criteria\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"}\n                }\n            },\n            \"required\": [\"title\", \"description\", \"feature_id\", \"component_id\", \"acceptance_criteria\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let mut plan = load_implementation_plan(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        let task_id = generate_id(\"TASK\", plan.tasks.len());\n\n        let task = Task {\n            id: task_id.clone(),\n            title: args[\"title\"].as_str().unwrap().to_string(),\n            description: args[\"description\"].as_str().unwrap().to_string(),\n            feature_id: args[\"feature_id\"].as_str().unwrap().to_string(),\n            component_id: args[\"component_id\"].as_str().unwrap().to_string(),\n            status: TaskStatus::Pending,\n            dependencies: args.get(\"dependencies\")\n                .and_then(|v| v.as_array())\n                .map(|arr| arr.iter().map(|v| v.as_str().unwrap().to_string()).collect())\n                .unwrap_or_default(),\n            estimated_effort: None,\n            files_to_create: args.get(\"files_to_create\")\n                .and_then(|v| v.as_array())\n                .map(|arr| arr.iter().map(|v| v.as_str().unwrap().to_string()).collect())\n                .unwrap_or_default(),\n            acceptance_criteria: args[\"acceptance_criteria\"]\n                .as_array()\n                .unwrap()\n                .iter()\n                .map(|v| v.as_str().unwrap().to_string())\n                .collect(),\n            created_at: chrono::Utc::now(),\n            started_at: None,\n            completed_at: None,\n        };\n\n        plan.tasks.push(task);\n        save_implementation_plan(&self.session_id, &plan).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        Ok(json!({\n            \"status\": \"success\",\n            \"task_id\": task_id,\n            \"message\": format!(\"Task {} created successfully\", task_id)\n        }))\n    }\n}\n\n// ============================================================================\n// Update Status Tools\n// ============================================================================\n\npub struct UpdateFeatureStatusTool {\n    session_id: String,\n}\n\nimpl UpdateFeatureStatusTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for UpdateFeatureStatusTool {\n    fn name(&self) -> &str {\n        \"update_feature_status\"\n    }\n\n    fn description(&self) -> &str {\n        \"Update the status of a feature. Valid transitions: \\\n         pending → in_progress → completed.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"feature_id\": {\"type\": \"string\"},\n                \"new_status\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"pending\", \"in_progress\", \"completed\", \"blocked\"]\n                }\n            },\n            \"required\": [\"feature_id\", \"new_status\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let mut features = load_feature_list(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        let feature_id = args[\"feature_id\"].as_str().unwrap();\n        let new_status_str = args[\"new_status\"].as_str().unwrap();\n\n        let new_status = match new_status_str {\n            \"pending\" => FeatureStatus::Pending,\n            \"in_progress\" => FeatureStatus::InProgress,\n            \"completed\" => FeatureStatus::Completed,\n            \"blocked\" => FeatureStatus::Blocked,\n            _ => FeatureStatus::Pending,\n        };\n\n        if let Some(feature) = features.features.iter_mut().find(|f| f.id == feature_id) {\n            feature.status = new_status;\n            if new_status_str == \"completed\" {\n                feature.completed_at = Some(chrono::Utc::now());\n            }\n            save_feature_list(&self.session_id, &features).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n            Ok(json!({\n                \"status\": \"success\",\n                \"feature_id\": feature_id,\n                \"new_status\": new_status_str,\n                \"message\": format!(\"Feature {} status updated to {}\", feature_id, new_status_str)\n            }))\n        } else {\n            Ok(json!({\n                \"status\": \"error\",\n                \"message\": format!(\"Feature {} not found\", feature_id)\n            }))\n        }\n    }\n}\n\npub struct UpdateTaskStatusTool {\n    session_id: String,\n}\n\nimpl UpdateTaskStatusTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for UpdateTaskStatusTool {\n    fn name(&self) -> &str {\n        \"update_task_status\"\n    }\n\n    fn description(&self) -> &str {\n        \"Update task status. Call this as you start and complete tasks.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"task_id\": {\"type\": \"string\"},\n                \"new_status\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"pending\", \"in_progress\", \"completed\", \"blocked\"]\n                }\n            },\n            \"required\": [\"task_id\", \"new_status\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let mut plan = load_implementation_plan(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        let task_id = args.get(\"task_id\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| AdkError::Tool(\"Missing or invalid 'task_id' parameter\".to_string()))?;\n        \n        let new_status_str = args.get(\"new_status\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| AdkError::Tool(\"Missing or invalid 'new_status' parameter\".to_string()))?;\n\n        let new_status = match new_status_str {\n            \"pending\" => TaskStatus::Pending,\n            \"in_progress\" => TaskStatus::InProgress,\n            \"completed\" => TaskStatus::Completed,\n            \"blocked\" => TaskStatus::Blocked,\n            _ => return Err(AdkError::Tool(format!(\"Invalid status: {}. Must be one of: pending, in_progress, completed, blocked\", new_status_str))),\n        };\n\n        if let Some(task) = plan.tasks.iter_mut().find(|t| t.id == task_id) {\n            task.status = new_status;\n            match new_status_str {\n                \"in_progress\" => task.started_at = Some(chrono::Utc::now()),\n                \"completed\" => task.completed_at = Some(chrono::Utc::now()),\n                _ => {}\n            }\n            save_implementation_plan(&self.session_id, &plan).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n            println!(\"✓ Task {} → {}\", task_id, new_status_str);\n\n            Ok(json!({\n                \"status\": \"success\",\n                \"task_id\": task_id,\n                \"new_status\": new_status_str\n            }))\n        } else {\n            Ok(json!({\n                \"status\": \"error\",\n                \"message\": format!(\"Task {} not found\", task_id)\n            }))\n        }\n    }\n}\n\n// ============================================================================\n// Get/Read Tools\n// ============================================================================\n\npub struct GetRequirementsTool {\n    session_id: String,\n}\n\nimpl GetRequirementsTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for GetRequirementsTool {\n    fn name(&self) -> &str {\n        \"get_requirements\"\n    }\n\n    fn description(&self) -> &str {\n        \"Retrieve all requirements and features.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {}\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {\n        let requirements = load_requirements(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n        let features = load_feature_list(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        Ok(json!({\n            \"requirements\": requirements.requirements,\n            \"features\": features.features\n        }))\n    }\n}\n\npub struct GetDesignTool {\n    session_id: String,\n}\n\nimpl GetDesignTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for GetDesignTool {\n    fn name(&self) -> &str {\n        \"get_design\"\n    }\n\n    fn description(&self) -> &str {\n        \"Retrieve the design specification.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\"type\": \"object\", \"properties\": {}}))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {\n        let design = load_design_spec(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n        Ok(serde_json::to_value(design).map_err(|e| AdkError::Tool(e.to_string()))?)\n    }\n}\n\npub struct GetPlanTool {\n    session_id: String,\n}\n\nimpl GetPlanTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for GetPlanTool {\n    fn name(&self) -> &str {\n        \"get_plan\"\n    }\n\n    fn description(&self) -> &str {\n        \"Retrieve the implementation plan with all tasks.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\"type\": \"object\", \"properties\": {}}))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {\n        let plan = load_implementation_plan(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n        Ok(serde_json::to_value(plan).map_err(|e| AdkError::Tool(e.to_string()))?)\n    }\n}\n"
+      "source_summary": "// Data operation tools - Create and modify structured data (Session-scoped)\nuse crate::data::*;\nuse crate::storage::*;\nuse adk_core::{Tool, ToolContext, AdkError};\nuse async_trait::async_trait;\nuse serde_json::{json, Value};\nuse std::sync::Arc;\n\n// ============================================================================\n// CreateRequirementTool\n// ============================================================================\n\npub struct CreateRequirementTool {\n    session_id: String,\n}\n\nimpl CreateRequirementTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for CreateRequirementTool {\n    fn name(&self) -> &str {\n        \"create_requirement\"\n    }\n\n    fn description(&self) -> &str {\n        \"Create a new requirement in requirements.json. Requirements define what \\\n         the system must do. Each requirement should be SMART (Specific, Measurable, \\\n         Achievable, Relevant, Time-bound) with clear acceptance criteria.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"title\": {\n                    \"type\": \"string\",\n                    \"description\": \"Brief requirement title\"\n                },\n                \"description\": {\n                    \"type\": \"string\",\n                    \"description\": \"Detailed description of the requirement\"\n                },\n                \"priority\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"high\", \"medium\", \"low\"],\n                    \"description\": \"Priority level\"\n                },\n                \"category\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"functional\", \"non_functional\"],\n                    \"description\": \"Requirement category\"\n                },\n                \"acceptance_criteria\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"List of acceptance criteria\"\n                }\n            },\n            \"required\": [\"title\", \"description\", \"priority\", \"category\", \"acceptance_criteria\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let mut reqs = load_requirements(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        let req_id = generate_id(\"REQ\", reqs.requirements.len());\n\n        let priority = match args[\"priority\"].as_str().unwrap() {\n            \"high\" => Priority::High,\n            \"medium\" => Priority::Medium,\n            \"low\" => Priority::Low,\n            _ => Priority::Medium,\n        };\n\n        let category = match args[\"category\"].as_str().unwrap() {\n            \"functional\" => RequirementCategory::Functional,\n            \"non_functional\" => RequirementCategory::NonFunctional,\n            _ => RequirementCategory::Functional,\n        };\n\n        let requirement = Requirement {\n            id: req_id.clone(),\n            title: args[\"title\"].as_str().unwrap().to_string(),\n            description: args[\"description\"].as_str().unwrap().to_string(),\n            priority,\n            category,\n            acceptance_criteria: args[\"acceptance_criteria\"]\n                .as_array()\n                .unwrap()\n                .iter()\n                .map(|v| v.as_str().unwrap().to_string())\n                .collect(),\n            related_features: vec![],\n        };\n\n        reqs.requirements.push(requirement.clone());\n        reqs.updated_at = chrono::Utc::now();\n        save_requirements(&self.session_id, &reqs).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        println!(\"✅ Created: {} - {}\", req_id, requirement.title);\n\n        Ok(json!({\n            \"status\": \"success\",\n            \"requirement_id\": req_id,\n            \"message\": format!(\"Requirement {} created successfully\", req_id)\n        }))\n    }\n}\n\n// ============================================================================\n// AddFeatureTool\n// ============================================================================\n\npub struct AddFeatureTool {\n    session_id: String,\n}\n\nimpl AddFeatureTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for AddFeatureTool {\n    fn name(&self) -> &str {\n        \"add_feature\"\n    }\n\n    fn description(&self) -> &str {\n        \"Add a new feature to feature_list.json. Features are concrete \\\n         functionalities that implement one or more requirements. Each \\\n         feature will later be broken down into implementation tasks.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"name\": {\n                    \"type\": \"string\",\n                    \"description\": \"Feature name\"\n                },\n                \"description\": {\n                    \"type\": \"string\",\n                    \"description\": \"Detailed description\"\n                },\n                \"requirement_ids\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"IDs of requirements this feature implements\"\n                },\n                \"completion_criteria\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"Criteria for feature completion\"\n                }\n            },\n            \"required\": [\"name\", \"description\", \"requirement_ids\", \"completion_criteria\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let mut features = load_feature_list(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        let feat_id = generate_id(\"FEAT\", features.features.len());\n\n        let feature = Feature {\n            id: feat_id.clone(),\n            name: args[\"name\"].as_str().unwrap().to_string(),\n            description: args[\"description\"].as_str().unwrap().to_string(),\n            requirement_ids: args[\"requirement_ids\"]\n                .as_array()\n                .unwrap()\n                .iter()\n                .map(|v| v.as_str().unwrap().to_string())\n                .collect(),\n            status: FeatureStatus::Pending,\n            assigned_to_tasks: vec![],\n            completion_criteria: args[\"completion_criteria\"]\n                .as_array()\n                .unwrap()\n                .iter()\n                .map(|v| v.as_str().unwrap().to_string())\n                .collect(),\n            created_at: chrono::Utc::now(),\n            completed_at: None,\n            metadata: FeatureMetadata::default(),\n        };\n\n        features.features.push(feature);\n        save_feature_list(&self.session_id, &features).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        Ok(json!({\n            \"status\": \"success\",\n            \"feature_id\": feat_id,\n            \"message\": format!(\"Feature {} created successfully\", feat_id)\n        }))\n    }\n}\n\n// ============================================================================\n// CreateDesignComponentTool\n// ============================================================================\n\npub struct CreateDesignComponentTool {\n    session_id: String,\n}\n\nimpl CreateDesignComponentTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for CreateDesignComponentTool {\n    fn name(&self) -> &str {\n        \"create_design_component\"\n    }\n\n    fn description(&self) -> &str {\n        \"Create a new component in design_spec.json. Components are the \\\n         architectural building blocks (services, modules, UI components) \\\n         that implement features.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"name\": {\n                    \"type\": \"string\",\n                    \"description\": \"Component name\"\n                },\n                \"component_type\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"backend_service\", \"frontend_component\", \"database\", \"api_gateway\"],\n                    \"description\": \"Type of component\"\n                },\n                \"responsibilities\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"List of responsibilities\"\n                },\n                \"technology\": {\n                    \"type\": \"string\",\n                    \"description\": \"Technology stack\"\n                },\n                \"related_features\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"Related feature IDs\"\n                }\n            },\n            \"required\": [\"name\", \"component_type\", \"responsibilities\", \"technology\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let mut design = load_design_spec(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        let comp_id = generate_id(\"COMP\", design.architecture.components.len());\n\n        let component_type = args.get(\"component_type\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| AdkError::Tool(\"Missing or invalid 'component_type' parameter\".to_string()))?;\n        \n        let component_type = match component_type {\n            \"backend_service\" => ComponentType::BackendService,\n            \"frontend_component\" => ComponentType::FrontendComponent,\n            \"database\" => ComponentType::Database,\n            \"api_gateway\" => ComponentType::ApiGateway,\n            other => ComponentType::Other(other.to_string()),\n        };\n\n        let name = args.get(\"name\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| AdkError::Tool(\"Missing or invalid 'name' parameter\".to_string()))?\n            .to_string();\n\n        let technology = args.get(\"technology\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| AdkError::Tool(\"Missing or invalid 'technology' parameter\".to_string()))?\n            .to_string();\n\n        let responsibilities = args.get(\"responsibilities\")\n            .and_then(|v| v.as_array())\n            .ok_or_else(|| AdkError::Tool(\"Missing or invalid 'responsibilities' parameter (must be an array)\".to_string()))?\n            .iter()\n            .filter_map(|v| v.as_str().map(|s| s.to_string()))\n            .collect::<Vec<String>>();\n\n        if responsibilities.is_empty() {\n            return Err(AdkError::Tool(\"'responsibilities' array cannot be empty\".to_string()));\n        }\n\n        let related_features = args.get(\"related_features\")\n            .and_then(|v| v.as_array())\n            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())\n            .unwrap_or_default();\n\n        let component = DesignComponent {\n            id: comp_id.clone(),\n            name,\n            component_type,\n            responsibilities,\n            technology,\n            interfaces: vec![],\n            related_features,\n        };\n\n        design.architecture.components.push(component.clone());\n        save_design_spec(&self.session_id, &design).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        println!(\"🏗️  Created component: {} - {}\", comp_id, component.name);\n\n        Ok(json!({\n            \"status\": \"success\",\n            \"component_id\": comp_id,\n            \"message\": format!(\"Component {} created successfully\", comp_id)\n        }))\n    }\n}\n\n// ============================================================================\n// CreateTaskTool\n// ============================================================================\n\npub struct CreateTaskTool {\n    session_id: String,\n}\n\nimpl CreateTaskTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for CreateTaskTool {\n    fn name(&self) -> &str {\n        \"create_task\"\n    }\n\n    fn description(&self) -> &str {\n        \"Create an implementation task in implementation_plan.json. Tasks \\\n         are concrete coding work items that implement features.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"title\": {\"type\": \"string\"},\n                \"description\": {\"type\": \"string\"},\n                \"feature_id\": {\"type\": \"string\"},\n                \"component_id\": {\"type\": \"string\"},\n                \"files_to_create\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"}\n                },\n                \"dependencies\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"Task IDs that must be completed first\"\n                },\n                \"acceptance_criteria\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"}\n                }\n            },\n            \"required\": [\"title\", \"description\", \"feature_id\", \"component_id\", \"acceptance_criteria\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let mut plan = load_implementation_plan(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        let task_id = generate_id(\"TASK\", plan.tasks.len());\n\n        let task = Task {\n            id: task_id.clone(),\n            title: args[\"title\"].as_str().unwrap().to_string(),\n            description: args[\"description\"].as_str().unwrap().to_string(),\n            feature_id: args[\"feature_id\"].as_str().unwrap().to_string(),\n            component_id: args[\"component_id\"].as_str().unwrap().to_string(),\n            status: TaskStatus::Pending,\n            dependencies: args.get(\"dependencies\")\n                .and_then(|v| v.as_array())\n                .map(|arr| arr.iter().map(|v| v.as_str().unwrap().to_string()).collect())\n                .unwrap_or_default(),\n            estimated_effort: None,\n            files_to_create: args.get(\"files_to_create\")\n                .and_then(|v| v.as_array())\n                .map(|arr| arr.iter().map(|v| v.as_str().unwrap().to_string()).collect())\n                .unwrap_or_default(),\n            acceptance_criteria: args[\"acceptance_criteria\"]\n                .as_array()\n                .unwrap()\n                .iter()\n                .map(|v| v.as_str().unwrap().to_string())\n                .collect(),\n            created_at: chrono::Utc::now(),\n            started_at: None,\n            completed_at: None,\n        };\n\n        plan.tasks.push(task);\n        save_implementation_plan(&self.session_id, &plan).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        Ok(json!({\n            \"status\": \"success\",\n            \"task_id\": task_id,\n            \"message\": format!(\"Task {} created successfully\", task_id)\n        }))\n    }\n}\n\n// ============================================================================\n// Update Status Tools\n// ============================================================================\n\npub struct UpdateFeatureStatusTool {\n    session_id: String,\n}\n\nimpl UpdateFeatureStatusTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for UpdateFeatureStatusTool {\n    fn name(&self) -> &str {\n        \"update_feature_status\"\n    }\n\n    fn description(&self) -> &str {\n        \"Update the status of a feature. Valid transitions: \\\n         pending → in_progress → completed.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"feature_id\": {\"type\": \"string\"},\n                \"new_status\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"pending\", \"in_progress\", \"completed\", \"blocked\"]\n                }\n            },\n            \"required\": [\"feature_id\", \"new_status\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let mut features = load_feature_list(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        let feature_id = args[\"feature_id\"].as_str().unwrap();\n        let new_status_str = args[\"new_status\"].as_str().unwrap();\n\n        let new_status = match new_status_str {\n            \"pending\" => FeatureStatus::Pending,\n            \"in_progress\" => FeatureStatus::InProgress,\n            \"completed\" => FeatureStatus::Completed,\n            \"blocked\" => FeatureStatus::Blocked,\n            _ => FeatureStatus::Pending,\n        };\n\n        if let Some(feature) = features.features.iter_mut().find(|f| f.id == feature_id) {\n            feature.status = new_status;\n            if new_status_str == \"completed\" {\n                feature.completed_at = Some(chrono::Utc::now());\n            }\n            save_feature_list(&self.session_id, &features).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n            Ok(json!({\n                \"status\": \"success\",\n                \"feature_id\": feature_id,\n                \"new_status\": new_status_str,\n                \"message\": format!(\"Feature {} status updated to {}\", feature_id, new_status_str)\n            }))\n        } else {\n            Ok(json!({\n                \"status\": \"error\",\n                \"message\": format!(\"Feature {} not found\", feature_id)\n            }))\n        }\n    }\n}\n\npub struct UpdateTaskStatusTool {\n    session_id: String,\n}\n\nimpl UpdateTaskStatusTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for UpdateTaskStatusTool {\n    fn name(&self) -> &str {\n        \"update_task_status\"\n    }\n\n    fn description(&self) -> &str {\n        \"Update task status. Call this as you start and complete tasks.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"task_id\": {\"type\": \"string\"},\n                \"new_status\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"pending\", \"in_progress\", \"completed\", \"blocked\"]\n                }\n            },\n            \"required\": [\"task_id\", \"new_status\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let mut plan = load_implementation_plan(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        let task_id = args.get(\"task_id\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| AdkError::Tool(\"Missing or invalid 'task_id' parameter\".to_string()))?;\n        \n        let new_status_str = args.get(\"new_status\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| AdkError::Tool(\"Missing or invalid 'new_status' parameter\".to_string()))?;\n\n        let new_status = match new_status_str {\n            \"pending\" => TaskStatus::Pending,\n            \"in_progress\" => TaskStatus::InProgress,\n            \"completed\" => TaskStatus::Completed,\n            \"blocked\" => TaskStatus::Blocked,\n            _ => return Err(AdkError::Tool(format!(\"Invalid status: {}. Must be one of: pending, in_progress, completed, blocked\", new_status_str))),\n        };\n\n        if let Some(task) = plan.tasks.iter_mut().find(|t| t.id == task_id) {\n            task.status = new_status;\n            match new_status_str {\n                \"in_progress\" => task.started_at = Some(chrono::Utc::now()),\n                \"completed\" => task.completed_at = Some(chrono::Utc::now()),\n                _ => {}\n            }\n            save_implementation_plan(&self.session_id, &plan).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n            println!(\"✓ Task {} → {}\", task_id, new_status_str);\n\n            Ok(json!({\n                \"status\": \"success\",\n                \"task_id\": task_id,\n                \"new_status\": new_status_str\n            }))\n        } else {\n            Ok(json!({\n                \"status\": \"error\",\n                \"message\": format!(\"Task {} not found\", task_id)\n            }))\n        }\n    }\n}\n\n// ============================================================================\n// UpdateTaskTool - Modify task properties\n// ============================================================================\n\npub struct UpdateTaskTool {\n    session_id: String,\n}\n\nimpl UpdateTaskTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for UpdateTaskTool {\n    fn name(&self) -> &str {\n        \"update_task\"\n    }\n\n    fn description(&self) -> &str {\n        \"Update task properties such as title, description, dependencies, or files. \\\n         Use this when you discover that task requirements have changed during implementation.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"task_id\": {\n                    \"type\": \"string\",\n                    \"description\": \"ID of the task to update\"\n                },\n                \"title\": {\n                    \"type\": \"string\",\n                    \"description\": \"New title (optional)\"\n                },\n                \"description\": {\n                    \"type\": \"string\",\n                    \"description\": \"New description (optional)\"\n                },\n                \"dependencies\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"New list of task IDs that must be completed first (optional)\"\n                },\n                \"files_to_create\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"New list of files to create (optional)\"\n                },\n                \"acceptance_criteria\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"New acceptance criteria (optional)\"\n                },\n                \"reason\": {\n                    \"type\": \"string\",\n                    \"description\": \"Reason for this update\"\n                }\n            },\n            \"required\": [\"task_id\", \"reason\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let task_id = args.get(\"task_id\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| AdkError::Tool(\"Missing 'task_id' parameter\".to_string()))?;\n        \n        let reason = args.get(\"reason\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| AdkError::Tool(\"Missing 'reason' parameter\".to_string()))?;\n\n        let mut plan = load_implementation_plan(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        // First, find the task index\n        let task_idx = plan.tasks.iter()\n            .position(|t| t.id == task_id)\n            .ok_or_else(|| AdkError::Tool(format!(\"Task {} not found\", task_id)))?;\n\n        let mut updates = Vec::new();\n\n        // Update title if provided\n        if let Some(title) = args.get(\"title\").and_then(|v| v.as_str()) {\n            plan.tasks[task_idx].title = title.to_string();\n            updates.push(format!(\"title → {}\", title));\n        }\n\n        // Update description if provided\n        if let Some(desc) = args.get(\"description\").and_then(|v| v.as_str()) {\n            plan.tasks[task_idx].description = desc.to_string();\n            updates.push(\"description updated\".to_string());\n        }\n\n        // Update dependencies if provided\n        if let Some(deps) = args.get(\"dependencies\").and_then(|v| v.as_array()) {\n            let new_deps: Vec<String> = deps.iter()\n                .filter_map(|v| v.as_str().map(String::from))\n                .collect();\n            \n            // Validate that all dependency task IDs exist\n            for dep_id in &new_deps {\n                if !plan.tasks.iter().any(|t| &t.id == dep_id) {\n                    return Err(AdkError::Tool(format!(\"Dependency task {} not found\", dep_id)));\n                }\n            }\n            \n            plan.tasks[task_idx].dependencies = new_deps.clone();\n            updates.push(format!(\"dependencies → {:?}\", new_deps));\n        }\n\n        // Update files_to_create if provided\n        if let Some(files) = args.get(\"files_to_create\").and_then(|v| v.as_array()) {\n            plan.tasks[task_idx].files_to_create = files.iter()\n                .filter_map(|v| v.as_str().map(String::from))\n                .collect();\n            updates.push(\"files_to_create updated\".to_string());\n        }\n\n        // Update acceptance_criteria if provided\n        if let Some(criteria) = args.get(\"acceptance_criteria\").and_then(|v| v.as_array()) {\n            plan.tasks[task_idx].acceptance_criteria = criteria.iter()\n                .filter_map(|v| v.as_str().map(String::from))\n                .collect();\n            updates.push(\"acceptance_criteria updated\".to_string());\n        }\n\n        save_implementation_plan(&self.session_id, &plan).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        // Log the update with reason\n        println!(\"✓ Task {} updated: {}\", task_id, updates.join(\", \"));\n        println!(\"  Reason: {}\", reason);\n\n        // Record to feedback for audit trail\n        let feedback = crate::data::Feedback {\n            feedback_type: crate::data::FeedbackType::Suggestion,\n            severity: crate::data::Severity::Minor,\n            details: format!(\"Task {} updated: {}. Reason: {}\", task_id, updates.join(\", \"), reason),\n            suggested_fix: None,\n            timestamp: chrono::Utc::now(),\n        };\n        let _ = crate::storage::append_feedback(&self.session_id, &feedback);\n\n        Ok(json!({\n            \"status\": \"success\",\n            \"task_id\": task_id,\n            \"updates\": updates,\n            \"reason\": reason\n        }))\n    }\n}\n\n// ============================================================================\n// DeleteTaskTool - Remove task and clean up dependencies\n// ============================================================================\n\npub struct DeleteTaskTool {\n    session_id: String,\n}\n\nimpl DeleteTaskTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for DeleteTaskTool {\n    fn name(&self) -> &str {\n        \"delete_task\"\n    }\n\n    fn description(&self) -> &str {\n        \"Delete a task from the plan. This will also remove references to this task \\\n         from other tasks' dependencies. Use this when a task is no longer needed \\\n         or was incorrectly planned.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"task_id\": {\n                    \"type\": \"string\",\n                    \"description\": \"ID of the task to delete\"\n                },\n                \"reason\": {\n                    \"type\": \"string\",\n                    \"description\": \"Reason for deleting this task\"\n                }\n            },\n            \"required\": [\"task_id\", \"reason\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let task_id = args.get(\"task_id\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| AdkError::Tool(\"Missing 'task_id' parameter\".to_string()))?;\n        \n        let reason = args.get(\"reason\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| AdkError::Tool(\"Missing 'reason' parameter\".to_string()))?;\n\n        let mut plan = load_implementation_plan(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        // Check if task exists\n        let task_exists = plan.tasks.iter().any(|t| t.id == task_id);\n        if !task_exists {\n            return Err(AdkError::Tool(format!(\"Task {} not found\", task_id)));\n        }\n\n        // Check if this task is in_progress or completed\n        if let Some(task) = plan.tasks.iter().find(|t| t.id == task_id) {\n            if task.status == crate::data::TaskStatus::InProgress {\n                return Err(AdkError::Tool(format!(\n                    \"Cannot delete task {} because it's currently in progress. \\\n                     Set status to pending or blocked first.\", task_id\n                )));\n            }\n            if task.status == crate::data::TaskStatus::Completed {\n                return Err(AdkError::Tool(format!(\n                    \"Cannot delete task {} because it's already completed. \\\n                     Consider keeping it for documentation.\", task_id\n                )));\n            }\n        }\n\n        // Remove the task\n        plan.tasks.retain(|t| t.id != task_id);\n\n        // Clean up dependencies - remove this task_id from other tasks' dependencies\n        let mut affected_tasks = Vec::new();\n        for task in &mut plan.tasks {\n            let before_len = task.dependencies.len();\n            task.dependencies.retain(|dep| dep != task_id);\n            let after_len = task.dependencies.len();\n            \n            if before_len != after_len {\n                affected_tasks.push(task.id.clone());\n            }\n        }\n\n        save_implementation_plan(&self.session_id, &plan).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        println!(\"✓ Task {} deleted\", task_id);\n        if !affected_tasks.is_empty() {\n            println!(\"  Cleaned dependencies from: {}\", affected_tasks.join(\", \"));\n        }\n        println!(\"  Reason: {}\", reason);\n\n        // Record to feedback for audit trail\n        let feedback = crate::data::Feedback {\n            feedback_type: crate::data::FeedbackType::Suggestion,\n            severity: crate::data::Severity::Minor,\n            details: format!(\n                \"Task {} deleted. Reason: {}. Affected tasks: {}\", \n                task_id, reason, \n                if affected_tasks.is_empty() { \"none\".to_string() } else { affected_tasks.join(\", \") }\n            ),\n            suggested_fix: None,\n            timestamp: chrono::Utc::now(),\n        };\n        let _ = crate::storage::append_feedback(&self.session_id, &feedback);\n\n        Ok(json!({\n            \"status\": \"success\",\n            \"task_id\": task_id,\n            \"affected_tasks\": affected_tasks,\n            \"reason\": reason,\n            \"message\": format!(\"Task {} deleted successfully\", task_id)\n        }))\n    }\n}\n\n// ============================================================================\n// Get/Read Tools\n// ============================================================================\n\npub struct GetRequirementsTool {\n    session_id: String,\n}\n\nimpl GetRequirementsTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for GetRequirementsTool {\n    fn name(&self) -> &str {\n        \"get_requirements\"\n    }\n\n    fn description(&self) -> &str {\n        \"Retrieve all requirements and features.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {}\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {\n        let requirements = load_requirements(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n        let features = load_feature_list(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n\n        Ok(json!({\n            \"requirements\": requirements.requirements,\n            \"features\": features.features\n        }))\n    }\n}\n\npub struct GetDesignTool {\n    session_id: String,\n}\n\nimpl GetDesignTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for GetDesignTool {\n    fn name(&self) -> &str {\n        \"get_design\"\n    }\n\n    fn description(&self) -> &str {\n        \"Retrieve the design specification.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\"type\": \"object\", \"properties\": {}}))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {\n        let design = load_design_spec(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n        Ok(serde_json::to_value(design).map_err(|e| AdkError::Tool(e.to_string()))?)\n    }\n}\n\npub struct GetPlanTool {\n    session_id: String,\n}\n\nimpl GetPlanTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for GetPlanTool {\n    fn name(&self) -> &str {\n        \"get_plan\"\n    }\n\n    fn description(&self) -> &str {\n        \"Retrieve the implementation plan with all tasks.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\"type\": \"object\", \"properties\": {}}))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {\n        let plan = load_implementation_plan(&self.session_id).map_err(|e| AdkError::Tool(e.to_string()))?;\n        Ok(serde_json::to_value(plan).map_err(|e| AdkError::Tool(e.to_string()))?)\n    }\n}\n"
     },
     "complexity_metrics": {
-      "cyclomatic_complexity": 21.0,
-      "lines_of_code": 677,
-      "number_of_classes": 9,
-      "number_of_functions": 9
+      "cyclomatic_complexity": 50.0,
+      "lines_of_code": 953,
+      "number_of_classes": 11,
+      "number_of_functions": 77
     },
     "dependencies": [
       {
-        "dependency_type": "internal_module",
+        "dependency_type": "internal_import",
         "is_external": false,
-        "line_number": 2,
-        "name": "crate::data",
+        "line_number": null,
+        "name": "crate::data::*",
         "path": null,
         "version": null
       },
       {
-        "dependency_type": "internal_module",
+        "dependency_type": "internal_import",
         "is_external": false,
-        "line_number": 3,
-        "name": "crate::storage",
+        "line_number": null,
+        "name": "crate::storage::*",
         "path": null,
         "version": null
       },
       {
         "dependency_type": "external_crate",
         "is_external": true,
-        "line_number": 4,
+        "line_number": null,
         "name": "adk_core",
         "path": null,
         "version": null
@@ -2772,7 +2779,7 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "external_crate",
         "is_external": true,
-        "line_number": 5,
+        "line_number": null,
         "name": "async_trait",
         "path": null,
         "version": null
@@ -2780,101 +2787,50 @@ Code analysis results from preprocessing phase, including definitions of functio
       {
         "dependency_type": "external_crate",
         "is_external": true,
-        "line_number": 6,
+        "line_number": null,
         "name": "serde_json",
         "path": null,
         "version": null
       },
       {
-        "dependency_type": "standard_library",
+        "dependency_type": "std_library",
         "is_external": false,
-        "line_number": 7,
+        "line_number": null,
         "name": "std::sync::Arc",
         "path": null,
         "version": null
       }
     ],
-    "detailed_description": "This component provides a comprehensive suite of tools for managing software development artifacts including requirements, features, design components, and implementation tasks. It implements the Tool trait from adk_core, enabling these operations to be executed as part of an automated development workflow. Each tool handles CRUD operations for specific artifact types with validation, error handling, and session-based data persistence. The tools follow a consistent pattern of loading data, performing operations, saving changes, and returning structured responses.",
+    "detailed_description": "This component provides a suite of tool functions for managing structured data in a software development workflow. It implements 11 distinct tools that enable the creation, modification, retrieval, and deletion of core project artifacts including requirements, features, design components, and implementation tasks. All tools operate within a session-scoped context and interact with persistent JSON storage files (requirements.json, feature_list.json, design_spec.json, implementation_plan.json). The tools follow a consistent pattern: each is an async Tool implementation with a name, description, parameter schema, and execute method that validates input, reads/writes to storage, and returns structured JSON responses. The system enforces data integrity through validation, type conversion, and dependency tracking, particularly in task management where dependencies are maintained and cleaned up during deletions. The component supports a complete development lifecycle from requirement definition to task execution tracking.",
     "interfaces": [
       {
-        "description": "Creates new requirements with SMART criteria validation",
-        "interface_type": "struct",
-        "name": "CreateRequirementTool",
-        "parameters": [],
-        "return_type": null,
-        "visibility": "public"
-      },
-      {
-        "description": "Adds features that implement requirements",
-        "interface_type": "struct",
-        "name": "AddFeatureTool",
-        "parameters": [],
-        "return_type": null,
-        "visibility": "public"
-      },
-      {
-        "description": "Creates architectural components with technology specifications",
-        "interface_type": "struct",
-        "name": "CreateDesignComponentTool",
-        "parameters": [],
-        "return_type": null,
-        "visibility": "public"
-      },
-      {
-        "description": "Creates implementation tasks with dependencies",
-        "interface_type": "struct",
-        "name": "CreateTaskTool",
-        "parameters": [],
-        "return_type": null,
-        "visibility": "public"
-      },
-      {
-        "description": "Updates feature status with valid state transitions",
-        "interface_type": "struct",
-        "name": "UpdateFeatureStatusTool",
-        "parameters": [],
-        "return_type": null,
-        "visibility": "public"
-      },
-      {
-        "description": "Updates task status with timestamp tracking",
-        "interface_type": "struct",
-        "name": "UpdateTaskStatusTool",
-        "parameters": [],
-        "return_type": null,
-        "visibility": "public"
-      },
-      {
-        "description": "Retrieves requirements and features",
-        "interface_type": "struct",
-        "name": "GetRequirementsTool",
-        "parameters": [],
-        "return_type": null,
-        "visibility": "public"
-      },
-      {
-        "description": "Retrieves design specifications",
-        "interface_type": "struct",
-        "name": "GetDesignTool",
-        "parameters": [],
-        "return_type": null,
-        "visibility": "public"
-      },
-      {
-        "description": "Retrieves implementation plan with tasks",
-        "interface_type": "struct",
-        "name": "GetPlanTool",
-        "parameters": [],
-        "return_type": null,
+        "description": null,
+        "interface_type": "trait",
+        "name": "Tool",
+        "parameters": [
+          {
+            "description": null,
+            "is_optional": false,
+            "name": "_ctx",
+            "param_type": "Arc<dyn ToolContext>"
+          },
+          {
+            "description": null,
+            "is_optional": false,
+            "name": "args",
+            "param_type": "Value"
+          }
+        ],
+        "return_type": "adk_core::Result<Value>",
         "visibility": "public"
       }
     ],
     "responsibilities": [
-      "Manage requirements creation and storage with SMART criteria validation",
-      "Handle feature lifecycle management including status transitions and completion tracking",
-      "Create and maintain design components with architectural specifications",
-      "Manage implementation tasks with dependencies and acceptance criteria",
-      "Provide read/write operations for all development artifacts with session isolation"
+      "Manage requirement lifecycle (create, retrieve)",
+      "Manage feature lifecycle (create, update status)",
+      "Manage architectural component lifecycle (create)",
+      "Manage implementation task lifecycle (create, update status, update properties, delete)",
+      "Maintain data consistency and audit trails across related entities"
     ]
   },
   {
@@ -3430,14 +3386,15 @@ Code analysis results from preprocessing phase, including definitions of functio
   {
     "code_dossier": {
       "code_purpose": "tool",
-      "description": "Control tools for providing feedback and user interaction functionality",
+      "description": null,
       "file_path": "crates/cowork-core/src/tools/control_tools.rs",
       "functions": [
-        "provide_feedback",
-        "ask_user"
-      ],
-      "importance_score": 0.8,
-      "interfaces": [
+        "ProvideFeedbackTool::new",
+        "RequestReplanningTool::new",
+        "RequestReplanningTool::name",
+        "RequestReplanningTool::description",
+        "RequestReplanningTool::parameters_schema",
+        "RequestReplanningTool::execute",
         "ProvideFeedbackTool::name",
         "ProvideFeedbackTool::description",
         "ProvideFeedbackTool::parameters_schema",
@@ -3447,112 +3404,108 @@ Code analysis results from preprocessing phase, including definitions of functio
         "AskUserTool::parameters_schema",
         "AskUserTool::execute"
       ],
+      "importance_score": 0.8,
+      "interfaces": [
+        "Tool"
+      ],
       "name": "control_tools.rs",
-      "source_summary": "// Control tools - provide_feedback, ask_user, etc. (Session-scoped)\nuse crate::data::*;\nuse crate::storage::*;\nuse adk_core::{Tool, ToolContext};\n\nuse async_trait::async_trait;\nuse dialoguer::{Confirm, Input};\nuse serde_json::{json, Value};\nuse std::sync::Arc;\n\n// ============================================================================\n// ProvideFeedbackTool\n// ============================================================================\n\npub struct ProvideFeedbackTool {\n    session_id: String,\n}\n\nimpl ProvideFeedbackTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for ProvideFeedbackTool {\n    fn name(&self) -> &str {\n        \"provide_feedback\"\n    }\n\n    fn description(&self) -> &str {\n        \"Provide structured feedback to the Actor agent. \\\n         This feedback will be visible to the Actor in the next iteration.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"feedback_type\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"build_error\", \"quality_issue\", \"missing_requirement\", \"suggestion\"],\n                },\n                \"severity\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"critical\", \"major\", \"minor\"],\n                },\n                \"details\": {\"type\": \"string\"},\n                \"suggested_fix\": {\"type\": \"string\"}\n            },\n            \"required\": [\"feedback_type\", \"severity\", \"details\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let feedback_type = match args[\"feedback_type\"].as_str().unwrap() {\n            \"build_error\" => FeedbackType::BuildError,\n            \"quality_issue\" => FeedbackType::QualityIssue,\n            \"missing_requirement\" => FeedbackType::MissingRequirement,\n            _ => FeedbackType::Suggestion,\n        };\n\n        let severity = match args[\"severity\"].as_str().unwrap() {\n            \"critical\" => Severity::Critical,\n            \"major\" => Severity::Major,\n            _ => Severity::Minor,\n        };\n\n        let feedback = Feedback {\n            feedback_type,\n            severity,\n            details: args[\"details\"].as_str().unwrap().to_string(),\n            suggested_fix: args\n                .get(\"suggested_fix\")\n                .and_then(|v| v.as_str())\n                .map(String::from),\n            timestamp: chrono::Utc::now(),\n        };\n\n        append_feedback(&self.session_id, &feedback).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;\n\n        Ok(json!({\n            \"status\": \"feedback_recorded\",\n            \"message\": \"Feedback will be available to Actor in next iteration\"\n        }))\n    }\n}\n\n// ============================================================================\n// AskUserTool\n// ============================================================================\n\npub struct AskUserTool;\n\n#[async_trait]\nimpl Tool for AskUserTool {\n    fn name(&self) -> &str {\n        \"ask_user\"\n    }\n\n    fn description(&self) -> &str {\n        \"Ask the user for confirmation or input via CLI interface.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"question\": {\n                    \"type\": \"string\",\n                    \"description\": \"The question to ask the user\"\n                },\n                \"question_type\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"yes_no\", \"text_input\"],\n                    \"description\": \"Type of question\"\n                }\n            },\n            \"required\": [\"question\", \"question_type\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let question = args[\"question\"].as_str().unwrap();\n        let question_type = args[\"question_type\"].as_str().unwrap();\n\n        match question_type {\n            \"yes_no\" => {\n                let answer = Confirm::new()\n                    .with_prompt(question)\n                    .default(false)\n                    .interact()\n                    .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;\n\n                Ok(json!({\n                    \"answer\": answer,\n                    \"answer_type\": \"boolean\"\n                }))\n            }\n            \"text_input\" => {\n                let answer: String = Input::new()\n                    .with_prompt(question)\n                    .interact_text()\n                    .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;\n\n                Ok(json!({\n                    \"answer\": answer,\n                    \"answer_type\": \"text\"\n                }))\n            }\n            _ => Ok(json!({\"error\": \"Invalid question type\"})),\n        }\n    }\n}\n"
+      "source_summary": "// Control tools - provide_feedback, ask_user, etc. (Session-scoped)\nuse crate::data::*;\nuse crate::storage::*;\nuse adk_core::{Tool, ToolContext};\n\nuse async_trait::async_trait;\nuse dialoguer::{Confirm, Input};\nuse serde_json::{json, Value};\nuse std::sync::Arc;\n\n// ============================================================================\n// ProvideFeedbackTool\n// ============================================================================\n\npub struct ProvideFeedbackTool {\n    session_id: String,\n}\n\nimpl ProvideFeedbackTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n// ============================================================================\n// RequestReplanningTool\n// ============================================================================\n\npub struct RequestReplanningTool {\n    session_id: String,\n}\n\nimpl RequestReplanningTool {\n    pub fn new(session_id: String) -> Self {\n        Self { session_id }\n    }\n}\n\n#[async_trait]\nimpl Tool for RequestReplanningTool {\n    fn name(&self) -> &str {\n        \"request_replanning\"\n    }\n\n    fn description(&self) -> &str {\n        \"Request replanning when you discover fundamental issues with the current plan \\\n         during implementation. This records the request and provides guidance to revisit \\\n         the planning phase. Use this for major architectural issues, not minor task adjustments.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"issue_type\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"design_flaw\", \"missing_dependency\", \"architecture_conflict\", \"requirement_mismatch\"],\n                    \"description\": \"Type of issue requiring replanning\"\n                },\n                \"severity\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"critical\", \"major\", \"moderate\"],\n                    \"description\": \"How severe is this issue\"\n                },\n                \"details\": {\n                    \"type\": \"string\",\n                    \"description\": \"Detailed description of the problem\"\n                },\n                \"affected_features\": {\n                    \"type\": \"array\",\n                    \"items\": {\"type\": \"string\"},\n                    \"description\": \"Feature IDs affected by this issue\"\n                },\n                \"suggested_approach\": {\n                    \"type\": \"string\",\n                    \"description\": \"Your suggested approach to resolve this (optional)\"\n                }\n            },\n            \"required\": [\"issue_type\", \"severity\", \"details\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        use crate::data::{Feedback, FeedbackType, Severity};\n        use crate::storage::append_feedback;\n\n        let issue_type = args.get(\"issue_type\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| adk_core::AdkError::Tool(\"Missing 'issue_type'\".to_string()))?;\n\n        let severity_str = args.get(\"severity\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| adk_core::AdkError::Tool(\"Missing 'severity'\".to_string()))?;\n\n        let details = args.get(\"details\")\n            .and_then(|v| v.as_str())\n            .ok_or_else(|| adk_core::AdkError::Tool(\"Missing 'details'\".to_string()))?;\n\n        let severity = match severity_str {\n            \"critical\" => Severity::Critical,\n            \"major\" => Severity::Major,\n            _ => Severity::Minor,\n        };\n\n        let affected_features: Vec<String> = args.get(\"affected_features\")\n            .and_then(|v| v.as_array())\n            .map(|arr| arr.iter()\n                .filter_map(|v| v.as_str().map(String::from))\n                .collect())\n            .unwrap_or_default();\n\n        let suggested_approach = args.get(\"suggested_approach\")\n            .and_then(|v| v.as_str());\n\n        // Compose detailed feedback message\n        let mut feedback_details = format!(\n            \"REPLANNING REQUEST\\n\\\n             Issue Type: {}\\n\\\n             Severity: {}\\n\\\n             Details: {}\\n\",\n            issue_type, severity_str, details\n        );\n\n        if !affected_features.is_empty() {\n            feedback_details.push_str(&format!(\"Affected Features: {}\\n\", affected_features.join(\", \")));\n        }\n\n        if let Some(approach) = suggested_approach {\n            feedback_details.push_str(&format!(\"Suggested Approach: {}\\n\", approach));\n        }\n\n        // Record as critical feedback\n        let feedback = Feedback {\n            feedback_type: FeedbackType::MissingRequirement, // Use this to indicate planning issue\n            severity,\n            details: feedback_details.clone(),\n            suggested_fix: suggested_approach.map(String::from),\n            timestamp: chrono::Utc::now(),\n        };\n\n        append_feedback(&self.session_id, &feedback)\n            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;\n\n        // Print warning to console\n        println!(\"\\n⚠️  REPLANNING REQUESTED ⚠️\");\n        println!(\"Type: {} | Severity: {}\", issue_type, severity_str);\n        println!(\"Details: {}\", details);\n        if !affected_features.is_empty() {\n            println!(\"Affected: {}\", affected_features.join(\", \"));\n        }\n        println!();\n\n        let message = format!(\n            \"Replanning request recorded with {} severity. \\\n             The coding loop will continue, but this issue should be addressed. \\\n             Consider using 'goto_stage' in the check phase if fundamental changes are needed.\",\n            severity_str\n        );\n\n        Ok(json!({\n            \"status\": \"replanning_requested\",\n            \"issue_type\": issue_type,\n            \"severity\": severity_str,\n            \"affected_features\": affected_features,\n            \"message\": message,\n            \"guidance\": \"Continue with current implementation if possible, or mark tasks as blocked. \\\n                        The Check Agent will review this request and may trigger goto_stage if needed.\"\n        }))\n    }\n}\n\n\n#[async_trait]\nimpl Tool for ProvideFeedbackTool {\n    fn name(&self) -> &str {\n        \"provide_feedback\"\n    }\n\n    fn description(&self) -> &str {\n        \"Provide structured feedback to the Actor agent. \\\n         This feedback will be visible to the Actor in the next iteration.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"feedback_type\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"build_error\", \"quality_issue\", \"missing_requirement\", \"suggestion\"],\n                },\n                \"severity\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"critical\", \"major\", \"minor\"],\n                },\n                \"details\": {\"type\": \"string\"},\n                \"suggested_fix\": {\"type\": \"string\"}\n            },\n            \"required\": [\"feedback_type\", \"severity\", \"details\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let feedback_type = match args[\"feedback_type\"].as_str().unwrap() {\n            \"build_error\" => FeedbackType::BuildError,\n            \"quality_issue\" => FeedbackType::QualityIssue,\n            \"missing_requirement\" => FeedbackType::MissingRequirement,\n            _ => FeedbackType::Suggestion,\n        };\n\n        let severity = match args[\"severity\"].as_str().unwrap() {\n            \"critical\" => Severity::Critical,\n            \"major\" => Severity::Major,\n            _ => Severity::Minor,\n        };\n\n        let feedback = Feedback {\n            feedback_type,\n            severity,\n            details: args[\"details\"].as_str().unwrap().to_string(),\n            suggested_fix: args\n                .get(\"suggested_fix\")\n                .and_then(|v| v.as_str())\n                .map(String::from),\n            timestamp: chrono::Utc::now(),\n        };\n\n        append_feedback(&self.session_id, &feedback).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;\n\n        Ok(json!({\n            \"status\": \"feedback_recorded\",\n            \"message\": \"Feedback will be available to Actor in next iteration\"\n        }))\n    }\n}\n\n// ============================================================================\n// AskUserTool\n// ============================================================================\n\npub struct AskUserTool;\n\n#[async_trait]\nimpl Tool for AskUserTool {\n    fn name(&self) -> &str {\n        \"ask_user\"\n    }\n\n    fn description(&self) -> &str {\n        \"Ask the user for confirmation or input via CLI interface.\"\n    }\n\n    fn parameters_schema(&self) -> Option<Value> {\n        Some(json!({\n            \"type\": \"object\",\n            \"properties\": {\n                \"question\": {\n                    \"type\": \"string\",\n                    \"description\": \"The question to ask the user\"\n                },\n                \"question_type\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"yes_no\", \"text_input\"],\n                    \"description\": \"Type of question\"\n                }\n            },\n            \"required\": [\"question\", \"question_type\"]\n        }))\n    }\n\n    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {\n        let question = args[\"question\"].as_str().unwrap();\n        let question_type = args[\"question_type\"].as_str().unwrap();\n\n        match question_type {\n            \"yes_no\" => {\n                let answer = Confirm::new()\n                    .with_prompt(question)\n                    .default(false)\n                    .interact()\n                    .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;\n\n                Ok(json!({\n                    \"answer\": answer,\n                    \"answer_type\": \"boolean\"\n                }))\n            }\n            \"text_input\" => {\n                let answer: String = Input::new()\n                    .with_prompt(question)\n                    .interact_text()\n                    .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;\n\n                Ok(json!({\n                    \"answer\": answer,\n                    \"answer_type\": \"text\"\n                }))\n            }\n            _ => Ok(json!({\"error\": \"Invalid question type\"})),\n        }\n    }\n}\n"
     },
     "complexity_metrics": {
-      "cyclomatic_complexity": 7.0,
-      "lines_of_code": 154,
-      "number_of_classes": 2,
-      "number_of_functions": 2
+      "cyclomatic_complexity": 16.0,
+      "lines_of_code": 302,
+      "number_of_classes": 3,
+      "number_of_functions": 14
     },
     "dependencies": [
       {
         "dependency_type": "internal",
         "is_external": false,
-        "line_number": 2,
+        "line_number": null,
         "name": "crate::data",
-        "path": "crate::data",
+        "path": null,
         "version": null
       },
       {
         "dependency_type": "internal",
         "is_external": false,
-        "line_number": 3,
+        "line_number": null,
         "name": "crate::storage",
-        "path": "crate::storage",
+        "path": null,
         "version": null
       },
       {
         "dependency_type": "external",
         "is_external": true,
-        "line_number": 4,
+        "line_number": null,
         "name": "adk_core",
-        "path": "adk_core",
+        "path": null,
         "version": null
       },
       {
         "dependency_type": "external",
         "is_external": true,
-        "line_number": 6,
+        "line_number": null,
         "name": "async_trait",
-        "path": "async_trait",
+        "path": null,
         "version": null
       },
       {
         "dependency_type": "external",
         "is_external": true,
-        "line_number": 7,
+        "line_number": null,
         "name": "dialoguer",
-        "path": "dialoguer",
+        "path": null,
         "version": null
       },
       {
         "dependency_type": "external",
         "is_external": true,
-        "line_number": 8,
+        "line_number": null,
         "name": "serde_json",
-        "path": "serde_json",
+        "path": null,
         "version": null
       },
       {
-        "dependency_type": "standard_library",
-        "is_external": false,
-        "line_number": 9,
+        "dependency_type": "external",
+        "is_external": true,
+        "line_number": null,
         "name": "std::sync::Arc",
-        "path": "std::sync::Arc",
+        "path": null,
+        "version": null
+      },
+      {
+        "dependency_type": "external",
+        "is_external": true,
+        "line_number": null,
+        "name": "chrono",
+        "path": null,
+        "version": null
+      },
+      {
+        "dependency_type": "external",
+        "is_external": true,
+        "line_number": null,
+        "name": "adk_core::AdkError",
+        "path": null,
         "version": null
       }
     ],
-    "detailed_description": "This component implements session-scoped control tools for agent systems. It contains two main tools: ProvideFeedbackTool for structured feedback collection and AskUserTool for interactive user queries. The feedback tool allows categorizing feedback by type (build_error, quality_issue, missing_requirement, suggestion) and severity (critical, major, minor), storing it for actor agents. The user interaction tool supports yes/no confirmations and text input collection via CLI interface. Both tools implement the Tool trait with proper parameter schemas and async execution.",
+    "detailed_description": "This component implements three CLI-based interactive tools for a session-aware AI agent system: ProvideFeedbackTool, RequestReplanningTool, and AskUserTool. These tools enable the agent to communicate structured feedback, request replanning due to architectural issues, and interact with the human user via command-line prompts. Each tool implements the Tool trait from adk_core, allowing them to be invoked as part of an agent's execution loop. The tools operate within the context of a session_id, persisting feedback to storage and providing structured JSON responses to the calling agent. The implementation uses serde_json for response formatting, dialoguer for interactive input, and chrono for timestamping feedback records.",
     "interfaces": [
       {
-        "description": "Returns the tool name identifier",
-        "interface_type": "method",
-        "name": "name",
-        "parameters": [],
-        "return_type": "&str",
-        "visibility": "public"
-      },
-      {
-        "description": "Returns tool functionality description",
-        "interface_type": "method",
-        "name": "description",
-        "parameters": [],
-        "return_type": "&str",
-        "visibility": "public"
-      },
-      {
-        "description": "Defines JSON schema for tool parameters",
-        "interface_type": "method",
-        "name": "parameters_schema",
-        "parameters": [],
-        "return_type": "Option<Value>",
-        "visibility": "public"
-      },
-      {
-        "description": "Asynchronous tool execution method",
-        "interface_type": "method",
-        "name": "execute",
+        "description": null,
+        "interface_type": "trait",
+        "name": "Tool",
         "parameters": [
           {
-            "description": "Tool execution context",
+            "description": null,
             "is_optional": false,
-            "name": "ctx",
+            "name": "_ctx",
             "param_type": "Arc<dyn ToolContext>"
           },
           {
-            "description": "Input parameters as JSON value",
+            "description": null,
             "is_optional": false,
             "name": "args",
             "param_type": "Value"
@@ -3563,11 +3516,11 @@ Code analysis results from preprocessing phase, including definitions of functio
       }
     ],
     "responsibilities": [
-      "Structured feedback collection and storage for agent systems",
-      "Interactive user input handling via CLI interface",
-      "Session-scoped tool management and execution",
-      "Parameter validation and schema definition for tool operations",
-      "Error handling and result reporting for control operations"
+      "Provide structured feedback to the Actor agent for next iteration",
+      "Request replanning for critical architectural issues during implementation",
+      "Interact with human user via CLI for confirmation or input",
+      "Persist feedback and replanning requests to storage with session context",
+      "Validate and sanitize input parameters before processing"
     ]
   },
   {
@@ -4020,7 +3973,7 @@ Code analysis results from preprocessing phase, including definitions of functio
   {
     "code_dossier": {
       "code_purpose": "agent",
-      "description": "Agents module providing factory functions for creating intelligent agents using adk-rust framework",
+      "description": null,
       "file_path": "crates/cowork-core/src/agents/mod.rs",
       "functions": [
         "create_idea_agent",
@@ -4033,251 +3986,119 @@ Code analysis results from preprocessing phase, including definitions of functio
       ],
       "importance_score": 0.8,
       "interfaces": [
-        "create_idea_agent",
-        "create_prd_loop",
-        "create_design_loop",
-        "create_plan_loop",
-        "create_coding_loop",
-        "create_check_agent",
-        "create_delivery_agent"
+        "ResilientAgent"
       ],
       "name": "mod.rs",
-      "source_summary": "// Agents module - Agent builders using adk-rust\n// \n// IMPORTANT: This file solves a CRITICAL bug where SequentialAgent stops after\n// the first LoopAgent completes. \n//\n// PROBLEM: When a sub-agent in LoopAgent calls exit_loop(), it terminates the\n// ENTIRE SequentialAgent, not just the LoopAgent. This is adk-rust's design.\n//\n// SOLUTION: Remove exit_loop tools and use max_iterations=1 to let LoopAgent\n// complete naturally, allowing SequentialAgent to continue to next agent.\n\nuse crate::instructions::*;\nuse crate::tools::*;\nuse adk_agent::{LlmAgentBuilder, LoopAgent};\nuse adk_core::{Llm, IncludeContents};\nuse anyhow::Result;\nuse std::sync::Arc;\n\nmod hitl;\nuse hitl::ResilientAgent;\n\n// ============================================================================\n// IdeaAgent - Simple agent to capture initial idea\n// ============================================================================\n\npub fn create_idea_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let agent = LlmAgentBuilder::new(\"idea_agent\")\n        .instruction(IDEA_AGENT_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(SaveIdeaTool::new(session_id.to_string())))\n        .tool(Arc::new(LoadIdeaTool::new(session_id.to_string())))\n        .tool(Arc::new(ReviewAndEditContentTool))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    Ok(Arc::new(agent))\n}\n\n// ============================================================================\n// PRD Loop - Actor + Critic with LoopAgent\n// ============================================================================\n\npub fn create_prd_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let prd_actor = LlmAgentBuilder::new(\"prd_actor\")\n        .instruction(PRD_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(LoadIdeaTool::new(session.clone())))\n        .tool(Arc::new(ReviewWithFeedbackContentTool))\n        .tool(Arc::new(CreateRequirementTool::new(session.clone())))\n        .tool(Arc::new(AddFeatureTool::new(session.clone())))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(SavePrdDocTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let prd_critic = LlmAgentBuilder::new(\"prd_critic\")\n        .instruction(PRD_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\n        \"prd_loop\",\n        vec![Arc::new(prd_actor), Arc::new(prd_critic)],\n    );\n    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts for Actor to fix issues\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Design Loop - Actor + Critic\n// ============================================================================\n\npub fn create_design_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let design_actor = LlmAgentBuilder::new(\"design_actor\")\n        .instruction(DESIGN_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(ReviewWithFeedbackContentTool))\n        .tool(Arc::new(CreateDesignComponentTool::new(session.clone())))\n        .tool(Arc::new(SaveDesignDocTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let design_critic = LlmAgentBuilder::new(\"design_critic\")\n        .instruction(DESIGN_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(CheckFeatureCoverageTool::new(session.clone())))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\"design_loop\", vec![Arc::new(design_actor), Arc::new(design_critic)]);\n    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Plan Loop - Actor + Critic\n// ============================================================================\n\npub fn create_plan_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let plan_actor = LlmAgentBuilder::new(\"plan_actor\")\n        .instruction(PLAN_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(ReviewWithFeedbackContentTool))\n        .tool(Arc::new(CreateTaskTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let plan_critic = LlmAgentBuilder::new(\"plan_critic\")\n        .instruction(PLAN_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(CheckTaskDependenciesTool::new(session.clone())))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\"plan_loop\", vec![Arc::new(plan_actor), Arc::new(plan_critic)]);\n    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Coding Loop - Actor + Critic\n// ============================================================================\n\npub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let coding_actor = LlmAgentBuilder::new(\"coding_actor\")\n        .instruction(CODING_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(UpdateTaskStatusTool::new(session.clone())))\n        .tool(Arc::new(UpdateFeatureStatusTool::new(session.clone())))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(WriteFileTool))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(RunCommandTool))\n        .tool(Arc::new(CheckTestsTool))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let coding_critic = LlmAgentBuilder::new(\"coding_critic\")\n        .instruction(CODING_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(RunCommandTool))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\"coding_loop\", vec![Arc::new(coding_actor), Arc::new(coding_critic)]);\n    loop_agent = loop_agent.with_max_iterations(5);\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Check Agent - Quality assurance\n// ============================================================================\n\npub fn create_check_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let agent = LlmAgentBuilder::new(\"check_agent\")\n        .instruction(CHECK_AGENT_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(CheckDataFormatTool::new(session.clone())))\n        .tool(Arc::new(CheckFeatureCoverageTool::new(session.clone())))\n        .tool(Arc::new(CheckTaskDependenciesTool::new(session.clone())))\n        .tool(Arc::new(RunCommandTool))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(CheckTestsTool))\n        .tool(Arc::new(CheckLintTool))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .tool(Arc::new(GotoStageTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    Ok(Arc::new(agent))\n}\n\n// ============================================================================\n// Delivery Agent - Final report generation\n// ============================================================================\n\npub fn create_delivery_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let agent = LlmAgentBuilder::new(\"delivery_agent\")\n        .instruction(DELIVERY_AGENT_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(LoadFeedbackHistoryTool::new(session.clone())))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(SaveDeliveryReportTool::new(session.clone())))\n        .tool(Arc::new(SavePrdDocTool::new(session.clone())))\n        .tool(Arc::new(SaveDesignDocTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    Ok(Arc::new(agent))\n}\n"
+      "source_summary": "// Agents module - Agent builders using adk-rust\n// \n// IMPORTANT: This file solves a CRITICAL bug where SequentialAgent stops after\n// the first LoopAgent completes. \n//\n// PROBLEM: When a sub-agent in LoopAgent calls exit_loop(), it terminates the\n// ENTIRE SequentialAgent, not just the LoopAgent. This is adk-rust's design.\n//\n// SOLUTION: Remove exit_loop tools and use max_iterations=1 to let LoopAgent\n// complete naturally, allowing SequentialAgent to continue to next agent.\n\nuse crate::instructions::*;\nuse crate::tools::*;\nuse adk_agent::{LlmAgentBuilder, LoopAgent};\nuse adk_core::{Llm, IncludeContents};\nuse anyhow::Result;\nuse std::sync::Arc;\n\nmod hitl;\nuse hitl::ResilientAgent;\n\n// ============================================================================\n// IdeaAgent - Simple agent to capture initial idea\n// ============================================================================\n\npub fn create_idea_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let agent = LlmAgentBuilder::new(\"idea_agent\")\n        .instruction(IDEA_AGENT_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(SaveIdeaTool::new(session_id.to_string())))\n        .tool(Arc::new(LoadIdeaTool::new(session_id.to_string())))\n        .tool(Arc::new(ReviewAndEditContentTool))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    Ok(Arc::new(agent))\n}\n\n// ============================================================================\n// PRD Loop - Actor + Critic with LoopAgent\n// ============================================================================\n\npub fn create_prd_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let prd_actor = LlmAgentBuilder::new(\"prd_actor\")\n        .instruction(PRD_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(LoadIdeaTool::new(session.clone())))\n        .tool(Arc::new(ReviewWithFeedbackContentTool))\n        .tool(Arc::new(CreateRequirementTool::new(session.clone())))\n        .tool(Arc::new(AddFeatureTool::new(session.clone())))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(SavePrdDocTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let prd_critic = LlmAgentBuilder::new(\"prd_critic\")\n        .instruction(PRD_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\n        \"prd_loop\",\n        vec![Arc::new(prd_actor), Arc::new(prd_critic)],\n    );\n    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts for Actor to fix issues\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Design Loop - Actor + Critic\n// ============================================================================\n\npub fn create_design_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let design_actor = LlmAgentBuilder::new(\"design_actor\")\n        .instruction(DESIGN_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(ReviewWithFeedbackContentTool))\n        .tool(Arc::new(CreateDesignComponentTool::new(session.clone())))\n        .tool(Arc::new(SaveDesignDocTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let design_critic = LlmAgentBuilder::new(\"design_critic\")\n        .instruction(DESIGN_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(CheckFeatureCoverageTool::new(session.clone())))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\"design_loop\", vec![Arc::new(design_actor), Arc::new(design_critic)]);\n    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Plan Loop - Actor + Critic\n// ============================================================================\n\npub fn create_plan_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let plan_actor = LlmAgentBuilder::new(\"plan_actor\")\n        .instruction(PLAN_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(ReviewWithFeedbackContentTool))\n        .tool(Arc::new(CreateTaskTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let plan_critic = LlmAgentBuilder::new(\"plan_critic\")\n        .instruction(PLAN_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(CheckTaskDependenciesTool::new(session.clone())))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\"plan_loop\", vec![Arc::new(plan_actor), Arc::new(plan_critic)]);\n    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Coding Loop - Actor + Critic\n// ============================================================================\n\npub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let coding_actor = LlmAgentBuilder::new(\"coding_actor\")\n        .instruction(CODING_ACTOR_INSTRUCTION)\n        .model(model.clone())\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(UpdateTaskStatusTool::new(session.clone())))\n        .tool(Arc::new(UpdateFeatureStatusTool::new(session.clone())))\n        // Task management tools - NEW\n        .tool(Arc::new(CreateTaskTool::new(session.clone())))\n        .tool(Arc::new(UpdateTaskTool::new(session.clone())))\n        .tool(Arc::new(DeleteTaskTool::new(session.clone())))\n        // File operations\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(WriteFileTool))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(RunCommandTool))\n        .tool(Arc::new(CheckTestsTool))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let coding_critic = LlmAgentBuilder::new(\"coding_critic\")\n        .instruction(CODING_CRITIC_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(RunCommandTool))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        // Replanning request - NEW\n        .tool(Arc::new(RequestReplanningTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    let mut loop_agent = LoopAgent::new(\"coding_loop\", vec![Arc::new(coding_actor), Arc::new(coding_critic)]);\n    loop_agent = loop_agent.with_max_iterations(5);\n\n    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))\n}\n\n// ============================================================================\n// Check Agent - Quality assurance\n// ============================================================================\n\npub fn create_check_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let agent = LlmAgentBuilder::new(\"check_agent\")\n        .instruction(CHECK_AGENT_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(CheckDataFormatTool::new(session.clone())))\n        .tool(Arc::new(CheckFeatureCoverageTool::new(session.clone())))\n        .tool(Arc::new(CheckTaskDependenciesTool::new(session.clone())))\n        .tool(Arc::new(RunCommandTool))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(CheckTestsTool))\n        .tool(Arc::new(CheckLintTool))\n        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))\n        .tool(Arc::new(GotoStageTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    Ok(Arc::new(agent))\n}\n\n// ============================================================================\n// Delivery Agent - Final report generation\n// ============================================================================\n\npub fn create_delivery_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {\n    let session = session_id.to_string();\n    \n    let agent = LlmAgentBuilder::new(\"delivery_agent\")\n        .instruction(DELIVERY_AGENT_INSTRUCTION)\n        .model(model)\n        .tool(Arc::new(GetRequirementsTool::new(session.clone())))\n        .tool(Arc::new(GetDesignTool::new(session.clone())))\n        .tool(Arc::new(GetPlanTool::new(session.clone())))\n        .tool(Arc::new(LoadFeedbackHistoryTool::new(session.clone())))\n        .tool(Arc::new(ListFilesTool))\n        .tool(Arc::new(ReadFileTool))\n        .tool(Arc::new(SaveDeliveryReportTool::new(session.clone())))\n        .tool(Arc::new(SavePrdDocTool::new(session.clone())))\n        .tool(Arc::new(SaveDesignDocTool::new(session.clone())))\n        .include_contents(IncludeContents::None)\n        .build()?;\n\n    Ok(Arc::new(agent))\n}\n"
     },
     "complexity_metrics": {
       "cyclomatic_complexity": 2.0,
-      "lines_of_code": 236,
-      "number_of_classes": 0,
+      "lines_of_code": 243,
+      "number_of_classes": 1,
       "number_of_functions": 7
     },
     "dependencies": [
       {
-        "dependency_type": "module",
+        "dependency_type": "internal",
         "is_external": false,
-        "line_number": 8,
+        "line_number": null,
         "name": "crate::instructions",
-        "path": "crates/cowork-core/src/instructions",
+        "path": null,
         "version": null
       },
       {
-        "dependency_type": "module",
+        "dependency_type": "internal",
         "is_external": false,
-        "line_number": 9,
+        "line_number": null,
         "name": "crate::tools",
-        "path": "crates/cowork-core/src/tools",
+        "path": null,
         "version": null
       },
       {
-        "dependency_type": "library",
+        "dependency_type": "external",
         "is_external": true,
-        "line_number": 10,
+        "line_number": null,
         "name": "adk_agent",
         "path": null,
         "version": null
       },
       {
-        "dependency_type": "library",
+        "dependency_type": "external",
         "is_external": true,
-        "line_number": 11,
+        "line_number": null,
         "name": "adk_core",
         "path": null,
         "version": null
       },
       {
-        "dependency_type": "library",
+        "dependency_type": "external",
         "is_external": true,
-        "line_number": 12,
+        "line_number": null,
         "name": "anyhow",
         "path": null,
         "version": null
       },
       {
-        "dependency_type": "standard_library",
-        "is_external": false,
-        "line_number": 13,
+        "dependency_type": "external",
+        "is_external": true,
+        "line_number": null,
         "name": "std::sync::Arc",
         "path": null,
         "version": null
       },
       {
-        "dependency_type": "module",
+        "dependency_type": "internal",
         "is_external": false,
-        "line_number": 15,
+        "line_number": null,
         "name": "hitl",
-        "path": "crates/cowork-core/src/agents/hitl.rs",
+        "path": null,
         "version": null
       },
       {
-        "dependency_type": "type",
-        "is_external": false,
-        "line_number": 16,
-        "name": "ResilientAgent",
-        "path": "crates/cowork-core/src/agents/hitl.rs",
+        "dependency_type": "external",
+        "is_external": true,
+        "line_number": null,
+        "name": "async_trait",
+        "path": null,
         "version": null
       }
     ],
-    "detailed_description": "This component is a factory module for creating various intelligent agents that form a complete software development workflow. It implements a sophisticated agent orchestration system with actor-critic patterns and human-in-the-loop resilience. The module solves critical architectural issues with LoopAgent termination behavior by using max_iterations instead of exit_loop tools. Each agent serves a specific phase in the development lifecycle: idea generation, PRD creation, design, planning, coding, quality checking, and final delivery.",
+    "detailed_description": "This component implements a suite of intelligent agent builders for a collaborative AI workflow system. It defines seven high-level agent creation functions that construct LLM-based agents using the adk-rust framework. Each agent serves a distinct phase in a multi-stage development lifecycle: Idea capture, PRD generation, Design, Planning, Coding, Quality Check, and Delivery. The agents are structured as either simple LLM agents or LoopAgents (actor-critic pairs) with max_iterations=3 or 5 to enable iterative refinement. A critical bug fix is implemented by replacing exit_loop() calls with max_iterations limits to prevent premature termination of parent SequentialAgents. The ResilientAgent wrapper from the hitl module provides human-in-the-loop (HITL) recovery for loop iteration failures, allowing user intervention via CLI prompts to retry, provide guidance, or abort.",
     "interfaces": [
       {
-        "description": "Creates an agent for capturing initial project ideas",
-        "interface_type": "function",
-        "name": "create_idea_agent",
+        "description": "A wrapper agent that provides human-in-the-loop recovery for agent execution failures, particularly when LoopAgent exceeds max_iterations. It intercepts errors, presents CLI options to the user, and allows retrying with or without guidance.",
+        "interface_type": "struct",
+        "name": "ResilientAgent",
         "parameters": [
           {
-            "description": "Language model instance",
+            "description": null,
             "is_optional": false,
-            "name": "model",
-            "param_type": "Arc<dyn Llm>"
+            "name": "inner",
+            "param_type": "Arc<dyn Agent>"
           },
           {
-            "description": "Session identifier",
+            "description": null,
             "is_optional": false,
-            "name": "session_id",
-            "param_type": "&str"
+            "name": "subs",
+            "param_type": "Vec<Arc<dyn Agent>>"
           }
         ],
-        "return_type": "Result<Arc<dyn Agent>>",
-        "visibility": "public"
-      },
-      {
-        "description": "Creates actor-critic loop for PRD (Product Requirements Document) creation",
-        "interface_type": "function",
-        "name": "create_prd_loop",
-        "parameters": [
-          {
-            "description": "Language model instance",
-            "is_optional": false,
-            "name": "model",
-            "param_type": "Arc<dyn Llm>"
-          },
-          {
-            "description": "Session identifier",
-            "is_optional": false,
-            "name": "session_id",
-            "param_type": "&str"
-          }
-        ],
-        "return_type": "Result<Arc<dyn Agent>>",
-        "visibility": "public"
-      },
-      {
-        "description": "Creates actor-critic loop for design specification creation",
-        "interface_type": "function",
-        "name": "create_design_loop",
-        "parameters": [
-          {
-            "description": "Language model instance",
-            "is_optional": false,
-            "name": "model",
-            "param_type": "Arc<dyn Llm>"
-          },
-          {
-            "description": "Session identifier",
-            "is_optional": false,
-            "name": "session_id",
-            "param_type": "&str"
-          }
-        ],
-        "return_type": "Result<Arc<dyn Agent>>",
-        "visibility": "public"
-      },
-      {
-        "description": "Creates actor-critic loop for task planning and scheduling",
-        "interface_type": "function",
-        "name": "create_plan_loop",
-        "parameters": [
-          {
-            "description": "Language model instance",
-            "is_optional": false,
-            "name": "model",
-            "param_type": "Arc<dyn Llm>"
-          },
-          {
-            "description": "Session identifier",
-            "is_optional": false,
-            "name": "session_id",
-            "param_type": "&str"
-          }
-        ],
-        "return_type": "Result<Arc<dyn Agent>>",
-        "visibility": "public"
-      },
-      {
-        "description": "Creates actor-critic loop for code implementation",
-        "interface_type": "function",
-        "name": "create_coding_loop",
-        "parameters": [
-          {
-            "description": "Language model instance",
-            "is_optional": false,
-            "name": "model",
-            "param_type": "Arc<dyn Llm>"
-          },
-          {
-            "description": "Session identifier",
-            "is_optional": false,
-            "name": "session_id",
-            "param_type": "&str"
-          }
-        ],
-        "return_type": "Result<Arc<dyn Agent>>",
-        "visibility": "public"
-      },
-      {
-        "description": "Creates quality assurance agent for validation",
-        "interface_type": "function",
-        "name": "create_check_agent",
-        "parameters": [
-          {
-            "description": "Language model instance",
-            "is_optional": false,
-            "name": "model",
-            "param_type": "Arc<dyn Llm>"
-          },
-          {
-            "description": "Session identifier",
-            "is_optional": false,
-            "name": "session_id",
-            "param_type": "&str"
-          }
-        ],
-        "return_type": "Result<Arc<dyn Agent>>",
-        "visibility": "public"
-      },
-      {
-        "description": "Creates final delivery agent for report generation",
-        "interface_type": "function",
-        "name": "create_delivery_agent",
-        "parameters": [
-          {
-            "description": "Language model instance",
-            "is_optional": false,
-            "name": "model",
-            "param_type": "Arc<dyn Llm>"
-          },
-          {
-            "description": "Session identifier",
-            "is_optional": false,
-            "name": "session_id",
-            "param_type": "&str"
-          }
-        ],
-        "return_type": "Result<Arc<dyn Agent>>",
+        "return_type": null,
         "visibility": "public"
       }
     ],
     "responsibilities": [
-      "Agent Factory Creation - Provides factory functions for creating specialized agents for different development phases",
-      "Workflow Orchestration - Implements sequential agent patterns with feedback loops for iterative refinement",
-      "Error Resilience - Integrates human-in-the-loop capabilities through ResilientAgent wrapper",
-      "Tool Configuration - Properly configures each agent with appropriate tools and instructions",
-      "Performance Optimization - Sets appropriate iteration limits for different agent types"
+      "Construct LLM-based agents for each phase of the software development lifecycle",
+      "Implement iterative actor-critic loops using LoopAgent with max_iterations to avoid premature termination",
+      "Provide resilient agent execution via HITL recovery mechanisms",
+      "Encapsulate domain-specific tools and instructions for each agent type",
+      "Maintain session state consistency across agent invocations using session_id"
     ]
   },
   {
     "code_dossier": {
       "code_purpose": "database",
-      "description": "Storage layer for .cowork/ directory - Session-scoped architecture",
+      "description": "Storage layer for .cowork/ directory implementing session-scoped architecture",
       "file_path": "crates/cowork-core/src/storage/mod.rs",
       "functions": [
         "get_cowork_dir",
@@ -4301,6 +4122,8 @@ Code analysis results from preprocessing phase, including definitions of functio
         "has_requirements",
         "has_design_spec",
         "has_implementation_plan",
+        "has_code_metadata",
+        "has_code_files",
         "save_requirements",
         "load_requirements",
         "save_feature_list",
@@ -4326,16 +4149,18 @@ Code analysis results from preprocessing phase, including definitions of functio
       ],
       "importance_score": 0.8,
       "interfaces": [
-        "SessionInput"
+        "SessionInput",
+        "artifact_path",
+        "state_path"
       ],
       "name": "mod.rs",
-      "source_summary": "// Storage layer for .cowork/ directory - Session-scoped architecture\nuse crate::data::*;\nuse anyhow::{Context, Result};\nuse std::fs;\nuse std::path::{Path, PathBuf};\n\n#[cfg(test)]\nmod storage_test;\n\nconst COWORK_DIR: &str = \".cowork\";\nconst INDEX_FILE: &str = \"index.json\";\nconst SESSIONS_DIR: &str = \"sessions\";\n\n// ============================================================================\n// Core Directory Structure\n// ============================================================================\n\n/// Get the .cowork directory path, create if not exists\npub fn get_cowork_dir() -> Result<PathBuf> {\n    let path = PathBuf::from(COWORK_DIR);\n    \n    // Create main directory and subdirectories\n    fs::create_dir_all(&path)\n        .with_context(|| format!(\"Failed to create .cowork directory at {:?}\", path))?;\n    fs::create_dir_all(path.join(SESSIONS_DIR))?;\n    \n    Ok(path)\n}\n\n/// Get path for a specific session directory\npub fn get_session_dir(session_id: &str) -> Result<PathBuf> {\n    let cowork_dir = get_cowork_dir()?;\n    let session_path = cowork_dir.join(SESSIONS_DIR).join(session_id);\n    \n    // Create session subdirectories\n    fs::create_dir_all(&session_path)?;\n    fs::create_dir_all(session_path.join(\"artifacts\"))?;\n    fs::create_dir_all(session_path.join(\"state\"))?;\n    fs::create_dir_all(session_path.join(\"patch\"))?;\n    fs::create_dir_all(session_path.join(\"logs\"))?;\n    \n    Ok(session_path)\n}\n\n/// Get the project root directory (where .cowork/ is located)\n/// This is the actual workspace where code files are written\npub fn get_project_root() -> Result<PathBuf> {\n    let current_dir = std::env::current_dir()\n        .with_context(|| \"Failed to get current directory\")?;\n    Ok(current_dir)\n}\n\n/// Check if .cowork directory exists\npub fn cowork_dir_exists() -> bool {\n    Path::new(COWORK_DIR).exists()\n}\n\n/// Check if project has been initialized (has index.json)\npub fn is_project_initialized() -> bool {\n    Path::new(COWORK_DIR).join(INDEX_FILE).exists()\n}\n\n// ============================================================================\n// Project Index (index.json at root of .cowork/)\n// ============================================================================\n\npub fn load_project_index() -> Result<ProjectIndex> {\n    let path = PathBuf::from(COWORK_DIR).join(INDEX_FILE);\n    if !path.exists() {\n        anyhow::bail!(\"Project not initialized. Run 'cowork new' first.\");\n    }\n    let content = fs::read_to_string(&path)\n        .with_context(|| format!(\"Failed to read {:?}\", path))?;\n    let index: ProjectIndex = serde_json::from_str(&content)\n        .with_context(|| \"Failed to parse index.json\")?;\n    Ok(index)\n}\n\npub fn save_project_index(index: &ProjectIndex) -> Result<()> {\n    let cowork_dir = get_cowork_dir()?;\n    let path = cowork_dir.join(INDEX_FILE);\n    let content = serde_json::to_string_pretty(index)?;\n    fs::write(&path, content)\n        .with_context(|| format!(\"Failed to write {:?}\", path))?;\n    Ok(())\n}\n\npub fn init_project_index(project_name: String) -> Result<ProjectIndex> {\n    if is_project_initialized() {\n        anyhow::bail!(\".cowork directory already initialized\");\n    }\n    let index = ProjectIndex::new(project_name);\n    save_project_index(&index)?;\n    Ok(index)\n}\n\n// ============================================================================\n// Session Input (sessions/<id>/input.json)\n// ============================================================================\n\n#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]\npub struct SessionInput {\n    pub session_id: String,\n    pub session_type: SessionType,\n    pub description: String,\n    pub base_session_id: Option<String>,\n    pub created_at: chrono::DateTime<chrono::Utc>,\n}\n\npub fn save_session_input(session_id: &str, input: &SessionInput) -> Result<()> {\n    let session_dir = get_session_dir(session_id)?;\n    let path = session_dir.join(\"input.json\");\n    let content = serde_json::to_string_pretty(input)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_session_input(session_id: &str) -> Result<SessionInput> {\n    let session_dir = get_session_dir(session_id)?;\n    let path = session_dir.join(\"input.json\");\n    if !path.exists() {\n        anyhow::bail!(\"Session input not found for session {}\", session_id);\n    }\n    let content = fs::read_to_string(&path)?;\n    let input: SessionInput = serde_json::from_str(&content)?;\n    Ok(input)\n}\n\n// ============================================================================\n// Change Request (sessions/<id>/change_request.json - only for modify sessions)\n// ============================================================================\n\npub fn save_change_request(session_id: &str, change_request: &ChangeRequest) -> Result<()> {\n    let session_dir = get_session_dir(session_id)?;\n    let path = session_dir.join(\"change_request.json\");\n    let content = serde_json::to_string_pretty(change_request)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_change_request(session_id: &str) -> Result<ChangeRequest> {\n    let session_dir = get_session_dir(session_id)?;\n    let path = session_dir.join(\"change_request.json\");\n    if !path.exists() {\n        anyhow::bail!(\"Change request not found for session {}\", session_id);\n    }\n    let content = fs::read_to_string(&path)?;\n    let cr: ChangeRequest = serde_json::from_str(&content)?;\n    Ok(cr)\n}\n\n// ============================================================================\n// Session-scoped Artifacts (sessions/<id>/artifacts/)\n// ============================================================================\n\nfn artifact_path(session_id: &str, filename: &str) -> Result<PathBuf> {\n    let session_dir = get_session_dir(session_id)?;\n    Ok(session_dir.join(\"artifacts\").join(filename))\n}\n\npub fn save_idea(session_id: &str, content: &str) -> Result<()> {\n    let path = artifact_path(session_id, \"idea.md\")?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_idea(session_id: &str) -> Result<String> {\n    let path = artifact_path(session_id, \"idea.md\")?;\n    if !path.exists() {\n        return Ok(String::new());\n    }\n    let content = fs::read_to_string(&path)?;\n    Ok(content)\n}\n\npub fn save_prd_doc(session_id: &str, content: &str) -> Result<()> {\n    let path = artifact_path(session_id, \"prd.md\")?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn save_design_doc(session_id: &str, content: &str) -> Result<()> {\n    let path = artifact_path(session_id, \"design.md\")?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn save_delivery_report(session_id: &str, content: &str) -> Result<()> {\n    let path = artifact_path(session_id, \"delivery_report.md\")?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\n// ============================================================================\n// Session-scoped State (sessions/<id>/state/)\n// ============================================================================\n\nfn state_path(session_id: &str, filename: &str) -> Result<PathBuf> {\n    let session_dir = get_session_dir(session_id)?;\n    Ok(session_dir.join(\"state\").join(filename))\n}\n\npub fn state_file_exists(session_id: &str, filename: &str) -> Result<bool> {\n    Ok(state_path(session_id, filename)?.exists())\n}\n\npub fn has_requirements(session_id: &str) -> Result<bool> {\n    state_file_exists(session_id, \"requirements.json\")\n}\n\npub fn has_design_spec(session_id: &str) -> Result<bool> {\n    state_file_exists(session_id, \"design_spec.json\")\n}\n\npub fn has_implementation_plan(session_id: &str) -> Result<bool> {\n    state_file_exists(session_id, \"implementation_plan.json\")\n}\n\npub fn save_requirements(session_id: &str, requirements: &Requirements) -> Result<()> {\n    let path = state_path(session_id, \"requirements.json\")?;\n    let content = serde_json::to_string_pretty(requirements)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_requirements(session_id: &str) -> Result<Requirements> {\n    let path = state_path(session_id, \"requirements.json\")?;\n    if !path.exists() {\n        return Ok(Requirements::new());\n    }\n    let content = fs::read_to_string(&path)?;\n    let requirements: Requirements = serde_json::from_str(&content)?;\n    Ok(requirements)\n}\n\npub fn save_feature_list(session_id: &str, features: &FeatureList) -> Result<()> {\n    let path = state_path(session_id, \"feature_list.json\")?;\n    let content = serde_json::to_string_pretty(features)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_feature_list(session_id: &str) -> Result<FeatureList> {\n    let path = state_path(session_id, \"feature_list.json\")?;\n    if !path.exists() {\n        return Ok(FeatureList::new());\n    }\n    let content = fs::read_to_string(&path)?;\n    let features: FeatureList = serde_json::from_str(&content)?;\n    Ok(features)\n}\n\npub fn save_design_spec(session_id: &str, design: &DesignSpec) -> Result<()> {\n    let path = state_path(session_id, \"design_spec.json\")?;\n    let content = serde_json::to_string_pretty(design)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_design_spec(session_id: &str) -> Result<DesignSpec> {\n    let path = state_path(session_id, \"design_spec.json\")?;\n    if !path.exists() {\n        return Ok(DesignSpec::new());\n    }\n    let content = fs::read_to_string(&path)?;\n    let design: DesignSpec = serde_json::from_str(&content)?;\n    Ok(design)\n}\n\npub fn save_implementation_plan(session_id: &str, plan: &ImplementationPlan) -> Result<()> {\n    let path = state_path(session_id, \"implementation_plan.json\")?;\n    let content = serde_json::to_string_pretty(plan)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_implementation_plan(session_id: &str) -> Result<ImplementationPlan> {\n    let path = state_path(session_id, \"implementation_plan.json\")?;\n    if !path.exists() {\n        return Ok(ImplementationPlan::new());\n    }\n    let content = fs::read_to_string(&path)?;\n    let plan: ImplementationPlan = serde_json::from_str(&content)?;\n    Ok(plan)\n}\n\npub fn save_code_metadata(session_id: &str, metadata: &CodeMetadata) -> Result<()> {\n    let path = state_path(session_id, \"code_metadata.json\")?;\n    let content = serde_json::to_string_pretty(metadata)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_code_metadata(session_id: &str) -> Result<CodeMetadata> {\n    let path = state_path(session_id, \"code_metadata.json\")?;\n    if !path.exists() {\n        return Ok(CodeMetadata::new());\n    }\n    let content = fs::read_to_string(&path)?;\n    let metadata: CodeMetadata = serde_json::from_str(&content)?;\n    Ok(metadata)\n}\n\n// ============================================================================\n// Session Metadata (sessions/<id>/state/meta.json)\n// ============================================================================\n\npub fn save_session_meta(session_id: &str, meta: &SessionMeta) -> Result<()> {\n    let path = state_path(session_id, \"meta.json\")?;\n    let content = serde_json::to_string_pretty(meta)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_session_meta(session_id: &str) -> Result<Option<SessionMeta>> {\n    let path = state_path(session_id, \"meta.json\")?;\n    if !path.exists() {\n        return Ok(None);\n    }\n    let content = fs::read_to_string(&path)?;\n    let meta: SessionMeta = serde_json::from_str(&content)?;\n    Ok(Some(meta))\n}\n\n// ============================================================================\n// Feedback History (sessions/<id>/state/feedback.json)\n// ============================================================================\n\npub fn save_feedback_history(session_id: &str, history: &FeedbackHistory) -> Result<()> {\n    let path = state_path(session_id, \"feedback.json\")?;\n    let content = serde_json::to_string_pretty(history)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_feedback_history(session_id: &str) -> Result<FeedbackHistory> {\n    let path = state_path(session_id, \"feedback.json\")?;\n    if !path.exists() {\n        return Ok(FeedbackHistory::new());\n    }\n    let content = fs::read_to_string(&path)?;\n    let history: FeedbackHistory = serde_json::from_str(&content)?;\n    Ok(history)\n}\n\npub fn append_feedback(session_id: &str, feedback: &Feedback) -> Result<()> {\n    let mut history = load_feedback_history(session_id)?;\n    history.feedbacks.push(feedback.clone());\n    save_feedback_history(session_id, &history)?;\n    Ok(())\n}\n\n// ============================================================================\n// Patch Metadata (sessions/<id>/patch/metadata.json - for modify sessions)\n// ============================================================================\n\npub fn save_patch_metadata(session_id: &str, patch: &PatchMetadata) -> Result<()> {\n    let session_dir = get_session_dir(session_id)?;\n    let path = session_dir.join(\"patch\").join(\"metadata.json\");\n    let content = serde_json::to_string_pretty(patch)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_patch_metadata(session_id: &str) -> Result<PatchMetadata> {\n    let session_dir = get_session_dir(session_id)?;\n    let path = session_dir.join(\"patch\").join(\"metadata.json\");\n    if !path.exists() {\n        anyhow::bail!(\"Patch metadata not found for session {}\", session_id);\n    }\n    let content = fs::read_to_string(&path)?;\n    let patch: PatchMetadata = serde_json::from_str(&content)?;\n    Ok(patch)\n}\n\n// ============================================================================\n// Session Inheritance / Bootstrap\n// ============================================================================\n\n/// Initialize a new session by copying state/artifacts from a base session.\n///\n/// This is critical for `modify` / `revert` / `resume` flows: a fresh session directory\n/// should not start with empty state, otherwise agents will see empty requirements/design/plan.\n///\n/// What we copy:\n/// - state/*.json (requirements, feature_list, design_spec, implementation_plan, code_metadata, feedback, meta)\n/// - artifacts/*.md (idea, prd, design, delivery_report) if present\n///\n/// Notes:\n/// - This function does NOT copy code files in the project root.\n/// - Missing files are skipped.\npub fn init_session_from_base(new_session_id: &str, base_session_id: &str) -> Result<()> {\n    let base_dir = get_session_dir(base_session_id)?;\n    let new_dir = get_session_dir(new_session_id)?;\n\n    // helper to copy a file if it exists\n    fn copy_if_exists(src: &Path, dst: &Path) -> Result<()> {\n        if !src.exists() {\n            return Ok(());\n        }\n        if let Some(parent) = dst.parent() {\n            fs::create_dir_all(parent)?;\n        }\n        fs::copy(src, dst).with_context(|| format!(\"Failed to copy {:?} -> {:?}\", src, dst))?;\n        Ok(())\n    }\n\n    // state files\n    let state_files = [\n        \"requirements.json\",\n        \"feature_list.json\",\n        \"design_spec.json\",\n        \"implementation_plan.json\",\n        \"code_metadata.json\",\n        \"feedback.json\",\n        \"meta.json\",\n    ];\n\n    for name in state_files {\n        let src = base_dir.join(\"state\").join(name);\n        let dst = new_dir.join(\"state\").join(name);\n        copy_if_exists(&src, &dst)?;\n    }\n\n    // artifact files\n    let artifact_files = [\"idea.md\", \"prd.md\", \"design.md\", \"delivery_report.md\"]; \n    for name in artifact_files {\n        let src = base_dir.join(\"artifacts\").join(name);\n        let dst = new_dir.join(\"artifacts\").join(name);\n        copy_if_exists(&src, &dst)?;\n    }\n\n    Ok(())\n}\n\n// ============================================================================\n// Helper utilities\n// ============================================================================\n\n/// Generate ID with prefix and counter\npub fn generate_id(prefix: &str, counter: usize) -> String {\n    format!(\"{}-{:03}\", prefix, counter + 1)\n}\n\n/// Get the latest successful session ID from index\npub fn get_latest_successful_session() -> Result<Option<String>> {\n    if !is_project_initialized() {\n        return Ok(None);\n    }\n    let index = load_project_index()?;\n    Ok(index.latest_successful_session)\n}\n\n/// Mark a session as completed successfully\npub fn mark_session_completed(session_id: &str) -> Result<()> {\n    let mut index = load_project_index()?;\n    \n    // Update session record\n    for session in &mut index.sessions {\n        if session.session_id == session_id {\n            session.status = SessionStatus::Completed;\n            session.completed_at = Some(chrono::Utc::now());\n            break;\n        }\n    }\n    \n    // Update latest successful session\n    index.update_latest_successful(session_id.to_string());\n    save_project_index(&index)?;\n    Ok(())\n}\n\n/// Mark a session as failed\npub fn mark_session_failed(session_id: &str) -> Result<()> {\n    let mut index = load_project_index()?;\n    \n    for session in &mut index.sessions {\n        if session.session_id == session_id {\n            session.status = SessionStatus::Failed;\n            session.completed_at = Some(chrono::Utc::now());\n            break;\n        }\n    }\n    \n    save_project_index(&index)?;\n    Ok(())\n}\n"
+      "source_summary": "// Storage layer for .cowork/ directory - Session-scoped architecture\nuse crate::data::*;\nuse anyhow::{Context, Result};\nuse std::fs;\nuse std::path::{Path, PathBuf};\n\n#[cfg(test)]\nmod storage_test;\n\nconst COWORK_DIR: &str = \".cowork\";\nconst INDEX_FILE: &str = \"index.json\";\nconst SESSIONS_DIR: &str = \"sessions\";\n\n// ============================================================================\n// Core Directory Structure\n// ============================================================================\n\n/// Get the .cowork directory path, create if not exists\npub fn get_cowork_dir() -> Result<PathBuf> {\n    let path = PathBuf::from(COWORK_DIR);\n    \n    // Create main directory and subdirectories\n    fs::create_dir_all(&path)\n        .with_context(|| format!(\"Failed to create .cowork directory at {:?}\", path))?;\n    fs::create_dir_all(path.join(SESSIONS_DIR))?;\n    \n    Ok(path)\n}\n\n/// Get path for a specific session directory\npub fn get_session_dir(session_id: &str) -> Result<PathBuf> {\n    let cowork_dir = get_cowork_dir()?;\n    let session_path = cowork_dir.join(SESSIONS_DIR).join(session_id);\n    \n    // Create session subdirectories\n    fs::create_dir_all(&session_path)?;\n    fs::create_dir_all(session_path.join(\"artifacts\"))?;\n    fs::create_dir_all(session_path.join(\"state\"))?;\n    fs::create_dir_all(session_path.join(\"patch\"))?;\n    fs::create_dir_all(session_path.join(\"logs\"))?;\n    \n    Ok(session_path)\n}\n\n/// Get the project root directory (where .cowork/ is located)\n/// This is the actual workspace where code files are written\npub fn get_project_root() -> Result<PathBuf> {\n    let current_dir = std::env::current_dir()\n        .with_context(|| \"Failed to get current directory\")?;\n    Ok(current_dir)\n}\n\n/// Check if .cowork directory exists\npub fn cowork_dir_exists() -> bool {\n    Path::new(COWORK_DIR).exists()\n}\n\n/// Check if project has been initialized (has index.json)\npub fn is_project_initialized() -> bool {\n    Path::new(COWORK_DIR).join(INDEX_FILE).exists()\n}\n\n// ============================================================================\n// Project Index (index.json at root of .cowork/)\n// ============================================================================\n\npub fn load_project_index() -> Result<ProjectIndex> {\n    let path = PathBuf::from(COWORK_DIR).join(INDEX_FILE);\n    if !path.exists() {\n        anyhow::bail!(\"Project not initialized. Run 'cowork new' first.\");\n    }\n    let content = fs::read_to_string(&path)\n        .with_context(|| format!(\"Failed to read {:?}\", path))?;\n    let index: ProjectIndex = serde_json::from_str(&content)\n        .with_context(|| \"Failed to parse index.json\")?;\n    Ok(index)\n}\n\npub fn save_project_index(index: &ProjectIndex) -> Result<()> {\n    let cowork_dir = get_cowork_dir()?;\n    let path = cowork_dir.join(INDEX_FILE);\n    let content = serde_json::to_string_pretty(index)?;\n    fs::write(&path, content)\n        .with_context(|| format!(\"Failed to write {:?}\", path))?;\n    Ok(())\n}\n\npub fn init_project_index(project_name: String) -> Result<ProjectIndex> {\n    if is_project_initialized() {\n        anyhow::bail!(\".cowork directory already initialized\");\n    }\n    let index = ProjectIndex::new(project_name);\n    save_project_index(&index)?;\n    Ok(index)\n}\n\n// ============================================================================\n// Session Input (sessions/<id>/input.json)\n// ============================================================================\n\n#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]\npub struct SessionInput {\n    pub session_id: String,\n    pub session_type: SessionType,\n    pub description: String,\n    pub base_session_id: Option<String>,\n    pub created_at: chrono::DateTime<chrono::Utc>,\n}\n\npub fn save_session_input(session_id: &str, input: &SessionInput) -> Result<()> {\n    let session_dir = get_session_dir(session_id)?;\n    let path = session_dir.join(\"input.json\");\n    let content = serde_json::to_string_pretty(input)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_session_input(session_id: &str) -> Result<SessionInput> {\n    let session_dir = get_session_dir(session_id)?;\n    let path = session_dir.join(\"input.json\");\n    if !path.exists() {\n        anyhow::bail!(\"Session input not found for session {}\", session_id);\n    }\n    let content = fs::read_to_string(&path)?;\n    let input: SessionInput = serde_json::from_str(&content)?;\n    Ok(input)\n}\n\n// ============================================================================\n// Change Request (sessions/<id>/change_request.json - only for modify sessions)\n// ============================================================================\n\npub fn save_change_request(session_id: &str, change_request: &ChangeRequest) -> Result<()> {\n    let session_dir = get_session_dir(session_id)?;\n    let path = session_dir.join(\"change_request.json\");\n    let content = serde_json::to_string_pretty(change_request)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_change_request(session_id: &str) -> Result<ChangeRequest> {\n    let session_dir = get_session_dir(session_id)?;\n    let path = session_dir.join(\"change_request.json\");\n    if !path.exists() {\n        anyhow::bail!(\"Change request not found for session {}\", session_id);\n    }\n    let content = fs::read_to_string(&path)?;\n    let cr: ChangeRequest = serde_json::from_str(&content)?;\n    Ok(cr)\n}\n\n// ============================================================================\n// Session-scoped Artifacts (sessions/<id>/artifacts/)\n// ============================================================================\n\nfn artifact_path(session_id: &str, filename: &str) -> Result<PathBuf> {\n    let session_dir = get_session_dir(session_id)?;\n    Ok(session_dir.join(\"artifacts\").join(filename))\n}\n\npub fn save_idea(session_id: &str, content: &str) -> Result<()> {\n    let path = artifact_path(session_id, \"idea.md\")?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_idea(session_id: &str) -> Result<String> {\n    let path = artifact_path(session_id, \"idea.md\")?;\n    if !path.exists() {\n        return Ok(String::new());\n    }\n    let content = fs::read_to_string(&path)?;\n    Ok(content)\n}\n\npub fn save_prd_doc(session_id: &str, content: &str) -> Result<()> {\n    let path = artifact_path(session_id, \"prd.md\")?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn save_design_doc(session_id: &str, content: &str) -> Result<()> {\n    let path = artifact_path(session_id, \"design.md\")?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn save_delivery_report(session_id: &str, content: &str) -> Result<()> {\n    let path = artifact_path(session_id, \"delivery_report.md\")?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\n// ============================================================================\n// Session-scoped State (sessions/<id>/state/)\n// ============================================================================\n\nfn state_path(session_id: &str, filename: &str) -> Result<PathBuf> {\n    let session_dir = get_session_dir(session_id)?;\n    Ok(session_dir.join(\"state\").join(filename))\n}\n\npub fn state_file_exists(session_id: &str, filename: &str) -> Result<bool> {\n    Ok(state_path(session_id, filename)?.exists())\n}\n\npub fn has_requirements(session_id: &str) -> Result<bool> {\n    state_file_exists(session_id, \"requirements.json\")\n}\n\npub fn has_design_spec(session_id: &str) -> Result<bool> {\n    state_file_exists(session_id, \"design_spec.json\")\n}\n\npub fn has_implementation_plan(session_id: &str) -> Result<bool> {\n    state_file_exists(session_id, \"implementation_plan.json\")\n}\n\npub fn has_code_metadata(session_id: &str) -> Result<bool> {\n    state_file_exists(session_id, \"code_metadata.json\")\n}\n\n/// Check if coding stage has made progress (has written files)\npub fn has_code_files(session_id: &str) -> Result<bool> {\n    if !has_code_metadata(session_id)? {\n        return Ok(false);\n    }\n    \n    let metadata = load_code_metadata(session_id)?;\n    Ok(!metadata.files.is_empty())\n}\n\npub fn save_requirements(session_id: &str, requirements: &Requirements) -> Result<()> {\n    let path = state_path(session_id, \"requirements.json\")?;\n    let content = serde_json::to_string_pretty(requirements)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_requirements(session_id: &str) -> Result<Requirements> {\n    let path = state_path(session_id, \"requirements.json\")?;\n    if !path.exists() {\n        return Ok(Requirements::new());\n    }\n    let content = fs::read_to_string(&path)?;\n    let requirements: Requirements = serde_json::from_str(&content)?;\n    Ok(requirements)\n}\n\npub fn save_feature_list(session_id: &str, features: &FeatureList) -> Result<()> {\n    let path = state_path(session_id, \"feature_list.json\")?;\n    let content = serde_json::to_string_pretty(features)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_feature_list(session_id: &str) -> Result<FeatureList> {\n    let path = state_path(session_id, \"feature_list.json\")?;\n    if !path.exists() {\n        return Ok(FeatureList::new());\n    }\n    let content = fs::read_to_string(&path)?;\n    let features: FeatureList = serde_json::from_str(&content)?;\n    Ok(features)\n}\n\npub fn save_design_spec(session_id: &str, design: &DesignSpec) -> Result<()> {\n    let path = state_path(session_id, \"design_spec.json\")?;\n    let content = serde_json::to_string_pretty(design)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_design_spec(session_id: &str) -> Result<DesignSpec> {\n    let path = state_path(session_id, \"design_spec.json\")?;\n    if !path.exists() {\n        return Ok(DesignSpec::new());\n    }\n    let content = fs::read_to_string(&path)?;\n    let design: DesignSpec = serde_json::from_str(&content)?;\n    Ok(design)\n}\n\npub fn save_implementation_plan(session_id: &str, plan: &ImplementationPlan) -> Result<()> {\n    let path = state_path(session_id, \"implementation_plan.json\")?;\n    let content = serde_json::to_string_pretty(plan)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_implementation_plan(session_id: &str) -> Result<ImplementationPlan> {\n    let path = state_path(session_id, \"implementation_plan.json\")?;\n    if !path.exists() {\n        return Ok(ImplementationPlan::new());\n    }\n    let content = fs::read_to_string(&path)?;\n    let plan: ImplementationPlan = serde_json::from_str(&content)?;\n    Ok(plan)\n}\n\npub fn save_code_metadata(session_id: &str, metadata: &CodeMetadata) -> Result<()> {\n    let path = state_path(session_id, \"code_metadata.json\")?;\n    let content = serde_json::to_string_pretty(metadata)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_code_metadata(session_id: &str) -> Result<CodeMetadata> {\n    let path = state_path(session_id, \"code_metadata.json\")?;\n    if !path.exists() {\n        return Ok(CodeMetadata::new());\n    }\n    let content = fs::read_to_string(&path)?;\n    let metadata: CodeMetadata = serde_json::from_str(&content)?;\n    Ok(metadata)\n}\n\n// ============================================================================\n// Session Metadata (sessions/<id>/state/meta.json)\n// ============================================================================\n\npub fn save_session_meta(session_id: &str, meta: &SessionMeta) -> Result<()> {\n    let path = state_path(session_id, \"meta.json\")?;\n    let content = serde_json::to_string_pretty(meta)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_session_meta(session_id: &str) -> Result<Option<SessionMeta>> {\n    let path = state_path(session_id, \"meta.json\")?;\n    if !path.exists() {\n        return Ok(None);\n    }\n    let content = fs::read_to_string(&path)?;\n    let meta: SessionMeta = serde_json::from_str(&content)?;\n    Ok(Some(meta))\n}\n\n// ============================================================================\n// Feedback History (sessions/<id>/state/feedback.json)\n// ============================================================================\n\npub fn save_feedback_history(session_id: &str, history: &FeedbackHistory) -> Result<()> {\n    let path = state_path(session_id, \"feedback.json\")?;\n    let content = serde_json::to_string_pretty(history)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_feedback_history(session_id: &str) -> Result<FeedbackHistory> {\n    let path = state_path(session_id, \"feedback.json\")?;\n    if !path.exists() {\n        return Ok(FeedbackHistory::new());\n    }\n    let content = fs::read_to_string(&path)?;\n    let history: FeedbackHistory = serde_json::from_str(&content)?;\n    Ok(history)\n}\n\npub fn append_feedback(session_id: &str, feedback: &Feedback) -> Result<()> {\n    let mut history = load_feedback_history(session_id)?;\n    history.feedbacks.push(feedback.clone());\n    save_feedback_history(session_id, &history)?;\n    Ok(())\n}\n\n// ============================================================================\n// Patch Metadata (sessions/<id>/patch/metadata.json - for modify sessions)\n// ============================================================================\n\npub fn save_patch_metadata(session_id: &str, patch: &PatchMetadata) -> Result<()> {\n    let session_dir = get_session_dir(session_id)?;\n    let path = session_dir.join(\"patch\").join(\"metadata.json\");\n    let content = serde_json::to_string_pretty(patch)?;\n    fs::write(&path, content)?;\n    Ok(())\n}\n\npub fn load_patch_metadata(session_id: &str) -> Result<PatchMetadata> {\n    let session_dir = get_session_dir(session_id)?;\n    let path = session_dir.join(\"patch\").join(\"metadata.json\");\n    if !path.exists() {\n        anyhow::bail!(\"Patch metadata not found for session {}\", session_id);\n    }\n    let content = fs::read_to_string(&path)?;\n    let patch: PatchMetadata = serde_json::from_str(&content)?;\n    Ok(patch)\n}\n\n// ============================================================================\n// Session Inheritance / Bootstrap\n// ============================================================================\n\n/// Initialize a new session by copying state/artifacts from a base session.\n///\n/// This is critical for `modify` / `revert` / `resume` flows: a fresh session directory\n/// should not start with empty state, otherwise agents will see empty requirements/design/plan.\n///\n/// What we copy:\n/// - state/*.json (requirements, feature_list, design_spec, implementation_plan, code_metadata, feedback, meta)\n/// - artifacts/*.md (idea, prd, design, delivery_report) if present\n///\n/// Notes:\n/// - This function does NOT copy code files in the project root.\n/// - Missing files are skipped.\npub fn init_session_from_base(new_session_id: &str, base_session_id: &str) -> Result<()> {\n    let base_dir = get_session_dir(base_session_id)?;\n    let new_dir = get_session_dir(new_session_id)?;\n\n    // helper to copy a file if it exists\n    fn copy_if_exists(src: &Path, dst: &Path) -> Result<()> {\n        if !src.exists() {\n            return Ok(());\n        }\n        if let Some(parent) = dst.parent() {\n            fs::create_dir_all(parent)?;\n        }\n        fs::copy(src, dst).with_context(|| format!(\"Failed to copy {:?} -> {:?}\", src, dst))?;\n        Ok(())\n    }\n\n    // state files\n    let state_files = [\n        \"requirements.json\",\n        \"feature_list.json\",\n        \"design_spec.json\",\n        \"implementation_plan.json\",\n        \"code_metadata.json\",\n        \"feedback.json\",\n        \"meta.json\",\n    ];\n\n    for name in state_files {\n        let src = base_dir.join(\"state\").join(name);\n        let dst = new_dir.join(\"state\").join(name);\n        copy_if_exists(&src, &dst)?;\n    }\n\n    // artifact files\n    let artifact_files = [\"idea.md\", \"prd.md\", \"design.md\", \"delivery_report.md\"]; \n    for name in artifact_files {\n        let src = base_dir.join(\"artifacts\").join(name);\n        let dst = new_dir.join(\"artifacts\").join(name);\n        copy_if_exists(&src, &dst)?;\n    }\n\n    Ok(())\n}\n\n// ============================================================================\n// Helper utilities\n// ============================================================================\n\n/// Generate ID with prefix and counter\npub fn generate_id(prefix: &str, counter: usize) -> String {\n    format!(\"{}-{:03}\", prefix, counter + 1)\n}\n\n/// Get the latest successful session ID from index\npub fn get_latest_successful_session() -> Result<Option<String>> {\n    if !is_project_initialized() {\n        return Ok(None);\n    }\n    let index = load_project_index()?;\n    Ok(index.latest_successful_session)\n}\n\n/// Mark a session as completed successfully\npub fn mark_session_completed(session_id: &str) -> Result<()> {\n    let mut index = load_project_index()?;\n    \n    // Update session record\n    for session in &mut index.sessions {\n        if session.session_id == session_id {\n            session.status = SessionStatus::Completed;\n            session.completed_at = Some(chrono::Utc::now());\n            break;\n        }\n    }\n    \n    // Update latest successful session\n    index.update_latest_successful(session_id.to_string());\n    save_project_index(&index)?;\n    Ok(())\n}\n\n/// Mark a session as failed\npub fn mark_session_failed(session_id: &str) -> Result<()> {\n    let mut index = load_project_index()?;\n    \n    for session in &mut index.sessions {\n        if session.session_id == session_id {\n            session.status = SessionStatus::Failed;\n            session.completed_at = Some(chrono::Utc::now());\n            break;\n        }\n    }\n    \n    save_project_index(&index)?;\n    Ok(())\n}\n"
     },
     "complexity_metrics": {
-      "cyclomatic_complexity": 36.0,
-      "lines_of_code": 487,
-      "number_of_classes": 0,
-      "number_of_functions": 47
+      "cyclomatic_complexity": 38.0,
+      "lines_of_code": 501,
+      "number_of_classes": 1,
+      "number_of_functions": 49
     },
     "dependencies": [
       {
@@ -4343,11 +4168,11 @@ Code analysis results from preprocessing phase, including definitions of functio
         "is_external": false,
         "line_number": 2,
         "name": "crate::data",
-        "path": null,
+        "path": "crates/cowork-core/src/data",
         "version": null
       },
       {
-        "dependency_type": "error_handling",
+        "dependency_type": "external",
         "is_external": true,
         "line_number": 3,
         "name": "anyhow",
@@ -4371,70 +4196,103 @@ Code analysis results from preprocessing phase, including definitions of functio
         "version": null
       },
       {
-        "dependency_type": "serialization",
+        "dependency_type": "external",
         "is_external": true,
-        "line_number": null,
+        "line_number": 72,
         "name": "serde",
-        "path": null,
-        "version": null
-      },
-      {
-        "dependency_type": "datetime",
-        "is_external": true,
-        "line_number": null,
-        "name": "chrono",
         "path": null,
         "version": null
       }
     ],
-    "detailed_description": "This component serves as the persistent storage layer for the cowork-core system, implementing a session-scoped file-based storage architecture. It manages the .cowork/ directory structure containing project metadata, session-specific data, artifacts, and state information. The module provides comprehensive CRUD operations for various data types including project index, session inputs, requirements, design specifications, implementation plans, code metadata, feedback history, and patch metadata. It features session inheritance capabilities for modify/revert/resume workflows and maintains transactional integrity through file-based operations.",
+    "detailed_description": "This is a comprehensive storage component for the cowork system that manages the file-based persistence layer. It implements a session-scoped architecture where each development session has its own isolated storage directory. The component handles creation and management of the .cowork directory structure, persistence of project metadata, session data, artifacts, state files, and patch metadata. It supports session inheritance for modify/revert/resume flows by copying state between sessions. The implementation uses JSON serialization with proper error handling and directory creation.",
     "interfaces": [
       {
-        "description": "Input data structure for session creation",
-        "interface_type": "struct",
-        "name": "SessionInput",
+        "description": "Get the .cowork directory path, create if not exists",
+        "interface_type": "function",
+        "name": "get_cowork_dir",
+        "parameters": [],
+        "return_type": "Result<PathBuf>",
+        "visibility": "public"
+      },
+      {
+        "description": "Get path for a specific session directory",
+        "interface_type": "function",
+        "name": "get_session_dir",
         "parameters": [
           {
-            "description": null,
+            "description": "Session identifier",
             "is_optional": false,
             "name": "session_id",
-            "param_type": "String"
-          },
-          {
-            "description": null,
-            "is_optional": false,
-            "name": "session_type",
-            "param_type": "SessionType"
-          },
-          {
-            "description": null,
-            "is_optional": false,
-            "name": "description",
-            "param_type": "String"
-          },
-          {
-            "description": null,
-            "is_optional": true,
-            "name": "base_session_id",
-            "param_type": "Option<String>"
-          },
-          {
-            "description": null,
-            "is_optional": false,
-            "name": "created_at",
-            "param_type": "chrono::DateTime<chrono::Utc>"
+            "param_type": "&str"
           }
         ],
-        "return_type": null,
+        "return_type": "Result<PathBuf>",
+        "visibility": "public"
+      },
+      {
+        "description": "Save requirements to session state",
+        "interface_type": "function",
+        "name": "save_requirements",
+        "parameters": [
+          {
+            "description": "Session identifier",
+            "is_optional": false,
+            "name": "session_id",
+            "param_type": "&str"
+          },
+          {
+            "description": "Requirements data to save",
+            "is_optional": false,
+            "name": "requirements",
+            "param_type": "&Requirements"
+          }
+        ],
+        "return_type": "Result<()>",
+        "visibility": "public"
+      },
+      {
+        "description": "Load requirements from session state",
+        "interface_type": "function",
+        "name": "load_requirements",
+        "parameters": [
+          {
+            "description": "Session identifier",
+            "is_optional": false,
+            "name": "session_id",
+            "param_type": "&str"
+          }
+        ],
+        "return_type": "Result<Requirements>",
+        "visibility": "public"
+      },
+      {
+        "description": "Initialize new session by copying state from base session",
+        "interface_type": "function",
+        "name": "init_session_from_base",
+        "parameters": [
+          {
+            "description": "New session identifier",
+            "is_optional": false,
+            "name": "new_session_id",
+            "param_type": "&str"
+          },
+          {
+            "description": "Base session identifier",
+            "is_optional": false,
+            "name": "base_session_id",
+            "param_type": "&str"
+          }
+        ],
+        "return_type": "Result<()>",
         "visibility": "public"
       }
     ],
     "responsibilities": [
-      "Manage .cowork/ directory structure and session-scoped data organization",
-      "Provide persistence operations for project metadata and session state",
-      "Handle session inheritance and bootstrap operations for workflow continuity",
-      "Maintain artifact storage for documentation and delivery reports",
-      "Track session lifecycle and completion status"
+      "Manage .cowork directory structure and session-specific subdirectories",
+      "Serialize and deserialize project metadata, session data, and artifacts to/from JSON files",
+      "Provide session-scoped state management for requirements, design specs, implementation plans, and code metadata",
+      "Handle session inheritance and state copying for modify/revert/resume workflows",
+      "Maintain feedback history and session completion tracking"
     ]
   },
   {
@@ -5012,29 +4870,25 @@ Code analysis results from preprocessing phase, including definitions of functio
 
 ## Memory Storage Statistics
 
-**Total Storage Size**: 611089 bytes
+**Total Storage Size**: 609269 bytes
 
-- **preprocess**: 361793 bytes (59.2%)
-- **timing**: 35 bytes (0.0%)
-- **studies_research**: 98435 bytes (16.1%)
-- **documentation**: 150826 bytes (24.7%)
+- **studies_research**: 88837 bytes (14.6%)
+- **preprocess**: 403395 bytes (66.2%)
+- **documentation**: 117000 bytes (19.2%)
+- **timing**: 37 bytes (0.0%)
 
 ## Generated Documents Statistics
 
-Number of Generated Documents: 15
+Number of Generated Documents: 11
 
-- Project Overview
-- Boundary Interfaces
-- Key Modules and Components Research Report_工具支持域
+- Key Modules and Components Research Report_持久化存储域
+- Key Modules and Components Research Report_智能体执行域
 - Key Modules and Components Research Report_LLM集成域
+- Key Modules and Components Research Report_智能体指令域
+- Key Modules and Components Research Report_工具执行域
 - Core Workflows
-- Key Modules and Components Research Report_数据存储域
-- Key Modules and Components Research Report_编码实施域
-- Key Modules and Components Research Report_CLI接口域
-- Key Modules and Components Research Report_代理管理域
-- Key Modules and Components Research Report_需求管理域
-- Key Modules and Components Research Report_交付管理域
-- Key Modules and Components Research Report_编排管理域
 - Architecture Description
-- Key Modules and Components Research Report_设计管理域
-- Key Modules and Components Research Report_规划管理域
+- Key Modules and Components Research Report_模块聚合域
+- Project Overview
+- Key Modules and Components Research Report_入口与编排域
+- Boundary Interfaces

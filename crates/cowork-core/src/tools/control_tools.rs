@@ -22,6 +22,154 @@ impl ProvideFeedbackTool {
     }
 }
 
+// ============================================================================
+// RequestReplanningTool
+// ============================================================================
+
+pub struct RequestReplanningTool {
+    session_id: String,
+}
+
+impl RequestReplanningTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
+
+#[async_trait]
+impl Tool for RequestReplanningTool {
+    fn name(&self) -> &str {
+        "request_replanning"
+    }
+
+    fn description(&self) -> &str {
+        "Request replanning when you discover fundamental issues with the current plan \
+         during implementation. This records the request and provides guidance to revisit \
+         the planning phase. Use this for major architectural issues, not minor task adjustments."
+    }
+
+    fn parameters_schema(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": {
+                "issue_type": {
+                    "type": "string",
+                    "enum": ["design_flaw", "missing_dependency", "architecture_conflict", "requirement_mismatch"],
+                    "description": "Type of issue requiring replanning"
+                },
+                "severity": {
+                    "type": "string",
+                    "enum": ["critical", "major", "moderate"],
+                    "description": "How severe is this issue"
+                },
+                "details": {
+                    "type": "string",
+                    "description": "Detailed description of the problem"
+                },
+                "affected_features": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Feature IDs affected by this issue"
+                },
+                "suggested_approach": {
+                    "type": "string",
+                    "description": "Your suggested approach to resolve this (optional)"
+                }
+            },
+            "required": ["issue_type", "severity", "details"]
+        }))
+    }
+
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        use crate::data::{Feedback, FeedbackType, Severity};
+        use crate::storage::append_feedback;
+
+        let issue_type = args.get("issue_type")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("Missing 'issue_type'".to_string()))?;
+
+        let severity_str = args.get("severity")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("Missing 'severity'".to_string()))?;
+
+        let details = args.get("details")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("Missing 'details'".to_string()))?;
+
+        let severity = match severity_str {
+            "critical" => Severity::Critical,
+            "major" => Severity::Major,
+            _ => Severity::Minor,
+        };
+
+        let affected_features: Vec<String> = args.get("affected_features")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect())
+            .unwrap_or_default();
+
+        let suggested_approach = args.get("suggested_approach")
+            .and_then(|v| v.as_str());
+
+        // Compose detailed feedback message
+        let mut feedback_details = format!(
+            "REPLANNING REQUEST\n\
+             Issue Type: {}\n\
+             Severity: {}\n\
+             Details: {}\n",
+            issue_type, severity_str, details
+        );
+
+        if !affected_features.is_empty() {
+            feedback_details.push_str(&format!("Affected Features: {}\n", affected_features.join(", ")));
+        }
+
+        if let Some(approach) = suggested_approach {
+            feedback_details.push_str(&format!("Suggested Approach: {}\n", approach));
+        }
+
+        // Record as critical feedback
+        let feedback = Feedback {
+            feedback_type: FeedbackType::MissingRequirement, // Use this to indicate planning issue
+            severity,
+            details: feedback_details.clone(),
+            suggested_fix: suggested_approach.map(String::from),
+            timestamp: chrono::Utc::now(),
+        };
+
+        append_feedback(&self.session_id, &feedback)
+            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+
+        // Print warning to console
+        println!("\n⚠️  REPLANNING REQUESTED ⚠️");
+        println!("Type: {} | Severity: {}", issue_type, severity_str);
+        println!("Details: {}", details);
+        if !affected_features.is_empty() {
+            println!("Affected: {}", affected_features.join(", "));
+        }
+        println!();
+
+        let message = format!(
+            "Replanning request recorded with {} severity. \
+             The coding loop will continue, but this issue should be addressed. \
+             Consider using 'goto_stage' in the check phase if fundamental changes are needed.",
+            severity_str
+        );
+
+        Ok(json!({
+            "status": "replanning_requested",
+            "issue_type": issue_type,
+            "severity": severity_str,
+            "affected_features": affected_features,
+            "message": message,
+            "guidance": "Continue with current implementation if possible, or mark tasks as blocked. \
+                        The Check Agent will review this request and may trigger goto_stage if needed."
+        }))
+    }
+}
+
+
 #[async_trait]
 impl Tool for ProvideFeedbackTool {
     fn name(&self) -> &str {

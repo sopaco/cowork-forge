@@ -216,6 +216,20 @@ pub fn has_implementation_plan(session_id: &str) -> Result<bool> {
     state_file_exists(session_id, "implementation_plan.json")
 }
 
+pub fn has_code_metadata(session_id: &str) -> Result<bool> {
+    state_file_exists(session_id, "code_metadata.json")
+}
+
+/// Check if coding stage has made progress (has written files)
+pub fn has_code_files(session_id: &str) -> Result<bool> {
+    if !has_code_metadata(session_id)? {
+        return Ok(false);
+    }
+    
+    let metadata = load_code_metadata(session_id)?;
+    Ok(!metadata.files.is_empty())
+}
+
 pub fn save_requirements(session_id: &str, requirements: &Requirements) -> Result<()> {
     let path = state_path(session_id, "requirements.json")?;
     let content = serde_json::to_string_pretty(requirements)?;

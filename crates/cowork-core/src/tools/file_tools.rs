@@ -231,7 +231,7 @@ fn should_ignore(path: &str) -> bool {
     let ignore_patterns = [
         "./.git", "./target", "./node_modules", "./.cowork", "./.litho",
         "./.idea", "./.vscode", "./dist", "./build", "./docs", "./tests",
-        "./.archived",
+        "__tests__", "./.archived",
         ".DS_Store", "Thumbs.db",
     ];
 

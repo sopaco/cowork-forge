@@ -4,7 +4,6 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use cowork_core::llm::ModelConfig;
 use cowork_core::pipeline::{create_cowork_pipeline, create_partial_pipeline, create_resume_pipeline, create_modify_pipeline};
-use cowork_core::storage::is_project_initialized;
 use std::path::Path;
 use std::sync::Arc;
 use std::collections::{HashMap, HashSet};

@@ -62,11 +62,15 @@ pub fn create_resume_pipeline(
 
     // Determine which stage to start from based on existing data files in base session
     // NOTE: load_* returns default empty structs when files don't exist, so we must check file existence.
-    let start_stage = if has_implementation_plan(base_session_id)?
+    // IMPORTANT: Check from the most advanced stage to the earliest to resume from the furthest progress point.
+    let start_stage = if has_code_files(base_session_id)? {
+        // Code files exist → Coding is complete, resume from Check
+        "check"
+    } else if has_implementation_plan(base_session_id)?
         && has_design_spec(base_session_id)?
         && has_requirements(base_session_id)?
     {
-        // PRD, Design, Plan exist → Resume from Coding
+        // PRD, Design, Plan exist (but no code files yet) → Resume from Coding
         "coding"
     } else if has_design_spec(base_session_id)? && has_requirements(base_session_id)? {
         // PRD, Design exist → Resume from Plan
@@ -95,7 +99,7 @@ pub fn create_resume_pipeline(
 pub fn create_partial_pipeline(
     config: &ModelConfig,
     session_id: &str,
-    base_session_id: &str,
+    _base_session_id: &str,
     start_stage: &str,
 ) -> Result<Arc<dyn Agent>> {
     let llm = create_llm_client(&config.llm)?;

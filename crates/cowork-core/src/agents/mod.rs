@@ -123,6 +123,9 @@ pub fn create_plan_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn
         .tool(Arc::new(GetPlanTool::new(session.clone())))
         .tool(Arc::new(ReviewWithFeedbackContentTool))
         .tool(Arc::new(CreateTaskTool::new(session.clone())))
+        // Add task management tools so Actor can respond to Critic feedback
+        .tool(Arc::new(UpdateTaskTool::new(session.clone())))
+        .tool(Arc::new(DeleteTaskTool::new(session.clone())))
         .include_contents(IncludeContents::None)
         .build()?;
 
@@ -156,6 +159,11 @@ pub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<d
         .tool(Arc::new(GetPlanTool::new(session.clone())))
         .tool(Arc::new(UpdateTaskStatusTool::new(session.clone())))
         .tool(Arc::new(UpdateFeatureStatusTool::new(session.clone())))
+        // Task management tools - NEW
+        .tool(Arc::new(CreateTaskTool::new(session.clone())))
+        .tool(Arc::new(UpdateTaskTool::new(session.clone())))
+        .tool(Arc::new(DeleteTaskTool::new(session.clone())))
+        // File operations
         .tool(Arc::new(ReadFileTool))
         .tool(Arc::new(WriteFileTool))
         .tool(Arc::new(ListFilesTool))
@@ -172,6 +180,8 @@ pub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<d
         .tool(Arc::new(ListFilesTool))
         .tool(Arc::new(RunCommandTool))
         .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))
+        // Replanning request - NEW
+        .tool(Arc::new(RequestReplanningTool::new(session.clone())))
         .include_contents(IncludeContents::None)
         .build()?;
 
