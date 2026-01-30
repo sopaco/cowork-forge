@@ -176,8 +176,7 @@ pub fn create_modify_pipeline(
 ) -> Result<Arc<dyn Agent>> {
     let llm = create_llm_client(&config.llm)?;
 
-    // For now, create a simplified modify pipeline
-    // TODO: Implement specialized change triage and patch agents
+    // Create modify pipeline with specialized agents
     let agents: Vec<Arc<dyn Agent>> = vec![
         create_change_triage_agent(llm.clone(), session_id, base_session_id)?,
         create_code_patch_agent(llm.clone(), session_id, base_session_id)?,

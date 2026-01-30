@@ -426,7 +426,7 @@ pub fn init_session_from_base(new_session_id: &str, base_session_id: &str) -> Re
         "design_spec.json",
         "implementation_plan.json",
         "code_metadata.json",
-        "feedback.json",
+        // "feedback.json",  // Don't copy feedback history to new session
         "meta.json",
     ];
 
