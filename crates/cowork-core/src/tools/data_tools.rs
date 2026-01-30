@@ -69,31 +69,59 @@ impl Tool for CreateRequirementTool {
 
         let req_id = generate_id("REQ", reqs.requirements.len());
 
-        let priority = match args["priority"].as_str().unwrap() {
+        // Extract and validate required fields with better error messages
+        let title = args.get("title")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'title' parameter".to_string()))?
+            .to_string();
+
+        let description = args.get("description")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'description' parameter".to_string()))?
+            .to_string();
+
+        let priority_str = args.get("priority")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'priority' parameter".to_string()))?;
+
+        let priority = match priority_str {
             "high" => Priority::High,
             "medium" => Priority::Medium,
             "low" => Priority::Low,
             _ => Priority::Medium,
         };
 
-        let category = match args["category"].as_str().unwrap() {
+        let category_str = args.get("category")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'category' parameter".to_string()))?;
+
+        let category = match category_str {
             "functional" => RequirementCategory::Functional,
             "non_functional" => RequirementCategory::NonFunctional,
             _ => RequirementCategory::Functional,
         };
 
+        let acceptance_criteria = args.get("acceptance_criteria")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| AdkError::Tool(
+                "Missing or invalid 'acceptance_criteria' parameter. Expected an array of criteria.".to_string()
+            ))?
+            .iter()
+            .enumerate()
+            .map(|(i, v)| {
+                v.as_str()
+                    .ok_or_else(|| AdkError::Tool(format!("acceptance_criteria[{}] is not a string", i)))
+                    .map(String::from)
+            })
+            .collect::<Result<Vec<String>, AdkError>>()?;
+
         let requirement = Requirement {
             id: req_id.clone(),
-            title: args["title"].as_str().unwrap().to_string(),
-            description: args["description"].as_str().unwrap().to_string(),
+            title,
+            description,
             priority,
             category,
-            acceptance_criteria: args["acceptance_criteria"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|v| v.as_str().unwrap().to_string())
-                .collect(),
+            acceptance_criteria,
             related_features: vec![],
         };
 
@@ -169,24 +197,53 @@ impl Tool for AddFeatureTool {
 
         let feat_id = generate_id("FEAT", features.features.len());
 
+        // Extract and validate required fields with better error messages
+        let name = args.get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'name' parameter".to_string()))?
+            .to_string();
+
+        let description = args.get("description")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'description' parameter".to_string()))?
+            .to_string();
+
+        let requirement_ids = args.get("requirement_ids")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| AdkError::Tool(
+                "Missing or invalid 'requirement_ids' parameter. Expected an array of requirement IDs.".to_string()
+            ))?
+            .iter()
+            .enumerate()
+            .map(|(i, v)| {
+                v.as_str()
+                    .ok_or_else(|| AdkError::Tool(format!("requirement_ids[{}] is not a string", i)))
+                    .map(String::from)
+            })
+            .collect::<Result<Vec<String>, AdkError>>()?;
+
+        let completion_criteria = args.get("completion_criteria")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| AdkError::Tool(
+                "Missing or invalid 'completion_criteria' parameter. Expected an array of criteria.".to_string()
+            ))?
+            .iter()
+            .enumerate()
+            .map(|(i, v)| {
+                v.as_str()
+                    .ok_or_else(|| AdkError::Tool(format!("completion_criteria[{}] is not a string", i)))
+                    .map(String::from)
+            })
+            .collect::<Result<Vec<String>, AdkError>>()?;
+
         let feature = Feature {
             id: feat_id.clone(),
-            name: args["name"].as_str().unwrap().to_string(),
-            description: args["description"].as_str().unwrap().to_string(),
-            requirement_ids: args["requirement_ids"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|v| v.as_str().unwrap().to_string())
-                .collect(),
+            name,
+            description,
+            requirement_ids,
             status: FeatureStatus::Pending,
             assigned_to_tasks: vec![],
-            completion_criteria: args["completion_criteria"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|v| v.as_str().unwrap().to_string())
-                .collect(),
+            completion_criteria,
             created_at: chrono::Utc::now(),
             completed_at: None,
             metadata: FeatureMetadata::default(),
@@ -383,28 +440,82 @@ impl Tool for CreateTaskTool {
 
         let task_id = generate_id("TASK", plan.tasks.len());
 
+        // Extract and validate required fields with better error messages
+        let title = args.get("title")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'title' parameter".to_string()))?
+            .to_string();
+
+        let description = args.get("description")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'description' parameter".to_string()))?
+            .to_string();
+
+        let feature_id = args.get("feature_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'feature_id' parameter".to_string()))?
+            .to_string();
+
+        let component_id = args.get("component_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AdkError::Tool("Missing or invalid 'component_id' parameter".to_string()))?
+            .to_string();
+
+        let dependencies: Vec<String> = args.get("dependencies")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .enumerate()
+                    .map(|(i, v)| {
+                        v.as_str()
+                            .ok_or_else(|| AdkError::Tool(format!("dependencies[{}] is not a string", i)))
+                            .map(String::from)
+                    })
+                    .collect::<Result<Vec<String>, AdkError>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+
+        let files_to_create: Vec<String> = args.get("files_to_create")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .enumerate()
+                    .map(|(i, v)| {
+                        v.as_str()
+                            .ok_or_else(|| AdkError::Tool(format!("files_to_create[{}] is not a string", i)))
+                            .map(String::from)
+                    })
+                    .collect::<Result<Vec<String>, AdkError>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+
+        let acceptance_criteria = args.get("acceptance_criteria")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| AdkError::Tool(
+                "Missing or invalid 'acceptance_criteria' parameter. Expected an array of criteria.".to_string()
+            ))?
+            .iter()
+            .enumerate()
+            .map(|(i, v)| {
+                v.as_str()
+                    .ok_or_else(|| AdkError::Tool(format!("acceptance_criteria[{}] is not a string", i)))
+                    .map(String::from)
+            })
+            .collect::<Result<Vec<String>, AdkError>>()?;
+
         let task = Task {
             id: task_id.clone(),
-            title: args["title"].as_str().unwrap().to_string(),
-            description: args["description"].as_str().unwrap().to_string(),
-            feature_id: args["feature_id"].as_str().unwrap().to_string(),
-            component_id: args["component_id"].as_str().unwrap().to_string(),
+            title,
+            description,
+            feature_id,
+            component_id,
             status: TaskStatus::Pending,
-            dependencies: args.get("dependencies")
-                .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().map(|v| v.as_str().unwrap().to_string()).collect())
-                .unwrap_or_default(),
+            dependencies,
             estimated_effort: None,
-            files_to_create: args.get("files_to_create")
-                .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().map(|v| v.as_str().unwrap().to_string()).collect())
-                .unwrap_or_default(),
-            acceptance_criteria: args["acceptance_criteria"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|v| v.as_str().unwrap().to_string())
-                .collect(),
+            files_to_create,
+            acceptance_criteria,
             created_at: chrono::Utc::now(),
             started_at: None,
             completed_at: None,

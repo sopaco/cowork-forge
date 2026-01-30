@@ -313,3 +313,107 @@ impl Tool for AskUserTool {
         }
     }
 }
+
+// ============================================================================
+// RequestHumanReviewTool
+// ============================================================================
+
+pub struct RequestHumanReviewTool {
+    session_id: String,
+}
+
+impl RequestHumanReviewTool {
+    pub fn new(session_id: String) -> Self {
+        Self { session_id }
+    }
+}
+
+#[async_trait]
+impl Tool for RequestHumanReviewTool {
+    fn name(&self) -> &str {
+        "request_human_review"
+    }
+
+    fn description(&self) -> &str {
+        "Request human intervention when you detect an infinite loop, unclear situation, \
+         or when you're about to repeat the same feedback. This prevents endless loops \
+         and escalates issues that require human judgment."
+    }
+
+    fn parameters_schema(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "description": "Brief reason for requesting human review (e.g., 'Detected infinite loop', 'Unclear if task is non-core')"
+                },
+                "details": {
+                    "type": "string",
+                    "description": "Detailed explanation of the situation, including what you observed and why you cannot proceed"
+                },
+                "suspected_issue": {
+                    "type": "string",
+                    "enum": ["infinite_loop", "unclear_requirements", "actor_not_responding", "hallucination_detected", "other"],
+                    "description": "Type of issue detected"
+                }
+            },
+            "required": ["reason", "details"]
+        }))
+    }
+
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        use crate::data::{Feedback, FeedbackType, Severity};
+        use crate::storage::append_feedback;
+
+        let reason = args.get("reason")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("Missing 'reason'".to_string()))?;
+
+        let details = args.get("details")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("Missing 'details'".to_string()))?;
+
+        let suspected_issue = args.get("suspected_issue")
+            .and_then(|v| v.as_str())
+            .unwrap_or("other");
+
+        // Record as critical feedback requiring human review
+        let feedback_details = format!(
+            "🚨 HUMAN REVIEW REQUESTED 🚨\n\
+             Reason: {}\n\
+             Suspected Issue: {}\n\
+             Details: {}\n\
+             \n\
+             The Critic agent has detected a situation that requires human intervention. \
+             Please review the session logs and decide how to proceed.",
+            reason, suspected_issue, details
+        );
+
+        let feedback = Feedback {
+            feedback_type: FeedbackType::Suggestion, // Use suggestion type for human review
+            severity: Severity::Critical,
+            details: feedback_details.clone(),
+            suggested_fix: Some("Human review required - please examine session state and provide guidance".to_string()),
+            timestamp: chrono::Utc::now(),
+        };
+
+        append_feedback(&self.session_id, &feedback)
+            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+
+        // Print prominent warning to console
+        println!("\n╔═══════════════════════════════════════════════════════════╗");
+        println!("║  🚨 HUMAN REVIEW REQUESTED - CRITIC NEEDS HELP 🚨        ║");
+        println!("╚═══════════════════════════════════════════════════════════╝");
+        println!("Reason: {}", reason);
+        println!("Type: {}", suspected_issue);
+        println!("Details: {}", details);
+        println!("═══════════════════════════════════════════════════════════\n");
+
+        // Return error to stop the loop - this will trigger ResilientAgent HITL
+        Err(adk_core::AdkError::Agent(format!(
+            "Human review requested: {}. The loop will stop to prevent infinite iteration.",
+            reason
+        )))
+    }
+}

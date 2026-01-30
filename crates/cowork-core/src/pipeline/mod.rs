@@ -2,10 +2,86 @@
 
 use crate::agents::*;
 use crate::llm::*;
-use adk_agent::SequentialAgent;
-use adk_core::Agent;
+use adk_core::{Agent, EventStream, InvocationContext, Result as AdkResult};
 use anyhow::Result;
+use async_trait::async_trait;
+use futures::stream::{Stream, StreamExt};
+use std::pin::Pin;
 use std::sync::Arc;
+
+/// StageExecutor - Executes stages sequentially without propagating escalate
+/// 
+/// Unlike SequentialAgent, this executor isolates each stage's escalate flag,
+/// allowing LoopAgents to use ExitLoopTool without terminating the entire workflow.
+pub struct StageExecutor {
+    name: String,
+    stages: Vec<(String, Arc<dyn Agent>)>,
+}
+
+impl StageExecutor {
+    pub fn new(name: impl Into<String>, stages: Vec<(String, Arc<dyn Agent>)>) -> Self {
+        Self {
+            name: name.into(),
+            stages,
+        }
+    }
+}
+
+#[async_trait]
+impl Agent for StageExecutor {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn description(&self) -> &str {
+        "Stage-based workflow executor"
+    }
+
+    fn sub_agents(&self) -> &[Arc<dyn Agent>] {
+        &[] // Stages are not exposed as sub-agents
+    }
+
+    async fn run(&self, ctx: Arc<dyn InvocationContext>) -> AdkResult<EventStream> {
+        let stages = self.stages.clone();
+        
+        let s: Pin<Box<dyn Stream<Item = AdkResult<adk_core::Event>> + Send>> = Box::pin(async_stream::stream! {
+            for (stage_name, agent) in stages {
+                println!("\n🔄 Starting stage: {}", stage_name);
+                
+                // Run the stage agent
+                let mut stage_stream = agent.run(ctx.clone()).await?;
+                
+                // Forward all events from this stage
+                while let Some(result) = stage_stream.next().await {
+                    match result {
+                        Ok(event) => {
+                            // Append content to history for next stages
+                            if let Some(ref content) = event.llm_response.content {
+                                ctx.session().append_to_history(content.clone());
+                            }
+                            
+                            // NOTE: We deliberately ignore event.actions.escalate here
+                            // This allows LoopAgents to use ExitLoopTool without affecting other stages
+                            
+                            yield Ok(event);
+                        }
+                        Err(e) => {
+                            // If a stage errors, stop the entire workflow
+                            yield Err(e);
+                            return;
+                        }
+                    }
+                }
+                
+                println!("✅ Stage completed: {}", stage_name);
+            }
+            
+            println!("\n🎉 All stages completed successfully");
+        });
+
+        Ok(s)
+    }
+}
 
 /// Create the main Cowork Forge pipeline for new projects
 /// 
@@ -30,17 +106,18 @@ pub fn create_cowork_pipeline(config: &ModelConfig, session_id: &str) -> Result<
     let check_agent = create_check_agent(llm.clone(), session_id)?;
     let delivery_agent = create_delivery_agent(llm, session_id)?;
 
-    // Assemble into SequentialAgent
-    let pipeline = SequentialAgent::new(
+    // Assemble into StageExecutor (replaces SequentialAgent)
+    // Each stage can now use ExitLoopTool without affecting other stages
+    let pipeline = StageExecutor::new(
         "cowork_forge_pipeline",
         vec![
-            idea_agent,
-            prd_loop as Arc<dyn Agent>,
-            design_loop as Arc<dyn Agent>,
-            plan_loop as Arc<dyn Agent>,
-            coding_loop as Arc<dyn Agent>,
-            check_agent,
-            delivery_agent,
+            ("idea".to_string(), idea_agent),
+            ("prd".to_string(), prd_loop),
+            ("design".to_string(), design_loop),
+            ("plan".to_string(), plan_loop),
+            ("coding".to_string(), coding_loop),
+            ("check".to_string(), check_agent),
+            ("delivery".to_string(), delivery_agent),
         ],
     );
 
@@ -104,58 +181,58 @@ pub fn create_partial_pipeline(
 ) -> Result<Arc<dyn Agent>> {
     let llm = create_llm_client(&config.llm)?;
 
-    let agents: Vec<Arc<dyn Agent>> = match start_stage {
+    let stages: Vec<(String, Arc<dyn Agent>)> = match start_stage {
         "prd" => {
             vec![
-                create_prd_loop(llm.clone(), session_id)? as Arc<dyn Agent>,
-                create_design_loop(llm.clone(), session_id)? as Arc<dyn Agent>,
-                create_plan_loop(llm.clone(), session_id)? as Arc<dyn Agent>,
-                create_coding_loop(llm.clone(), session_id)? as Arc<dyn Agent>,
-                create_check_agent(llm.clone(), session_id)?,
-                create_delivery_agent(llm, session_id)?,
+                ("prd".to_string(), create_prd_loop(llm.clone(), session_id)?),
+                ("design".to_string(), create_design_loop(llm.clone(), session_id)?),
+                ("plan".to_string(), create_plan_loop(llm.clone(), session_id)?),
+                ("coding".to_string(), create_coding_loop(llm.clone(), session_id)?),
+                ("check".to_string(), create_check_agent(llm.clone(), session_id)?),
+                ("delivery".to_string(), create_delivery_agent(llm, session_id)?),
             ]
         }
         "design" => {
             vec![
-                create_design_loop(llm.clone(), session_id)? as Arc<dyn Agent>,
-                create_plan_loop(llm.clone(), session_id)? as Arc<dyn Agent>,
-                create_coding_loop(llm.clone(), session_id)? as Arc<dyn Agent>,
-                create_check_agent(llm.clone(), session_id)?,
-                create_delivery_agent(llm, session_id)?,
+                ("design".to_string(), create_design_loop(llm.clone(), session_id)?),
+                ("plan".to_string(), create_plan_loop(llm.clone(), session_id)?),
+                ("coding".to_string(), create_coding_loop(llm.clone(), session_id)?),
+                ("check".to_string(), create_check_agent(llm.clone(), session_id)?),
+                ("delivery".to_string(), create_delivery_agent(llm, session_id)?),
             ]
         }
         "plan" => {
             vec![
-                create_plan_loop(llm.clone(), session_id)? as Arc<dyn Agent>,
-                create_coding_loop(llm.clone(), session_id)? as Arc<dyn Agent>,
-                create_check_agent(llm.clone(), session_id)?,
-                create_delivery_agent(llm, session_id)?,
+                ("plan".to_string(), create_plan_loop(llm.clone(), session_id)?),
+                ("coding".to_string(), create_coding_loop(llm.clone(), session_id)?),
+                ("check".to_string(), create_check_agent(llm.clone(), session_id)?),
+                ("delivery".to_string(), create_delivery_agent(llm, session_id)?),
             ]
         }
         "coding" => {
             vec![
-                create_coding_loop(llm.clone(), session_id)? as Arc<dyn Agent>,
-                create_check_agent(llm.clone(), session_id)?,
-                create_delivery_agent(llm, session_id)?,
+                ("coding".to_string(), create_coding_loop(llm.clone(), session_id)?),
+                ("check".to_string(), create_check_agent(llm.clone(), session_id)?),
+                ("delivery".to_string(), create_delivery_agent(llm, session_id)?),
             ]
         }
         "check" => {
             vec![
-                create_check_agent(llm.clone(), session_id)?,
-                create_delivery_agent(llm, session_id)?,
+                ("check".to_string(), create_check_agent(llm.clone(), session_id)?),
+                ("delivery".to_string(), create_delivery_agent(llm, session_id)?),
             ]
         }
         "delivery" => {
-            vec![create_delivery_agent(llm, session_id)?]
+            vec![("delivery".to_string(), create_delivery_agent(llm, session_id)?)]
         }
         _ => {
             anyhow::bail!("Unknown stage: {}. Valid stages: prd, design, plan, coding, check, delivery", start_stage)
         }
     };
 
-    let pipeline = SequentialAgent::new(
+    let pipeline = StageExecutor::new(
         format!("cowork_partial_pipeline_{}", start_stage),
-        agents,
+        stages,
     );
 
     Ok(Arc::new(pipeline))
@@ -184,9 +261,15 @@ pub fn create_modify_pipeline(
         create_modify_delivery_agent(llm, session_id, base_session_id)?,
     ];
 
-    let pipeline = SequentialAgent::new(
+    let pipeline = StageExecutor::new(
         format!("cowork_modify_pipeline_{}", session_id),
-        agents,
+        vec![
+            ("triage".to_string(), agents[0].clone()),
+            ("patch".to_string(), agents[1].clone()),
+            ("code".to_string(), agents[2].clone()),
+            ("check".to_string(), agents[3].clone()),
+            ("delivery".to_string(), agents[4].clone()),
+        ],
     );
 
     Ok(Arc::new(pipeline))

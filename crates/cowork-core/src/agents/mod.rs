@@ -1,18 +1,17 @@
 // Agents module - Agent builders using adk-rust
 // 
-// IMPORTANT: This file solves a CRITICAL bug where SequentialAgent stops after
-// the first LoopAgent completes. 
+// IMPORTANT: This file uses StageExecutor instead of SequentialAgent to allow
+// LoopAgents to use ExitLoopTool without affecting other stages.
 //
-// PROBLEM: When a sub-agent in LoopAgent calls exit_loop(), it terminates the
-// ENTIRE SequentialAgent, not just the LoopAgent. This is adk-rust's design.
-//
-// SOLUTION: Remove exit_loop tools and use max_iterations=1 to let LoopAgent
-// complete naturally, allowing SequentialAgent to continue to next agent.
+// SOLUTION: StageExecutor isolates each stage's escalate flag, so when a
+// sub-agent in LoopAgent calls exit_loop(), it only terminates that specific
+// LoopAgent, not the entire workflow.
 
 use crate::instructions::*;
 use crate::tools::*;
 use adk_agent::{LlmAgentBuilder, LoopAgent};
 use adk_core::{Llm, IncludeContents};
+use adk_tool::ExitLoopTool;
 use anyhow::Result;
 use std::sync::Arc;
 
@@ -60,15 +59,14 @@ pub fn create_prd_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn 
         .model(model)
         .tool(Arc::new(ReadFileTool))
         .tool(Arc::new(GetRequirementsTool::new(session.clone())))
-        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))
-        .include_contents(IncludeContents::None)
+        .tool(Arc::new(ProvideFeedbackTool::new(session.clone()))) // Write feedback to file when checks fail
+        .tool(Arc::new(ExitLoopTool::new())) // Exit loop when checks pass
+        .tool(Arc::new(RequestHumanReviewTool::new(session.clone())))
+        .include_contents(IncludeContents::Default)
         .build()?;
 
-    let mut loop_agent = LoopAgent::new(
-        "prd_loop",
-        vec![Arc::new(prd_actor), Arc::new(prd_critic)],
-    );
-    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts for Actor to fix issues
+    let mut loop_agent = LoopAgent::new("prd_loop", vec![Arc::new(prd_actor), Arc::new(prd_critic)]);
+    loop_agent = loop_agent.with_max_iterations(3); // Loop will complete naturally after 3 iterations
 
     Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
 }
@@ -99,11 +97,13 @@ pub fn create_design_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<d
         .tool(Arc::new(GetDesignTool::new(session.clone())))
         .tool(Arc::new(CheckFeatureCoverageTool::new(session.clone())))
         .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))
-        .include_contents(IncludeContents::None)
+        .tool(Arc::new(ExitLoopTool::new()))
+        .tool(Arc::new(RequestHumanReviewTool::new(session.clone())))
+        .include_contents(IncludeContents::Default)
         .build()?;
 
     let mut loop_agent = LoopAgent::new("design_loop", vec![Arc::new(design_actor), Arc::new(design_critic)]);
-    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts
+    loop_agent = loop_agent.with_max_iterations(3); // Loop will complete naturally after 3 iterations
 
     Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
 }
@@ -137,11 +137,13 @@ pub fn create_plan_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn
         .tool(Arc::new(GetDesignTool::new(session.clone())))
         .tool(Arc::new(CheckTaskDependenciesTool::new(session.clone())))
         .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))
-        .include_contents(IncludeContents::None)
+        .tool(Arc::new(ExitLoopTool::new()))
+        .tool(Arc::new(RequestHumanReviewTool::new(session.clone())))
+        .include_contents(IncludeContents::Default)
         .build()?;
 
     let mut loop_agent = LoopAgent::new("plan_loop", vec![Arc::new(plan_actor), Arc::new(plan_critic)]);
-    loop_agent = loop_agent.with_max_iterations(3); // Allow up to 3 attempts
+    loop_agent = loop_agent.with_max_iterations(3); // Loop will complete naturally after 3 iterations
 
     Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
 }
@@ -157,9 +159,10 @@ pub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<d
         .instruction(CODING_ACTOR_INSTRUCTION)
         .model(model.clone())
         .tool(Arc::new(GetPlanTool::new(session.clone())))
+        .tool(Arc::new(ReviewWithFeedbackContentTool)) // Read Critic feedback
         .tool(Arc::new(UpdateTaskStatusTool::new(session.clone())))
         .tool(Arc::new(UpdateFeatureStatusTool::new(session.clone())))
-        // Task management tools - NEW
+        // Task management tools
         .tool(Arc::new(CreateTaskTool::new(session.clone())))
         .tool(Arc::new(UpdateTaskTool::new(session.clone())))
         .tool(Arc::new(DeleteTaskTool::new(session.clone())))
@@ -180,13 +183,13 @@ pub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<d
         .tool(Arc::new(ListFilesTool))
         .tool(Arc::new(RunCommandTool))
         .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))
-        // Replanning request - NEW
+        .tool(Arc::new(ExitLoopTool::new()))
         .tool(Arc::new(RequestReplanningTool::new(session.clone())))
-        .include_contents(IncludeContents::None)
+        .include_contents(IncludeContents::Default)
         .build()?;
 
     let mut loop_agent = LoopAgent::new("coding_loop", vec![Arc::new(coding_actor), Arc::new(coding_critic)]);
-    loop_agent = loop_agent.with_max_iterations(5);
+    loop_agent = loop_agent.with_max_iterations(5); // Loop will complete naturally after 5 iterations
 
     Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
 }

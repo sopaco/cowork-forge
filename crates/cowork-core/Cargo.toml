@@ -18,6 +18,7 @@ adk-tool = "0.2.1"
 # Async runtime
 tokio = { workspace = true }
 async-trait = "0.1"
+async-stream = "0.3"
 futures = { workspace = true }
 
 # Error handling
