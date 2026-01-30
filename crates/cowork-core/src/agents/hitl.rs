@@ -1,26 +1,82 @@
 use adk_core::{Agent, Event, AdkError, InvocationContext};
 use async_trait::async_trait;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::pin::Pin;
 use std::task::{Context as TaskContext, Poll};
 use futures::{Stream, Future};
 use dialoguer::{Select, Input, theme::ColorfulTheme};
 
+type AgentOutput = Pin<Box<dyn Stream<Item = Result<Event, AdkError>> + Send>>;
+
 pub struct ResilientAgent {
     inner: Arc<dyn Agent>,
     subs: Vec<Arc<dyn Agent>>,
+    retry_count: Arc<AtomicU32>,
 }
 
 impl ResilientAgent {
+    const MAX_RETRY_ATTEMPTS: u32 = 3;
+    
     pub fn new(inner: Arc<dyn Agent>) -> Self {
         Self {
             inner: inner.clone(),
             subs: vec![inner],
+            retry_count: Arc::new(AtomicU32::new(0)),
         }
     }
-}
+    
+    // Helper for immediate errors (recursion in async fn)
+    async fn handle_error(&self, context: Arc<dyn InvocationContext>, e: AdkError) -> Result<AgentOutput, AdkError> {
+        let current_retry = self.retry_count.fetch_add(1, Ordering::SeqCst);
+        
+        // Check if max retry attempts reached
+        if current_retry >= Self::MAX_RETRY_ATTEMPTS {
+            println!("\n❌ Maximum retry attempts ({}) reached.", Self::MAX_RETRY_ATTEMPTS);
+            self.retry_count.store(0, Ordering::SeqCst); // Reset counter
+            return Err(AdkError::Tool(format!(
+                "Agent '{}' failed after {} retry attempts", 
+                self.name(), 
+                Self::MAX_RETRY_ATTEMPTS
+            )));
+        }
+        
+        println!("\n⚠️  Agent '{}' encountered error: {}", self.name(), e);
+        println!("The agent loop limit has been exceeded.");
+        println!("Retry attempt {}/{}", current_retry + 1, Self::MAX_RETRY_ATTEMPTS);
+         
+        let selections = &["Retry (reset counter)", "Provide Guidance & Retry", "Abort"];
+        let selection = Select::with_theme(&ColorfulTheme::default())
+           .with_prompt("How would you like to proceed?")
+           .default(0)
+           .items(&selections[..])
+           .interact()
+           .unwrap_or(2);
 
-type AgentOutput = Pin<Box<dyn Stream<Item = Result<Event, AdkError>> + Send>>;
+        match selection {
+           0 => {
+               println!("🔄 Retrying agent execution...");
+               return self.run(context).await;
+           },
+           1 => {
+               let input: String = Input::with_theme(&ColorfulTheme::default())
+                   .with_prompt("Please provide guidance for the agent")
+                   .interact_text()
+                   .unwrap_or_default();
+               
+               if !input.is_empty() {
+                   println!("(Note: User guidance provided: '{}' - but context injection is not implemented. Retrying anyway.)", input);
+               }
+               println!("🔄 Retrying with new guidance...");
+               return self.run(context).await;
+           },
+           _ => {
+               self.retry_count.store(0, Ordering::SeqCst); // Reset counter on abort
+               return Err(e);
+           }
+        }
+   }
+}
 
 #[async_trait]
 impl Agent for ResilientAgent {
@@ -40,11 +96,14 @@ impl Agent for ResilientAgent {
         // Initial run
         match self.inner.run(context.clone()).await {
             Ok(stream) => {
+                // Success - reset retry counter
+                self.retry_count.store(0, Ordering::SeqCst);
                 // Wrap the stream to handle errors during iteration
                 Ok(Box::pin(ResilientStream::new(
                     self.inner.clone(),
                     context,
-                    stream
+                    stream,
+                    self.retry_count.clone(),
                 )))
             },
             Err(e) => {
@@ -58,42 +117,6 @@ impl Agent for ResilientAgent {
                 Err(e)
             }
         }
-    }
-}
-
-impl ResilientAgent {
-    // Helper for immediate errors (recursion in async fn)
-    async fn handle_error(&self, context: Arc<dyn InvocationContext>, e: AdkError) -> Result<AgentOutput, AdkError> {
-         println!("\n⚠️  Agent '{}' encountered error: {}", self.name(), e);
-         println!("The agent loop limit has been exceeded.");
-         
-         let selections = &["Retry (reset counter)", "Provide Guidance & Retry", "Abort"];
-         let selection = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("How would you like to proceed?")
-            .default(0)
-            .items(&selections[..])
-            .interact()
-            .unwrap_or(2);
-
-         match selection {
-            0 => {
-                println!("🔄 Retrying agent execution...");
-                return self.run(context).await;
-            },
-            1 => {
-                let input: String = Input::with_theme(&ColorfulTheme::default())
-                    .with_prompt("Please provide guidance for the agent")
-                    .interact_text()
-                    .unwrap_or_default();
-                
-                if !input.is_empty() {
-                    println!("(Note: User guidance provided: '{}' - but context injection is not implemented. Retrying anyway.)", input);
-                }
-                println!("🔄 Retrying with new guidance...");
-                return self.run(context).await;
-            },
-            _ => return Err(e),
-         }
     }
 }
 
@@ -111,6 +134,7 @@ struct ResilientStream {
     context: Arc<dyn InvocationContext>,
     state: StreamState,
     agent_name: String, // Cached for logging
+    retry_count: Arc<AtomicU32>,
 }
 
 impl ResilientStream {
@@ -118,6 +142,7 @@ impl ResilientStream {
         inner_agent: Arc<dyn Agent>,
         context: Arc<dyn InvocationContext>,
         stream: AgentOutput,
+        retry_count: Arc<AtomicU32>,
     ) -> Self {
         let agent_name = inner_agent.name().to_string();
         Self {
@@ -125,6 +150,7 @@ impl ResilientStream {
             context,
             state: StreamState::Streaming(stream),
             agent_name,
+            retry_count,
         }
     }
 

@@ -860,6 +860,7 @@ dependencies = [
  "adk-rust",
  "adk-tool",
  "anyhow",
+ "async-stream",
  "async-trait",
  "chrono",
  "console",
