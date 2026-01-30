@@ -125,7 +125,7 @@ Cowork Forge 的专业智能体像真实开发团队一样协同工作:
 - <strong>Coding Loop Agent</strong>: 使用演员-评论家模式规划和执行代码变更
 - <strong>Check Agent</strong>: 验证代码质量和完整性
 - <strong>Delivery Agent</strong>: 生成全面的交付报告
-- <strong>Modify Agent</strong>: 分析和处理增量修改请求
+- <strong>Change Triage Agent</strong>: 分析和分流增量修改请求
 - <strong>Code Patch Agent</strong>: 实施精准的代码补丁
 - <strong>Modify Delivery Agent</strong>: 生成修改交付报告
 
@@ -237,7 +237,7 @@ graph TB
 管理会话生命周期、阶段依赖和工作流执行，支持完整流程和部分流程的灵活组装。
 
 ### AI 智能体
-专业智能体协同工作，每个负责开发生命周期的特定阶段。其中 4 个智能体（PRD、设计、规划、编码）使用演员-评论家循环模式进行迭代优化和人类反馈整合。包括：Idea、PRD、Design、Plan、Coding、Check、Delivery、Modify、CodePatch、ModifyDelivery。
+专业智能体协同工作，每个负责开发生命周期的特定阶段。其中 4 个智能体（PRD、设计、规划、编码）使用演员-评论家循环模式进行迭代优化和人类反馈整合。包括：Idea、PRD、Design、Plan、Coding、Check、Delivery、Change Triage、Code Patch、Modify Delivery。
 
 ### 提示词模板
 为每个智能体提供专门的指令模板，定义其行为和输出格式。

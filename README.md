@@ -116,8 +116,8 @@ Cowork Forge's specialized agents work together like a real development team:
 - <strong>Coding Loop Agent</strong>: Plans and executes code changes with actor-critic refinement
 - <strong>Check Agent</strong>: Verifies code quality and completeness
 - <strong>Delivery Agent</strong>: Generates comprehensive delivery reports
-- <strong>Modify Agent</strong>: Analyzes and handles incremental change requests
-- <strong>Code Patch Agent</strong>: Implements precise code patches
+- <strong>Change Triage Agent</strong>: Analyzes and triages incremental change requests
+- <strong>Code Patch Agent</strong>: Implements precise code patches for modifications
 - <strong>Modify Delivery Agent</strong>: Generates modification delivery reports
 
 ### 3. Human-in-the-Loop Validation
@@ -227,7 +227,7 @@ graph TB
 Manages session lifecycle, stage dependencies, and workflow execution with support for full and partial pipeline assembly.
 
 ### AI Agents
-Specialized agents work collaboratively, each responsible for a specific stage of the development lifecycle. Four agents (PRD, Design, Plan, Coding) use actor-critic loop patterns for iterative refinement with human feedback. Includes: Idea, PRD, Design, Plan, Coding, Check, Delivery, Modify, CodePatch, ModifyDelivery.
+Specialized agents work collaboratively, each responsible for a specific stage of the development lifecycle. Four agents (PRD, Design, Plan, Coding) use actor-critic loop patterns for iterative refinement with human feedback. Includes: Idea, PRD, Design, Plan, Coding, Check, Delivery, Change Triage, Code Patch, Modify Delivery.
 
 ### Instruction Templates
 Provides specialized prompt templates for each agent, defining their behavior and output format.
