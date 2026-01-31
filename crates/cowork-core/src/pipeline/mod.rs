@@ -266,9 +266,8 @@ pub fn create_modify_pipeline(
         vec![
             ("triage".to_string(), agents[0].clone()),
             ("patch".to_string(), agents[1].clone()),
-            ("code".to_string(), agents[2].clone()),
-            ("check".to_string(), agents[3].clone()),
-            ("delivery".to_string(), agents[4].clone()),
+            ("check".to_string(), agents[2].clone()),
+            ("delivery".to_string(), agents[3].clone()),
         ],
     );
 
@@ -327,6 +326,8 @@ fn create_code_patch_agent(
         .tool(Arc::new(ListFilesTool))
         .tool(Arc::new(ReadFileTool))
         .tool(Arc::new(WriteFileTool))
+        .tool(Arc::new(DeleteFileTool))
+        .tool(Arc::new(DeleteDirectoryTool))
         .tool(Arc::new(RunCommandTool))
         .tool(Arc::new(UpdateTaskStatusTool::new(session.clone())))
         .tool(Arc::new(UpdateFeatureStatusTool::new(session.clone())))

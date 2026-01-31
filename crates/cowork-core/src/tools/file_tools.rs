@@ -39,6 +39,11 @@ fn validate_path_security(path: &str) -> Result<PathBuf, String> {
     let current_dir = std::env::current_dir()
         .map_err(|e| format!("Failed to get current directory: {}", e))?;
     
+    // Normalize current_dir for consistent comparison (handle UNC paths on Windows)
+    // On Windows, canonicalize() may return \\?\ prefix paths
+    let normalized_current_dir = current_dir.canonicalize()
+        .unwrap_or_else(|_| current_dir.clone());
+    
     let full_path = current_dir.join(path);
     
     // Canonicalize if path exists, otherwise just check the constructed path
@@ -51,11 +56,13 @@ fn validate_path_security(path: &str) -> Result<PathBuf, String> {
     };
     
     // Verify the path is within current directory
-    if !canonical_path.starts_with(&current_dir) {
+    // Use normalized paths for comparison to handle Windows UNC path prefixes
+    if !canonical_path.starts_with(&normalized_current_dir) {
         return Err(format!(
-            "Security: Path escapes current directory. Path '{}' resolves to '{}'",
+            "Security: Path escapes current directory. Path '{}' resolves to '{}', expected to be within '{}'",
             path,
-            canonical_path.display()
+            canonical_path.display(),
+            normalized_current_dir.display()
         ));
     }
     
@@ -483,6 +490,166 @@ impl Tool for RunCommandTool {
                     "message": "Command execution timeout (30s limit)"
                 }))
             }
+        }
+    }
+}
+
+// ============================================================================
+// DeleteFileTool
+// ============================================================================
+
+pub struct DeleteFileTool;
+
+#[async_trait]
+impl Tool for DeleteFileTool {
+    fn name(&self) -> &str {
+        "delete_file"
+    }
+
+    fn description(&self) -> &str {
+        "Delete a file from the project. \
+         SECURITY: Only works within current directory. \
+         Useful for removing deprecated or unused files during iterative changes."
+    }
+
+    fn parameters_schema(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "File path to delete (must be relative path within current directory)"
+                }
+            },
+            "required": ["path"]
+        }))
+    }
+
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let path = args["path"].as_str().unwrap();
+
+        // Security check
+        let safe_path = match validate_path_security(path) {
+            Ok(p) => p,
+            Err(e) => {
+                return Ok(json!({
+                    "status": "security_error",
+                    "message": e
+                }));
+            }
+        };
+
+        // Check if file exists
+        if !safe_path.exists() {
+            return Ok(json!({
+                "status": "not_found",
+                "message": format!("File not found: {}", path)
+            }));
+        }
+
+        // Check if it's a directory (we only delete files, not directories)
+        if safe_path.is_dir() {
+            return Ok(json!({
+                "status": "error",
+                "message": format!("Path '{}' is a directory. Use delete_directory for directories.", path)
+            }));
+        }
+
+        // Delete the file
+        match fs::remove_file(&safe_path) {
+            Ok(_) => {
+                // Log file deletion for user visibility
+                println!("🗑️  Deleted file: {}", path);
+                Ok(json!({
+                    "status": "success",
+                    "path": path,
+                    "message": format!("File '{}' deleted successfully", path)
+                }))
+            },
+            Err(e) => Ok(json!({
+                "status": "error",
+                "message": format!("Failed to delete file: {}", e)
+            })),
+        }
+    }
+}
+
+// ============================================================================
+// DeleteDirectoryTool
+// ============================================================================
+
+pub struct DeleteDirectoryTool;
+
+#[async_trait]
+impl Tool for DeleteDirectoryTool {
+    fn name(&self) -> &str {
+        "delete_directory"
+    }
+
+    fn description(&self) -> &str {
+        "Delete a directory and all its contents recursively. \
+         SECURITY: Only works within current directory. \
+         WARNING: This operation is irreversible! Use with caution."
+    }
+
+    fn parameters_schema(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Directory path to delete (must be relative path within current directory)"
+                }
+            },
+            "required": ["path"]
+        }))
+    }
+
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let path = args["path"].as_str().unwrap();
+
+        // Security check
+        let safe_path = match validate_path_security(path) {
+            Ok(p) => p,
+            Err(e) => {
+                return Ok(json!({
+                    "status": "security_error",
+                    "message": e
+                }));
+            }
+        };
+
+        // Check if directory exists
+        if !safe_path.exists() {
+            return Ok(json!({
+                "status": "not_found",
+                "message": format!("Directory not found: {}", path)
+            }));
+        }
+
+        // Check if it's actually a directory
+        if !safe_path.is_dir() {
+            return Ok(json!({
+                "status": "error",
+                "message": format!("Path '{}' is a file. Use delete_file for files.", path)
+            }));
+        }
+
+        // Delete the directory recursively
+        match fs::remove_dir_all(&safe_path) {
+            Ok(_) => {
+                // Log directory deletion for user visibility
+                println!("🗑️  Deleted directory: {}", path);
+                Ok(json!({
+                    "status": "success",
+                    "path": path,
+                    "message": format!("Directory '{}' and all its contents deleted successfully", path)
+                }))
+            },
+            Err(e) => Ok(json!({
+                "status": "error",
+                "message": format!("Failed to delete directory: {}", e)
+            })),
         }
     }
 }
