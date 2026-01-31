@@ -29,6 +29,8 @@ You have access to:
 - `list_files` - See current project structure
 - `read_file` - Read existing files
 - `write_file` - Create or modify files
+- `delete_file` - Delete a file
+- `delete_directory` - Delete a directory and all its contents
 - `run_command` - Run build/test commands (avoid long-running servers!)
 - `update_task_status` - Mark tasks as completed
 - `update_feature_status` - Mark features as completed
@@ -43,12 +45,21 @@ You have access to:
    - **Prefer modifying existing files** over creating new ones
    - Keep changes minimal and focused
    - Follow existing code style and patterns
+   - **Delete deprecated files** using `delete_file` when removing features
 5. Test changes if possible (run build, but DON'T start servers)
 
 ### For Changes Requiring New Components:
 1. Create new files following project structure
 2. Update existing files to integrate the new component
 3. Follow the design spec for architecture
+
+### For Removing Features:
+1. Use `list_files` to identify files related to the feature
+2. Read files to confirm they're safe to delete
+3. Use `delete_file` to remove individual files
+4. Use `delete_directory` to remove entire directories (e.g., old components)
+5. Update imports/references in other files
+6. Test to ensure no broken references remain
 
 ## Guidelines
 
