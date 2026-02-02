@@ -24,6 +24,17 @@ chrono = "0.4"
 anyhow = "1"
 futures = "0.3"
 
+# Preview server
+tiny_http = "0.12"
+attohttpc = "0.22"
+urlencoding = "2.1"
+
+# Global state
+lazy_static = "1.4"
+
+# Logging
+tracing = "0.1"
+
 # Cowork Core
 cowork-core = { path = "../../cowork-core" }
 
