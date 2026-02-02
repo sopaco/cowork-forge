@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/cowork-core",
     "crates/cowork-cli",
+    "crates/cowork-gui/src-tauri",
 ]
 
 [workspace.package]

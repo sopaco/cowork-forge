@@ -9,6 +9,7 @@
 
 use crate::instructions::*;
 use crate::tools::*;
+use crate::interaction::InteractiveBackend;
 use adk_agent::{LlmAgentBuilder, LoopAgent};
 use adk_core::{Llm, IncludeContents};
 use adk_tool::ExitLoopTool;
@@ -16,13 +17,26 @@ use anyhow::Result;
 use std::sync::Arc;
 
 mod hitl;
-use hitl::ResilientAgent;
+pub use hitl::ResilientAgent;
 
 // ============================================================================
 // IdeaAgent - Simple agent to capture initial idea
 // ============================================================================
 
 pub fn create_idea_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {
+    create_idea_agent_with_interaction(model, session_id, None)
+}
+
+pub fn create_idea_agent_with_interaction(
+    model: Arc<dyn Llm>, 
+    session_id: &str,
+    interaction: Option<Arc<dyn InteractiveBackend>>
+) -> Result<Arc<dyn adk_core::Agent>> {
+    // Set global interaction backend if provided
+    if let Some(backend) = interaction {
+        set_interaction_backend(backend);
+    }
+
     let agent = LlmAgentBuilder::new("idea_agent")
         .instruction(IDEA_AGENT_INSTRUCTION)
         .model(model)
@@ -39,7 +53,10 @@ pub fn create_idea_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dy
 // PRD Loop - Actor + Critic with LoopAgent
 // ============================================================================
 
-pub fn create_prd_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {
+pub fn create_prd_loop(model: Arc<dyn Llm>, session_id: &str, interaction: Arc<dyn InteractiveBackend>) -> Result<Arc<dyn adk_core::Agent>> {
+    // Set global interaction backend
+    set_interaction_backend(interaction.clone());
+
     let session = session_id.to_string();
     
     let prd_actor = LlmAgentBuilder::new("prd_actor")
@@ -68,14 +85,17 @@ pub fn create_prd_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn 
     let mut loop_agent = LoopAgent::new("prd_loop", vec![Arc::new(prd_actor), Arc::new(prd_critic)]);
     loop_agent = loop_agent.with_max_iterations(3); // Loop will complete naturally after 3 iterations
 
-    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
+    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent), interaction)))
 }
 
 // ============================================================================
 // Design Loop - Actor + Critic
 // ============================================================================
 
-pub fn create_design_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {
+pub fn create_design_loop(model: Arc<dyn Llm>, session_id: &str, interaction: Arc<dyn InteractiveBackend>) -> Result<Arc<dyn adk_core::Agent>> {
+    // Set global interaction backend
+    set_interaction_backend(interaction.clone());
+
     let session = session_id.to_string();
     
     let design_actor = LlmAgentBuilder::new("design_actor")
@@ -103,16 +123,19 @@ pub fn create_design_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<d
         .build()?;
 
     let mut loop_agent = LoopAgent::new("design_loop", vec![Arc::new(design_actor), Arc::new(design_critic)]);
-    loop_agent = loop_agent.with_max_iterations(3); // Loop will complete naturally after 3 iterations
+    loop_agent = loop_agent.with_max_iterations(3);
 
-    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
+    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent), interaction)))
 }
 
 // ============================================================================
 // Plan Loop - Actor + Critic
 // ============================================================================
 
-pub fn create_plan_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {
+pub fn create_plan_loop(model: Arc<dyn Llm>, session_id: &str, interaction: Arc<dyn InteractiveBackend>) -> Result<Arc<dyn adk_core::Agent>> {
+    // Set global interaction backend
+    set_interaction_backend(interaction.clone());
+
     let session = session_id.to_string();
     
     let plan_actor = LlmAgentBuilder::new("plan_actor")
@@ -123,7 +146,6 @@ pub fn create_plan_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn
         .tool(Arc::new(GetPlanTool::new(session.clone())))
         .tool(Arc::new(ReviewWithFeedbackContentTool))
         .tool(Arc::new(CreateTaskTool::new(session.clone())))
-        // Add task management tools so Actor can respond to Critic feedback
         .tool(Arc::new(UpdateTaskTool::new(session.clone())))
         .tool(Arc::new(DeleteTaskTool::new(session.clone())))
         .include_contents(IncludeContents::None)
@@ -143,30 +165,31 @@ pub fn create_plan_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn
         .build()?;
 
     let mut loop_agent = LoopAgent::new("plan_loop", vec![Arc::new(plan_actor), Arc::new(plan_critic)]);
-    loop_agent = loop_agent.with_max_iterations(3); // Loop will complete naturally after 3 iterations
+    loop_agent = loop_agent.with_max_iterations(3);
 
-    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
+    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent), interaction)))
 }
 
 // ============================================================================
 // Coding Loop - Actor + Critic
 // ============================================================================
 
-pub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {
+pub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str, interaction: Arc<dyn InteractiveBackend>) -> Result<Arc<dyn adk_core::Agent>> {
+    // Set global interaction backend
+    set_interaction_backend(interaction.clone());
+
     let session = session_id.to_string();
     
     let coding_actor = LlmAgentBuilder::new("coding_actor")
         .instruction(CODING_ACTOR_INSTRUCTION)
         .model(model.clone())
         .tool(Arc::new(GetPlanTool::new(session.clone())))
-        .tool(Arc::new(ReviewWithFeedbackContentTool)) // Read Critic feedback
+        .tool(Arc::new(ReviewWithFeedbackContentTool))
         .tool(Arc::new(UpdateTaskStatusTool::new(session.clone())))
         .tool(Arc::new(UpdateFeatureStatusTool::new(session.clone())))
-        // Task management tools
         .tool(Arc::new(CreateTaskTool::new(session.clone())))
         .tool(Arc::new(UpdateTaskTool::new(session.clone())))
         .tool(Arc::new(DeleteTaskTool::new(session.clone())))
-        // File operations
         .tool(Arc::new(ReadFileTool))
         .tool(Arc::new(WriteFileTool))
         .tool(Arc::new(ListFilesTool))
@@ -189,9 +212,9 @@ pub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<d
         .build()?;
 
     let mut loop_agent = LoopAgent::new("coding_loop", vec![Arc::new(coding_actor), Arc::new(coding_critic)]);
-    loop_agent = loop_agent.with_max_iterations(5); // Loop will complete naturally after 5 iterations
+    loop_agent = loop_agent.with_max_iterations(5);
 
-    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
+    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent), interaction)))
 }
 
 // ============================================================================

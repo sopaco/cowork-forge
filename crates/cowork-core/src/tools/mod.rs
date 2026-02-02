@@ -19,6 +19,6 @@ pub use artifact_tools::*;
 pub use goto_stage_tool::*;
 pub use test_lint_tools::*;
 pub use hitl_tools::*;
-pub use hitl_content_tools::*;
+pub use hitl_content_tools::{ReviewAndEditContentTool, ReviewWithFeedbackContentTool, set_interaction_backend};
 pub use modify_tools::*;
 pub use idea_tools::*;

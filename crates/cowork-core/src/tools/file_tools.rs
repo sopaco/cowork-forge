@@ -39,20 +39,30 @@ fn validate_path_security(path: &str) -> Result<PathBuf, String> {
     let current_dir = std::env::current_dir()
         .map_err(|e| format!("Failed to get current directory: {}", e))?;
     
-    // Normalize current_dir for consistent comparison (handle UNC paths on Windows)
-    // On Windows, canonicalize() may return \\?\ prefix paths
-    let normalized_current_dir = current_dir.canonicalize()
-        .unwrap_or_else(|_| current_dir.clone());
-    
     let full_path = current_dir.join(path);
     
-    // Canonicalize if path exists, otherwise just check the constructed path
+    // Canonicalize both paths for reliable comparison
+    // On Windows, canonicalize() returns \\?\ prefix paths
+    let normalized_current_dir = current_dir.canonicalize()
+        .map_err(|e| format!("Failed to canonicalize current directory: {}", e))?;
+    
     let canonical_path = if full_path.exists() {
         full_path.canonicalize()
             .map_err(|e| format!("Failed to resolve path: {}", e))?
     } else {
-        // For non-existent paths (e.g., files to be created), just verify parent
-        full_path
+        // For non-existent paths (e.g., files to be created), canonicalize parent directory
+        // then append the filename to get consistent UNC prefix format
+        if let Some(parent) = full_path.parent() {
+            let canonical_parent = parent.canonicalize()
+                .unwrap_or_else(|_| parent.to_path_buf());
+            if let Some(filename) = full_path.file_name() {
+                canonical_parent.join(filename)
+            } else {
+                full_path
+            }
+        } else {
+            full_path
+        }
     };
     
     // Verify the path is within current directory

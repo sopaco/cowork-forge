@@ -1,7 +1,9 @@
 // Main pipeline - Cowork Forge workflow
 
 use crate::agents::*;
+use crate::agents::ResilientAgent;
 use crate::llm::*;
+use crate::interaction::InteractiveBackend;
 use adk_core::{Agent, EventStream, InvocationContext, Result as AdkResult};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -93,16 +95,24 @@ impl Agent for StageExecutor {
 /// 5. Coding Loop - Code implementation (Actor-Critic)
 /// 6. Check Agent - Quality assurance
 /// 7. Delivery Agent - Final report
-pub fn create_cowork_pipeline(config: &ModelConfig, session_id: &str) -> Result<Arc<dyn Agent>> {
+pub fn create_cowork_pipeline(
+    config: &ModelConfig,
+    session_id: &str,
+    interaction: Arc<dyn crate::interaction::InteractiveBackend>,
+) -> Result<Arc<dyn Agent>> {
     // Create LLM client
     let llm = create_llm_client(&config.llm)?;
 
     // Create all agents with session context
-    let idea_agent = create_idea_agent(llm.clone(), session_id)?;
-    let prd_loop = create_prd_loop(llm.clone(), session_id)?;
-    let design_loop = create_design_loop(llm.clone(), session_id)?;
-    let plan_loop = create_plan_loop(llm.clone(), session_id)?;
-    let coding_loop = create_coding_loop(llm.clone(), session_id)?;
+    let idea_agent = create_idea_agent_with_interaction(
+        llm.clone(), 
+        session_id, 
+        Some(interaction.clone())
+    )?;
+    let prd_loop = create_prd_loop(llm.clone(), session_id, interaction.clone())?;
+    let design_loop = create_design_loop(llm.clone(), session_id, interaction.clone())?;
+    let plan_loop = create_plan_loop(llm.clone(), session_id, interaction.clone())?;
+    let coding_loop = create_coding_loop(llm.clone(), session_id, interaction.clone())?;
     let check_agent = create_check_agent(llm.clone(), session_id)?;
     let delivery_agent = create_delivery_agent(llm, session_id)?;
 
@@ -132,38 +142,31 @@ pub fn create_resume_pipeline(
     config: &ModelConfig,
     session_id: &str,
     base_session_id: &str,
+    interaction: Arc<dyn crate::interaction::InteractiveBackend>,
 ) -> Result<Arc<dyn Agent>> {
     use crate::storage::*;
     
     let _llm = create_llm_client(&config.llm)?;
 
     // Determine which stage to start from based on existing data files in base session
-    // NOTE: load_* returns default empty structs when files don't exist, so we must check file existence.
-    // IMPORTANT: Check from the most advanced stage to the earliest to resume from the furthest progress point.
     let start_stage = if has_code_files(base_session_id)? {
-        // Code files exist → Coding is complete, resume from Check
         "check"
     } else if has_implementation_plan(base_session_id)?
         && has_design_spec(base_session_id)?
         && has_requirements(base_session_id)?
     {
-        // PRD, Design, Plan exist (but no code files yet) → Resume from Coding
         "coding"
     } else if has_design_spec(base_session_id)? && has_requirements(base_session_id)? {
-        // PRD, Design exist → Resume from Plan
         "plan"
     } else if has_requirements(base_session_id)? {
-        // PRD exists → Resume from Design
         "design"
     } else {
-        // Nothing exists or only idea.md → Start from PRD
         "prd"
     };
 
     println!("📍 Resuming from: {} stage", start_stage);
 
-    // Use create_partial_pipeline to start from the determined stage
-    create_partial_pipeline(config, session_id, base_session_id, start_stage)
+    create_partial_pipeline(config, session_id, base_session_id, start_stage, interaction)
 }
 
 /// Create a partial pipeline starting from a specific stage (for revert)
@@ -178,40 +181,41 @@ pub fn create_partial_pipeline(
     session_id: &str,
     _base_session_id: &str,
     start_stage: &str,
+    interaction: Arc<dyn crate::interaction::InteractiveBackend>,
 ) -> Result<Arc<dyn Agent>> {
     let llm = create_llm_client(&config.llm)?;
 
     let stages: Vec<(String, Arc<dyn Agent>)> = match start_stage {
         "prd" => {
             vec![
-                ("prd".to_string(), create_prd_loop(llm.clone(), session_id)?),
-                ("design".to_string(), create_design_loop(llm.clone(), session_id)?),
-                ("plan".to_string(), create_plan_loop(llm.clone(), session_id)?),
-                ("coding".to_string(), create_coding_loop(llm.clone(), session_id)?),
+                ("prd".to_string(), create_prd_loop(llm.clone(), session_id, interaction.clone())?),
+                ("design".to_string(), create_design_loop(llm.clone(), session_id, interaction.clone())?),
+                ("plan".to_string(), create_plan_loop(llm.clone(), session_id, interaction.clone())?),
+                ("coding".to_string(), create_coding_loop(llm.clone(), session_id, interaction.clone())?),
                 ("check".to_string(), create_check_agent(llm.clone(), session_id)?),
                 ("delivery".to_string(), create_delivery_agent(llm, session_id)?),
             ]
         }
         "design" => {
             vec![
-                ("design".to_string(), create_design_loop(llm.clone(), session_id)?),
-                ("plan".to_string(), create_plan_loop(llm.clone(), session_id)?),
-                ("coding".to_string(), create_coding_loop(llm.clone(), session_id)?),
+                ("design".to_string(), create_design_loop(llm.clone(), session_id, interaction.clone())?),
+                ("plan".to_string(), create_plan_loop(llm.clone(), session_id, interaction.clone())?),
+                ("coding".to_string(), create_coding_loop(llm.clone(), session_id, interaction.clone())?),
                 ("check".to_string(), create_check_agent(llm.clone(), session_id)?),
                 ("delivery".to_string(), create_delivery_agent(llm, session_id)?),
             ]
         }
         "plan" => {
             vec![
-                ("plan".to_string(), create_plan_loop(llm.clone(), session_id)?),
-                ("coding".to_string(), create_coding_loop(llm.clone(), session_id)?),
+                ("plan".to_string(), create_plan_loop(llm.clone(), session_id, interaction.clone())?),
+                ("coding".to_string(), create_coding_loop(llm.clone(), session_id, interaction.clone())?),
                 ("check".to_string(), create_check_agent(llm.clone(), session_id)?),
                 ("delivery".to_string(), create_delivery_agent(llm, session_id)?),
             ]
         }
         "coding" => {
             vec![
-                ("coding".to_string(), create_coding_loop(llm.clone(), session_id)?),
+                ("coding".to_string(), create_coding_loop(llm.clone(), session_id, interaction.clone())?),
                 ("check".to_string(), create_check_agent(llm.clone(), session_id)?),
                 ("delivery".to_string(), create_delivery_agent(llm, session_id)?),
             ]
@@ -250,13 +254,14 @@ pub fn create_modify_pipeline(
     config: &ModelConfig,
     session_id: &str,
     base_session_id: &str,
+    interaction: Arc<dyn crate::interaction::InteractiveBackend>,
 ) -> Result<Arc<dyn Agent>> {
     let llm = create_llm_client(&config.llm)?;
 
     // Create modify pipeline with specialized agents
     let agents: Vec<Arc<dyn Agent>> = vec![
         create_change_triage_agent(llm.clone(), session_id, base_session_id)?,
-        create_code_patch_agent(llm.clone(), session_id, base_session_id)?,
+        create_code_patch_agent(llm.clone(), session_id, base_session_id, interaction.clone())?,
         create_check_agent(llm.clone(), session_id)?,
         create_modify_delivery_agent(llm, session_id, base_session_id)?,
     ];
@@ -309,6 +314,7 @@ fn create_code_patch_agent(
     llm: Arc<dyn adk_core::Llm>,
     session_id: &str,
     _base_session_id: &str,
+    interaction: Arc<dyn crate::interaction::InteractiveBackend>,
 ) -> Result<Arc<dyn Agent>> {
     use crate::instructions::CODE_PATCH_INSTRUCTION;
     use crate::tools::*;
@@ -334,7 +340,8 @@ fn create_code_patch_agent(
         .include_contents(IncludeContents::None)
         .build()?;
     
-    Ok(Arc::new(agent))
+    // Wrap with ResilientAgent for error handling
+    Ok(Arc::new(ResilientAgent::new(Arc::new(agent), interaction)))
 }
 
 fn create_modify_delivery_agent(

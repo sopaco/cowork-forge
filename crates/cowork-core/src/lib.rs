@@ -8,6 +8,8 @@ pub mod tools;
 pub mod agents;
 pub mod pipeline;
 pub mod instructions;
+pub mod interaction;
+pub mod event_bus;
 
 // Re-exports for convenience
 pub use data::*;

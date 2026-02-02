@@ -1,14 +1,30 @@
-// HITL tools (content-based) to avoid hardcoding artifact file paths
+// HITL tools (content-based) using InteractiveBackend
 use adk_core::{Tool, ToolContext};
 use async_trait::async_trait;
-use dialoguer::{Editor, Input};
 use serde_json::{json, Value};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use once_cell::sync::Lazy;
+
+use crate::interaction::{InteractiveBackend, InputOption, InputResponse, MessageLevel};
+
+// Global InteractiveBackend for HITL tools
+static INTERACTION_BACKEND: Lazy<Mutex<Option<Arc<dyn InteractiveBackend + Send + Sync>>>> = 
+    Lazy::new(|| Mutex::new(None));
+
+/// Set the global InteractiveBackend
+pub fn set_interaction_backend(backend: Arc<dyn InteractiveBackend + Send + Sync>) {
+    *INTERACTION_BACKEND.lock().unwrap() = Some(backend);
+}
+
+/// Get the global InteractiveBackend
+fn get_interaction_backend() -> Option<Arc<dyn InteractiveBackend + Send + Sync>> {
+    INTERACTION_BACKEND.lock().unwrap().clone()
+}
 
 /// review_and_edit_content
-/// - Takes content as input
-/// - Optionally lets user edit in editor
-/// - Returns edited content
+/// - Shows content to user
+/// - Lets user choose: edit, pass, or provide feedback
+/// - Returns action and content/feedback
 pub struct ReviewAndEditContentTool;
 
 #[async_trait]
@@ -18,7 +34,7 @@ impl Tool for ReviewAndEditContentTool {
     }
 
     fn description(&self) -> &str {
-        "Let the user review and optionally edit markdown content using their default editor. Returns edited content." 
+        "Let the user review content and choose: edit, pass, or provide feedback."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
@@ -26,7 +42,7 @@ impl Tool for ReviewAndEditContentTool {
             "type": "object",
             "properties": {
                 "title": {"type": "string", "description": "Title shown to user"},
-                "content": {"type": "string", "description": "Content to review/edit"}
+                "content": {"type": "string", "description": "Content to review"}
             },
             "required": ["title", "content"]
         }))
@@ -36,49 +52,79 @@ impl Tool for ReviewAndEditContentTool {
         let title = args["title"].as_str().unwrap();
         let content = args["content"].as_str().unwrap();
 
-        println!("\n📝 {}", title);
-        println!("  ────────────────────────────────────────");
-        for (i, line) in content.lines().take(12).enumerate() {
-            println!("  {}: {}", i + 1, line);
-        }
-        let line_count = content.lines().count();
-        if line_count > 12 {
-            println!("  ... ({} more lines)", line_count - 12);
-        }
-        println!("  ────────────────────────────────────────\n");
+        // Get InteractiveBackend
+        let interaction = get_interaction_backend()
+            .ok_or_else(|| adk_core::AdkError::Tool("InteractiveBackend not set".to_string()))?;
 
-        let input: String = Input::new()
-            .with_prompt("输入 'edit' 打开编辑器，或直接回车跳过")
-            .allow_empty(true)
-            .interact_text()
-            .map_err(|e| adk_core::AdkError::Tool(format!("Interaction error: {}", e)))?;
+        // Show content to user
+        interaction.show_message(
+            MessageLevel::Info,
+            format!("\n📝 {}\n{}\n---\n{}",
+                title,
+                "─".repeat(40),
+                content.lines().take(15).collect::<Vec<_>>().join("\n")
+            )
+        ).await;
 
-        if input.trim().to_lowercase() != "edit" {
-            return Ok(json!({
+        // Request user input
+        let options = vec![
+            InputOption {
+                id: "pass".to_string(),
+                label: "✓ Pass".to_string(),
+                description: Some("Continue without changes".to_string()),
+            },
+        ];
+
+        let response = interaction.request_input(
+            "Type 'edit' to open editor, 'pass' to continue, or provide feedback:",
+            options,
+            Some(content.to_string())
+        ).await.map_err(|e| adk_core::AdkError::Tool(format!("Input error: {}", e)))?;
+
+        match response {
+            InputResponse::Selection(id) => match id.as_str() {
+                "pass" => Ok(json!({
+                    "action": "pass",
+                    "content": content,
+                    "message": "User passed"
+                })),
+                _ => Ok(json!({
+                    "action": "pass",
+                    "content": content,
+                    "message": "Unknown action"
+                }))
+            },
+            InputResponse::Text(text) => {
+                let text = text.trim();
+                // Check if text looks like edited content (multiline) or feedback (short)
+                if text.contains('\n') || text.len() > 100 {
+                    // Assume this is edited content
+                    Ok(json!({
+                        "action": "edit",
+                        "content": text,
+                        "message": "User provided edited content"
+                    }))
+                } else {
+                    // Assume this is feedback
+                    Ok(json!({
+                        "action": "feedback",
+                        "feedback": text,
+                        "content": content,
+                        "message": "User provided feedback"
+                    }))
+                }
+            },
+            InputResponse::Cancel => Ok(json!({
                 "action": "pass",
                 "content": content,
-                "message": "User skipped editing"
-            }));
+                "message": "User cancelled"
+            })),
         }
-
-        println!("📝 Opening editor... (Save and close to submit changes)");
-        let edited = Editor::new()
-            .require_save(true)
-            .edit(content)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Editor error: {}", e)))?;
-
-        let new_content = edited.unwrap_or_else(|| content.to_string());
-
-        Ok(json!({
-            "action": "edit",
-            "content": new_content,
-            "message": "Content edited"
-        }))
     }
 }
 
 /// review_with_feedback_content
-/// - Takes content as input
+/// - Shows content to user
 /// - Allows edit/pass/feedback
 /// - Returns edited content OR feedback text
 pub struct ReviewWithFeedbackContentTool;
@@ -90,7 +136,7 @@ impl Tool for ReviewWithFeedbackContentTool {
     }
 
     fn description(&self) -> &str {
-        "Review content and allow user to: edit in editor, pass, or provide feedback text."
+        "Review content and allow user to: edit, pass, or provide feedback text."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
@@ -108,53 +154,72 @@ impl Tool for ReviewWithFeedbackContentTool {
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let title = args["title"].as_str().unwrap();
         let content = args["content"].as_str().unwrap();
-        let default_prompt = "输入 'edit' 编辑，'pass' 继续，或直接输入修改建议";
+        let default_prompt = "Type 'edit' to open editor, 'pass' to continue, or provide feedback:";
         let prompt = args.get("prompt").and_then(|v| v.as_str()).unwrap_or(default_prompt);
 
-        println!("\n📝 {}", title);
-        println!("  ────────────────────────────────────────");
-        for (i, line) in content.lines().take(15).enumerate() {
-            println!("  {}: {}", i + 1, line);
-        }
-        let line_count = content.lines().count();
-        if line_count > 15 {
-            println!("  ... ({} more lines)", line_count - 15);
-        }
-        println!("  ────────────────────────────────────────\n");
+        // Get InteractiveBackend
+        let interaction = get_interaction_backend()
+            .ok_or_else(|| adk_core::AdkError::Tool("InteractiveBackend not set".to_string()))?;
 
-        let user_input: String = Input::new()
-            .with_prompt(prompt)
-            .allow_empty(true)
-            .interact_text()
-            .map_err(|e| adk_core::AdkError::Tool(format!("Interaction error: {}", e)))?;
+        // Show content to user
+        interaction.show_message(
+            MessageLevel::Info,
+            format!("\n📝 {}\n{}\n---\n{}",
+                title,
+                "─".repeat(40),
+                content.lines().take(15).collect::<Vec<_>>().join("\n")
+            )
+        ).await;
 
-        let trimmed = user_input.trim();
+        // Request user input
+        let options = vec![
+            InputOption {
+                id: "pass".to_string(),
+                label: "✓ Pass".to_string(),
+                description: Some("Continue without changes".to_string()),
+            },
+        ];
 
-        match trimmed.to_lowercase().as_str() {
-            "edit" => {
-                println!("📝 Opening editor... (Save and close to submit changes)");
-                let edited = Editor::new()
-                    .require_save(true)
-                    .edit(content)
-                    .map_err(|e| adk_core::AdkError::Tool(format!("Editor error: {}", e)))?;
+        let response = interaction.request_input(prompt, options, Some(content.to_string()))
+            .await.map_err(|e| adk_core::AdkError::Tool(format!("Input error: {}", e)))?;
 
-                let new_content = edited.unwrap_or_else(|| content.to_string());
-                Ok(json!({
-                    "action": "edit",
-                    "content": new_content,
-                    "message": "User edited content"
+        match response {
+            InputResponse::Selection(id) => match id.as_str() {
+                "pass" => Ok(json!({
+                    "action": "pass",
+                    "content": content,
+                    "message": "User passed"
+                })),
+                _ => Ok(json!({
+                    "action": "pass",
+                    "content": content,
+                    "message": "Unknown action"
                 }))
-            }
-            "pass" | "" => Ok(json!({
+            },
+            InputResponse::Text(text) => {
+                let text = text.trim();
+                // Check if text looks like edited content (multiline) or feedback (short)
+                if text.contains('\n') || text.len() > 100 {
+                    // Assume this is edited content
+                    Ok(json!({
+                        "action": "edit",
+                        "content": text,
+                        "message": "User provided edited content"
+                    }))
+                } else {
+                    // Assume this is feedback
+                    Ok(json!({
+                        "action": "feedback",
+                        "feedback": text,
+                        "content": content,
+                        "message": "User provided feedback"
+                    }))
+                }
+            },
+            InputResponse::Cancel => Ok(json!({
                 "action": "pass",
                 "content": content,
-                "message": "User passed"
-            })),
-            _ => Ok(json!({
-                "action": "feedback",
-                "feedback": trimmed,
-                "content": content,
-                "message": "User provided feedback"
+                "message": "User cancelled"
             })),
         }
     }

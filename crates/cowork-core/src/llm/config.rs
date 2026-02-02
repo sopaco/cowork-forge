@@ -49,10 +49,15 @@ impl ModelConfig {
 /// This uses the built-in OpenAIClient from adk-model and configures it
 /// to point to a custom OpenAI-compatible endpoint.
 /// 
-/// **Rate Limiting**: Automatically wraps the client with a 2-second delay
-/// to comply with rate limits (<30 calls per minute).
+/// **Rate Limiting**: Automatically wraps the client with:
+/// 1. Global semaphore to limit concurrent requests (max 1 at a time)
+/// 2. Per-request delay (2 seconds) to ensure <30 calls per minute
 pub fn create_llm_client(config: &LlmConfig) -> Result<Arc<dyn Llm>> {
     use crate::llm::rate_limiter::RateLimitedLlm;
+
+    // Initialize global rate limiter (max 1 concurrent request)
+    // This ensures no more than 1 request is sent at any given time
+    crate::llm::rate_limiter::init_global_rate_limiter(1);
 
     // Create OpenAI config with custom base URL using OpenAIConfig::compatible
     let openai_config = OpenAIConfig::compatible(
@@ -65,7 +70,7 @@ pub fn create_llm_client(config: &LlmConfig) -> Result<Arc<dyn Llm>> {
     let client = OpenAIClient::new(openai_config)
         .with_context(|| "Failed to create OpenAI client")?;
 
-    // Wrap with rate limiter (2-second delay for <30 calls/min)
+    // Wrap with rate limiter (2-second delay + global semaphore)
     let rate_limited_client = RateLimitedLlm::with_default_delay(Arc::new(client));
 
     Ok(Arc::new(rate_limited_client))

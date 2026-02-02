@@ -4,6 +4,8 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use cowork_core::llm::ModelConfig;
 use cowork_core::pipeline::{create_cowork_pipeline, create_partial_pipeline, create_resume_pipeline, create_modify_pipeline};
+use cowork_core::interaction::CliBackend;
+use cowork_core::event_bus::EventBus;
 use std::path::Path;
 use std::sync::Arc;
 use std::collections::{HashMap, HashSet};
@@ -168,8 +170,12 @@ async fn cmd_new(idea: String, config: &ModelConfig, enable_stream: bool) -> Res
     };
     save_session_input(&session_id, &session_input)?;
 
+    // Create interaction backend
+    let event_bus = Arc::new(EventBus::new());
+    let interaction = Arc::new(CliBackend::new(event_bus));
+
     // Create pipeline
-    let pipeline = create_cowork_pipeline(config, &session_id)?;
+    let pipeline = create_cowork_pipeline(config, &session_id, interaction)?;
 
     // Execute pipeline with idea as input
     println!("✨ Creating new project...");
@@ -262,8 +268,12 @@ async fn cmd_resume(base: Option<String>, config: &ModelConfig, enable_stream: b
     // Bootstrap session state from base session
     init_session_from_base(&session_id, &base_session_id)?;
 
+    // Create interaction backend
+    let event_bus = Arc::new(EventBus::new());
+    let interaction = Arc::new(CliBackend::new(event_bus));
+
     // Create resume pipeline
-    let pipeline = create_resume_pipeline(config, &session_id, &base_session_id)?;
+    let pipeline = create_resume_pipeline(config, &session_id, &base_session_id, interaction)?;
 
     // Execute pipeline
     println!("🔄 Resuming project...");
@@ -364,8 +374,12 @@ async fn cmd_revert(from_stage: &str, config: &ModelConfig, enable_stream: bool)
     // Bootstrap session state from base session
     init_session_from_base(&session_id, &base_session_id)?;
 
+    // Create interaction backend
+    let event_bus = Arc::new(EventBus::new());
+    let interaction = Arc::new(CliBackend::new(event_bus));
+
     // Create partial pipeline
-    let pipeline = create_partial_pipeline(config, &session_id, &base_session_id, resolved_stage)?;
+    let pipeline = create_partial_pipeline(config, &session_id, &base_session_id, resolved_stage, interaction)?;
 
     // Execute pipeline
     println!("🔧 Reverting project from {} stage...", resolved_stage);
@@ -532,8 +546,12 @@ async fn cmd_modify(idea: &str, base: Option<String>, config: &ModelConfig, enab
     // Bootstrap session state from base session
     init_session_from_base(&session_id, &base_session_id)?;
 
+    // Create interaction backend
+    let event_bus = Arc::new(EventBus::new());
+    let interaction = Arc::new(CliBackend::new(event_bus));
+
     // Create modify pipeline (incremental change pipeline)
-    let pipeline = create_modify_pipeline(config, &session_id, &base_session_id)?;
+    let pipeline = create_modify_pipeline(config, &session_id, &base_session_id, interaction)?;
 
     // Snapshot project files before modification (for patch metadata)
     let before_files = collect_project_file_fingerprints()?;
