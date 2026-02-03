@@ -203,6 +203,12 @@ function App() {
       loadSessions();
     });
     
+    // Listen for session deleted event
+    const unlistenSessionDeleted = listen('session_deleted', () => {
+      console.log('[App] Session deleted event received, reloading sessions...');
+      loadSessions();
+    });
+    
     return () => {
       if (unlistenProjectLoaded) {
         unlistenProjectLoaded.then(fn => fn()).catch(e => console.error('[App] Failed to unlisten project_loaded:', e));
@@ -212,6 +218,9 @@ function App() {
       }
       if (unlistenSessionCompleted) {
         unlistenSessionCompleted.then(fn => fn()).catch(e => console.error('[App] Failed to unlisten session_completed:', e));
+      }
+      if (unlistenSessionDeleted) {
+        unlistenSessionDeleted.then(fn => fn()).catch(e => console.error('[App] Failed to unlisten session_deleted:', e));
       }
     };
   }, []);
@@ -736,6 +745,76 @@ function App() {
     });
   };
 
+  const handleViewSessionLogs = async (sessionId) => {
+    try {
+      const logs = await invoke('get_session_logs', { sessionId });
+      
+      if (logs.length === 0) {
+        message.info('No logs found for this session.');
+        return;
+      }
+      
+      // Combine all log content
+      const allLogs = logs.map(log => 
+        `=== ${log.file} ===\n${log.content}`
+      ).join('\n\n');
+      
+      // Show logs in a modal
+      Modal.info({
+        title: `Session Logs: ${sessionId.substring(0, 12)}...`,
+        width: 800,
+        content: (
+          <div style={{ 
+            maxHeight: '500px', 
+            overflow: 'auto',
+            background: '#1e1e1e',
+            padding: '15px',
+            borderRadius: '4px',
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            whiteSpace: 'pre-wrap',
+            color: '#d4d4d4'
+          }}>
+            {allLogs}
+          </div>
+        ),
+        okText: 'Close',
+      });
+    } catch (error) {
+      message.error('Failed to load session logs: ' + error);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    Modal.confirm({
+      title: 'Delete Session',
+      content: (
+        <div>
+          <p>Are you sure you want to delete this session?</p>
+          <p style={{ color: '#ff4d4f', fontWeight: 'bold' }}>
+            Warning: This action cannot be undone. All session data will be permanently deleted.
+          </p>
+          <p style={{ fontSize: '12px', color: '#888' }}>
+            Session ID: {sessionId.substring(0, 20)}...
+          </p>
+        </div>
+      ),
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          await invoke('delete_session', { sessionId });
+          message.success('Session deleted successfully');
+          // Reload sessions
+          setTimeout(() => loadSessions(), 500);
+        } catch (error) {
+          message.error('Failed to delete session: ' + error);
+        }
+      }
+    });
+  };
+
   const hasCompletedSession = (sessions) => {
     return sessions && sessions.some(s => s.status === 'Completed');
   };
@@ -1080,6 +1159,57 @@ function App() {
                                 </Button>
                               </div>
                             ) : null}
+                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '8px' }}>
+                              {session.status === 'InProgress' && session.id !== currentSession && (
+                                <Button
+                                  size="small"
+                                  type="primary"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    message.info('This session is marked as in progress. Check logs for details.');
+                                  }}
+                                  style={{ padding: '2px 6px', fontSize: '11px' }}
+                                >
+                                  Logs
+                                </Button>
+                              )}
+                              {session.status === 'Failed' && (
+                                <>
+                                  <Button
+                                    size="small"
+                                    type="primary"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleResumeSession(session.id);
+                                    }}
+                                    style={{ padding: '2px 6px', fontSize: '11px' }}
+                                  >
+                                    Resume
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleViewSessionLogs(session.id);
+                                    }}
+                                    style={{ padding: '2px 6px', fontSize: '11px' }}
+                                  >
+                                    Logs
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    danger
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteSession(session.id);
+                                    }}
+                                    style={{ padding: '2px 6px', fontSize: '11px' }}
+                                  >
+                                    Delete
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         );
                       })}

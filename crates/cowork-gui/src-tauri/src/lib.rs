@@ -1607,6 +1607,115 @@ async fn submit_input_response(
 }
 
 // ============================================================================
+// Session Management Commands
+// ============================================================================
+
+#[tauri::command]
+async fn delete_session(
+    session_id: String,
+    window: tauri::Window,
+) -> Result<(), String> {
+    use cowork_core::storage::*;
+    
+    // Check if this is the current session in workspace
+    let workspace = std::env::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+    
+    let index = load_project_index()
+        .map_err(|e| format!("Failed to load index: {}", e))?;
+    
+    // Check if session exists
+    let session_exists = index.sessions.iter().any(|s| s.session_id == session_id);
+    if !session_exists {
+        return Err(format!("Session not found: {}", session_id));
+    }
+    
+    // Delete session from index
+    let mut index = load_project_index()
+        .map_err(|e| format!("Failed to load index: {}", e))?;
+    
+    index.sessions.retain(|s| s.session_id != session_id);
+    
+    // Update latest successful session if needed
+    if let Some(ref latest) = index.latest_successful_session {
+        if latest == &session_id {
+            index.latest_successful_session = None;
+        }
+    }
+    
+    save_project_index(&index)
+        .map_err(|e| format!("Failed to save index: {}", e))?;
+    
+    // Delete session directory
+    let session_dir = workspace.join(".cowork").join("sessions").join(&session_id);
+    if session_dir.exists() {
+        std::fs::remove_dir_all(&session_dir)
+            .map_err(|e| format!("Failed to delete session directory: {}", e))?;
+    }
+    
+    // Emit event to refresh sessions
+    let _ = window.emit("session_deleted", &session_id);
+    
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_session_logs(
+    session_id: String,
+) -> Result<Vec<SessionLogEntry>, String> {
+    use std::fs;
+    use std::path::PathBuf;
+    
+    let current_dir = std::env::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+    
+    let logs_dir = current_dir
+        .join(".cowork")
+        .join("sessions")
+        .join(&session_id)
+        .join("logs");
+    
+    if !logs_dir.exists() {
+        return Ok(vec![]);
+    }
+    
+    let mut logs = Vec::new();
+    
+    // Read all log files
+    let entries = fs::read_dir(&logs_dir)
+        .map_err(|e| format!("Failed to read logs directory: {}", e))?;
+    
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+        let path = entry.path();
+        
+        if path.is_file() {
+            let content = fs::read_to_string(&path)
+                .map_err(|e| format!("Failed to read log file: {}", e))?;
+            
+            logs.push(SessionLogEntry {
+                file: path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown")
+                    .to_string(),
+                content,
+            });
+        }
+    }
+    
+    // Sort logs by file name (assuming timestamp-based naming)
+    logs.sort_by(|a, b| a.file.cmp(&b.file));
+    
+    Ok(logs)
+}
+
+#[derive(serde::Serialize)]
+struct SessionLogEntry {
+    file: String,
+    content: String,
+}
+
+// ============================================================================
 // Run Application
 // ============================================================================
 
@@ -1637,6 +1746,8 @@ pub fn run() {
             resume_project,
             get_sessions,
             submit_input_response,
+            delete_session,
+            get_session_logs,
             // GUI-specific commands
             gui_commands::get_session_artifacts,
             gui_commands::read_file_content,
