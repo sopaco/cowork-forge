@@ -25,7 +25,7 @@ impl InteractiveBackend for TauriBackend {
         println!("{} [Tauri]: {}", level.emoji(), content);
     }
 
-    async fn request_input(&self, prompt: &str, options: Vec<InputOption>, _initial_content: Option<String>) -> Result<InputResponse> {
+    async fn request_input(&self, _prompt: &str, _options: Vec<InputOption>, _initial_content: Option<String>) -> Result<InputResponse> {
         // Tauri implementation will send HITL request event and wait for response
         // For now, return a placeholder
         Ok(InputResponse::Cancel)

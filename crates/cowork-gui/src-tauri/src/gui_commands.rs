@@ -1,18 +1,26 @@
 // GUI-specific commands for enhanced functionality
 use super::gui_types::*;
+use super::gui_types::FileReadResult;
 use crate::AppState;
 use crate::preview_server::PreviewServerManager;
 use crate::project_runner::ProjectRunner;
 use cowork_core::storage::*;
 use tauri::{State, Window};
 use std::fs;
-use std::path::Path;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
 
 // Global instances
 lazy_static::lazy_static! {
     static ref PREVIEW_SERVER_MANAGER: PreviewServerManager = PreviewServerManager::new();
     static ref PROJECT_RUNNER: ProjectRunner = ProjectRunner::new();
+}
+
+// ============================================================================
+// Initialization
+// ============================================================================
+
+pub fn init_app_handle(handle: tauri::AppHandle) {
+    PROJECT_RUNNER.set_app_handle(handle);
 }
 
 // ============================================================================
@@ -78,9 +86,11 @@ pub async fn get_session_artifacts(
 pub async fn read_file_content(
     session_id: String,
     file_path: String,
+    offset: Option<usize>,
+    limit: Option<usize>,
     _window: Window,
     _state: State<'_, AppState>,
-) -> Result<String, String> {
+) -> Result<FileReadResult, String> {
     println!("[GUI] Reading file: {}", file_path);
 
     let project_root = cowork_core::storage::get_project_root()
@@ -88,8 +98,52 @@ pub async fn read_file_content(
 
     let full_path = project_root.join(&file_path);
 
-    fs::read_to_string(&full_path)
-        .map_err(|e| format!("Failed to read file: {}", e))
+    // Get file metadata
+    let metadata = fs::metadata(&full_path)
+        .map_err(|e| format!("Failed to get file metadata: {}", e))?;
+    
+    let file_size = metadata.len() as usize;
+    const MAX_FILE_SIZE: usize = 10 * 1024 * 1024; // 10MB limit for full read
+
+    // If file is too large or offset/limit specified, read in chunks
+    if file_size > MAX_FILE_SIZE || offset.is_some() || limit.is_some() {
+        let offset = offset.unwrap_or(0);
+        let limit = limit.unwrap_or(1024 * 1024); // Default 1MB chunks
+        
+        let mut file = fs::File::open(&full_path)
+            .map_err(|e| format!("Failed to open file: {}", e))?;
+        
+        use std::io::{Seek, Read};
+        
+        file.seek(std::io::SeekFrom::Start(offset as u64))
+            .map_err(|e| format!("Failed to seek in file: {}", e))?;
+        
+        let mut buffer = vec![0; limit.min(file_size - offset)];
+        let bytes_read = file.read(&mut buffer)
+            .map_err(|e| format!("Failed to read file: {}", e))?;
+        
+        buffer.truncate(bytes_read);
+        
+        let content = String::from_utf8_lossy(&buffer).to_string();
+        
+        Ok(FileReadResult {
+            content,
+            offset: offset as u64,
+            total_size: file_size as u64,
+            is_partial: true,
+        })
+    } else {
+        // Read full file for small files
+        let content = fs::read_to_string(&full_path)
+            .map_err(|e| format!("Failed to read file: {}", e))?;
+        
+        Ok(FileReadResult {
+            content,
+            offset: 0,
+            total_size: file_size as u64,
+            is_partial: false,
+        })
+    }
 }
 
 #[tauri::command]
@@ -354,7 +408,7 @@ fn detect_language(filename: &str) -> Option<String> {
         Some("css") | Some("scss") | Some("sass") => Some("css".to_string()),
         Some("json") => Some("json".to_string()),
         Some("md") => Some("markdown".to_string()),
-        Some("xml") | Some("html") => Some("xml".to_string()),
+        Some("xml") => Some("xml".to_string()),
         Some("toml") => Some("toml".to_string()),
         Some("yaml") | Some("yml") => Some("yaml".to_string()),
         _ => None,
@@ -406,4 +460,654 @@ fn detect_start_command(code_dir: &Path) -> Result<String, String> {
     }
 
     Err("Unable to detect project type".to_string())
+}
+
+// ============================================================================
+// Memory Commands
+// ============================================================================
+
+#[tauri::command]
+pub async fn query_memory_index(
+    query_type: String,
+    category: String,
+    stage: Option<String>,
+    limit: i64,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    println!("[GUI] Querying memory index: query_type={}, category={}, stage={:?}, limit={}", 
+             query_type, category, stage, limit);
+
+    use cowork_core::tools::QueryMemoryIndexTool;
+    use adk_core::Tool;
+
+    let tool = QueryMemoryIndexTool;
+    
+    let args = serde_json::json!({
+        "query_type": query_type,
+        "category": category,
+        "stage": stage,
+        "limit": limit
+    });
+
+    // Create a simple tool context - we don't need full context for memory tools
+    // Since our memory tools use _ctx parameter, they don't actually use it
+    let ctx = std::sync::Arc::new(DummyToolContext);
+    
+    tool.execute(ctx, args)
+        .await
+        .map_err(|e| format!("Failed to query memory index: {}", e))
+}
+
+#[tauri::command]
+pub async fn load_memory_detail(
+    memory_id: String,
+    file: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    println!("[GUI] Loading memory detail: memory_id={}, file={}", memory_id, file);
+
+    use cowork_core::tools::LoadMemoryDetailTool;
+    use adk_core::Tool;
+
+    let tool = LoadMemoryDetailTool;
+    
+    let args = serde_json::json!({
+        "memory_id": memory_id,
+        "file": file
+    });
+
+    let ctx = std::sync::Arc::new(DummyToolContext);
+    
+    tool.execute(ctx, args)
+        .await
+        .map_err(|e| format!("Failed to load memory detail: {}", e))
+}
+
+#[tauri::command]
+pub async fn save_session_memory(
+    memory_type: String,
+    title: String,
+    summary: String,
+    content: String,
+    stage: String,
+    category: Option<String>,
+    impact: Option<String>,
+    tags: Option<Vec<String>>,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    println!("[GUI] Saving session memory: memory_type={}, title={}", memory_type, title);
+
+    use cowork_core::tools::SaveSessionMemoryTool;
+    use adk_core::Tool;
+
+    let tool = SaveSessionMemoryTool;
+    
+    let args = serde_json::json!({
+        "memory_type": memory_type,
+        "title": title,
+        "summary": summary,
+        "content": content,
+        "stage": stage,
+        "category": category.unwrap_or("general".to_string()),
+        "impact": impact.unwrap_or("medium".to_string()),
+        "tags": tags.unwrap_or_default()
+    });
+
+    let ctx = std::sync::Arc::new(DummyToolContext);
+    
+    tool.execute(ctx, args)
+        .await
+        .map_err(|e| format!("Failed to save session memory: {}", e))
+}
+
+#[tauri::command]
+pub async fn promote_to_project_memory(
+    memory_id: String,
+    reason: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    println!("[GUI] Promoting to project memory: memory_id={}, reason={}", memory_id, reason);
+
+    use cowork_core::tools::PromoteToProjectMemoryTool;
+    use adk_core::Tool;
+
+    let tool = PromoteToProjectMemoryTool;
+    
+    let args = serde_json::json!({
+        "memory_id": memory_id,
+        "reason": reason
+    });
+
+    let ctx = std::sync::Arc::new(DummyToolContext);
+    
+    tool.execute(ctx, args)
+        .await
+        .map_err(|e| format!("Failed to promote to project memory: {}", e))
+}
+
+#[tauri::command]
+pub async fn get_memory_context(
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    println!("[GUI] Getting memory context");
+
+    use cowork_core::tools::GetMemoryContextTool;
+    use adk_core::Tool;
+
+    let tool = GetMemoryContextTool;
+    
+    let args = serde_json::json!({});
+
+    let ctx = std::sync::Arc::new(DummyToolContext);
+    
+    tool.execute(ctx, args)
+        .await
+        .map_err(|e| format!("Failed to get memory context: {}", e))
+}
+
+// ============================================================================
+// Dummy Tool Context for GUI Commands
+// ============================================================================
+
+use adk_core::{ToolContext, CallbackContext, ReadonlyContext, EventActions, AdkError};
+
+/// Dummy tool context used for GUI commands that don't need full tool context
+pub struct DummyToolContext;
+
+impl CallbackContext for DummyToolContext {
+    fn artifacts(&self) -> Option<std::sync::Arc<dyn adk_core::Artifacts>> {
+        None
+    }
+}
+
+impl ReadonlyContext for DummyToolContext {
+    fn invocation_id(&self) -> &str {
+        "dummy_invocation"
+    }
+    
+    fn session_id(&self) -> &str {
+        "dummy_session"
+    }
+    
+    fn agent_name(&self) -> &str {
+        "dummy_agent"
+    }
+    
+    fn user_id(&self) -> &str {
+        "dummy_user"
+    }
+    
+    fn app_name(&self) -> &str {
+        "cowork_gui"
+    }
+    
+    fn branch(&self) -> &str {
+        "main"
+    }
+    
+    fn user_content(&self) -> &adk_core::Content {
+        use std::sync::OnceLock;
+        static CONTENT: OnceLock<adk_core::Content> = OnceLock::new();
+        CONTENT.get_or_init(|| adk_core::Content::new("user"))
+    }
+}
+
+#[async_trait::async_trait]
+impl ToolContext for DummyToolContext {
+    fn function_call_id(&self) -> &str {
+        "dummy"
+    }
+
+    fn actions(&self) -> EventActions {
+        EventActions::default()
+    }
+
+    fn set_actions(&self, _actions: EventActions) {
+        // No-op
+    }
+
+    async fn search_memory<'life0: 'async_trait, 'life1: 'async_trait>(
+        &'life0 self,
+        _query: &'life1 str,
+    ) -> Result<Vec<adk_core::MemoryEntry>, AdkError> {
+        Ok(vec![])
+    }
+}
+
+// ============================================================================
+// Code Formatting Commands
+// ============================================================================
+
+#[tauri::command]
+pub async fn format_code(
+    session_id: String,
+    file_path: Option<String>,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<FormatResult, String> {
+    println!("[GUI] Formatting code: session_id={:?}, file_path={:?}", session_id, file_path);
+
+    let project_root = cowork_core::storage::get_project_root()
+        .map_err(|e| format!("Failed to get project root: {}", e))?;
+
+    let code_dir = project_root.join(format!(".cowork/sessions/{}/code", session_id));
+    
+    if !code_dir.exists() {
+        return Err("Code directory not found".to_string());
+    }
+
+    // Detect project type and run appropriate formatter
+    let package_json = code_dir.join("package.json");
+    let cargo_toml = code_dir.join("Cargo.toml");
+
+    let mut formatted_files = Vec::new();
+    let mut errors = Vec::new();
+
+    // Check for Prettier (JavaScript/TypeScript)
+    if package_json.exists() {
+        // Try to run prettier
+        let output = tokio::process::Command::new("npx")
+            .args(["prettier", "--write", "."])
+            .current_dir(&code_dir)
+            .output()
+            .await;
+
+        match output {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                
+                if output.status.success() {
+                    // Parse formatted files from output
+                    for line in stdout.lines() {
+                        if line.trim().len() > 0 {
+                            formatted_files.push(line.to_string());
+                        }
+                    }
+                } else {
+                    errors.push(format!("Prettier failed: {}", stderr));
+                }
+            }
+            Err(e) => {
+                errors.push(format!("Failed to run prettier: {}", e));
+            }
+        }
+    }
+
+    // Check for rustfmt (Rust)
+    if cargo_toml.exists() {
+        let output = tokio::process::Command::new("cargo")
+            .args(["fmt"])
+            .current_dir(&code_dir)
+            .output()
+            .await;
+
+        match output {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                
+                if output.status.success() {
+                    // rustfmt doesn't output formatted files by default
+                    formatted_files.push("All Rust files formatted".to_string());
+                } else {
+                    errors.push(format!("rustfmt failed: {}", stdout));
+                }
+            }
+            Err(e) => {
+                errors.push(format!("Failed to run rustfmt: {}", e));
+            }
+        }
+    }
+
+    // If no formatter found
+    if formatted_files.is_empty() && errors.is_empty() {
+        return Err("No supported formatter found for this project type".to_string());
+    }
+
+    let success = errors.is_empty();
+    Ok(FormatResult {
+        formatted_files,
+        errors,
+        success,
+    })
+}
+
+#[tauri::command]
+pub async fn check_formatter_available(
+    session_id: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<FormatterAvailability, String> {
+    println!("[GUI] Checking formatter availability: session_id={}", session_id);
+
+    let project_root = cowork_core::storage::get_project_root()
+        .map_err(|e| format!("Failed to get project root: {}", e))?;
+
+    let code_dir = project_root.join(format!(".cowork/sessions/{}/code", session_id));
+    
+    let mut prettier_available = false;
+    let mut rustfmt_available = false;
+
+    // Check for Prettier
+    let package_json = code_dir.join("package.json");
+    if package_json.exists() {
+        let output = tokio::process::Command::new("npx")
+            .args(["prettier", "--version"])
+            .output()
+            .await;
+
+        prettier_available = output.is_ok() && output.unwrap().status.success();
+    }
+
+    // Check for rustfmt
+    let cargo_toml = code_dir.join("Cargo.toml");
+    if cargo_toml.exists() {
+        let output = tokio::process::Command::new("cargo")
+            .args(["fmt", "--version"])
+            .output()
+            .await;
+
+        rustfmt_available = output.is_ok() && output.unwrap().status.success();
+    }
+
+    Ok(FormatterAvailability {
+        prettier: prettier_available,
+        rustfmt: rustfmt_available,
+    })
+}
+
+// ============================================================================
+// Project Template Commands
+// ============================================================================
+
+#[tauri::command]
+pub async fn get_templates(
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<Vec<ProjectTemplate>, String> {
+    println!("[GUI] Getting templates");
+
+    // Get templates directory
+    let templates_dir = get_templates_dir()?;
+    
+    if !templates_dir.exists() {
+        return Ok(vec![]);
+    }
+
+    let mut templates = Vec::new();
+
+    // Read built-in templates
+    let built_in_templates = get_built_in_templates();
+    templates.extend(built_in_templates);
+
+    // Read custom templates
+    if let Ok(entries) = fs::read_dir(&templates_dir) {
+        for entry in entries.flatten() {
+            if let Ok(meta) = entry.metadata() {
+                if meta.is_file() {
+                    let path = entry.path();
+                    if path.extension().and_then(|e| e.to_str()) == Some("json") {
+                        if let Ok(content) = fs::read_to_string(&path) {
+                            if let Ok(template) = serde_json::from_str::<ProjectTemplate>(&content) {
+                                templates.push(template);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(templates)
+}
+
+#[tauri::command]
+pub async fn export_template(
+    session_id: String,
+    name: String,
+    description: String,
+    category: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<ProjectTemplate, String> {
+    println!("[GUI] Exporting template from session: {}", session_id);
+
+    let project_root = cowork_core::storage::get_project_root()
+        .map_err(|e| format!("Failed to get project root: {}", e))?;
+
+    let code_dir = project_root.join(format!(".cowork/sessions/{}/code", session_id));
+    
+    if !code_dir.exists() {
+        return Err("Code directory not found".to_string());
+    }
+
+    // Collect all files
+    let mut files = Vec::new();
+    collect_template_files(&code_dir, &mut files)?;
+
+    // Create template
+    let template_id = format!("template-{}", chrono::Utc::now().timestamp_millis());
+    let template = ProjectTemplate {
+        id: template_id.clone(),
+        name,
+        description,
+        category,
+        technology_stack: vec![], // TODO: detect from files
+        created_at: chrono::Utc::now().to_rfc3339(),
+        updated_at: chrono::Utc::now().to_rfc3339(),
+        is_built_in: false,
+        files,
+        config: TemplateConfig {
+            variables: vec![],
+            post_creation_commands: vec![],
+        },
+    };
+
+    // Save template
+    let templates_dir = get_templates_dir()?;
+    fs::create_dir_all(&templates_dir)
+        .map_err(|e| format!("Failed to create templates directory: {}", e))?;
+
+    let template_file = templates_dir.join(format!("{}.json", template_id));
+    fs::write(&template_file, serde_json::to_string_pretty(&template).unwrap())
+        .map_err(|e| format!("Failed to save template: {}", e))?;
+
+    Ok(template)
+}
+
+#[tauri::command]
+pub async fn import_template(
+    template_data: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<ProjectTemplate, String> {
+    println!("[GUI] Importing template");
+
+    let template: ProjectTemplate = serde_json::from_str(&template_data)
+        .map_err(|e| format!("Failed to parse template data: {}", e))?;
+
+    // Validate template
+    if template.id.is_empty() || template.name.is_empty() {
+        return Err("Invalid template: missing id or name".to_string());
+    }
+
+    // Save template
+    let templates_dir = get_templates_dir()?;
+    fs::create_dir_all(&templates_dir)
+        .map_err(|e| format!("Failed to create templates directory: {}", e))?;
+
+    let template_file = templates_dir.join(format!("{}.json", template.id));
+    fs::write(&template_file, serde_json::to_string_pretty(&template).unwrap())
+        .map_err(|e| format!("Failed to save template: {}", e))?;
+
+    Ok(template)
+}
+
+#[tauri::command]
+pub async fn delete_template(
+    template_id: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<(), String> {
+    println!("[GUI] Deleting template: {}", template_id);
+
+    let templates_dir = get_templates_dir()?;
+    let template_file = templates_dir.join(format!("{}.json", template_id));
+
+    if !template_file.exists() {
+        return Err("Template not found".to_string());
+    }
+
+    fs::remove_file(&template_file)
+        .map_err(|e| format!("Failed to delete template: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn apply_template(
+    template_id: String,
+    variables: serde_json::Value,
+    target_dir: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<Vec<String>, String> {
+    println!("[GUI] Applying template: {} to {}", template_id, target_dir);
+
+    // Get template
+    let templates_dir = get_templates_dir()?;
+    let template_file = templates_dir.join(format!("{}.json", template_id));
+
+    if !template_file.exists() {
+        return Err("Template not found".to_string());
+    }
+
+    let template_content = fs::read_to_string(&template_file)
+        .map_err(|e| format!("Failed to read template: {}", e))?;
+
+    let template: ProjectTemplate = serde_json::from_str(&template_content)
+        .map_err(|e| format!("Failed to parse template: {}", e))?;
+
+    // Create target directory
+    let target_path = Path::new(&target_dir);
+    fs::create_dir_all(target_path)
+        .map_err(|e| format!("Failed to create target directory: {}", e))?;
+
+    // Apply template files
+    let mut created_files = Vec::new();
+    for file in &template.files {
+        let file_path = target_path.join(&file.path);
+        
+        // Create parent directories
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create directory: {}", e))?;
+        }
+
+        // Replace variables in content
+        let content = replace_template_variables(&file.content, &variables, &template.config.variables);
+
+        // Write file
+        fs::write(&file_path, content)
+            .map_err(|e| format!("Failed to write file {}: {}", file.path, e))?;
+
+        created_files.push(file.path.clone());
+    }
+
+    Ok(created_files)
+}
+
+// ============================================================================
+// Template Helper Functions
+// ============================================================================
+
+fn get_templates_dir() -> Result<PathBuf, String> {
+    let config_dir = dirs::config_dir()
+        .ok_or("Failed to get config directory")?;
+    
+    let templates_dir = config_dir.join("CoworkCreative").join("templates");
+    Ok(templates_dir)
+}
+
+fn get_built_in_templates() -> Vec<ProjectTemplate> {
+    // Return built-in templates
+    vec![
+        ProjectTemplate {
+            id: "react-basic".to_string(),
+            name: "React Basic".to_string(),
+            description: "Basic React project structure".to_string(),
+            category: "Frontend".to_string(),
+            technology_stack: vec!["React".to_string(), "JavaScript".to_string()],
+            created_at: chrono::Utc::now().to_rfc3339(),
+            updated_at: chrono::Utc::now().to_rfc3339(),
+            is_built_in: true,
+            files: vec![],
+            config: TemplateConfig {
+                variables: vec![],
+                post_creation_commands: vec!["npm install".to_string()],
+            },
+        },
+        ProjectTemplate {
+            id: "rust-cli".to_string(),
+            name: "Rust CLI".to_string(),
+            description: "Basic Rust CLI project structure".to_string(),
+            category: "Backend".to_string(),
+            technology_stack: vec!["Rust".to_string()],
+            created_at: chrono::Utc::now().to_rfc3339(),
+            updated_at: chrono::Utc::now().to_rfc3339(),
+            is_built_in: true,
+            files: vec![],
+            config: TemplateConfig {
+                variables: vec![],
+                post_creation_commands: vec!["cargo build".to_string()],
+            },
+        },
+    ]
+}
+
+fn collect_template_files(dir: &Path, files: &mut Vec<TemplateFile>) -> Result<(), String> {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Ok(meta) = entry.metadata() {
+                if meta.is_file() {
+                    if let Ok(content) = fs::read_to_string(&path) {
+                        let relative_path = path.strip_prefix(dir)
+                            .map_err(|e| format!("Failed to get relative path: {}", e))?
+                            .to_string_lossy()
+                            .to_string();
+                        
+                        files.push(TemplateFile {
+                            path: relative_path,
+                            content,
+                            is_template: true,
+                        });
+                    }
+                } else if meta.is_dir() {
+                    collect_template_files(&path, files)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn replace_template_variables(content: &str, variables: &serde_json::Value, config_vars: &[TemplateVariable]) -> String {
+    let mut result = content.to_string();
+    
+    // Replace variables
+    for var in config_vars {
+        let placeholder = format!("{{{{{}}}}}", var.name);
+        let value = variables.get(&var.name)
+            .and_then(|v| v.as_str())
+            .unwrap_or(&var.default_value);
+        result = result.replace(&placeholder, value);
+    }
+    
+    result
 }

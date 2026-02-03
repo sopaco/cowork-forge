@@ -3,7 +3,6 @@
 use crate::agents::*;
 use crate::agents::ResilientAgent;
 use crate::llm::*;
-use crate::interaction::InteractiveBackend;
 use adk_core::{Agent, EventStream, InvocationContext, Result as AdkResult};
 use anyhow::Result;
 use async_trait::async_trait;

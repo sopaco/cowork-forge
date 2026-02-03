@@ -1,6 +1,5 @@
 use adk_core::{Agent, Event, AdkError, InvocationContext};
 use crate::interaction::{InteractiveBackend, InputOption, InputResponse, MessageLevel};
-use crate::event_bus::EventBus;
 use async_trait::async_trait;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -156,7 +155,9 @@ struct ResilientStream {
     inner_agent: Arc<dyn Agent>,
     context: Arc<dyn InvocationContext>,
     state: StreamState,
+    #[allow(dead_code)]
     agent_name: String,
+    #[allow(dead_code)]
     retry_count: Arc<AtomicU32>,
     interaction: Arc<dyn InteractiveBackend>,
 }
@@ -169,12 +170,12 @@ impl ResilientStream {
         retry_count: Arc<AtomicU32>,
         interaction: Arc<dyn InteractiveBackend>,
     ) -> Self {
-        let agent_name = inner_agent.name().to_string();
+        let _agent_name = inner_agent.name().to_string();
         Self {
             inner_agent,
             context,
             state: StreamState::Streaming(stream),
-            agent_name,
+            agent_name: _agent_name,
             retry_count,
             interaction,
         }

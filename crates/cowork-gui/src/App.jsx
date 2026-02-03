@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { Layout, Menu, Button, Spin, Empty, Modal, Dropdown, message } from 'antd';
+import { Layout, Menu, Button, Spin, Empty, Modal, Dropdown, message, Tooltip } from 'antd';
 import { 
   FolderOutlined, 
   FileTextOutlined, 
@@ -12,12 +12,18 @@ import {
   RollbackOutlined,
   DownOutlined,
   MessageOutlined,
-  SettingOutlined
+  SettingOutlined,
+  AppstoreOutlined,
+  DatabaseOutlined,
+  BgColorsOutlined
 } from '@ant-design/icons';
 import ArtifactsViewer from './components/ArtifactsViewer';
 import CodeEditor from './components/CodeEditor';
 import PreviewPanel from './components/PreviewPanel';
 import RunnerPanel from './components/RunnerPanel';
+import ProjectsPanel from './components/ProjectsPanel';
+import MemoryPanel from './components/MemoryPanel';
+import CommandPalette from './components/CommandPalette';
 
 const { Sider, Content, Header, Footer } = Layout;
 
@@ -28,15 +34,96 @@ function App() {
   const [userInput, setUserInput] = useState('');
   const [inputRequest, setInputRequest] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeView, setActiveView] = useState('chat'); // chat, artifacts, code, preview, run
+  const [activeView, setActiveView] = useState('chat'); // chat, artifacts, code, preview, run, memory
   const [messages, setMessages] = useState([]);
+  const [showModifySuggestion, setShowModifySuggestion] = useState(false);
+  const [modifySuggestion, setModifySuggestion] = useState(null);
+  const [pendingSessionId, setPendingSessionId] = useState(null);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const listenersRegistered = useRef(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const [isUserScrolled, setIsUserScrolled] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [showInactiveSessions, setShowInactiveSessions] = useState(true);
+  const [currentWorkspace, setCurrentWorkspace] = useState('');
   const initialLoadRef = useRef(true);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ctrl+K or Cmd+K: Open command palette
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(true);
+      }
+      // Ctrl+1: View chat
+      if ((e.ctrlKey || e.metaKey) && e.key === '1') {
+        e.preventDefault();
+        setActiveView('chat');
+      }
+      // Ctrl+2: View artifacts
+      if ((e.ctrlKey || e.metaKey) && e.key === '2') {
+        e.preventDefault();
+        setActiveView('artifacts');
+      }
+      // Ctrl+3: View code
+      if ((e.ctrlKey || e.metaKey) && e.key === '3') {
+        e.preventDefault();
+        setActiveView('code');
+      }
+      // Ctrl+4: View preview
+      if ((e.ctrlKey || e.metaKey) && e.key === '4') {
+        e.preventDefault();
+        setActiveView('preview');
+      }
+      // Ctrl+5: View run
+      if ((e.ctrlKey || e.metaKey) && e.key === '5') {
+        e.preventDefault();
+        setActiveView('run');
+      }
+      // Ctrl+6: View memory
+      if ((e.ctrlKey || e.metaKey) && e.key === '6') {
+        e.preventDefault();
+        setActiveView('memory');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Handle command selection from palette
+  const handleCommandSelect = (commandId) => {
+    switch (commandId) {
+      case 'create-project':
+        document.getElementById('projectIdeaInput')?.focus();
+        break;
+      case 'open-project':
+        setActiveView('projects');
+        break;
+      case 'view-chat':
+        setActiveView('chat');
+        break;
+      case 'view-artifacts':
+        setActiveView('artifacts');
+        break;
+      case 'view-code':
+        setActiveView('code');
+        break;
+      case 'view-preview':
+        setActiveView('preview');
+        break;
+      case 'view-run':
+        setActiveView('run');
+        break;
+      case 'view-memory':
+        setActiveView('memory');
+        break;
+      default:
+        console.log('Command selected:', commandId);
+    }
+  };
 
   const loadSessions = async () => {
     const isInitialLoad = initialLoadRef.current;
@@ -65,9 +152,66 @@ function App() {
     }
   };
 
+  const checkWorkspace = async () => {
+    try {
+      const workspace = await invoke('get_workspace');
+      if (!workspace) {
+        console.log('[App] No workspace set, showing projects view');
+        setCurrentWorkspace('No workspace set');
+        // Default to projects view when no workspace is set
+        setActiveView('projects');
+        // Clear sessions when no workspace is set
+        setSessions([]);
+      } else {
+        console.log('[App] Workspace set:', workspace);
+        setCurrentWorkspace(workspace);
+      }
+    } catch (error) {
+      console.error('[App] Failed to check workspace:', error);
+      setCurrentWorkspace('Unknown');
+      // Default to projects view on error
+      setActiveView('projects');
+      // Clear sessions on error
+      setSessions([]);
+    }
+  };
+
   useEffect(() => {
-    console.log('[App] Component mounted, loading sessions...');
+    console.log('[App] Component mounted, checking workspace...');
+    checkWorkspace();
     loadSessions();
+    
+    // Listen for project loaded event
+    const unlistenProjectLoaded = listen('project_loaded', () => {
+      console.log('[App] Project loaded event received, reloading sessions...');
+      loadSessions();
+      checkWorkspace();
+    });
+    
+    // Listen for project created event
+    const unlistenProjectCreated = listen('project_created', () => {
+      console.log('[App] Project created event received, reloading sessions...');
+      loadSessions();
+      checkWorkspace();
+    });
+    
+    // Listen for session completed event
+    const unlistenSessionCompleted = listen('session_completed', () => {
+      console.log('[App] Session completed event received, reloading sessions...');
+      loadSessions();
+    });
+    
+    return () => {
+      if (unlistenProjectLoaded) {
+        unlistenProjectLoaded.then(fn => fn()).catch(e => console.error('[App] Failed to unlisten project_loaded:', e));
+      }
+      if (unlistenProjectCreated) {
+        unlistenProjectCreated.then(fn => fn()).catch(e => console.error('[App] Failed to unlisten project_created:', e));
+      }
+      if (unlistenSessionCompleted) {
+        unlistenSessionCompleted.then(fn => fn()).catch(e => console.error('[App] Failed to unlisten session_completed:', e));
+      }
+    };
   }, []);
 
   // Load session artifacts when session changes
@@ -166,6 +310,9 @@ function App() {
       setMessages(prev => [...prev, { type: 'user', content: projectIdea, timestamp: new Date().toISOString() }]);
       setProjectIdea('');
       setCurrentSession(sessionId);
+      
+      // Refresh workspace info and sessions after creating project
+      await checkWorkspace();
       setTimeout(() => loadSessions(), 500);
     } catch (error) {
       alert('Failed to create project: ' + error);
@@ -175,12 +322,125 @@ function App() {
 
   const handleSendUserMessage = async () => {
     if (!userInput.trim()) return;
-    setMessages(prev => [...prev, { type: 'user', content: userInput, timestamp: new Date().toISOString() }]);
+    const message = userInput;
+    setMessages(prev => [...prev, { type: 'user', content: message, timestamp: new Date().toISOString() }]);
+    
     if (inputRequest) {
-      await invoke('submit_input_response', { requestId: inputRequest.requestId, response: userInput, responseType: 'text' });
+      // HITL 交互
+      await invoke('submit_input_response', { requestId: inputRequest.requestId, response: message, responseType: 'text' });
       setInputRequest(null);
+    } else if (currentSession) {
+      // 检查 session 状态，如果已 completed，使用 send_chat_message 命令
+      const session = sessions.find(s => s.id === currentSession);
+      if (session && session.status === 'Completed') {
+        try {
+          const response = await invoke('send_chat_message', {
+            sessionId: currentSession,
+            message: message
+          });
+          
+          // 处理响应
+          handleChatResponse(response);
+        } catch (error) {
+          console.error('[App] Failed to send chat message:', error);
+          message.error('Failed to send message: ' + error);
+        }
+      }
     }
+    
     setUserInput('');
+  };
+
+  const handleChatResponse = (response) => {
+    switch (response.type) {
+      case 'direct_processing':
+        // 直接处理中
+        setIsProcessing(true);
+        message.info('Starting modification...');
+        break;
+        
+      case 'await_confirmation':
+        // 等待确认
+        setModifySuggestion(response.data);
+        setPendingSessionId(response.session_id);
+        setShowModifySuggestion(true);
+        break;
+        
+      case 'await_clarification':
+        // 需要澄清
+        Modal.info({
+          title: 'Need More Information',
+          content: (
+            <div>
+              <p>I need more information to help you:</p>
+              {response.data?.questions?.map((q, i) => (
+                <p key={i}>• {q}</p>
+              ))}
+            </div>
+          )
+        });
+        break;
+        
+      case 'suggest_new_project':
+        Modal.confirm({
+          title: 'Create New Project?',
+          content: 'It seems you want to start a new project. Would you like to create one?',
+          onOk: () => {
+            document.getElementById('projectIdeaInput')?.focus();
+          }
+        });
+        break;
+        
+      default:
+        console.log('[App] Unknown response type:', response.type);
+    }
+  };
+
+  const handleConfirmModify = async () => {
+    if (!modifySuggestion || !pendingSessionId) return;
+    
+    try {
+      const newSessionId = await invoke('confirm_modify', {
+        sessionId: pendingSessionId,
+        suggestionStr: modifySuggestion
+      });
+      
+      setShowModifySuggestion(false);
+      setModifySuggestion(null);
+      setPendingSessionId(null);
+      
+      message.success('Modification started successfully!');
+      
+      // 重新加载 sessions
+          await loadSessions();
+          
+          // 切换到新的 session
+          setCurrentSession(newSessionId);
+          setMessages([]);
+          setIsProcessing(true);
+          
+        } catch (error) {
+          console.error('[App] Failed to confirm modification:', error);
+          message.error('Failed to confirm modification: ' + error);
+        }
+      };
+      
+      const handleCancelModify = () => {
+        setShowModifySuggestion(false);
+        setModifySuggestion(null);
+        setPendingSessionId(null);
+      };
+  const getChatPlaceholder = () => {
+    if (inputRequest) {
+      return "Type your response...";
+    }
+    if (currentSession) {
+      const session = sessions.find(s => s.id === currentSession);
+      if (session && session.status === 'Completed') {
+        return "Continue developing? Describe what you want to change...";
+      }
+    }
+    return "Type a message...";
   };
 
   const handleSelectOption = async (option) => {
@@ -491,6 +751,15 @@ function App() {
   };
 
   const renderContent = () => {
+    // Projects and Memory views don't require a session
+    if (activeView === 'projects') {
+      return <ProjectsPanel />;
+    }
+
+    if (activeView === 'memory') {
+      return <MemoryPanel currentSession={currentSession} />;
+    }
+
     if (!currentSession) {
       return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', color: '#888' }}>
@@ -509,15 +778,24 @@ function App() {
               onScroll={handleScroll}
             >
               {messages.map((msg, idx) => (
-                <div key={idx} style={{ marginBottom: '20px', padding: '10px', background: msg.type === 'user' ? '#1890ff22' : msg.type === 'system' ? '#52c41a22' : '#262626', borderRadius: '8px' }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '5px', color: msg.type === 'system' ? '#52c41a' : '#1890ff' }}>{msg.type}</div>
+                <div key={idx} style={{ marginBottom: '20px', padding: '10px', background: msg.type === 'user' ? '#1890ff22' : msg.type === 'system' ? '#52c41a22' : msg.type === 'thinking' ? '#ffeb3b22' : '#262626', borderRadius: '8px' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '5px', color: msg.type === 'system' ? '#52c41a' : msg.type === 'thinking' ? '#ffeb3b' : '#1890ff' }}>
+                    {msg.type === 'thinking' ? '🤔 AI Thinking' : msg.type}
+                  </div>
                   <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                  {msg.type === 'thinking' && (
+                    <div style={{ marginTop: '8px', fontSize: '12px', color: '#888', fontStyle: 'italic' }}>
+                      AI is reasoning about the next step...
+                    </div>
+                  )}
                 </div>
               ))}
               {isProcessing && (
                 <div style={{ textAlign: 'center', padding: '20px' }}>
                   <Spin />
-                  <div style={{ marginTop: '10px', color: '#888' }}>Processing...</div>
+                  <div style={{ marginTop: '10px', color: '#888' }}>
+                    {isProcessing ? 'Processing...' : 'Ready'}
+                  </div>
                 </div>
               )}
               <div ref={messagesEndRef} />
@@ -540,7 +818,7 @@ function App() {
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSendUserMessage()}
-                placeholder={inputRequest ? "Type your response..." : "Type a message..."}
+                placeholder={getChatPlaceholder()}
                 style={{ flex: 1, padding: '10px', background: '#1e1e1e', border: '1px solid #303030', color: '#fff' }}
               />
               <Button onClick={handleSendUserMessage} disabled={!userInput.trim()}>Send</Button>
@@ -548,13 +826,15 @@ function App() {
           </div>
         );
       case 'artifacts':
-        return <ArtifactsViewer sessionId={currentSession} />;
+        return <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}><ArtifactsViewer sessionId={currentSession} /></div>;
       case 'code':
-        return <CodeEditor sessionId={currentSession} />;
+        return <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}><CodeEditor sessionId={currentSession} /></div>;
       case 'preview':
-        return <PreviewPanel sessionId={currentSession} />;
+        return <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}><PreviewPanel sessionId={currentSession} /></div>;
       case 'run':
-        return <RunnerPanel sessionId={currentSession} />;
+        return <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}><RunnerPanel sessionId={currentSession} /></div>;
+      case 'memory':
+        return <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}><MemoryPanel currentSession={currentSession} /></div>;
       default:
         return null;
     }
@@ -564,14 +844,14 @@ function App() {
     <Layout style={{ minHeight: '100vh', background: '#141414', color: '#fff' }}>
       <Header style={{ background: '#1f1f1f', borderBottom: '1px solid #303030', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <h1 style={{ margin: 0, fontSize: '18px' }}>🛠️ Cowork Creative Studio</h1>
+          <h1 style={{ margin: 0, fontSize: '16px', whiteSpace: 'nowrap' }}>Cowork Creative Studio</h1>
           <textarea
             id="projectIdeaInput"
             value={projectIdea}
             onChange={(e) => setProjectIdea(e.target.value)}
             placeholder="Describe your project idea..."
             rows={1}
-            style={{ width: '400px', background: '#2a2a2a', border: '1px solid #303030', color: '#fff', borderRadius: '4px', padding: '5px 10px', resize: 'none' }}
+            style={{ width: '350px', background: '#2a2a2a', border: '1px solid #303030', color: '#fff', borderRadius: '4px', padding: '5px 10px', resize: 'none' }}
           />
           <Button onClick={handleCreateProject} disabled={!projectIdea.trim() || isProcessing} type="primary">
             {isProcessing ? 'Processing...' : 'Create Project'}
@@ -615,11 +895,13 @@ function App() {
             selectedKeys={[activeView]} 
             onClick={({ key }) => setActiveView(key)}
             items={[
+              { key: 'projects', icon: <AppstoreOutlined />, label: 'Projects' },
               { key: 'chat', icon: <MessageOutlined />, label: 'Chat' },
               { key: 'artifacts', icon: <FileTextOutlined />, label: 'Artifacts' },
               { key: 'code', icon: <CodeOutlined />, label: 'Code' },
               { key: 'preview', icon: <EyeOutlined />, label: 'Preview' },
               { key: 'run', icon: <PlayCircleOutlined />, label: 'Run' },
+              { key: 'memory', icon: <DatabaseOutlined />, label: 'Memory' },
             ]}
             style={{ flexShrink: 0, flex: 'none' }}
           />
@@ -753,17 +1035,49 @@ function App() {
                             }}
                             onClick={() => setCurrentSession(session.id)}
                           >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {session.description}
-                                </div>
-                                <div style={{ fontSize: '11px', color: '#888', marginTop: '3px' }}>
-                                  {new Date(session.created_at).toLocaleDateString()} · 
-                                  <span style={{ color: statusColor, marginLeft: '3px' }}>{session.status}</span>
-                                </div>
+                            <div style={{ marginBottom: '8px' }}>
+                              <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {session.description}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#888', marginTop: '3px' }}>
+                                {new Date(session.created_at).toLocaleDateString()} · 
+                                <span style={{ color: statusColor, marginLeft: '3px' }}>{session.status}</span>
                               </div>
                             </div>
+                            {session.status === 'InProgress' ? (
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                <div style={{ fontSize: '11px', color: '#faad14' }}>
+                                  ⏳ {session.id === currentSession ? 'Loading session...' : 'Session in progress'}
+                                </div>
+                                {session.id !== currentSession && (
+                                  <Button
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      message.info('This session is marked as in progress. Check if it is still running or needs to be retried.');
+                                    }}
+                                    style={{ padding: '2px 6px', fontSize: '11px' }}
+                                  >
+                                    View Details
+                                  </Button>
+                                )}
+                              </div>
+                            ) : session.status === 'Failed' ? (
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                <Button
+                                  size="small"
+                                  type="primary"
+                                  danger
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    message.info('Session failed. Check logs for details or create a new session.');
+                                  }}
+                                  style={{ padding: '2px 6px', fontSize: '11px' }}
+                                >
+                                  View Details
+                                </Button>
+                              </div>
+                            ) : null}
                           </div>
                         );
                       })}
@@ -775,19 +1089,129 @@ function App() {
           </div>
         </Sider>
 
-        <Content style={{ overflow: 'auto' }}>
+        <Content style={{ overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
           {renderContent()}
         </Content>
       </Layout>
 
       <Footer style={{ background: '#1f1f1f', borderTop: '1px solid #303030', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <Tooltip title={currentWorkspace || 'No workspace'} placement="top">
+            <span style={{ fontSize: '13px', color: '#888', cursor: 'default' }}>
+              {currentWorkspace ? `📁 ${currentWorkspace.split(/[/\\]/).pop()}` : '📁 No workspace'}
+            </span>
+          </Tooltip>
+          <span style={{ fontSize: '13px', color: '#666' }}>
+            {currentSession ? `Session: ${currentSession.substring(0, 20)}...` : 'No session selected'}
+          </span>
+        </div>
         <span style={{ fontSize: '13px', color: '#888' }}>
-          {currentSession ? `Session: ${currentSession.substring(0, 20)}...` : 'No session selected'}
-        </span>
-        <span style={{ fontSize: '13px', color: '#888' }}>
-          {isProcessing ? '⚙️ Processing...' : '�?Ready'}
+          {isProcessing ? '⚙️ Processing...' : '✅ Ready'}
         </span>
       </Footer>
+
+      {/* 修改建议确认对话框 */}
+      <Modal
+        title="修改建议"
+        open={showModifySuggestion}
+        onOk={handleConfirmModify}
+        onCancel={handleCancelModify}
+        width={700}
+        okText="开始修改"
+        cancelText="取消"
+      >
+        {modifySuggestion && (
+          <div>
+            <h3 style={{ marginTop: 0 }}>{modifySuggestion.title}</h3>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <strong>修改类型:</strong>{' '}
+              <span style={{ marginLeft: '8px', padding: '2px 8px', background: '#1890ff22', color: '#1890ff', borderRadius: '4px' }}>
+                {modifySuggestion.modification_type}
+              </span>
+            </div>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <strong>受影响模块:</strong>
+              <div style={{ marginTop: '8px' }}>
+                {modifySuggestion.affected_modules?.map((module, idx) => (
+                  <span key={idx} style={{ 
+                    display: 'inline-block', 
+                    marginRight: '8px', 
+                    marginBottom: '8px',
+                    padding: '2px 8px', 
+                    background: '#52c41a22', 
+                    color: '#52c41a', 
+                    borderRadius: '4px',
+                    fontSize: '12px'
+                  }}>
+                    {module}
+                  </span>
+                ))}
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <strong>实施计划:</strong>
+              <ol style={{ marginTop: '8px', marginLeft: '20px' }}>
+                {modifySuggestion.implementation_plan?.map((step, idx) => (
+                  <li key={idx} style={{ marginBottom: '4px' }}>{step}</li>
+                ))}
+              </ol>
+            </div>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <strong>风险评估:</strong>
+              <div style={{ marginTop: '8px', padding: '12px', background: '#262626', borderRadius: '4px' }}>
+                <p style={{ margin: '0 0 8px 0' }}>
+                  <strong>风险等级:</strong>{' '}
+                  <span style={{ 
+                    color: modifySuggestion.risk_assessment?.risk_level === 'high' ? '#ff4d4f' : 
+                           modifySuggestion.risk_assessment?.risk_level === 'medium' ? '#faad14' : '#52c41a'
+                  }}>
+                    {modifySuggestion.risk_assessment?.risk_level?.toUpperCase()}
+                  </span>
+                </p>
+                <p style={{ margin: '0 0 8px 0' }}>
+                  <strong>预估工作量:</strong> {modifySuggestion.estimated_effort}
+                </p>
+                <p style={{ margin: '0 0 8px 0' }}>
+                  <strong>置信度:</strong> {(modifySuggestion.confidence * 100).toFixed(0)}%
+                </p>
+                
+                {modifySuggestion.risk_assessment?.risks && modifySuggestion.risk_assessment.risks.length > 0 && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <strong>风险:</strong>
+                    <ul style={{ marginTop: '4px', marginLeft: '20px', marginBottom: '0' }}>
+                      {modifySuggestion.risk_assessment.risks.map((risk, idx) => (
+                        <li key={idx}>{risk}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {modifySuggestion.risk_assessment?.mitigation_strategies && modifySuggestion.risk_assessment.mitigation_strategies.length > 0 && (
+                  <div>
+                    <strong>缓解策略:</strong>
+                    <ul style={{ marginTop: '4px', marginLeft: '20px', marginBottom: '0' }}>
+                      {modifySuggestion.risk_assessment.mitigation_strategies.map((strategy, idx) => (
+                        <li key={idx}>{strategy}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* 命令面板 */}
+      <CommandPalette
+        visible={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        onCommandSelect={handleCommandSelect}
+      />
     </Layout>
   );
 }

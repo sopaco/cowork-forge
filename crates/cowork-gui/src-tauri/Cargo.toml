@@ -35,6 +35,9 @@ lazy_static = "1.4"
 # Logging
 tracing = "0.1"
 
+# File system
+dirs = "5"
+
 # Cowork Core
 cowork-core = { path = "../../cowork-core" }
 

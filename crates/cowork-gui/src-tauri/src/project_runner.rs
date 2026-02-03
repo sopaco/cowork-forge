@@ -3,9 +3,11 @@ use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use tokio::process::{Command, Child};
 use tokio::sync::mpsc;
+use tauri::Emitter;
 
 pub struct ProjectRunner {
     processes: Arc<Mutex<HashMap<String, ProjectProcess>>>,
+    app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
 }
 
 struct ProjectProcess {
@@ -17,7 +19,13 @@ impl ProjectRunner {
     pub fn new() -> Self {
         Self {
             processes: Arc::new(Mutex::new(HashMap::new())),
+            app_handle: Arc::new(Mutex::new(None)),
         }
+    }
+
+    pub fn set_app_handle(&self, handle: tauri::AppHandle) {
+        let mut app_handle_guard = self.app_handle.lock().unwrap();
+        *app_handle_guard = Some(handle);
     }
 
     pub async fn start(&self, session_id: String, command: String) -> Result<u32, String> {
@@ -47,9 +55,13 @@ impl ProjectRunner {
 
         let pid = child.id().unwrap();
 
+        // Get app handle for event emission
+        let app_handle_opt = self.app_handle.lock().unwrap().clone();
+        let session_id_clone = session_id.clone();
+
         // Create channels for output
-        let (stdout_tx, mut stdout_rx) = mpsc::unbounded_channel();
-        let (stderr_tx, mut stderr_rx) = mpsc::unbounded_channel();
+        let (stdout_tx, _stdout_rx) = mpsc::unbounded_channel();
+        let (stderr_tx, _stderr_rx) = mpsc::unbounded_channel();
 
         // Clone child for stdout reading
         let stdout = child.stdout.take().unwrap();
@@ -58,41 +70,91 @@ impl ProjectRunner {
         // Clone senders for spawn tasks
         let stdout_tx_spawn = stdout_tx.clone();
         let stderr_tx_spawn = stderr_tx.clone();
+        
+        // Clone app_handle and session_id for stdout task
+        let app_handle_stdout = app_handle_opt.clone();
+        let session_id_stdout = session_id_clone.clone();
 
-        // Spawn task to read stdout
+        // Spawn task to read stdout and emit events
         tokio::spawn(async move {
             use tokio::io::{AsyncBufReadExt, BufReader};
             let mut reader = BufReader::new(stdout);
             let mut line = String::new();
+            
             loop {
                 match reader.read_line(&mut line).await {
                     Ok(0) => break,
                     Ok(_) => {
                         let _ = stdout_tx_spawn.send(line.clone());
+                        
+                        // Emit event to frontend
+                        if let Some(ref handle) = app_handle_stdout {
+                            if let Err(e) = handle.emit("process_output", serde_json::json!({
+                                "session_id": session_id_stdout,
+                                "output_type": "stdout",
+                                "content": line.clone()
+                            })) {
+                                eprintln!("[Runner] Failed to emit process_output event: {}", e);
+                            }
+                        }
+                        
                         line.clear();
                     }
                     Err(e) => {
                         eprintln!("[Runner] Error reading stdout: {}", e);
+                        
+                        // Emit error event
+                        if let Some(ref handle) = app_handle_stdout {
+                            if let Err(e) = handle.emit("process_error", serde_json::json!({
+                                "session_id": session_id_stdout,
+                                "error": e.to_string()
+                            })) {
+                                eprintln!("[Runner] Failed to emit process_error event: {}", e);
+                            }
+                        }
                         break;
                     }
                 }
             }
         });
 
-        // Spawn task to read stderr
+        // Spawn task to read stderr and emit events
         tokio::spawn(async move {
             use tokio::io::{AsyncBufReadExt, BufReader};
             let mut reader = BufReader::new(stderr);
             let mut line = String::new();
+            
             loop {
                 match reader.read_line(&mut line).await {
                     Ok(0) => break,
                     Ok(_) => {
                         let _ = stderr_tx_spawn.send(line.clone());
+                        
+                        // Emit event to frontend
+                        if let Some(ref handle) = app_handle_opt {
+                            if let Err(e) = handle.emit("process_output", serde_json::json!({
+                                "session_id": session_id_clone,
+                                "output_type": "stderr",
+                                "content": line.clone()
+                            })) {
+                                eprintln!("[Runner] Failed to emit process_output event: {}", e);
+                            }
+                        }
+                        
                         line.clear();
                     }
                     Err(e) => {
                         eprintln!("[Runner] Error reading stderr: {}", e);
+                        
+                        // Emit error event
+                        if let Some(ref handle) = app_handle_opt {
+                            if let Err(e) = handle.emit("process_error", serde_json::json!({
+                                "session_id": session_id_clone,
+                                "error": e.to_string()
+                            })) {
+                                eprintln!("[Runner] Failed to emit process_error event: {}", e);
+                            }
+                        }
                         break;
                     }
                 }
@@ -122,6 +184,13 @@ impl ProjectRunner {
             process.child.kill()
                 .await
                 .map_err(|e| format!("Failed to stop: {}", e))?;
+            
+            // Emit stopped event
+            if let Some(ref handle) = *self.app_handle.lock().unwrap() {
+                let _ = handle.emit("process_stopped", serde_json::json!({
+                    "session_id": session_id
+                }));
+            }
             
             println!("[Runner] Process stopped");
             Ok(())
@@ -164,9 +233,4 @@ impl ProjectRunner {
             }
         }
     }
-
-    // pub fn get_output_receiver(&self, session_id: String) -> Option<mpsc::UnboundedReceiver<String>> {
-    //     let processes = self.processes.lock().unwrap();
-    //     processes.get(&session_id).map(|p| p.output_tx.clone())
-    // }
 }

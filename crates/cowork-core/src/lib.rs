@@ -10,11 +10,13 @@ pub mod pipeline;
 pub mod instructions;
 pub mod interaction;
 pub mod event_bus;
+pub mod memory;
 
 // Re-exports for convenience
 pub use data::*;
 pub use storage::*;
 pub use llm::*;
+pub use memory::*;
 
 // Version info
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -2,7 +2,6 @@
 // Uses tokio broadcast channel for multi-subscriber support
 
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use tokio::sync::broadcast;
 
 /// Engine events that can be published to subscribers

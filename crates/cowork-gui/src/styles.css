@@ -373,7 +373,7 @@ body {
   border: 1px solid var(--border-color);
 }
 
-/* Artifact 样式 */
+/* Artifacts 样式 */
 .artifact-content {
   padding: 20px;
   background: var(--bg-container);
@@ -403,6 +403,55 @@ body {
 .artifacts-tabs .ant-tabs-tabpane {
   height: 100%;
   overflow: hidden;
+}
+
+/* Code Editor Tabs 样式 */
+.code-editor-tabs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-editor-tabs .ant-tabs-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-editor-tabs .ant-tabs-content-holder {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-editor-tabs .ant-tabs-tabpane {
+  height: 100% !important;
+  overflow: hidden !important;
+  display: none !important;
+}
+
+.code-editor-tabs .ant-tabs-tabpane-active {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.code-editor-tabs .ant-tabs-tabpane > div {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative;
+}
+
+.code-editor-tabs .ant-tabs-tabpane > div > div {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.code-editor-tabs .monaco-editor {
+  height: 100% !important;
 }
 
 /* 输入区域 */

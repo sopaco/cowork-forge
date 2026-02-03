@@ -10,6 +10,7 @@ pub mod hitl_tools;
 pub mod hitl_content_tools;
 pub mod modify_tools;
 pub mod idea_tools;
+pub mod memory_tools;
 
 pub use data_tools::*;
 pub use validation_tools::*;
@@ -22,3 +23,4 @@ pub use hitl_tools::*;
 pub use hitl_content_tools::{ReviewAndEditContentTool, ReviewWithFeedbackContentTool, set_interaction_backend};
 pub use modify_tools::*;
 pub use idea_tools::*;
+pub use memory_tools::*;
