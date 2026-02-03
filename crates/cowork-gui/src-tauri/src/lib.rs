@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::{Arc, Mutex};
+use std::fs;
 use tauri::{Emitter, Manager, State, Window};
 use cowork_core::interaction::{InteractiveBackend, InputOption, InputResponse, MessageLevel, ProgressInfo};
 use cowork_core::event_bus::EventBus;
@@ -294,7 +295,9 @@ async fn set_workspace(
     
     let path = Path::new(&workspace_path);
     if !path.exists() {
-        return Err(format!("Path does not exist: {}", workspace_path));
+        // Create the directory if it doesn't exist
+        fs::create_dir_all(path)
+            .map_err(|e| format!("Failed to create workspace directory: {}", e))?;
     }
     
     if !path.is_dir() {

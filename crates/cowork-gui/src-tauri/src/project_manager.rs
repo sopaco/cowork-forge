@@ -164,10 +164,16 @@ impl ProjectRegistryManager {
             anyhow::bail!("Project already registered: {}", workspace_path);
         }
         
-        // Validate workspace path
+        // Validate and create workspace path if it doesn't exist
         let workspace = Path::new(&workspace_path);
         if !workspace.exists() {
-            anyhow::bail!("Workspace path does not exist: {}", workspace_path);
+            // Create the directory if it doesn't exist
+            fs::create_dir_all(workspace)
+                .context(format!("Failed to create workspace directory: {}", workspace_path))?;
+        }
+        
+        if !workspace.is_dir() {
+            anyhow::bail!("Workspace path is not a directory: {}", workspace_path);
         }
         
         // Detect project metadata
