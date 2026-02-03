@@ -998,9 +998,11 @@ function App() {
               </div>
             ) : (
               <div>
-                {/* 可操作的Sessions（Completed） */}
+                {/* 可操作的Sessions（Completed + 当前运行的session） */}
                 {(() => {
-                  const activeSessions = sessions.filter(s => s.status === 'Completed');
+                  const activeSessions = sessions.filter(s => 
+                    s.status === 'Completed' || s.id === currentSession
+                  );
                   if (activeSessions.length === 0) return null;
                   
                   return (
@@ -1010,6 +1012,7 @@ function App() {
                       </div>
                       {activeSessions.map((session) => {
                         const isSelected = currentSession === session.id;
+                        const isCurrentlyRunning = session.id === currentSession && session.status === 'InProgress';
                         
                         return (
                           <div
@@ -1029,42 +1032,62 @@ function App() {
                             <div style={{ marginBottom: '8px' }}>
                               <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {session.description}
+                                {isCurrentlyRunning && (
+                                  <span style={{ marginLeft: '8px', color: '#faad14', fontSize: '11px' }}>
+                                    ⏳ Running
+                                  </span>
+                                )}
                               </div>
                               <div style={{ fontSize: '11px', color: '#888', marginTop: '3px' }}>
                                 {new Date(session.created_at).toLocaleDateString()} · {session.status}
                               </div>
                             </div>
                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                              <Button
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleResumeSession(session.id);
-                                }}
-                                style={{ padding: '2px 6px', fontSize: '11px' }}
-                              >
-                                Resume
-                              </Button>
-                              <Button
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleModifySession(session.id);
-                                }}
-                                style={{ padding: '2px 6px', fontSize: '11px' }}
-                              >
-                                Modify
-                              </Button>
-                              <Button
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRevertSession(session.id);
-                                }}
-                                style={{ padding: '2px 6px', fontSize: '11px' }}
-                              >
-                                Revert
-                              </Button>
+                              {isCurrentlyRunning ? (
+                                <Button
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewSessionLogs(session.id);
+                                  }}
+                                  style={{ padding: '2px 6px', fontSize: '11px' }}
+                                >
+                                  Logs
+                                </Button>
+                              ) : (
+                                <>
+                                  <Button
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleResumeSession(session.id);
+                                    }}
+                                    style={{ padding: '2px 6px', fontSize: '11px' }}
+                                  >
+                                    Resume
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleModifySession(session.id);
+                                    }}
+                                    style={{ padding: '2px 6px', fontSize: '11px' }}
+                                  >
+                                    Modify
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRevertSession(session.id);
+                                    }}
+                                    style={{ padding: '2px 6px', fontSize: '11px' }}
+                                  >
+                                    Revert
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </div>
                         );
@@ -1075,7 +1098,7 @@ function App() {
                 
                 {/* 不可操作的Sessions（InProgress/Failed） */}
                 {(() => {
-                  const inactiveSessions = sessions.filter(s => s.status !== 'Completed');
+                  const inactiveSessions = sessions.filter(s => s.status !== 'Completed' && s.id !== currentSession);
                   if (inactiveSessions.length === 0) return null;
                   
                   return (
@@ -1097,24 +1120,23 @@ function App() {
                         <span>Inactive Sessions ({inactiveSessions.length})</span>
                       </div>
                       {showInactiveSessions && inactiveSessions.map((session) => {
-                        const isSelected = currentSession === session.id;
                         const statusColor = session.status === 'InProgress' ? '#faad14' : '#ff4d4f';
+                        const isInterrupted = session.status === 'InProgress';
                         
                         return (
                           <div
                             key={session.id}
                             style={{
                               padding: '8px 10px',
-                              cursor: 'pointer',
-                              background: isSelected ? '#1890ff33' : 'transparent',
+                              cursor: 'default',
+                              background: 'transparent',
                               borderRadius: '4px',
                               marginBottom: '5px',
                               fontSize: '13px',
-                              border: isSelected ? '1px solid #1890ff' : '1px solid transparent',
+                              border: '1px solid #303030',
                               transition: 'all 0.2s',
                               opacity: 0.7
                             }}
-                            onClick={() => setCurrentSession(session.id)}
                           >
                             <div style={{ marginBottom: '8px' }}>
                               <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1122,26 +1144,16 @@ function App() {
                               </div>
                               <div style={{ fontSize: '11px', color: '#888', marginTop: '3px' }}>
                                 {new Date(session.created_at).toLocaleDateString()} · 
-                                <span style={{ color: statusColor, marginLeft: '3px' }}>{session.status}</span>
+                                <span style={{ color: statusColor, marginLeft: '3px' }}>
+                                  {isInterrupted ? 'Interrupted' : session.status}
+                                </span>
                               </div>
                             </div>
-                            {session.status === 'InProgress' ? (
+                            {isInterrupted ? (
                               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                 <div style={{ fontSize: '11px', color: '#faad14' }}>
-                                  ⏳ {session.id === currentSession ? 'Currently running...' : 'In progress'}
+                                  ⏳ Session was interrupted
                                 </div>
-                                {session.id !== currentSession && (
-                                  <Button
-                                    size="small"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      message.info('This session is marked as in progress. Check if it is still running or needs to be retried.');
-                                    }}
-                                    style={{ padding: '2px 6px', fontSize: '11px' }}
-                                  >
-                                    View Details
-                                  </Button>
-                                )}
                               </div>
                             ) : session.status === 'Failed' ? (
                               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -1160,18 +1172,41 @@ function App() {
                               </div>
                             ) : null}
                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '8px' }}>
-                              {session.status === 'InProgress' && session.id !== currentSession && (
-                                <Button
-                                  size="small"
-                                  type="primary"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    message.info('This session is marked as in progress. Check logs for details.');
-                                  }}
-                                  style={{ padding: '2px 6px', fontSize: '11px' }}
-                                >
-                                  Logs
-                                </Button>
+                              {isInterrupted && (
+                                <>
+                                  <Button
+                                    size="small"
+                                    type="primary"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleResumeSession(session.id);
+                                    }}
+                                    style={{ padding: '2px 6px', fontSize: '11px' }}
+                                  >
+                                    Resume
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleViewSessionLogs(session.id);
+                                    }}
+                                    style={{ padding: '2px 6px', fontSize: '11px' }}
+                                  >
+                                    Logs
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    danger
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteSession(session.id);
+                                    }}
+                                    style={{ padding: '2px 6px', fontSize: '11px' }}
+                                  >
+                                    Delete
+                                  </Button>
+                                </>
                               )}
                               {session.status === 'Failed' && (
                                 <>

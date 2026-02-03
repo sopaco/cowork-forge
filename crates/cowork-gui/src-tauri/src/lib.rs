@@ -560,6 +560,10 @@ async fn confirm_modify(
         window.app_handle().state::<AppState>().pending_requests.clone(),
     ));
     
+    // Set global interaction backend for HITL tools
+    use cowork_core::tools::hitl_content_tools::set_interaction_backend;
+    set_interaction_backend(interaction.clone());
+    
     // Create modify session
     let index = load_project_index()
         .map_err(|e| format!("Failed to load project index: {}", e))?;
@@ -788,6 +792,10 @@ async fn create_project(
         state.pending_requests.clone(),
     ));
 
+    // Set global interaction backend for HITL tools
+    use cowork_core::tools::hitl_content_tools::set_interaction_backend;
+    set_interaction_backend(interaction.clone());
+
     // Create pipeline
     let pipeline = create_cowork_pipeline(&config, &session_id, interaction)
         .map_err(|e| format!("Failed to create pipeline: {}", e))?;
@@ -920,7 +928,6 @@ async fn resume_project(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     use cowork_core::storage::*;
-    use cowork_core::interaction::CliBackend;
     use cowork_core::pipeline::create_resume_pipeline;
     use cowork_core::llm::ModelConfig;
     use std::path::Path;
@@ -942,8 +949,9 @@ async fn resume_project(
         .find(|s| s.session_id == base_session_id)
         .ok_or_else(|| format!("Base session {} not found", base_session_id))?;
 
-    if base_session.status != cowork_core::data::SessionStatus::Completed {
-        return Err("Can only resume from completed sessions".to_string());
+    if base_session.status != cowork_core::data::SessionStatus::Completed
+        && base_session.status != cowork_core::data::SessionStatus::InProgress {
+        return Err("Can only resume from completed or in-progress sessions".to_string());
     }
 
     // Create new session for resume
@@ -1001,8 +1009,15 @@ async fn resume_project(
     };
 
     // Create interaction backend
-    let event_bus = Arc::new(EventBus::new());
-    let interaction = Arc::new(CliBackend::new(event_bus));
+    let interaction = Arc::new(TauriBackend::new(
+        window.app_handle().clone(),
+        state.event_bus.clone(),
+        state.pending_requests.clone(),
+    ));
+
+    // Set global interaction backend for HITL tools
+    use cowork_core::tools::hitl_content_tools::set_interaction_backend;
+    set_interaction_backend(interaction.clone());
 
     // Create resume pipeline
     let pipeline = create_resume_pipeline(&config, &session_id, &base_session_id, interaction).map_err(|e| e.to_string())?;
@@ -1112,7 +1127,6 @@ async fn revert_project(
     _state: State<'_, AppState>,
 ) -> Result<String, String> {
     use cowork_core::storage::*;
-    use cowork_core::interaction::CliBackend;
     use cowork_core::llm::ModelConfig;
     use cowork_core::pipeline::create_resume_pipeline;
     use std::path::Path;
@@ -1193,8 +1207,15 @@ async fn revert_project(
     };
 
     // Create interaction backend
-    let event_bus = Arc::new(EventBus::new());
-    let interaction = Arc::new(CliBackend::new(event_bus));
+    let interaction = Arc::new(TauriBackend::new(
+        window.app_handle().clone(),
+        _state.event_bus.clone(),
+        _state.pending_requests.clone(),
+    ));
+
+    // Set global interaction backend for HITL tools
+    use cowork_core::tools::hitl_content_tools::set_interaction_backend;
+    set_interaction_backend(interaction.clone());
 
     // Create resume pipeline
     let pipeline = create_resume_pipeline(&config, &session_id, &base_session_id, interaction).map_err(|e| e.to_string())?;
