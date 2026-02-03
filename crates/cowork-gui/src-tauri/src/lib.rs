@@ -318,14 +318,15 @@ async fn set_workspace(
         .map_err(|e| format!("Failed to set current directory: {}", e))?;
     
     // Initialize project if not already initialized
+    let project_name = path.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("cowork_project")
+        .to_string();
+    
     if !is_project_initialized() {
         println!("[GUI] Project not initialized, initializing...");
-        let project_name = path.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("cowork_project")
-            .to_string();
         
-        let index = init_project_index(project_name)
+        let index = init_project_index(project_name.clone())
             .map_err(|e| {
                 eprintln!("[GUI] Failed to init project: {}", e);
                 format!("Failed to init project: {}", e)
@@ -341,6 +342,29 @@ async fn set_workspace(
     } else {
         println!("[GUI] Project already initialized");
     }
+    
+    // Auto-register project to registry
+    let mut registry = state.project_registry_manager.lock()
+        .map_err(|e| format!("Failed to acquire lock: {}", e))?;
+    
+    // Check if already registered
+    let workspace_path_str = workspace_path.clone();
+    if !registry.get_all_projects(None).iter().any(|p| p.workspace_path == workspace_path_str) {
+        println!("[GUI] Auto-registering project to registry");
+        if let Err(e) = registry.register_project(
+            workspace_path.clone(),
+            project_name,
+            Some(format!("Cowork project at {}", workspace_path))
+        ) {
+            eprintln!("[GUI] Warning: Failed to auto-register project: {}", e);
+            // Don't fail the whole operation if registration fails
+        } else {
+            println!("[GUI] Project registered successfully");
+        }
+    } else {
+        println!("[GUI] Project already registered");
+    }
+    drop(registry);
     
     // Store in app state
     let mut workspace = state.workspace_path.lock()

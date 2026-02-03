@@ -193,6 +193,8 @@ function App() {
       console.log('[App] Project created event received, reloading sessions...');
       loadSessions();
       checkWorkspace();
+      // Switch to chat view when a new session is created
+      setActiveView('chat');
     });
     
     // Listen for session completed event
@@ -1047,7 +1049,7 @@ function App() {
                             {session.status === 'InProgress' ? (
                               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                 <div style={{ fontSize: '11px', color: '#faad14' }}>
-                                  ⏳ {session.id === currentSession ? 'Loading session...' : 'Session in progress'}
+                                  ⏳ {session.id === currentSession ? 'Currently running...' : 'In progress'}
                                 </div>
                                 {session.id !== currentSession && (
                                   <Button

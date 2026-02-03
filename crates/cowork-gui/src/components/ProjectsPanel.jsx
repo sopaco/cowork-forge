@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { listen } from '@tauri-apps/api/event';
 import { Card, Button, Modal, Input, Tag, Empty, message, Spin, Space, Tooltip } from 'antd';
 import { 
   FolderOpenOutlined, 
@@ -39,6 +40,22 @@ const ProjectsPanel = () => {
 
   useEffect(() => {
     loadProjects();
+    
+    // Listen for project registration events to refresh the list
+    const unlistenProjectLoaded = listen('project_loaded', () => {
+      console.log('[ProjectsPanel] Project loaded event received, reloading projects...');
+      loadProjects();
+    });
+    
+    const unlistenProjectCreated = listen('project_created', () => {
+      console.log('[ProjectsPanel] Project created event received, reloading projects...');
+      loadProjects();
+    });
+    
+    return () => {
+      unlistenProjectLoaded.then(fn => fn()).catch(e => console.error('[ProjectsPanel] Failed to unlisten project_loaded:', e));
+      unlistenProjectCreated.then(fn => fn()).catch(e => console.error('[ProjectsPanel] Failed to unlisten project_created:', e));
+    };
   }, []);
 
   const handleEditProject = async () => {
@@ -85,11 +102,11 @@ const ProjectsPanel = () => {
           message.success('Project record deleted');
           loadProjects();
           
-          // If the deleted project was open in current window, close and reopen
+          // If the deleted project was open in current window, clear workspace
           if (isCurrentWindowProject) {
-            message.info('Closing current window and opening new one...');
-            const currentWindow = getCurrentWindow();
-            await currentWindow.close();
+            message.info('Project was open in current window. Workspace cleared.');
+            // Reload the page to clear all state
+            window.location.reload();
           }
         } catch (error) {
           message.error('Failed to delete project: ' + error);
@@ -108,11 +125,11 @@ const ProjectsPanel = () => {
           message.success('Project deleted (files and record)');
           loadProjects();
           
-          // If the deleted project was open in current window, close and reopen
+          // If the deleted project was open in current window, clear workspace
           if (isCurrentWindowProject) {
-            message.info('Closing current window and opening new one...');
-            const currentWindow = getCurrentWindow();
-            await currentWindow.close();
+            message.info('Project was open in current window. Workspace cleared.');
+            // Reload the page to clear all state
+            window.location.reload();
           }
         } catch (error) {
           message.error('Failed to delete project: ' + error);
