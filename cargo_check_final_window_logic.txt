@@ -1,0 +1,152 @@
+﻿cargo : warning: unused import: `Cursor`
+At line:1 char:64
++ ... ys\cowork-forge\crates\cowork-gui\src-tauri; cargo check 2>&1 | Out-F ...
++                                                  ~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: unused import: `Cursor`:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ --> crates\cowork-gui\src-tauri\src\preview_server.rs:8:15
+  |
+8 | use std::io::{Cursor, Read};
+  |               ^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Method`
+ --> crates\cowork-gui\src-tauri\src\preview_server.rs:9:52
+  |
+9 | use tiny_http::{Server, Response, Request, Header, Method, StatusCode};
+  |                                                    ^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+ --> crates\cowork-gui\src-tauri\src\project_manager.rs:7:5
+  |
+7 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `gui_types::*`
+  --> crates\cowork-gui\src-tauri\src\lib.rs:21:5
+   |
+21 | use gui_types::*;
+   |     ^^^^^^^^^^^^
+
+warning: unused import: `cowork_core::agents::iterative_assistant::*`
+   --> crates\cowork-gui\src-tauri\src\lib.rs:406:9
+    |
+406 |     use cowork_core::agents::iterative_assistant::*;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `cowork_core::llm::ModelConfig`
+   --> crates\cowork-gui\src-tauri\src\lib.rs:407:9
+    |
+407 |     use cowork_core::llm::ModelConfig;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::path::Path`
+    --> crates\cowork-gui\src-tauri\src\lib.rs:1438:9
+     |
+1438 |     use std::path::Path;
+     |         ^^^^^^^^^^^^^^^
+
+warning: unused import: `cowork_core::llm::ModelConfig`
+    --> crates\cowork-gui\src-tauri\src\lib.rs:1439:5
+     |
+1439 | use cowork_core::llm::ModelConfig;
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> crates\cowork-gui\src-tauri\src\project_runner.rs:176:13
+    |
+176 |         let mut process = {
+    |             ----^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Read`
+ --> crates\cowork-gui\src-tauri\src\preview_server.rs:8:23
+  |
+8 | use std::io::{Cursor, Read};
+  |                       ^^^^
+
+warning: unused variable: `session_id`
+  --> crates\cowork-gui\src-tauri\src\gui_commands.rs:87:5
+   |
+87 |     session_id: String,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_session_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `session_id`
+   --> crates\cowork-gui\src-tauri\src\gui_commands.rs:151:5
+    |
+151 |     session_id: String,
+    |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_session_id`
+
+warning: unused variable: `session_id`
+   --> crates\cowork-gui\src-tauri\src\project_runner.rs:202:41
+    |
+202 |     pub async fn execute_command(&self, session_id: String, command: String) -> Result<String, String> {
+    |                                         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_session_id`
+
+warning: variable does not need to be mutable
+   --> crates\cowork-gui\src-tauri\src\project_manager.rs:404:19
+    |
+404 |         if let Ok(mut entries) = fs::read_dir(&workspace.join(".cowork").join("sessions")) {
+    |                   ----^^^^^^^
+    |                   |
+    |                   help: remove this `mut`
+
+warning: unused variable: `window`
+   --> crates\cowork-gui\src-tauri\src\lib.rs:403:5
+    |
+403 |     window: Window,
+    |     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_window`
+
+warning: unused variable: `session_id_clone`
+   --> crates\cowork-gui\src-tauri\src\lib.rs:538:9
+    |
+538 |     let session_id_clone = new_session_id.clone();
+    |         ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_session_id_clone`
+
+warning: unused variable: `state`
+   --> crates\cowork-gui\src-tauri\src\lib.rs:843:5
+    |
+843 |     state: State<'_, AppState>,
+    |     ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: function `build_project_context` is never used
+  --> crates\cowork-gui\src-tauri\src\lib.rs:38:4
+   |
+38 | fn build_project_context(index: &cowork_core::ProjectIndex) -> anyhow::Result<ProjectContext> {
+   |    ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `ProjectInfo` is never constructed
+   --> crates\cowork-gui\src-tauri\src\gui_types.rs:177:12
+    |
+177 | pub struct ProjectInfo {
+    |            ^^^^^^^^^^^
+
+warning: field `base_dir` is never read
+  --> crates\cowork-gui\src-tauri\src\preview_server.rs:17:5
+   |
+15 | struct PreviewServer {
+   |        ------------- field in this struct
+16 |     port: u16,
+17 |     base_dir: PathBuf,
+   |     ^^^^^^^^
+
+warning: field `output_tx` is never read
+  --> crates\cowork-gui\src-tauri\src\project_runner.rs:15:5
+   |
+13 | struct ProjectProcess {
+   |        -------------- field in this struct
+14 |     child: Child,
+15 |     output_tx: mpsc::UnboundedSender<String>,
+   |     ^^^^^^^^^
+
+warning: `cowork-gui` (lib) generated 21 warnings (run `cargo fix --lib -p cowork-gui` to apply 16 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.67s
