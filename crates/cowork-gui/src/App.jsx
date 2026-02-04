@@ -275,23 +275,25 @@ function App() {
     const cleanupFunctions = [];
 
     listen('agent_event', (event) => {
-      const { content, is_thinking } = event.payload;
-      // Update current agent when content arrives
+      const { content, is_thinking, agent_name } = event.payload;
+      // Update current agent when content arrives - use backend-provided agent_name
       if (!is_thinking && content) {
-        const agentName = getAgentName(content);
-        setCurrentAgent(agentName);
+        const displayAgentName = agent_name ? 
+          agent_name.charAt(0).toUpperCase() + agent_name.slice(1) + ' Agent' : 
+          getAgentName(content);
+        setCurrentAgent(displayAgentName);
         
         setMessages(prev => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg && lastMsg.type === 'agent' && lastMsg.isStreaming) {
             return [
               ...prev.slice(0, -1),
-              { ...lastMsg, content: lastMsg.content + content, isStreaming: true, agentName }
+              { ...lastMsg, content: lastMsg.content + content, isStreaming: true, agentName: displayAgentName }
             ];
           } else {
             return [
               ...prev,
-              { type: 'agent', content, isStreaming: true, timestamp: new Date().toISOString(), agentName }
+              { type: 'agent', content, isStreaming: true, timestamp: new Date().toISOString(), agentName: displayAgentName }
             ];
           }
         });
@@ -903,8 +905,35 @@ function App() {
             >
               {messages.map((msg, idx) => (
                 <div key={idx} style={{ marginBottom: '20px', padding: '10px', background: msg.type === 'user' ? '#1890ff22' : msg.type === 'system' ? '#52c41a22' : msg.type === 'thinking' ? '#ffeb3b22' : '#262626', borderRadius: '8px' }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '5px', color: msg.type === 'system' ? '#52c41a' : msg.type === 'thinking' ? '#ffeb3b' : '#1890ff' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '5px', color: msg.type === 'system' ? '#52c41a' : msg.type === 'thinking' ? '#ffeb3b' : '#1890ff', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {msg.type === 'thinking' ? '🤔 AI Thinking' : msg.type === 'agent' ? (msg.agentName || 'AI Agent') : msg.type}
+                    {msg.type === 'agent' && msg.isStreaming && (
+                      <span className="agent-loading-indicator" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                        <span style={{ 
+                          width: '6px', 
+                          height: '6px', 
+                          background: '#1890ff', 
+                          borderRadius: '50%', 
+                          marginRight: '3px',
+                          animation: 'pulse 1s ease-in-out infinite'
+                        }}></span>
+                        <span style={{ 
+                          width: '6px', 
+                          height: '6px', 
+                          background: '#1890ff', 
+                          borderRadius: '50%', 
+                          marginRight: '3px',
+                          animation: 'pulse 1s ease-in-out infinite 0.2s'
+                        }}></span>
+                        <span style={{ 
+                          width: '6px', 
+                          height: '6px', 
+                          background: '#1890ff', 
+                          borderRadius: '50%',
+                          animation: 'pulse 1s ease-in-out infinite 0.4s'
+                        }}></span>
+                      </span>
+                    )}
                   </div>
                   <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
                   {msg.type === 'thinking' && (

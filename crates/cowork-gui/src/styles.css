@@ -647,6 +647,22 @@ body {
   padding: 40px;
 }
 
+/* Agent Loading Indicator Animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.agent-loading-indicator {
+  margin-left: 4px;
+}
+
 .welcome-screen h2 {
   color: var(--text-primary);
   font-size: 32px;

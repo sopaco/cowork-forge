@@ -24,6 +24,7 @@ use project_manager::*;
 
 // Import iterative assistant types
 use cowork_core::agents::iterative_assistant::*;
+use cowork_core::pipeline::get_current_stage_name;
 
 // ============================================================================
 // Iterative Assistant Types
@@ -655,11 +656,15 @@ async fn confirm_modify(
                             "".to_string()
                         };
                         
-                        // Send event to frontend
+                        // Get current stage name for agent identification
+                        let agent_name = get_current_stage_name();
+                        
+                        // Send event to frontend with agent name
                         let _ = window_clone.emit("agent_event", serde_json::json!({
                             "content": content,
                             "is_thinking": content.is_empty(),
-                            "timestamp": chrono::Utc::now().to_rfc3339()
+                            "timestamp": chrono::Utc::now().to_rfc3339(),
+                            "agent_name": agent_name
                         }));
                     }
                     Err(e) => {
@@ -881,11 +886,15 @@ async fn create_project(
                             println!("[Agent Event] Content length: {}", content.len());
                         }
                         
-                        // Send structured event to frontend
+                        // Get current stage name for agent identification
+                        let agent_name = get_current_stage_name();
+                        
+                        // Send structured event to frontend with agent name
                         let _ = window_clone.emit("agent_event", serde_json::json!({
                             "content": content,
                             "is_thinking": content.is_empty(),
-                            "timestamp": chrono::Utc::now().to_rfc3339()
+                            "timestamp": chrono::Utc::now().to_rfc3339(),
+                            "agent_name": agent_name
                         }));
 
                         if content.is_empty() {
@@ -1080,10 +1089,14 @@ async fn resume_project(
                             println!("[Agent Event] Content length: {}", content.len());
                         }
                         
+                        // Get current stage name for agent identification
+                        let agent_name = get_current_stage_name();
+                        
                         let _ = window_clone.emit("agent_event", serde_json::json!({
                             "content": content,
                             "is_thinking": content.is_empty(),
-                            "timestamp": chrono::Utc::now().to_rfc3339()
+                            "timestamp": chrono::Utc::now().to_rfc3339(),
+                            "agent_name": agent_name
                         }));
 
                         if content.is_empty() {
@@ -1278,10 +1291,14 @@ async fn revert_project(
                             println!("[Agent Event] Content length: {}", content.len());
                         }
                         
+                        // Get current stage name for agent identification
+                        let agent_name = get_current_stage_name();
+                        
                         let _ = window_clone.emit("agent_event", serde_json::json!({
                             "content": content,
                             "is_thinking": content.is_empty(),
-                            "timestamp": chrono::Utc::now().to_rfc3339()
+                            "timestamp": chrono::Utc::now().to_rfc3339(),
+                            "agent_name": agent_name
                         }));
 
                         if content.is_empty() {
@@ -1470,10 +1487,14 @@ async fn modify_project(
                             println!("[Agent Event] Content length: {}", content.len());
                         }
                         
+                        // Get current stage name for agent identification
+                        let agent_name = get_current_stage_name();
+                        
                         let _ = window_clone.emit("agent_event", serde_json::json!({
                             "content": content,
                             "is_thinking": content.is_empty(),
-                            "timestamp": chrono::Utc::now().to_rfc3339()
+                            "timestamp": chrono::Utc::now().to_rfc3339(),
+                            "agent_name": agent_name
                         }));
 
                         if content.is_empty() {

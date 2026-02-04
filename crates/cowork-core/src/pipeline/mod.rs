@@ -3,12 +3,25 @@
 use crate::agents::*;
 use crate::agents::ResilientAgent;
 use crate::llm::*;
+use crate::event_bus::EventBus;
 use adk_core::{Agent, EventStream, InvocationContext, Result as AdkResult};
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::stream::{Stream, StreamExt};
 use std::pin::Pin;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+/// Current stage tracker for GUI progress indication
+pub static CURRENT_STAGE: AtomicUsize = AtomicUsize::new(0);
+
+const STAGE_NAMES: &[&str] = &["idea", "prd", "design", "plan", "coding", "check", "delivery"];
+
+/// Get current stage name
+pub fn get_current_stage_name() -> String {
+    let idx = CURRENT_STAGE.load(Ordering::Relaxed);
+    STAGE_NAMES.get(idx).unwrap_or(&"unknown").to_string()
+}
 
 /// StageExecutor - Executes stages sequentially without propagating escalate
 /// 
@@ -46,7 +59,10 @@ impl Agent for StageExecutor {
         let stages = self.stages.clone();
         
         let s: Pin<Box<dyn Stream<Item = AdkResult<adk_core::Event>> + Send>> = Box::pin(async_stream::stream! {
-            for (stage_name, agent) in stages {
+            for (idx, (stage_name, agent)) in stages.iter().enumerate() {
+                // Update current stage index for GUI tracking
+                CURRENT_STAGE.store(idx, Ordering::Relaxed);
+                
                 println!("\n🔄 Starting stage: {}", stage_name);
                 
                 // Run the stage agent
@@ -70,13 +86,15 @@ impl Agent for StageExecutor {
                             // If a stage errors, stop the entire workflow
                             yield Err(e);
                             return;
+                            }
                         }
                     }
-                }
                 
                 println!("✅ Stage completed: {}", stage_name);
             }
             
+            // Reset stage counter when done
+            CURRENT_STAGE.store(0, Ordering::Relaxed);
             println!("\n🎉 All stages completed successfully");
         });
 
