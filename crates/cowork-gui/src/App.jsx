@@ -48,6 +48,37 @@ function App() {
   const [showInactiveSessions, setShowInactiveSessions] = useState(true);
   const [currentWorkspace, setCurrentWorkspace] = useState('');
   const initialLoadRef = useRef(true);
+  const [currentAgent, setCurrentAgent] = useState('');
+
+  // Helper function to identify agent based on content
+  const getAgentName = (content) => {
+    if (!content) return 'AI Assistant';
+    const lowerContent = content.toLowerCase();
+    
+    if (lowerContent.includes('project idea') || lowerContent.includes('idea.md')) {
+      return 'Idea Agent';
+    }
+    if (lowerContent.includes('requirement') || lowerContent.includes('prd') || lowerContent.includes('product requirement')) {
+      return 'PRD Agent';
+    }
+    if (lowerContent.includes('architecture') || lowerContent.includes('design specification') || lowerContent.includes('component')) {
+      return 'Design Agent';
+    }
+    if (lowerContent.includes('implementation plan') || lowerContent.includes('task') || lowerContent.includes('milestone')) {
+      return 'Plan Agent';
+    }
+    if (lowerContent.includes('code') || lowerContent.includes('function') || lowerContent.includes('class') || lowerContent.includes('import')) {
+      return 'Coding Agent';
+    }
+    if (lowerContent.includes('check') || lowerContent.includes('test') || lowerContent.includes('verify') || lowerContent.includes('quality')) {
+      return 'Check Agent';
+    }
+    if (lowerContent.includes('delivery') || lowerContent.includes('report') || lowerContent.includes('final')) {
+      return 'Delivery Agent';
+    }
+    
+    return 'AI Agent';
+  };
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -245,19 +276,22 @@ function App() {
 
     listen('agent_event', (event) => {
       const { content, is_thinking } = event.payload;
-      setIsProcessing(is_thinking || content.trim().length > 0);
+      // Update current agent when content arrives
       if (!is_thinking && content) {
+        const agentName = getAgentName(content);
+        setCurrentAgent(agentName);
+        
         setMessages(prev => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg && lastMsg.type === 'agent' && lastMsg.isStreaming) {
             return [
               ...prev.slice(0, -1),
-              { ...lastMsg, content: lastMsg.content + content, isStreaming: true }
+              { ...lastMsg, content: lastMsg.content + content, isStreaming: true, agentName }
             ];
           } else {
             return [
               ...prev,
-              { type: 'agent', content, isStreaming: true, timestamp: new Date().toISOString() }
+              { type: 'agent', content, isStreaming: true, timestamp: new Date().toISOString(), agentName }
             ];
           }
         });
@@ -270,13 +304,19 @@ function App() {
       setUserInput('');
     }).then(unlisten => cleanupFunctions.push(unlisten));
 
+    listen('project_created', (event) => {
+      setIsProcessing(true);
+    }).then(unlisten => cleanupFunctions.push(unlisten));
+
     listen('session_completed', (event) => {
       setIsProcessing(false);
+      setCurrentAgent('');
       loadSessions();
     }).then(unlisten => cleanupFunctions.push(unlisten));
 
     listen('session_failed', (event) => {
       setIsProcessing(false);
+      setCurrentAgent('');
       loadSessions();
     }).then(unlisten => cleanupFunctions.push(unlisten));
 
@@ -822,6 +862,9 @@ function App() {
   const getProjectStatus = (sessions) => {
     const inProgress = sessions.find(s => s.status === 'InProgress' || s.status === 'in_progress');
     if (inProgress) {
+      if (currentAgent && isProcessing) {
+        return `🔄 ${currentAgent} ⏳`;
+      }
       return `Status: In Progress (${inProgress.id.substring(0, 20)}...) ⏳`;
     }
     const completed = sessions.filter(s => s.status === 'Completed' || s.status === 'completed');
@@ -861,7 +904,7 @@ function App() {
               {messages.map((msg, idx) => (
                 <div key={idx} style={{ marginBottom: '20px', padding: '10px', background: msg.type === 'user' ? '#1890ff22' : msg.type === 'system' ? '#52c41a22' : msg.type === 'thinking' ? '#ffeb3b22' : '#262626', borderRadius: '8px' }}>
                   <div style={{ fontWeight: 'bold', marginBottom: '5px', color: msg.type === 'system' ? '#52c41a' : msg.type === 'thinking' ? '#ffeb3b' : '#1890ff' }}>
-                    {msg.type === 'thinking' ? '🤔 AI Thinking' : msg.type}
+                    {msg.type === 'thinking' ? '🤔 AI Thinking' : msg.type === 'agent' ? (msg.agentName || 'AI Agent') : msg.type}
                   </div>
                   <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
                   {msg.type === 'thinking' && (
@@ -875,7 +918,7 @@ function App() {
                 <div style={{ textAlign: 'center', padding: '20px' }}>
                   <Spin />
                   <div style={{ marginTop: '10px', color: '#888' }}>
-                    {isProcessing ? 'Processing...' : 'Ready'}
+                    {currentAgent ? `${currentAgent} is working...` : 'Processing...'}
                   </div>
                 </div>
               )}
@@ -884,6 +927,26 @@ function App() {
             {inputRequest && (
               <div style={{ padding: '20px', borderTop: '1px solid #303030' }}>
                 <div style={{ marginBottom: '10px' }}>{inputRequest.prompt}</div>
+                {inputRequest.prompt.includes('Project Idea') && (
+                  <div style={{ 
+                    marginBottom: '10px', 
+                    padding: '10px', 
+                    background: '#1890ff22', 
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    color: '#1890ff'
+                  }}>
+                    💡 Tip: View the detailed idea in the <strong>Artifacts</strong> tab → <strong>Idea</strong> section
+                    <Button 
+                      size="small" 
+                      type="link" 
+                      style={{ padding: '0 4px', height: 'auto', fontSize: '13px' }}
+                      onClick={() => setActiveView('artifacts')}
+                    >
+                      Go to Artifacts
+                    </Button>
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   {inputRequest.options.map((option) => (
                     <Button key={option.id} onClick={() => handleSelectOption(option)}>

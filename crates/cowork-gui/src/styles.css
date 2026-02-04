@@ -397,12 +397,12 @@ body {
 
 .artifacts-tabs .ant-tabs-content {
   flex: 1;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .artifacts-tabs .ant-tabs-tabpane {
   height: 100%;
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* Code Editor Tabs 样式 */
