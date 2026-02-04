@@ -242,13 +242,15 @@ const ArtifactsViewer = ({ sessionId }) => {
       key: 'idea',
       label: <span><FileTextOutlined /> Idea</span>,
       children: (
-        <div className="artifact-content markdown-content">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight, rehypeRaw]}
-          >
-            {artifacts.idea}
-          </ReactMarkdown>
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight, rehypeRaw]}
+            >
+              {artifacts.idea}
+            </ReactMarkdown>
+          </div>
         </div>
       ),
     });
@@ -302,16 +304,18 @@ const ArtifactsViewer = ({ sessionId }) => {
                 </ReactMarkdown>
               </div>
             ) : (
-              <JsonView
-                src={artifacts.requirements}
-                theme="dark"
-                displayObjectSize={false}
-                enableClipboard={false}
-                indentWidth={2}
-                collapsed={false}
-                quotesOnKeys={false}
-                sortKeys={false}
-              />
+              <div style={{ overflow: 'auto', maxHeight: '100%' }}>
+                <JsonView
+                  src={artifacts.requirements}
+                  theme="dark"
+                  displayObjectSize={false}
+                  enableClipboard={false}
+                  indentWidth={2}
+                  collapsed={false}
+                  quotesOnKeys={false}
+                  sortKeys={false}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -367,16 +371,18 @@ const ArtifactsViewer = ({ sessionId }) => {
                 </ReactMarkdown>
               </div>
             ) : (
-              <JsonView
-                src={artifacts.features}
-                theme="dark"
-                displayObjectSize={false}
-                enableClipboard={false}
-                indentWidth={2}
-                collapsed={false}
-                quotesOnKeys={false}
-                sortKeys={false}
-              />
+              <div style={{ overflow: 'auto', maxHeight: '100%' }}>
+                <JsonView
+                  src={artifacts.features}
+                  theme="dark"
+                  displayObjectSize={false}
+                  enableClipboard={false}
+                  indentWidth={2}
+                  collapsed={false}
+                  quotesOnKeys={false}
+                  sortKeys={false}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -432,16 +438,18 @@ const ArtifactsViewer = ({ sessionId }) => {
                 </ReactMarkdown>
               </div>
             ) : (
-              <JsonView
-                src={artifacts.design}
-                theme="dark"
-                displayObjectSize={false}
-                enableClipboard={false}
-                indentWidth={2}
-                collapsed={false}
-                quotesOnKeys={false}
-                sortKeys={false}
-              />
+              <div style={{ overflow: 'auto', maxHeight: '100%' }}>
+                <JsonView
+                  src={artifacts.design}
+                  theme="dark"
+                  displayObjectSize={false}
+                  enableClipboard={false}
+                  indentWidth={2}
+                  collapsed={false}
+                  quotesOnKeys={false}
+                  sortKeys={false}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -497,16 +505,18 @@ const ArtifactsViewer = ({ sessionId }) => {
                 </ReactMarkdown>
               </div>
             ) : (
-              <JsonView
-                src={artifacts.plan}
-                theme="dark"
-                displayObjectSize={false}
-                enableClipboard={false}
-                indentWidth={2}
-                collapsed={false}
-                quotesOnKeys={false}
-                sortKeys={false}
-              />
+              <div style={{ overflow: 'auto', maxHeight: '100%' }}>
+                <JsonView
+                  src={artifacts.plan}
+                  theme="dark"
+                  displayObjectSize={false}
+                  enableClipboard={false}
+                  indentWidth={2}
+                  collapsed={false}
+                  quotesOnKeys={false}
+                  sortKeys={false}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -519,18 +529,34 @@ const ArtifactsViewer = ({ sessionId }) => {
       key: 'code',
       label: <span><FileTextOutlined /> Code Files</span>,
       children: (
-        <div className="artifact-content">
-          <h3>Code Files ({artifacts.code_files.length})</h3>
-          <JsonView
-            src={artifacts.code_files}
-            theme="dark"
-            displayObjectSize={false}
-            enableClipboard={false}
-            indentWidth={2}
-            collapsed={false}
-            quotesOnKeys={false}
-            sortKeys={false}
-          />
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <div style={{
+            padding: '10px 20px',
+            borderBottom: '1px solid #303030',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: '#1f1f1f',
+            flexShrink: 0
+          }}>
+            <span style={{ fontWeight: 'bold', color: '#fff' }}>
+              Code Files ({artifacts.code_files.length})
+            </span>
+          </div>
+          <div className="artifact-content" style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+            <div style={{ overflow: 'auto', maxHeight: '100%' }}>
+              <JsonView
+                src={artifacts.code_files}
+                theme="dark"
+                displayObjectSize={false}
+                enableClipboard={false}
+                indentWidth={2}
+                collapsed={false}
+                quotesOnKeys={false}
+                sortKeys={false}
+              />
+            </div>
+          </div>
         </div>
       ),
     });
@@ -541,13 +567,15 @@ const ArtifactsViewer = ({ sessionId }) => {
       key: 'report',
       label: <span><CheckCircleOutlined /> Report</span>,
       children: (
-        <div className="artifact-content markdown-content">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight, rehypeRaw]}
-          >
-            {artifacts.delivery_report}
-          </ReactMarkdown>
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight, rehypeRaw]}
+            >
+              {artifacts.delivery_report}
+            </ReactMarkdown>
+          </div>
         </div>
       ),
     });
