@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
 import {
   Card,
   Button,
@@ -251,6 +252,23 @@ const ProjectsPanel = () => {
     }
   };
 
+  const handleSelectDirectory = async () => {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: "Select Directory",
+      });
+      
+      if (selected && typeof selected === "string") {
+        setOpenDirPath(selected);
+      }
+    } catch (error) {
+      console.error("Failed to open directory dialog:", error);
+      message.error("Failed to open directory dialog: " + error);
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return "Never";
     const date = new Date(dateString);
@@ -391,18 +409,20 @@ const ProjectsPanel = () => {
                       gap: "8px",
                     }}
                   >
-                    <div
-                      style={{
-                        color: "#666",
-                        fontSize: "14px",
-                        display: "-webkit-box",
-                        WebkitLineClamp: "2",
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {project.description || "No description provided"}
-                    </div>
+                    <Tooltip title={project.description || "No description provided"}>
+                      <div
+                        style={{
+                          color: "#666",
+                          fontSize: "14px",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          cursor: "help",
+                        }}
+                      >
+                        {project.description || "No description provided"}
+                      </div>
+                    </Tooltip>
                     <div
                       style={{ fontSize: "12px", color: "#999", minWidth: 0 }}
                     >
@@ -543,12 +563,20 @@ const ProjectsPanel = () => {
           >
             Directory Path:
           </label>
-          <Input
-            value={openDirPath}
-            onChange={(e) => setOpenDirPath(e.target.value)}
-            placeholder="e.g., D:\\Workspace\\tmp\\cowork_workspace"
-            autoFocus
-          />
+          <Space.Compact style={{ width: "100%" }}>
+            <Input
+              value={openDirPath}
+              onChange={(e) => setOpenDirPath(e.target.value)}
+              placeholder="e.g., D:\\Workspace\\tmp\\cowork_workspace"
+              autoFocus
+            />
+            <Button
+              icon={<FolderOpenOutlined />}
+              onClick={handleSelectDirectory}
+            >
+              Browse
+            </Button>
+          </Space.Compact>
           <div style={{ marginTop: "8px", fontSize: "12px", color: "#999" }}>
             Path to any directory (with or without .cowork folder). This will
             open the directory in a new workspace context.
