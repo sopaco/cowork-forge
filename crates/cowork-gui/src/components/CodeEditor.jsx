@@ -398,4 +398,23 @@ const CodeEditor = ({ iterationId }) => {
             margin: 0, 
             background: 'var(--bg-container)'
           }}
-          cla
+          className="code-editor-tabs"
+        />
+        
+        {openFiles.length === 0 && (
+          <div style={{ 
+            flex: 1, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            color: 'var(--text-secondary)'
+          }}>
+            <Empty description="Select a file from the tree to start editing" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default CodeEditor;

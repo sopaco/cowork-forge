@@ -175,6 +175,33 @@ Format as a professional project delivery document."#,
             )
             .await;
 
+        // Deliver code to project directory
+        interaction
+            .show_message(
+                crate::interaction::MessageLevel::Info,
+                "Delivering code to project directory...".to_string(),
+            )
+            .await;
+
+        match deliver_code_to_project(&ctx.workspace_path).await {
+            Ok(delivered_files) => {
+                interaction
+                    .show_message(
+                        crate::interaction::MessageLevel::Success,
+                        format!("Delivered {} files to project directory", delivered_files),
+                    )
+                    .await;
+            }
+            Err(e) => {
+                interaction
+                    .show_message(
+                        crate::interaction::MessageLevel::Warning,
+                        format!("Failed to deliver code to project directory: {}", e),
+                    )
+                    .await;
+            }
+        }
+
         StageResult::Success(Some(artifact_path))
     }
 }
@@ -233,4 +260,93 @@ fn load_config() -> anyhow::Result<ModelConfig> {
     } else {
         ModelConfig::from_env()
     }
+}
+
+/// Deliver code from workspace to project root directory
+async fn deliver_code_to_project(workspace_path: &std::path::Path) -> anyhow::Result<usize> {
+    let project_root = std::env::current_dir()?;
+    let mut delivered_count = 0;
+    
+    // Directories and files to exclude from delivery
+    let exclude_dirs: &[&str] = &[
+        ".cowork-v2",
+        ".cowork",
+        ".git",
+        "node_modules",
+        "target",
+        "dist",
+        "build",
+        ".idea",
+        ".vscode",
+    ];
+    
+    let exclude_files: &[&str] = &[
+        ".DS_Store",
+        "Thumbs.db",
+        ".gitignore",
+    ];
+    
+    if !workspace_path.exists() {
+        return Ok(0);
+    }
+    
+    deliver_recursive(
+        workspace_path,
+        &project_root,
+        exclude_dirs,
+        exclude_files,
+        &mut delivered_count,
+    ).await?;
+    
+    Ok(delivered_count)
+}
+
+async fn deliver_recursive(
+    src: &std::path::Path,
+    dst: &std::path::Path,
+    exclude_dirs: &[&str],
+    exclude_files: &[&str],
+    count: &mut usize,
+) -> anyhow::Result<()> {
+    use tokio::fs;
+    
+    let mut entries = fs::read_dir(src).await?;
+    
+    while let Some(entry) = entries.next_entry().await? {
+        let src_path = entry.path();
+        let file_name = entry.file_name();
+        let file_name_str = file_name.to_string_lossy();
+        
+        // Skip excluded directories and files
+        if src_path.is_dir() && exclude_dirs.contains(&file_name_str.as_ref()) {
+            continue;
+        }
+        
+        if src_path.is_file() && exclude_files.contains(&file_name_str.as_ref()) {
+            continue;
+        }
+        
+        let dst_path = dst.join(&file_name);
+        
+        if src_path.is_dir() {
+            // Create directory if it doesn't exist
+            if !dst_path.exists() {
+                fs::create_dir_all(&dst_path).await?;
+            }
+            // Recursively process subdirectory
+            Box::pin(deliver_recursive(
+                &src_path,
+                &dst_path,
+                exclude_dirs,
+                exclude_files,
+                count,
+            )).await?;
+        } else {
+            // Copy file
+            fs::copy(&src_path, &dst_path).await?;
+            *count += 1;
+        }
+    }
+    
+    Ok(())
 }

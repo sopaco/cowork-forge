@@ -227,4 +227,12 @@ const RunnerPanel = ({ iterationId }) => {
         <Tag color={isRunning ? 'green' : 'default'}>
           Status: {isRunning ? 'Running' : 'Stopped'}
         </Tag>
-        <span style={{ color: 
+        <span style={{ color: '#888', fontSize: '12px' }}>
+          {isRunning ? 'Project is running' : 'Project is stopped'}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+export default RunnerPanel; 

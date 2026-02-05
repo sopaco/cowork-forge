@@ -421,15 +421,15 @@ pub async fn start_iteration_preview(
 ) -> Result<PreviewInfo, String> {
     println!("[GUI] Starting preview for iteration: {}", iteration_id);
 
-    let iteration_store = IterationStore::new();
-    let workspace = iteration_store.workspace_path(&iteration_id)
-        .map_err(|e| format!("Failed to get workspace: {}", e))?;
+    // Use project root directory for preview (delivered code location)
+    let project_root = cowork_core::storage::get_project_root()
+        .map_err(|e| format!("Failed to get project root: {}", e))?;
 
-    if !workspace.exists() {
-        return Err(format!("Workspace directory not found: {}", workspace.display()));
+    if !project_root.exists() {
+        return Err(format!("Project directory not found: {}", project_root.display()));
     }
 
-    PREVIEW_SERVER_MANAGER.start(iteration_id, workspace).await
+    PREVIEW_SERVER_MANAGER.start(iteration_id, project_root).await
 }
 
 #[tauri::command]
@@ -450,11 +450,11 @@ pub async fn start_iteration_project(
 ) -> Result<RunInfo, String> {
     println!("[GUI] Starting project for iteration: {}", iteration_id);
 
-    let iteration_store = IterationStore::new();
-    let workspace = iteration_store.workspace_path(&iteration_id)
-        .map_err(|e| format!("Failed to get workspace: {}", e))?;
+    // Use project root directory for running (delivered code location)
+    let project_root = cowork_core::storage::get_project_root()
+        .map_err(|e| format!("Failed to get project root: {}", e))?;
 
-    let command = detect_start_command(&workspace)?;
+    let command = detect_start_command(&project_root)?;
 
     println!("[GUI] Detected start command: {}", command);
 
@@ -890,20 +890,20 @@ impl ToolContext for DummyToolContext {
 
 #[tauri::command]
 pub async fn format_code(
-    session_id: String,
-    file_path: Option<String>,
+    _session_id: String,
+    _file_path: Option<String>,
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<FormatResult, String> {
-    println!("[GUI] Formatting code: session_id={:?}, file_path={:?}", session_id, file_path);
+    println!("[GUI] Formatting code in project root");
 
     let project_root = cowork_core::storage::get_project_root()
         .map_err(|e| format!("Failed to get project root: {}", e))?;
 
-    let code_dir = project_root.join(format!(".cowork/sessions/{}/code", session_id));
+    let code_dir = &project_root;
     
     if !code_dir.exists() {
-        return Err("Code directory not found".to_string());
+        return Err("Project directory not found".to_string());
     }
 
     // Detect project type and run appropriate formatter
@@ -984,16 +984,16 @@ pub async fn format_code(
 
 #[tauri::command]
 pub async fn check_formatter_available(
-    session_id: String,
+    _session_id: String,
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<FormatterAvailability, String> {
-    println!("[GUI] Checking formatter availability: session_id={}", session_id);
+    println!("[GUI] Checking formatter availability in project root");
 
     let project_root = cowork_core::storage::get_project_root()
         .map_err(|e| format!("Failed to get project root: {}", e))?;
 
-    let code_dir = project_root.join(format!(".cowork/sessions/{}/code", session_id));
+    let code_dir = &project_root;
     
     let mut prettier_available = false;
     let mut rustfmt_available = false;
@@ -1073,22 +1073,22 @@ pub async fn get_templates(
 
 #[tauri::command]
 pub async fn export_template(
-    session_id: String,
+    _session_id: String,
     name: String,
     description: String,
     category: String,
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<ProjectTemplate, String> {
-    println!("[GUI] Exporting template from session: {}", session_id);
+    println!("[GUI] Exporting template from project root");
 
     let project_root = cowork_core::storage::get_project_root()
         .map_err(|e| format!("Failed to get project root: {}", e))?;
 
-    let code_dir = project_root.join(format!(".cowork/sessions/{}/code", session_id));
+    let code_dir = &project_root;
     
     if !code_dir.exists() {
-        return Err("Code directory not found".to_string());
+        return Err("Project directory not found".to_string());
     }
 
     // Collect all files
