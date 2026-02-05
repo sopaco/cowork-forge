@@ -19,7 +19,7 @@ pub fn get_cowork_dir() -> anyhow::Result<PathBuf> {
 }
 
 /// Initialize project structure
-pub fn init_project_structure(project_name: &str) -> anyhow::Result<PathBuf> {
+pub fn init_project_structure(_project_name: &str) -> anyhow::Result<PathBuf> {
     let cow_dir = get_cowork_dir()?;
 
     // Create subdirectories

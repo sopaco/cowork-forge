@@ -4,7 +4,6 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -407,7 +406,7 @@ fn detect_project_metadata(workspace: &Path) -> Result<ProjectMetadata> {
             .unwrap_or(0);
         
         // Find last session ID
-        if let Ok(mut entries) = fs::read_dir(&workspace.join(".cowork").join("sessions")) {
+        if let Ok(entries) = fs::read_dir(&workspace.join(".cowork").join("sessions")) {
             if let Some(Ok(last_entry)) = entries.last() {
                 if let Some(name) = last_entry.file_name().to_str() {
                     metadata.last_session_id = Some(name.to_string());

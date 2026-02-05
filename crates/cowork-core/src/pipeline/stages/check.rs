@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::interaction::InteractiveBackend;
 use crate::pipeline::{PipelineContext, Stage, StageResult};
 use crate::llm::{ModelConfig, create_llm_client};
-use adk_core::{Llm, Content, LlmRequest};
+use adk_core::{Content, LlmRequest};
 use futures::StreamExt;
 
 /// Check Stage - Quality assurance using LLM

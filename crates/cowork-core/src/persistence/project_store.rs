@@ -5,6 +5,7 @@ use crate::domain::{IterationSummary, Project};
 use super::get_cowork_dir;
 
 const PROJECT_FILE: &str = "project.json";
+#[allow(dead_code)]
 const ITERATIONS_FILE: &str = "iterations.json";
 
 /// Project store for persistence

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::interaction::InteractiveBackend;
 use crate::pipeline::{PipelineContext, Stage, StageResult};
 use crate::llm::{ModelConfig, create_llm_client};
-use adk_core::{Llm, Content, LlmRequest};
+use adk_core::{Content, LlmRequest};
 use futures::StreamExt;
 
 /// Coding Stage - Generate and write actual code using LLM
@@ -276,16 +276,52 @@ Provide ONLY the code for this file, no explanations."#,
 
                 let clean_code = extract_code(&generated_code);
 
-                if let Err(e) = std::fs::write(&full_path, clean_code) {
+                // Validate code syntax
+                let issues = validate_code_syntax(file_path, &clean_code);
+                if !issues.is_empty() {
+                    interaction
+                        .show_message(
+                            crate::interaction::MessageLevel::Warning,
+                            format!("Code validation warnings for {}: {}", file_path, issues.join(", ")),
+                        )
+                        .await;
+                }
+
+                // Create parent directory
+                if let Some(parent) = full_path.parent() {
+                    if let Err(e) = std::fs::create_dir_all(parent) {
+                        interaction
+                            .show_message(
+                                crate::interaction::MessageLevel::Error,
+                                format!("Failed to create directory for {}: {}", file_path, e),
+                            )
+                            .await;
+                        continue;
+                    }
+                }
+
+                if let Err(e) = std::fs::write(&full_path, &clean_code) {
                     interaction
                         .show_message(
                             crate::interaction::MessageLevel::Error,
                             format!("Failed to write {}: {}", file_path, e),
                         )
                         .await;
+                } else {
+                    interaction
+                        .show_message(
+                            crate::interaction::MessageLevel::Success,
+                            format!("Generated {} ({} bytes)", file_path, clean_code.len()),
+                        )
+                        .await;
                 }
             }
         }
+
+        // Write a summary file of generated code
+        let summary_path = workspace_path.join(".generated_files.txt");
+        let summary = generate_code_summary(workspace_path);
+        let _ = std::fs::write(&summary_path, summary);
 
         interaction
             .show_message(
@@ -335,7 +371,7 @@ fn load_plan_document(ctx: &PipelineContext) -> String {
     result
 }
 
-/// Parse file list from LLM response
+/// Parse file list from LLM response (improved to handle multiple formats)
 fn parse_file_list(text: &str) -> Vec<(String, String)> {
     let mut files = Vec::new();
     let mut in_files_section = false;
@@ -343,24 +379,104 @@ fn parse_file_list(text: &str) -> Vec<(String, String)> {
     for line in text.lines() {
         let trimmed = line.trim();
         
-        if trimmed.starts_with("FILES:") || trimmed.starts_with("File Structure:") {
+        // Detect file section start
+        if trimmed.starts_with("FILES:") 
+            || trimmed.starts_with("File Structure:")
+            || trimmed.starts_with("## Files")
+            || trimmed.starts_with("### Files")
+            || trimmed.to_lowercase().starts_with("file list:")
+            || trimmed.to_lowercase().starts_with("project structure:") {
             in_files_section = true;
             continue;
         }
 
-        if in_files_section && trimmed.starts_with("-") {
+        // Detect section end (next header or empty line after files)
+        if in_files_section && trimmed.starts_with("#") && !trimmed.starts_with("##") {
+            in_files_section = false;
+            continue;
+        }
+
+        if in_files_section && (trimmed.starts_with("-") || trimmed.starts_with("*")) {
             // Parse line like: - path/to/file.rs: description
-            let content = trimmed.trim_start_matches("-").trim();
+            // or: - `path/to/file.rs`: description
+            let content = trimmed.trim_start_matches("-").trim_start_matches("*").trim();
+            
+            // Remove backticks if present
+            let content = content.trim_matches('`');
+            
             if let Some(pos) = content.find(':') {
-                let path = content[..pos].trim().to_string();
+                let path = content[..pos].trim().trim_matches('`').to_string();
                 let desc = content[pos + 1..].trim().to_string();
-                files.push((path, desc));
+                if is_valid_file_path(&path) {
+                    files.push((path, desc));
+                }
             } else if let Some(pos) = content.find('|') {
-                let path = content[..pos].trim().to_string();
+                let path = content[..pos].trim().trim_matches('`').to_string();
                 let desc = content[pos + 1..].trim().to_string();
-                files.push((path, desc));
-            } else {
+                if is_valid_file_path(&path) {
+                    files.push((path, desc));
+                }
+            } else if is_valid_file_path(content) {
+                // Just a file path without description
                 files.push((content.to_string(), "Generated file".to_string()));
+            }
+        }
+
+        // Also try to detect file paths in code blocks or plain text
+        if !in_files_section && trimmed.contains('.') {
+            // Try to extract file paths like src/main.rs or path/to/file.js
+            let words: Vec<&str> = trimmed.split_whitespace().collect();
+            for word in words {
+                let clean = word.trim_matches(|c| c == '`' || c == '"' || c == '\'' || c == '(' || c == ')' || c == ',' || c == '.');
+                if is_valid_file_path(clean) && !files.iter().any(|(p, _)| p == clean) {
+                    files.push((clean.to_string(), "Generated file".to_string()));
+                }
+            }
+        }
+    }
+
+    // If no files found in structured format, try regex-like extraction
+    if files.is_empty() {
+        files = extract_files_from_text(text);
+    }
+
+    files
+}
+
+/// Check if a string looks like a valid file path
+fn is_valid_file_path(path: &str) -> bool {
+    // Must have a file extension
+    let has_extension = path.contains('.') && !path.ends_with('.');
+    
+    // Must not contain invalid characters
+    let invalid_chars = ['<', '>', '|', '?', '*', '\0'];
+    let no_invalid = !invalid_chars.iter().any(|&c| path.contains(c));
+    
+    // Should look like a path (contains / or is a simple filename)
+    let looks_like_path = path.contains('/') || !path.contains(' ');
+    
+    has_extension && no_invalid && looks_like_path && path.len() > 2
+}
+
+/// Extract file paths from unstructured text
+fn extract_files_from_text(text: &str) -> Vec<(String, String)> {
+    let mut files = Vec::new();
+    let common_patterns = [
+        (r"(?:^|\s)([\w\-/]+\.\w+)\s*[:\-]", "code"),  // path.ext: description
+        (r"`([^`]+\.\w+)`", "markdown"),                 // `path.ext`
+    ];
+
+    for line in text.lines() {
+        for (_pattern, _p_type) in &common_patterns {
+            // Simple pattern matching without regex crate
+            if let Some(start) = line.find("/") {
+                if let Some(end) = line[start..].find(' ') {
+                    let candidate = &line[start..start+end];
+                    if is_valid_file_path(candidate) {
+                        let desc = line[end..].trim_start_matches(|c| c == ':' || c == '-').trim();
+                        files.push((candidate.to_string(), desc.to_string()));
+                    }
+                }
             }
         }
     }
@@ -368,30 +484,146 @@ fn parse_file_list(text: &str) -> Vec<(String, String)> {
     files
 }
 
-/// Extract code from markdown code blocks
+/// Extract code from markdown code blocks (improved)
 fn extract_code(text: &str) -> String {
-    // Look for code blocks
     let mut result = String::new();
     let mut in_code_block = false;
+    let mut code_block_content = String::new();
 
     for line in text.lines() {
-        if line.trim().starts_with("```") {
-            in_code_block = !in_code_block;
+        let trimmed = line.trim();
+        
+        if trimmed.starts_with("```") {
+            if in_code_block {
+                // End of code block
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+                result.push_str(&code_block_content);
+                code_block_content.clear();
+                in_code_block = false;
+            } else {
+                // Start of code block - skip the language identifier
+                in_code_block = true;
+            }
             continue;
         }
 
         if in_code_block {
-            result.push_str(line);
-            result.push('\n');
+            code_block_content.push_str(line);
+            code_block_content.push('\n');
         }
     }
 
-    if result.is_empty() {
-        // No code blocks found, return entire text
-        text.to_string()
-    } else {
-        result
+    // If still in code block at end, include the content
+    if in_code_block && !code_block_content.is_empty() {
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        result.push_str(&code_block_content);
     }
+
+    if result.is_empty() {
+        // No code blocks found, return entire text (but clean it up)
+        text.trim()
+            .trim_start_matches(|c| c == '`')
+            .trim_end_matches(|c| c == '`')
+            .to_string()
+    } else {
+        result.trim_end().to_string()
+    }
+}
+
+/// Validate generated code has basic syntax correctness
+fn validate_code_syntax(file_path: &str, code: &str) -> Vec<String> {
+    let mut issues = Vec::new();
+    let ext = std::path::Path::new(file_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("");
+
+    // Check for unclosed braces/parentheses (basic check)
+    let open_braces = code.matches('{').count();
+    let close_braces = code.matches('}').count();
+    if open_braces != close_braces {
+        issues.push(format!("Unbalanced braces: {} open, {} close", open_braces, close_braces));
+    }
+
+    let open_parens = code.matches('(').count();
+    let close_parens = code.matches(')').count();
+    if open_parens != close_parens {
+        issues.push(format!("Unbalanced parentheses: {} open, {} close", open_parens, close_parens));
+    }
+
+    // Language-specific checks
+    match ext {
+        "rs" => {
+            // Rust: check for fn main or lib structure
+            if !code.contains("fn ") && !code.contains("struct ") && !code.contains("enum ") {
+                issues.push("No function or type definitions found".to_string());
+            }
+        }
+        "js" | "ts" | "jsx" | "tsx" => {
+            // JavaScript/TypeScript: check for basic structure
+            if !code.contains("function") && !code.contains("const") && !code.contains("export") {
+                issues.push("No JavaScript/TypeScript constructs found".to_string());
+            }
+        }
+        "py" => {
+            // Python: check for def or class
+            if !code.contains("def ") && !code.contains("class ") {
+                issues.push("No function or class definitions found".to_string());
+            }
+        }
+        _ => {}
+    }
+
+    // Check for placeholder comments that indicate incomplete generation
+    let placeholder_patterns = [
+        "TODO:", "FIXME:", "// ...", "// ...", "/* ...", "# ...",
+        "// implementation", "// your code here", "// add your logic",
+    ];
+    for pattern in &placeholder_patterns {
+        if code.to_lowercase().contains(&pattern.to_lowercase()) {
+            issues.push(format!("Contains placeholder: {}", pattern));
+        }
+    }
+
+    issues
+}
+
+/// Generate a summary of generated code files
+fn generate_code_summary(workspace_path: &std::path::Path) -> String {
+    let mut summary = String::from("# Generated Code Files\n\n");
+    summary.push_str(&format!("Generated at: {}\n\n", chrono::Utc::now().to_rfc3339()));
+
+    let mut total_files = 0;
+    let mut total_lines = 0;
+
+    if let Ok(entries) = std::fs::read_dir(workspace_path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() && path.extension().is_some() {
+                let file_name = path.file_name().unwrap().to_string_lossy();
+                if file_name.starts_with('.') {
+                    continue; // Skip hidden files
+                }
+
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    let lines = content.lines().count();
+                    total_lines += lines;
+                    total_files += 1;
+                    summary.push_str(&format!("- {} ({} lines)\n", file_name, lines));
+                }
+            }
+        }
+    }
+
+    summary.push_str(&format!("\n## Summary\n"));
+    summary.push_str(&format!("- Total files: {}\n", total_files));
+    summary.push_str(&format!("- Total lines: {}\n", total_lines));
+
+    summary
 }
 
 /// Load config from file or environment

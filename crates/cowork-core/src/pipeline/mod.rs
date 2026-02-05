@@ -3,9 +3,8 @@
 
 use std::sync::Arc;
 
-use crate::domain::{Iteration, IterationStatus, Project};
+use crate::domain::{Iteration, Project};
 use crate::interaction::InteractiveBackend;
-use crate::persistence::{IterationStore, ProjectStore};
 
 pub mod executor;
 pub mod stages;

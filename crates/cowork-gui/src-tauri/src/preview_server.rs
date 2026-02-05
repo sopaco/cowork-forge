@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::fs;
-use std::io::{Cursor, Read};
-use tiny_http::{Server, Response, Request, Header, Method, StatusCode};
+
+use tiny_http::{Server, Response, Request, Header, StatusCode};
 
 pub struct PreviewServerManager {
     servers: Arc<Mutex<HashMap<String, PreviewServer>>>,

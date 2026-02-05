@@ -5,7 +5,7 @@ use crate::AppState;
 use crate::preview_server::PreviewServerManager;
 use crate::project_runner::ProjectRunner;
 use cowork_core::storage::*;
-use cowork_core::persistence::{IterationStore, ProjectStore};
+use cowork_core::persistence::IterationStore;
 use cowork_core::data::{Requirements, DesignSpec, ImplementationPlan};
 use tauri::{State, Window};
 use std::fs;
@@ -38,7 +38,7 @@ pub async fn get_iteration_artifacts(
     println!("[GUI] Getting artifacts for iteration: {}", iteration_id);
 
     let iteration_store = IterationStore::new();
-    let iteration = iteration_store.load(&iteration_id)
+    let _iteration = iteration_store.load(&iteration_id)
         .map_err(|e| format!("Failed to load iteration: {}", e))?;
 
     // Get iteration artifacts directory
@@ -49,10 +49,10 @@ pub async fn get_iteration_artifacts(
     // Load artifacts from .cowork-v2 structure
     let idea = fs::read_to_string(artifacts_dir.join("idea.md")).ok();
     let prd = fs::read_to_string(artifacts_dir.join("prd.md")).ok();
-    let design_content = fs::read_to_string(artifacts_dir.join("design.md")).ok();
-    let plan_content = fs::read_to_string(artifacts_dir.join("plan.md")).ok();
+    let _design_content = fs::read_to_string(artifacts_dir.join("design.md")).ok();
+    let _plan_content = fs::read_to_string(artifacts_dir.join("plan.md")).ok();
     let delivery_report = fs::read_to_string(artifacts_dir.join("delivery_report.md")).ok();
-    let check_report = fs::read_to_string(artifacts_dir.join("check_report.md")).ok();
+    let _check_report = fs::read_to_string(artifacts_dir.join("check_report.md")).ok();
 
     // Load workspace code files if available
     let workspace = iteration_store.workspace_path(&iteration_id)

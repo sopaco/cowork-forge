@@ -2,12 +2,11 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use cowork_core::domain::{IterationStatus, Project};
+use cowork_core::domain::IterationStatus;
 use cowork_core::interaction::CliBackend;
 use cowork_core::persistence::{IterationStore, ProjectStore};
 use cowork_core::pipeline::IterationExecutor;
 use cowork_core::event_bus::EventBus;
-use std::path::Path;
 use std::sync::Arc;
 use tracing::{info, error, warn};
 

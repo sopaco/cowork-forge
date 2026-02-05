@@ -75,7 +75,7 @@ impl IterationStore {
     }
 
     /// Get workspace path for iteration
-    pub fn workspace_path(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
+    pub fn workspace_path(&self, _iteration_id: &str) -> anyhow::Result<PathBuf> {
         Ok(get_cowork_dir()?.join("workspace"))
     }
 

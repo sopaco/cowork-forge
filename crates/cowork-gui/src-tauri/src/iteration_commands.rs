@@ -2,10 +2,9 @@
 
 use crate::AppState;
 use crate::TauriBackend;
-use cowork_core::domain::{Iteration, IterationStatus, InheritanceMode, Project};
+use cowork_core::domain::{Iteration, InheritanceMode, Project};
 use cowork_core::persistence::{IterationStore, ProjectStore};
 use cowork_core::pipeline::IterationExecutor;
-use cowork_core::event_bus::EventBus;
 use tauri::{Emitter, Manager, State, Window};
 use std::sync::Arc;
 use serde::{Serialize, Deserialize};
@@ -108,7 +107,7 @@ pub async fn gui_delete_project(
 pub async fn gui_create_iteration(
     request: CreateIterationRequest,
     window: Window,
-    state: State<'_, AppState>,
+    _state: State<'_, AppState>,
 ) -> Result<IterationInfo, String> {
     let project_store = ProjectStore::new();
     let iteration_store = IterationStore::new();

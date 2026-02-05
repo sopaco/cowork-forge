@@ -173,7 +173,7 @@ impl ProjectRunner {
 
     pub async fn stop(&self, session_id: String) -> Result<(), String> {
         // Remove process from map and release lock before await
-        let mut process = {
+        let process = {
             let mut processes = self.processes.lock().unwrap();
             processes.remove(&session_id)
         };
@@ -199,7 +199,7 @@ impl ProjectRunner {
         }
     }
 
-    pub async fn execute_command(&self, session_id: String, command: String) -> Result<String, String> {
+    pub async fn execute_command(&self, _session_id: String, command: String) -> Result<String, String> {
         println!("[Runner] Executing command: {}", command);
 
         let project_root = cowork_core::storage::get_project_root()
