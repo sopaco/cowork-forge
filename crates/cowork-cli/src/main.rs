@@ -1,24 +1,19 @@
-// Cowork Forge - CLI Entry Point
+// Cowork Forge - CLI Entry Point (Iteration Architecture)
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use cowork_core::llm::ModelConfig;
-use cowork_core::pipeline::{create_cowork_pipeline, create_partial_pipeline, create_resume_pipeline, create_modify_pipeline};
+use cowork_core::domain::{IterationStatus, Project};
 use cowork_core::interaction::CliBackend;
+use cowork_core::persistence::{IterationStore, ProjectStore};
+use cowork_core::pipeline::IterationExecutor;
 use cowork_core::event_bus::EventBus;
 use std::path::Path;
 use std::sync::Arc;
-use std::collections::{HashMap, HashSet};
-use walkdir::WalkDir;
-use tracing::{info, error};
-use adk_runner::{Runner, RunnerConfig};
-use adk_session::InMemorySessionService;
-use adk_core::Content;
-use futures::StreamExt;
+use tracing::{info, error, warn};
 
 #[derive(Parser)]
 #[command(name = "cowork")]
-#[command(about = "AI-powered software development system", long_about = None)]
+#[command(about = "AI-powered software development system - Iteration Architecture", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -30,763 +25,549 @@ struct Cli {
     /// Enable verbose logging
     #[arg(short, long, global = true)]
     verbose: bool,
-
-    /// Enable LLM streaming output (shows AI thinking process in real-time)
-    #[arg(short, long, global = true)]
-    stream: bool,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Start a new project
-    New {
-        /// Project idea/description
-        idea: String,
-    },
+    /// Create and execute a new iteration
+    Iter {
+        /// Iteration title
+        title: String,
 
-    /// Resume an existing project
-    Resume {
-        /// Resume from a specific session ID (optional).
-        /// If omitted, defaults to latest successful session; if none, tries latest in-progress session.
+        /// Detailed description of the iteration
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// Base iteration ID to inherit from (for evolution iterations)
         #[arg(short, long)]
         base: Option<String>,
+
+        /// Inheritance mode: none, full, or partial
+        #[arg(short, long, default_value = "full")]
+        inherit: String,
     },
 
-    /// Revert project and restart from a specific stage
-    Revert {
-        /// Stage to restart from (prd, design, plan, coding, check, delivery)
+    /// List all iterations
+    List {
+        /// Show all iterations including completed ones
         #[arg(short, long)]
-        from: String,
+        all: bool,
     },
 
-    /// Modify existing project with incremental changes
-    Modify {
-        /// Change idea/description
-        idea: String,
-        /// Base session ID (defaults to latest successful session)
+    /// Show iteration details
+    Show {
+        /// Iteration ID (defaults to current iteration)
+        iteration_id: Option<String>,
+    },
+
+    /// Continue a paused iteration
+    Continue {
+        /// Iteration ID (defaults to current iteration)
+        iteration_id: Option<String>,
+    },
+
+    /// Initialize a new project
+    Init {
+        /// Project name
         #[arg(short, long)]
-        base: Option<String>,
+        name: Option<String>,
     },
 
     /// Show project status
-    Status {
-        /// Show all sessions
-        #[arg(short, long)]
-        sessions: bool,
-    },
+    Status,
 
-    /// Initialize config file
-    Init,
+    /// Delete an iteration
+    Delete {
+        /// Iteration ID to delete
+        iteration_id: String,
+    },
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Setup logging - output to stderr, not stdout
+    // Setup logging
     let log_filter = if cli.verbose {
-        // Verbose mode: show all logs including adk internals
         "debug".to_string()
     } else {
-        // Normal mode: filter out adk verbose logs to avoid clutter
-        "info,adk_agent=warn,adk_core=warn,adk_runner=warn".to_string()
+        "info".to_string()
     };
-    
+
     tracing_subscriber::fmt()
-        .with_writer(std::io::stderr) // Force logs to stderr
+        .with_writer(std::io::stderr)
         .with_env_filter(log_filter)
         .init();
 
-    // Load configuration
-    let config_path = cli.config.unwrap_or_else(|| "config.toml".to_string());
-    let config = load_config(&config_path)?;
-
     // Execute command
-    let enable_stream = cli.stream;
     match cli.command {
-        Commands::New { idea } => cmd_new(idea, &config, enable_stream).await?,
-        Commands::Resume { base } => cmd_resume(base, &config, enable_stream).await?,
-        Commands::Revert { from } => cmd_revert(&from, &config, enable_stream).await?,
-        Commands::Modify { idea, base } => cmd_modify(&idea, base, &config, enable_stream).await?,
-        Commands::Status { sessions } => cmd_status(sessions).await?,
-        Commands::Init => cmd_init()?,
+        Commands::Iter { title, description, base, inherit } => {
+            cmd_iter(title, description, base, inherit).await?
+        }
+        Commands::List { all } => cmd_list(all).await?,
+        Commands::Show { iteration_id } => cmd_show(iteration_id).await?,
+        Commands::Continue { iteration_id } => cmd_continue(iteration_id).await?,
+        Commands::Init { name } => cmd_init(name).await?,
+        Commands::Status => cmd_status().await?,
+        Commands::Delete { iteration_id } => cmd_delete(iteration_id).await?,
     }
 
     Ok(())
 }
 
-/// Load configuration from file or environment
-fn load_config(path: &str) -> Result<ModelConfig> {
-    if Path::new(path).exists() {
-        info!("Loading configuration from {}", path);
-        ModelConfig::from_file(path)
-    } else {
-        info!("Config file not found, attempting to load from environment variables");
-        ModelConfig::from_env()
-    }
-}
+/// Create and execute a new iteration
+async fn cmd_iter(
+    title: String,
+    description: Option<String>,
+    base: Option<String>,
+    inherit: String,
+) -> Result<()> {
+    let project_store = ProjectStore::new();
+    let iteration_store = IterationStore::new();
 
-/// Start a new project
-async fn cmd_new(idea: String, config: &ModelConfig, enable_stream: bool) -> Result<()> {
-    use cowork_core::storage::*;
-    use cowork_core::data::*;
-    
-    info!("Starting new project with idea: {}", idea);
-
-    if is_project_initialized() {
-        error!(".cowork directory already initialized. Use 'resume' or 'modify' instead.");
-        anyhow::bail!("Project already initialized");
-    }
-
-    // Initialize project index
-    let project_name = idea.split_whitespace().take(3).collect::<Vec<_>>().join("_");
-    let mut index = init_project_index(project_name)?;
-    
-    // Generate session ID
-    let session_id = format!("session-{}", chrono::Utc::now().timestamp());
-    
-    // Create session record
-    let session_record = SessionRecord {
-        session_id: session_id.clone(),
-        session_type: SessionType::New,
-        created_at: chrono::Utc::now(),
-        completed_at: None,
-        status: SessionStatus::InProgress,
-        base_session_id: None,
-        input_description: idea.clone(),
-        change_request_id: None,
+    // Check if project exists
+    let mut project = match project_store.load()? {
+        Some(p) => p,
+        None => {
+            error!("No project found. Run 'cowork init' first.");
+            anyhow::bail!("Project not initialized");
+        }
     };
-    
-    index.add_session(session_record);
-    save_project_index(&index)?;
-    
-    // Save session input
-    let session_input = SessionInput {
-        session_id: session_id.clone(),
-        session_type: SessionType::New,
-        description: idea.clone(),
-        base_session_id: None,
-        created_at: chrono::Utc::now(),
-    };
-    save_session_input(&session_id, &session_input)?;
+
+    let description = description.unwrap_or_else(|| title.clone());
 
     // Create interaction backend
     let event_bus = Arc::new(EventBus::new());
     let interaction = Arc::new(CliBackend::new(event_bus));
 
-    // Create pipeline
-    let pipeline = create_cowork_pipeline(config, &session_id, interaction)?;
+    // Create executor
+    let executor = IterationExecutor::new(interaction);
 
-    // Execute pipeline with idea as input
-    println!("✨ Creating new project...");
-    println!("Session ID: {}", session_id);
-    println!("Idea: {}", idea);
-    println!();
+    // Create iteration based on whether it's genesis or evolution
+    let iteration = if let Some(base_id) = base {
+        // Evolution iteration
+        info!("Creating evolution iteration based on: {}", base_id);
 
-    let result = execute_pipeline(pipeline, &idea, enable_stream).await;
-
-    // Mark session status based on result
-    match result {
-        Ok(_) => {
-            mark_session_completed(&session_id)?;
-            println!("\n✅ Project creation complete!");
-            println!("Session ID: {}", session_id);
-            println!("Check .cowork/sessions/{}/artifacts/ for outputs", session_id);
+        // Verify base iteration exists
+        if !iteration_store.exists(&base_id) {
+            error!("Base iteration '{}' not found", base_id);
+            anyhow::bail!("Base iteration not found");
         }
-        Err(e) => {
-            mark_session_failed(&session_id)?;
-            return Err(e);
-        }
-    }
 
-    Ok(())
-}
+        // Parse inheritance mode
+        let inheritance = match inherit.as_str() {
+            "none" => cowork_core::domain::InheritanceMode::None,
+            "partial" => cowork_core::domain::InheritanceMode::Partial,
+            _ => cowork_core::domain::InheritanceMode::Full,
+        };
 
-/// Resume an existing project
-async fn cmd_resume(base: Option<String>, config: &ModelConfig, enable_stream: bool) -> Result<()> {
-    use cowork_core::storage::*;
-    
-    info!("Resuming project");
-
-    if !is_project_initialized() {
-        error!(".cowork directory not found. Use 'new' to create a project.");
-        anyhow::bail!("No project found");
-    }
-
-    // Determine base session
-    let base_session_id = if let Some(base_id) = base {
-        base_id
-    } else if let Some(latest_ok) = get_latest_successful_session()? {
-        latest_ok
+        // Create evolution iteration
+        cowork_core::domain::Iteration::create_evolution(
+            &project,
+            title.clone(),
+            description.clone(),
+            base_id,
+            inheritance,
+        )
     } else {
-        // Fallback: try latest in-progress session (useful when previous run was interrupted)
-        let index = load_project_index()?;
-        let last_in_progress = index
-            .sessions
-            .iter()
-            .rev()
-            .find(|s| s.status == cowork_core::data::SessionStatus::InProgress)
-            .map(|s| s.session_id.clone());
-
-        if let Some(sid) = last_in_progress {
-            sid
-        } else {
-            error!("No successful session found. Cannot resume.");
-            anyhow::bail!("No session to resume from");
-        }
+        // Genesis iteration
+        info!("Creating genesis iteration");
+        cowork_core::domain::Iteration::create_genesis(
+            &project,
+            title.clone(),
+            description.clone(),
+        )
     };
 
-    info!("Resuming from session: {}", base_session_id);
+    // Save iteration
+    iteration_store.save(&iteration)?;
+    project_store.add_iteration(&mut project, iteration.to_summary())?;
 
-    // Create new session for resume
-    let session_id = format!("session-{}", chrono::Utc::now().timestamp());
-    
-    let mut index = load_project_index()?;
-    let session_record = cowork_core::data::SessionRecord {
-        session_id: session_id.clone(),
-        session_type: cowork_core::data::SessionType::New, // Resume is treated as continuation
-        created_at: chrono::Utc::now(),
-        completed_at: None,
-        status: cowork_core::data::SessionStatus::InProgress,
-        base_session_id: Some(base_session_id.clone()),
-        input_description: "Resume from last checkpoint".to_string(),
-        change_request_id: None,
-    };
-    index.add_session(session_record);
-    save_project_index(&index)?;
-    
-    // Save session input
-    let session_input = SessionInput {
-        session_id: session_id.clone(),
-        session_type: cowork_core::data::SessionType::New, // Resume is treated as continuation
-        description: "Resume from last checkpoint".to_string(),
-        base_session_id: Some(base_session_id.clone()),
-        created_at: chrono::Utc::now(),
-    };
-    save_session_input(&session_id, &session_input)?;
-
-    // Bootstrap session state from base session
-    init_session_from_base(&session_id, &base_session_id)?;
-
-    // Create interaction backend
-    let event_bus = Arc::new(EventBus::new());
-    let interaction = Arc::new(CliBackend::new(event_bus));
-
-    // Create resume pipeline
-    let pipeline = create_resume_pipeline(config, &session_id, &base_session_id, interaction)?;
-
-    // Execute pipeline
-    println!("🔄 Resuming project...");
-    println!("Base session: {}", base_session_id);
-    println!("New session: {}", session_id);
+    println!("✨ Created iteration: {}", iteration.id);
+    println!("   Title: {}", iteration.title);
+    println!("   Number: {}", iteration.number);
+    if iteration.base_iteration_id.is_some() {
+        println!("   Base: {:?}", iteration.base_iteration_id);
+        println!("   Inheritance: {:?}", iteration.inheritance);
+    }
+    println!("   Start Stage: {}", iteration.determine_start_stage());
     println!();
 
-    let result = execute_pipeline(pipeline, "Resume from last checkpoint", enable_stream).await;
+    // Execute iteration
+    println!("🚀 Starting iteration execution...");
+    println!();
 
-    match result {
+    match executor.execute(&mut project, &iteration.id).await {
         Ok(_) => {
-            mark_session_completed(&session_id)?;
-            println!("\n✅ Project resume complete!");
+            println!("\n✅ Iteration '{}' completed successfully!", iteration.title);
+            println!("   Iteration ID: {}", iteration.id);
+            Ok(())
         }
         Err(e) => {
-            mark_session_failed(&session_id)?;
-            return Err(e);
+            println!("\n❌ Iteration failed: {}", e);
+            Err(e)
         }
     }
-
-    Ok(())
 }
 
-/// Revert project and restart from a specific stage
-async fn cmd_revert(from_stage: &str, config: &ModelConfig, enable_stream: bool) -> Result<()> {
-    use cowork_core::storage::*;    info!("Reverting project from stage: {}", from_stage);
+/// List all iterations
+async fn cmd_list(all: bool) -> Result<()> {
+    let project_store = ProjectStore::new();
+    let iteration_store = IterationStore::new();
 
-    if !is_project_initialized() {
-        error!(".cowork directory not found. Use 'new' to create a project.");
-        anyhow::bail!("No project found");
-    }
+    // Check if project exists
+    match project_store.load()? {
+        Some(project) => {
+            println!("📊 Project: {}\n", project.name);
 
-    let latest_session = get_latest_successful_session()?;
-    if latest_session.is_none() {
-        error!("No successful session found. Cannot revert.");
-        anyhow::bail!("No session to revert from");
-    }
-    
-    let base_session_id = latest_session.unwrap();
+            let iterations = iteration_store.load_all()?;
 
-    // Support `--from auto`: use the latest session meta's requested restart stage (if any)
-    let resolved_stage = if from_stage == "auto" {
-        let index = load_project_index()?;
-        let last_session_id = index
-            .sessions
-            .last()
-            .map(|s| s.session_id.clone())
-            .ok_or_else(|| anyhow::anyhow!("No session records found"))?;
-
-        if let Some(meta) = load_session_meta(&last_session_id)? {
-            if let Some(stage) = meta.current_stage {
-                match stage {
-                    cowork_core::data::Stage::Prd => "prd",
-                    cowork_core::data::Stage::Design => "design",
-                    cowork_core::data::Stage::Plan => "plan",
-                    cowork_core::data::Stage::Coding => "coding",
-                    cowork_core::data::Stage::Check => "check",
-                    cowork_core::data::Stage::Delivery => "delivery",
-                    cowork_core::data::Stage::Idea => "prd",
-                }
-            } else {
-                "prd"
+            if iterations.is_empty() {
+                println!("No iterations yet. Run 'cowork iter <title>' to create one.");
+                return Ok(());
             }
-        } else {
-            "prd"
+
+            // Filter iterations if not showing all
+            let filtered: Vec<_> = if all {
+                iterations
+            } else {
+                iterations
+                    .into_iter()
+                    .filter(|i| matches!(i.status, IterationStatus::Running | IterationStatus::Paused))
+                    .collect()
+            };
+
+            if filtered.is_empty() && !all {
+                println!("No active iterations. Use --all to see completed iterations.");
+                return Ok(());
+            }
+
+            // Print header
+            println!("{:<12} {:<30} {:<12} {:<15} {}",
+                "Number", "Title", "Status", "Current Stage", "ID");
+            println!("{:-<100}", "");
+
+            // Print iterations
+            for iter in filtered {
+                let status_str = format!("{:?}", iter.status);
+                let status_colored = match iter.status {
+                    IterationStatus::Completed => format!("\x1b[32m{}\x1b[0m", status_str), // Green
+                    IterationStatus::Running => format!("\x1b[33m{}\x1b[0m", status_str),   // Yellow
+                    IterationStatus::Paused => format!("\x1b[36m{}\x1b[0m", status_str),    // Cyan
+                    IterationStatus::Failed => format!("\x1b[31m{}\x1b[0m", status_str),    // Red
+                    IterationStatus::Draft => status_str,
+                };
+
+                let current_stage = iter.current_stage.unwrap_or_else(|| "-".to_string());
+                let short_id = &iter.id[..20.min(iter.id.len())];
+
+                println!("{:<12} {:<30} {:<20} {:<15} {}",
+                    iter.number,
+                    truncate(&iter.title, 28),
+                    status_colored,
+                    current_stage,
+                    short_id
+                );
+            }
+
+            if !all {
+                println!("\nTip: Use --all to see completed iterations");
+            }
         }
-    } else {
-        from_stage
-    };
-
-    // Create new session for revert
-    let session_id = format!("session-{}", chrono::Utc::now().timestamp());
-    
-    let mut index = load_project_index()?;
-    let session_record = cowork_core::data::SessionRecord {
-        session_id: session_id.clone(),
-        session_type: cowork_core::data::SessionType::Revert,
-        created_at: chrono::Utc::now(),
-        completed_at: None,
-        status: cowork_core::data::SessionStatus::InProgress,
-        base_session_id: Some(base_session_id.clone()),
-        input_description: format!("Revert from {} stage", resolved_stage),
-        change_request_id: None,
-    };
-    index.add_session(session_record);
-    save_project_index(&index)?;
-    
-    // Save session input
-    let session_input = SessionInput {
-        session_id: session_id.clone(),
-        session_type: cowork_core::data::SessionType::Revert,
-        description: format!("Revert from {} stage", resolved_stage),
-        base_session_id: Some(base_session_id.clone()),
-        created_at: chrono::Utc::now(),
-    };
-    save_session_input(&session_id, &session_input)?;
-
-    // Bootstrap session state from base session
-    init_session_from_base(&session_id, &base_session_id)?;
-
-    // Create interaction backend
-    let event_bus = Arc::new(EventBus::new());
-    let interaction = Arc::new(CliBackend::new(event_bus));
-
-    // Create partial pipeline
-    let pipeline = create_partial_pipeline(config, &session_id, &base_session_id, resolved_stage, interaction)?;
-
-    // Execute pipeline
-    println!("🔧 Reverting project from {} stage...", resolved_stage);
-    println!("Base session: {}", base_session_id);
-    println!("New session: {}", session_id);
-    println!();
-
-    let result = execute_pipeline(pipeline, &format!("Revert from {} stage", resolved_stage), enable_stream).await;
-
-    match result {
-        Ok(_) => {
-            mark_session_completed(&session_id)?;
-            println!("\n✅ Revert complete!");
-        }
-        Err(e) => {
-            mark_session_failed(&session_id)?;
-            return Err(e);
+        None => {
+            println!("❌ No project found. Run 'cowork init' first.");
         }
     }
 
     Ok(())
 }
 
-fn should_ignore_project_path(path: &str) -> bool {
-    // Ignore cowork internal state and common build artifacts
-    let ignore_patterns = [
-        "./.cowork/",
-        "./target/",
-        "./node_modules/",
-        "./.git/",
-        "./dist/",
-        "./build/",
-        "./.vscode/",
-        "./.idea/",
-    ];
-    ignore_patterns.iter().any(|p| path.contains(p))
-}
+/// Show iteration details
+async fn cmd_show(iteration_id: Option<String>) -> Result<()> {
+    let project_store = ProjectStore::new();
+    let iteration_store = IterationStore::new();
 
-fn collect_project_file_fingerprints() -> Result<HashMap<String, (u64, u64)>> {
-    // path -> (len, mtime_secs)
-    let mut map = HashMap::new();
-
-    for entry in WalkDir::new(".").follow_links(false) {
-        let entry = entry?;
-        if !entry.file_type().is_file() {
-            continue;
-        }
-        let p = entry.path();
-        let rel = p.strip_prefix(".").unwrap_or(p).to_string_lossy();
-        let rel = format!("./{}", rel.trim_start_matches("/"));
-
-        if should_ignore_project_path(&rel) {
-            continue;
-        }
-
-        let md = entry.metadata()?;
-        let len = md.len();
-        let mtime = md
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-
-        map.insert(rel, (len, mtime));
-    }
-
-    Ok(map)
-}
-
-fn diff_project_files(
-    before: &HashMap<String, (u64, u64)>,
-    after: &HashMap<String, (u64, u64)>,
-) -> (Vec<String>, Vec<String>, Vec<String>) {
-    let before_keys: HashSet<&String> = before.keys().collect();
-    let after_keys: HashSet<&String> = after.keys().collect();
-
-    let mut added = Vec::new();
-    let mut deleted = Vec::new();
-    let mut modified = Vec::new();
-
-    for k in after_keys.difference(&before_keys) {
-        added.push((**k).clone());
-    }
-
-    for k in before_keys.difference(&after_keys) {
-        deleted.push((**k).clone());
-    }
-
-    for k in before_keys.intersection(&after_keys) {
-        let b = before.get(*k);
-        let a = after.get(*k);
-        if b != a {
-            modified.push((**k).clone());
-        }
-    }
-
-    added.sort();
-    deleted.sort();
-    modified.sort();
-
-    (added, modified, deleted)
-}
-
-/// Modify existing project with incremental changes
-async fn cmd_modify(idea: &str, base: Option<String>, config: &ModelConfig, enable_stream: bool) -> Result<()> {
-    use cowork_core::storage::*;
-    use cowork_core::data::*;
-    
-    info!("Modifying project with idea: {}", idea);
-
-    if !is_project_initialized() {
-        error!(".cowork directory not found. Use 'new' to create a project.");
-        anyhow::bail!("No project found");
-    }
-
-    // Determine base session
-    let base_session_id = if let Some(base_id) = base {
-        base_id
-    } else {
-        get_latest_successful_session()?
-            .ok_or_else(|| anyhow::anyhow!("No successful session found. Cannot modify without a base."))?
-    };
-    
-    info!("Using base session: {}", base_session_id);
-
-    // Create new session for modify
-    let session_id = format!("session-{}", chrono::Utc::now().timestamp());
-    
-    // Create change request
-    let change_request = ChangeRequest::new(
-        session_id.clone(),
-        idea.to_string(),
-        base_session_id.clone(),
-    );
-    let change_request_id = change_request.id.clone();
-    save_change_request(&session_id, &change_request)?;
-    
-    // Create session record
-    let mut index = load_project_index()?;
-    let session_record = SessionRecord {
-        session_id: session_id.clone(),
-        session_type: SessionType::Modify,
-        created_at: chrono::Utc::now(),
-        completed_at: None,
-        status: SessionStatus::InProgress,
-        base_session_id: Some(base_session_id.clone()),
-        input_description: idea.to_string(),
-        change_request_id: Some(change_request_id.clone()),
-    };
-    index.add_session(session_record);
-    save_project_index(&index)?;
-    
-    // Save session input
-    let session_input = SessionInput {
-        session_id: session_id.clone(),
-        session_type: SessionType::Modify,
-        description: idea.to_string(),
-        base_session_id: Some(base_session_id.clone()),
-        created_at: chrono::Utc::now(),
-    };
-    save_session_input(&session_id, &session_input)?;
-
-    // Bootstrap session state from base session
-    init_session_from_base(&session_id, &base_session_id)?;
-
-    // Create interaction backend
-    let event_bus = Arc::new(EventBus::new());
-    let interaction = Arc::new(CliBackend::new(event_bus));
-
-    // Create modify pipeline (incremental change pipeline)
-    let pipeline = create_modify_pipeline(config, &session_id, &base_session_id, interaction)?;
-
-    // Snapshot project files before modification (for patch metadata)
-    let before_files = collect_project_file_fingerprints()?;
-
-    // Execute pipeline
-    println!("🔄 Applying incremental changes...");
-    println!("Change: {}", idea);
-    println!("Base session: {}", base_session_id);
-    println!("New session: {}", session_id);
-    println!();
-
-    let result = execute_pipeline(pipeline, idea, enable_stream).await;
-
-    match result {
-        Ok(_) => {
-            // Snapshot after modification and persist patch metadata
-            let after_files = collect_project_file_fingerprints()?;
-            let (added_files, modified_files, deleted_files) = diff_project_files(&before_files, &after_files);
-
-            let mut patch = PatchMetadata::new(session_id.clone(), base_session_id.clone());
-            patch.added_files = added_files;
-            patch.modified_files = modified_files;
-            patch.deleted_files = deleted_files;
-            save_patch_metadata(&session_id, &patch)?;
-
-            mark_session_completed(&session_id)?;
-            println!("\n✅ Modification complete!");
-            println!("Session ID: {}", session_id);
-            println!("Patch metadata: .cowork/sessions/{}/patch/metadata.json", session_id);
-        }
-        Err(e) => {
-            mark_session_failed(&session_id)?;
-            return Err(e);
-        }
-    }
-
-    Ok(())
-}
-
-/// Execute a pipeline with given input
-async fn execute_pipeline(pipeline: Arc<dyn adk_core::Agent>, input: &str, enable_stream: bool) -> Result<()> {
-    use adk_core::RunConfig;
-    use adk_session::{CreateRequest, SessionService};
-    use std::collections::HashMap;
-
-    // Create session service
-    let session_service = Arc::new(InMemorySessionService::new());
-
-    // Create session FIRST
-    let user_id = "cowork-user".to_string();
-    let app_name = "cowork-forge".to_string();
-    
-    let session = session_service
-        .create(CreateRequest {
-            app_name: app_name.clone(),
-            user_id: user_id.clone(),
-            session_id: None, // Auto-generate session ID
-            state: HashMap::new(),
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to create session: {}", e))?;
-    
-    let session_id = session.id().to_string();
-
-    // Create runner with run config
-    let runner = Runner::new(RunnerConfig {
-        app_name,
-        agent: pipeline,
-        session_service,
-        artifact_service: None,
-        memory_service: None,
-        run_config: Some(RunConfig::default()),
-    })?;
-
-    // Execute
-    let content = Content::new("user").with_text(input);
-
-    let mut event_stream = runner.run(user_id, session_id, content).await?;
-
-    // Simple phase indicator - show when we start processing
-    println!("🚀 Starting execution...\n");
-    
-    // Optional: Show streaming mode status
-    if enable_stream {
-        println!("💬 Streaming mode enabled - showing LLM output in real-time\n");
-    }
-    
-    while let Some(event_result) = event_stream.next().await {
-        match event_result {
-            Ok(event) => {
-                // If streaming is enabled, show LLM output
-                if enable_stream {
-                    if let Some(llm_content) = &event.llm_response.content {
-                        use std::io::Write;
-                        let mut stdout = std::io::stdout();
-                        
-                        for part in &llm_content.parts {
-                            if let Some(text) = part.text() {
-                                // Filter out standalone newlines to reduce erratic line breaks
-                                if text != "\n" {
-                                    print!("{}", text);
-                                    stdout.flush().ok();
-                                }
-                            }
+    // Determine which iteration to show
+    let iteration_id = match iteration_id {
+        Some(id) => id,
+        None => {
+            // Use current iteration from project
+            match project_store.load()? {
+                Some(project) => {
+                    match project.current_iteration_id {
+                        Some(id) => id,
+                        None => {
+                            anyhow::bail!("No current iteration. Specify an iteration ID or run an iteration first.");
                         }
                     }
                 }
-                // Tools will always print their own progress (e.g., "📝 Writing file: ...")
-            }
-            Err(e) => {
-                error!("Error during pipeline execution: {}", e);
-                anyhow::bail!("Pipeline execution failed: {}", e);
+                None => {
+                    anyhow::bail!("No project found. Run 'cowork init' first.");
+                }
             }
         }
+    };
+
+    // Load iteration
+    let iteration = iteration_store.load(&iteration_id)?;
+
+    println!("📋 Iteration Details\n");
+    println!("  ID:          {}", iteration.id);
+    println!("  Number:      {}", iteration.number);
+    println!("  Title:       {}", iteration.title);
+    println!("  Description: {}", iteration.description);
+    println!("  Status:      {:?}", iteration.status);
+    println!("  Started:     {}", iteration.started_at.format("%Y-%m-%d %H:%M:%S"));
+
+    if let Some(completed_at) = iteration.completed_at {
+        println!("  Completed:   {}", completed_at.format("%Y-%m-%d %H:%M:%S"));
     }
 
-    println!("\n✅ Pipeline complete!");
+    if let Some(ref base_id) = iteration.base_iteration_id {
+        println!("  Base:        {}", base_id);
+        println!("  Inheritance: {:?}", iteration.inheritance);
+    }
+
+    if let Some(ref stage) = iteration.current_stage {
+        println!("  Current:     {}", stage);
+    }
+
+    if !iteration.completed_stages.is_empty() {
+        println!("  Completed:   {}", iteration.completed_stages.join(", "));
+    }
+
+    // Show artifacts
+    println!("\n  Artifacts:");
+    if iteration.artifacts.idea.is_some() {
+        println!("    ✓ Idea");
+    }
+    if iteration.artifacts.prd.is_some() {
+        println!("    ✓ PRD");
+    }
+    if iteration.artifacts.design.is_some() {
+        println!("    ✓ Design");
+    }
+    if iteration.artifacts.plan.is_some() {
+        println!("    ✓ Plan");
+    }
+    if iteration.artifacts.delivery.is_some() {
+        println!("    ✓ Delivery");
+    }
+
+    Ok(())
+}
+
+/// Continue a paused iteration
+async fn cmd_continue(iteration_id: Option<String>) -> Result<()> {
+    let project_store = ProjectStore::new();
+    let iteration_store = IterationStore::new();
+
+    // Determine which iteration to continue
+    let iteration_id = match iteration_id {
+        Some(id) => id,
+        None => {
+            // Find a paused iteration
+            let iterations = iteration_store.load_all()?;
+            let paused: Vec<_> = iterations
+                .into_iter()
+                .filter(|i| matches!(i.status, IterationStatus::Paused))
+                .collect();
+
+            match paused.len() {
+                0 => {
+                    anyhow::bail!("No paused iterations found.");
+                }
+                1 => paused[0].id.clone(),
+                _ => {
+                    println!("Multiple paused iterations found. Please specify one:");
+                    for iter in paused {
+                        println!("  - {} ({})", iter.id, iter.title);
+                    }
+                    anyhow::bail!("Multiple paused iterations");
+                }
+            }
+        }
+    };
+
+    // Load project and iteration
+    let mut project = match project_store.load()? {
+        Some(p) => p,
+        None => {
+            anyhow::bail!("No project found. Run 'cowork init' first.");
+        }
+    };
+
+    let iteration = iteration_store.load(&iteration_id)?;
+
+    if iteration.status != IterationStatus::Paused {
+        anyhow::bail!("Iteration '{}' is not paused (status: {:?})", iteration_id, iteration.status);
+    }
+
+    println!("🔄 Continuing iteration: {}", iteration.title);
+    println!("   Current stage: {:?}", iteration.current_stage);
+    println!();
+
+    // Create executor
+    let event_bus = Arc::new(EventBus::new());
+    let interaction = Arc::new(CliBackend::new(event_bus));
+    let executor = IterationExecutor::new(interaction);
+
+    match executor.continue_iteration(&mut project, &iteration_id).await {
+        Ok(_) => {
+            println!("\n✅ Iteration completed!");
+            Ok(())
+        }
+        Err(e) => {
+            println!("\n❌ Iteration failed: {}", e);
+            Err(e)
+        }
+    }
+}
+
+/// Initialize a new project
+async fn cmd_init(name: Option<String>) -> Result<()> {
+    let project_store = ProjectStore::new();
+
+    if project_store.exists() {
+        let existing = project_store.load()?.unwrap();
+        warn!("Project '{}' already exists", existing.name);
+        println!("⚠️  Project '{}' already exists", existing.name);
+        println!("   Use 'cowork iter' to create iterations.");
+        return Ok(());
+    }
+
+    // Get project name
+    let name = match name {
+        Some(n) => n,
+        None => {
+            // Try to infer from current directory
+            std::env::current_dir()?
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "my-project".to_string())
+        }
+    };
+
+    // Create project
+    let project = project_store.create(&name)?;
+
+    println!("✅ Created project: {}", project.name);
+    println!("   Project ID: {}", project.id);
+    println!("   Working directory: .cowork-v2/");
+    println!();
+    println!("Next steps:");
+    println!("  1. Run 'cowork iter \"<title>\"' to create your first iteration");
+    println!("  2. Or configure LLM settings in config.toml");
 
     Ok(())
 }
 
 /// Show project status
-async fn cmd_status(show_sessions: bool) -> Result<()> {
-    use cowork_core::storage::*;
-    use cowork_core::data::*;
+async fn cmd_status() -> Result<()> {
+    let project_store = ProjectStore::new();
+    let iteration_store = IterationStore::new();
 
-    if !is_project_initialized() {
-        println!("❌ No project found in current directory");
-        return Ok(());
-    }
+    match project_store.load()? {
+        Some(project) => {
+            println!("📊 Project Status\n");
+            println!("  Name:        {}", project.name);
+            println!("  ID:          {}", project.id);
+            println!("  Created:     {}", project.created_at.format("%Y-%m-%d %H:%M:%S"));
+            println!("  Updated:     {}", project.updated_at.format("%Y-%m-%d %H:%M:%S"));
 
-    let index = load_project_index()?;
-    
-    println!("📊 Project Status\n");
-    println!("Project: {}", index.project_name);
-    println!("Created: {}", index.created_at.format("%Y-%m-%d %H:%M:%S"));
-    println!();
+            if let Some(ref current_id) = project.current_iteration_id {
+                println!("  Current:     {}", current_id);
+            }
 
-    if show_sessions {
-        // Show all sessions
-        println!("Sessions ({} total):", index.sessions.len());
-        println!("{:<20} {:<10} {:<15} {:<25}", "Session ID", "Type", "Status", "Created At");
-        println!("{:-<70}", "");
-        
-        for session in &index.sessions {
-            let session_type = match session.session_type {
-                SessionType::New => "New",
-                SessionType::Modify => "Modify",
-                SessionType::Revert => "Revert",
-            };
-            let status = match session.status {
-                SessionStatus::InProgress => "In Progress",
-                SessionStatus::Completed => "Completed",
-                SessionStatus::Failed => "Failed",
-            };
-            println!(
-                "{:<20} {:<10} {:<15} {}",
-                session.session_id,
-                session_type,
-                status,
-                session.created_at.format("%Y-%m-%d %H:%M:%S")
-            );
+            // Load iterations
+            let iterations = iteration_store.load_all()?;
+
+            let completed = iterations.iter()
+                .filter(|i| matches!(i.status, IterationStatus::Completed))
+                .count();
+            let running = iterations.iter()
+                .filter(|i| matches!(i.status, IterationStatus::Running))
+                .count();
+            let paused = iterations.iter()
+                .filter(|i| matches!(i.status, IterationStatus::Paused))
+                .count();
+            let failed = iterations.iter()
+                .filter(|i| matches!(i.status, IterationStatus::Failed))
+                .count();
+
+            println!("\n  Iterations:");
+            println!("    Total:      {}", iterations.len());
+            println!("    Completed:  {}", completed);
+            println!("    Running:    {}", running);
+            println!("    Paused:     {}", paused);
+            println!("    Failed:     {}", failed);
+
+            // Show latest completed iteration
+            if let Some(latest) = project.get_latest_completed_iteration() {
+                println!("\n  Latest Completed:");
+                println!("    #{} - {}", latest.number, latest.title);
+                println!("    Stages: {}", latest.completed_stages.join(", "));
+            }
         }
-        println!();
-        
-        if let Some(latest) = &index.latest_successful_session {
-            println!("Latest successful: {}", latest);
+        None => {
+            println!("❌ No project found in current directory.");
+            println!("   Run 'cowork init' to create a new project.");
         }
-    } else {
-        // Show summary of latest session
-        if let Some(latest_id) = &index.latest_successful_session {
-            println!("Latest successful session: {}", latest_id);
-            
-            // Try to load artifacts from latest session
-            match load_requirements(latest_id) {
-                Ok(reqs) => {
-                    println!("Requirements: {} total", reqs.requirements.len());
-                }
-                Err(_) => println!("Requirements: Not yet created"),
-            }
-
-            match load_feature_list(latest_id) {
-                Ok(features) => {
-                    let completed = features.features.iter().filter(|f| matches!(f.status, FeatureStatus::Completed)).count();
-                    println!("Features: {}/{} completed", completed, features.features.len());
-                }
-                Err(_) => println!("Features: Not yet created"),
-            }
-
-            match load_design_spec(latest_id) {
-                Ok(design) => {
-                    println!("Components: {} defined", design.architecture.components.len());
-                }
-                Err(_) => println!("Design: Not yet created"),
-            }
-
-            match load_implementation_plan(latest_id) {
-                Ok(plan) => {
-                    let completed = plan.tasks.iter().filter(|t| matches!(t.status, TaskStatus::Completed)).count();
-                    println!("Tasks: {}/{} completed", completed, plan.tasks.len());
-                }
-                Err(_) => println!("Implementation Plan: Not yet created"),
-            }
-        } else {
-            println!("No successful sessions yet");
-        }
-        
-        println!();
-        println!("Tip: Use 'cowork status --sessions' to see all sessions");
     }
 
     Ok(())
 }
 
-/// Initialize configuration file
-fn cmd_init() -> Result<()> {
-    let config_path = "config.toml";
+/// Delete an iteration
+async fn cmd_delete(iteration_id: String) -> Result<()> {
+    let project_store = ProjectStore::new();
+    let iteration_store = IterationStore::new();
 
-    if Path::new(config_path).exists() {
-        error!("config.toml already exists");
-        anyhow::bail!("Configuration file already exists");
+    // Verify iteration exists
+    if !iteration_store.exists(&iteration_id) {
+        anyhow::bail!("Iteration '{}' not found", iteration_id);
     }
 
-    let default_config = r#"[llm]
-api_base_url = "http://localhost:8000/v1"
-api_key = "your-api-key-here"
-model_name = "gpt-4"
-"#;
+    // Load iteration to show details
+    let iteration = iteration_store.load(&iteration_id)?;
 
-    std::fs::write(config_path, default_config)?;
-    println!("✅ Created config.toml");
-    println!("\nPlease edit config.toml and set your API credentials:");
-    println!("  - api_base_url: Your OpenAI-compatible API endpoint");
-    println!("  - api_key: Your API key");
-    println!("  - model_name: Model to use (e.g., gpt-4, gpt-3.5-turbo)");
+    println!("⚠️  You are about to delete iteration:");
+    println!("   #{} - {}", iteration.number, iteration.title);
+    println!("   ID: {}", iteration_id);
+    println!();
+
+    // Confirm deletion
+    print!("Are you sure? [y/N]: ");
+    std::io::Write::flush(&mut std::io::stdout())?;
+
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input)?;
+
+    if input.trim().to_lowercase() != "y" {
+        println!("Deletion cancelled.");
+        return Ok(());
+    }
+
+    // Delete iteration
+    iteration_store.delete(&iteration_id)?;
+
+    // Update project (remove from iterations list)
+    if let Ok(Some(mut project)) = project_store.load() {
+        project.iterations.retain(|i| i.id != iteration_id);
+        project_store.save(&project)?;
+    }
+
+    println!("✅ Iteration '{}' deleted.", iteration_id);
 
     Ok(())
+}
+
+/// Helper function to truncate string
+fn truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        format!("{}...", &s[..max_len - 3])
+    }
 }

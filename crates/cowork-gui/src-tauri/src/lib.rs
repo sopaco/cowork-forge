@@ -4,12 +4,10 @@
 use std::sync::{Arc, Mutex};
 use std::fs;
 use tauri::{Emitter, Manager, State, Window};
-use cowork_core::interaction::{InteractiveBackend, InputOption, InputResponse, MessageLevel, ProgressInfo};
+use cowork_core::interaction::{InteractiveBackend, InputResponse};
 use cowork_core::event_bus::EventBus;
 use std::collections::HashMap;
 use tokio::sync::oneshot;
-use tracing::info;
-use std::path::{Path, PathBuf};
 use anyhow::Context;
 use serde::{Serialize, Deserialize};
 
@@ -19,12 +17,8 @@ mod gui_commands;
 mod preview_server;
 mod project_runner;
 mod project_manager;
-use gui_types::*;
+mod iteration_commands;
 use project_manager::*;
-
-// Import iterative assistant types
-use cowork_core::agents::iterative_assistant::*;
-use cowork_core::pipeline::get_current_stage_name;
 
 // ============================================================================
 // Iterative Assistant Types
@@ -34,26 +28,6 @@ use cowork_core::pipeline::get_current_stage_name;
 pub struct ChatActionResult {
     pub action_type: String,
     pub data: Option<serde_json::Value>,
-}
-
-/// Build project context from project index
-fn build_project_context(index: &cowork_core::ProjectIndex) -> anyhow::Result<ProjectContext> {
-    let sessions: Vec<cowork_core::agents::SessionInfo> = index.sessions.iter()
-        .map(|s| {
-            cowork_core::agents::SessionInfo {
-                session_id: s.session_id.clone(),
-                status: format!("{:?}", s.status),
-                description: s.input_description.clone(),
-                created_at: s.created_at.to_rfc3339(),
-            }
-        })
-        .collect();
-    
-    Ok(ProjectContext {
-        project_name: index.project_name.clone(),
-        sessions,
-        technology_stack: vec![],
-    })
 }
 
 // ============================================================================
@@ -82,11 +56,11 @@ impl TauriBackend {
 
 #[async_trait::async_trait]
 impl InteractiveBackend for TauriBackend {
-    async fn show_message(&self, level: MessageLevel, content: String) {
+    async fn show_message(&self, level: cowork_core::interaction::MessageLevel, content: String) {
         let _ = self.app_handle.emit("message", (level, content));
     }
 
-    async fn request_input(&self, prompt: &str, options: Vec<InputOption>, _initial_content: Option<String>) -> anyhow::Result<InputResponse> {
+    async fn request_input(&self, prompt: &str, options: Vec<cowork_core::interaction::InputOption>, _initial_content: Option<String>) -> anyhow::Result<InputResponse> {
         use std::time::Duration;
 
         // Generate a unique request ID
@@ -129,7 +103,7 @@ impl InteractiveBackend for TauriBackend {
         }
     }
 
-    async fn show_progress(&self, task_id: String, progress: ProgressInfo) {
+    async fn show_progress(&self, task_id: String, progress: cowork_core::interaction::ProgressInfo) {
         let _ = self.app_handle.emit("progress", (task_id, progress));
     }
 
@@ -290,7 +264,6 @@ async fn set_workspace(
     window: Window,
 ) -> Result<(), String> {
     use std::path::Path;
-    use cowork_core::storage::*;
     
     println!("[GUI] Setting workspace to: {}", workspace_path);
     
@@ -318,30 +291,36 @@ async fn set_workspace(
     std::env::set_current_dir(path)
         .map_err(|e| format!("Failed to set current directory: {}", e))?;
     
-    // Initialize project if not already initialized
+    // Initialize project using new V2 API
     let project_name = path.file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("cowork_project")
         .to_string();
     
-    if !is_project_initialized() {
-        println!("[GUI] Project not initialized, initializing...");
+    // Use new persistence API to check if initialized
+    let cowork_v2_path = path.join(".cowork-v2");
+    if !cowork_v2_path.exists() {
+        println!("[GUI] Project not initialized, initializing with V2 API...");
         
-        let index = init_project_index(project_name.clone())
-            .map_err(|e| {
-                eprintln!("[GUI] Failed to init project: {}", e);
-                format!("Failed to init project: {}", e)
-            })?;
+        // Create .cowork-v2 directory structure
+        std::fs::create_dir_all(&cowork_v2_path)
+            .map_err(|e| format!("Failed to create .cowork-v2 directory: {}", e))?;
         
-        // Verify that index.json was created
-        let index_path = path.join(".cowork/index.json");
-        if !index_path.exists() {
-            return Err(format!("Failed to create index.json at {:?}", index_path));
-        }
+        let project_file = cowork_v2_path.join("project.json");
+        let iterations_dir = cowork_v2_path.join("iterations");
+        std::fs::create_dir_all(&iterations_dir)
+            .map_err(|e| format!("Failed to create iterations directory: {}", e))?;
         
-        println!("[GUI] Project initialized successfully with {} sessions", index.sessions.len());
+        // Create initial project file
+        let project = cowork_core::domain::Project::new(&project_name);
+        let project_json = serde_json::to_string_pretty(&project)
+            .map_err(|e| format!("Failed to serialize project: {}", e))?;
+        std::fs::write(&project_file, project_json)
+            .map_err(|e| format!("Failed to write project.json: {}", e))?;
+        
+        println!("[GUI] Project initialized successfully with V2 API");
     } else {
-        println!("[GUI] Project already initialized");
+        println!("[GUI] Project already initialized with V2");
     }
     
     // Auto-register project to registry
@@ -451,238 +430,25 @@ async fn get_workspace(
 }
 
 // ============================================================================
-// Iterative Assistant Commands
+// Legacy Commands (Deprecated - use iteration-based API instead)
 // ============================================================================
 
 #[tauri::command]
 async fn send_chat_message(
-    session_id: String,
-    message: String,
-    window: Window,
+    _session_id: String,
+    _message: String,
 ) -> Result<ChatActionResult, String> {
-    use cowork_core::storage::*;
-    use cowork_core::agents::iterative_assistant::*;
-    use cowork_core::llm::ModelConfig;
-    
-    println!("[Iterative] Processing chat message for session: {}", session_id);
-    
-    // Check if project is initialized
-    if !is_project_initialized() {
-        return Ok(ChatActionResult {
-            action_type: "direct_processing".to_string(),
-            data: Some(serde_json::json!({ "new_session_id": session_id })),
-        });
-    }
-    
-    // Load project index
-    let index = load_project_index()
-        .map_err(|e| format!("Failed to load project index: {}", e))?;
-    
-    // Find session by id
-    let session_record = index.sessions.iter()
-        .find(|s| s.session_id == session_id)
-        .ok_or_else(|| format!("Session not found: {}", session_id))?;
-    
-    match session_record.status {
-        cowork_core::data::SessionStatus::InProgress => {
-            // Session in progress, direct processing
-            println!("[Iterative] Session in progress, direct processing");
-            Ok(ChatActionResult {
-                action_type: "direct_processing".to_string(),
-                data: Some(serde_json::json!({ "new_session_id": session_id })),
-            })
-        }
-        cowork_core::data::SessionStatus::Completed => {
-            // Session completed, use IterativeAssistant
-            println!("[Iterative] Session completed, analyzing intent");
-            
-            // For now, just return a simple response suggesting modify
-            // Full implementation would use LLM
-            Ok(ChatActionResult {
-                action_type: "await_confirmation".to_string(),
-                data: Some(serde_json::json!({
-                    "intent": {
-                        "intent_type": "continue_development",
-                        "confidence": 0.8,
-                        "reasoning": "Session completed, suggesting to continue development",
-                        "suggested_action": "modify"
-                    },
-                    "suggestion": {
-                        "title": message,
-                        "modification_type": "feature_modification",
-                        "affected_modules": ["unknown"],
-                        "implementation_plan": ["Will be generated by AI"],
-                        "risk_assessment": {
-                            "risk_level": "low",
-                            "risks": [],
-                            "mitigation_strategies": []
-                        },
-                        "estimated_effort": "unknown",
-                        "confidence": 0.8
-                    },
-                    "session_id": session_id
-                })),
-            })
-        }
-        _ => {
-            // Other statuses
-            Ok(ChatActionResult {
-                action_type: "direct_processing".to_string(),
-                data: Some(serde_json::json!({ "new_session_id": session_id })),
-            })
-        }
-    }
+    // Legacy command - functionality moved to iteration-based architecture
+    Err("This command is deprecated. Please use the new Iteration-based API".to_string())
 }
 
 #[tauri::command]
 async fn confirm_modify(
-    session_id: String,
-    suggestion_str: String,
-    window: Window,
+    _session_id: String,
+    _suggestion_str: String,
 ) -> Result<String, String> {
-    use cowork_core::storage::*;
-    use cowork_core::pipeline::create_cowork_pipeline;
-    use cowork_core::llm::ModelConfig;
-    
-    println!("[Iterative] Confirming modify for session: {}", session_id);
-    
-    // Parse suggestion string
-    let suggestion: ModifySuggestion = serde_json::from_str(&suggestion_str)
-        .map_err(|e| format!("Failed to parse suggestion: {}", e))?;
-    
-    // Load LLM config
-    let config = ModelConfig::from_env()
-        .map_err(|e| format!("Failed to load config: {}", e))?;
-    
-    // Create interaction backend
-    let interaction = Arc::new(TauriBackend::new(
-        window.app_handle().clone(),
-        window.app_handle().state::<AppState>().event_bus.clone(),
-        window.app_handle().state::<AppState>().pending_requests.clone(),
-    ));
-    
-    // Set global interaction backend for HITL tools
-    use cowork_core::tools::hitl_content_tools::set_interaction_backend;
-    set_interaction_backend(interaction.clone());
-    
-    // Create modify session
-    let index = load_project_index()
-        .map_err(|e| format!("Failed to load project index: {}", e))?;
-    
-    let new_session_id = format!("session-{}", chrono::Utc::now().timestamp());
-    
-    // Create session record
-    let session_record = cowork_core::data::SessionRecord {
-        session_id: new_session_id.clone(),
-        session_type: cowork_core::data::SessionType::Modify,
-        created_at: chrono::Utc::now(),
-        completed_at: None,
-        status: cowork_core::data::SessionStatus::InProgress,
-        base_session_id: Some(session_id),
-        input_description: suggestion.title.clone(),
-        change_request_id: None,
-    };
-    
-    let mut index = index;
-    index.add_session(session_record);
-    save_project_index(&index)
-        .map_err(|e| format!("Failed to save index: {}", e))?;
-    
-    // Create pipeline
-    let pipeline = create_cowork_pipeline(
-        &config,
-        &new_session_id,
-        interaction,
-    ).map_err(|e| format!("Failed to create pipeline: {}", e))?;
-    
-    // Execute pipeline in background
-    let pipeline_clone = pipeline.clone();
-    let session_id_clone = new_session_id.clone();
-    let window_clone = window.app_handle().clone();
-    let idea_clone = suggestion.title.clone();
-
-    tokio::spawn(async move {
-        use adk_core::{RunConfig, Content};
-        use adk_session::{CreateRequest, SessionService, InMemorySessionService};
-        use adk_runner::{Runner, RunnerConfig};
-        use futures::StreamExt;
-        use std::collections::HashMap;
-
-        let result = async {
-            // Create session service
-            let session_service = Arc::new(InMemorySessionService::new());
-
-            // Create session
-            let user_id = "cowork-gui-user".to_string();
-            let app_name = "cowork-forge".to_string();
-
-            let session = session_service
-                .create(CreateRequest {
-                    app_name: app_name.clone(),
-                    user_id: user_id.clone(),
-                    session_id: None,
-                    state: HashMap::<String, serde_json::Value>::new(),
-                })
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to create session: {}", e))?;
-
-            let session_id = session.id().to_string();
-
-            // Create runner
-            let runner = Runner::new(RunnerConfig {
-                app_name,
-                agent: pipeline_clone,
-                session_service,
-                artifact_service: None,
-                memory_service: None,
-                run_config: Some(RunConfig::default()),
-            })?;
-
-            // Execute
-            let content = Content::new("user").with_text(&idea_clone);
-            let mut event_stream = runner.run(user_id, session_id, content).await?;
-
-            // Process events
-            while let Some(event_result) = event_stream.next().await {
-                match event_result {
-                    Ok(event) => {
-                        // Extract content
-                        let content = if let Some(ref response_content) = event.llm_response.content {
-                            response_content.parts.iter()
-                                .filter_map(|part| part.text())
-                                .collect::<Vec<_>>()
-                                .join("")
-                        } else {
-                            "".to_string()
-                        };
-                        
-                        // Get current stage name for agent identification
-                        let agent_name = get_current_stage_name();
-                        
-                        // Send event to frontend with agent name
-                        let _ = window_clone.emit("agent_event", serde_json::json!({
-                            "content": content,
-                            "is_thinking": content.is_empty(),
-                            "timestamp": chrono::Utc::now().to_rfc3339(),
-                            "agent_name": agent_name
-                        }));
-                    }
-                    Err(e) => {
-                        eprintln!("[Pipeline] Event error: {:?}", e);
-                    }
-                }
-            }
-
-            Ok::<(), anyhow::Error>(())
-        };
-
-        if let Err(e) = result.await {
-            eprintln!("[Pipeline] Execution error: {:?}", e);
-            let _ = window_clone.emit("pipeline_error", format!("Pipeline execution failed: {}", e));
-        }
-    });
-
-    Ok(new_session_id)
+    // Legacy command - functionality moved to iteration-based architecture
+    Err("This command is deprecated. Please use the new Iteration-based API (gui_create_iteration, gui_execute_iteration)".to_string())
 }
 
 // ============================================================================
@@ -696,939 +462,86 @@ fn greet(name: &str) -> String {
 
 #[tauri::command]
 async fn create_project(
-    idea: String,
-    window: Window,
-    state: State<'_, AppState>,
+    _idea: String,
 ) -> Result<String, String> {
-    use cowork_core::llm::ModelConfig;
-    use cowork_core::pipeline::create_cowork_pipeline;
-    use cowork_core::storage::*;
-
-    println!("[GUI] Creating project with idea: {}", idea);
-
-    // Get workspace path from app state
-    let workspace = state.workspace_path.lock()
-        .map_err(|e| format!("Failed to acquire lock: {}", e))?;
-    
-    let workspace_path = if let Some(ref ws) = *workspace {
-        ws.clone()
-    } else {
-        // No workspace set, use current directory
-        std::env::current_dir()
-            .map_err(|e| format!("Failed to get current directory: {}", e))?
-            .to_str()
-            .ok_or("Invalid current directory")?
-            .to_string()
-    };
-    drop(workspace);
-
-    // Ensure we're in the correct workspace directory
-    let workspace_path_buf = std::path::Path::new(&workspace_path);
-    if !workspace_path_buf.exists() {
-        return Err(format!("Workspace directory does not exist: {}", workspace_path));
-    }
-    
-    std::env::set_current_dir(workspace_path_buf)
-        .map_err(|e| format!("Failed to set working directory to {}: {}", workspace_path, e))?;
-
-    println!("[GUI] Working directory set to: {}", std::env::current_dir().unwrap().display());
-
-    // Load config - try working directory first, then exe directory
-    let config = if Path::new("config.toml").exists() {
-        ModelConfig::from_file("config.toml")
-            .map_err(|e| format!("Failed to load config from working directory: {}", e))?
-    } else if let Ok(exe_path) = std::env::current_exe() {
-        let exe_dir = exe_path.parent().unwrap_or(&exe_path);
-        let config_path = exe_dir.join("config.toml");
-        if config_path.exists() {
-            ModelConfig::from_file(config_path.to_str().unwrap())
-                .map_err(|e| format!("Failed to load config from exe directory: {}", e))?
-        } else {
-            ModelConfig::from_env()
-                .map_err(|e| format!("Failed to load config from env: {}", e))?
-        }
-    } else {
-        ModelConfig::from_env()
-            .map_err(|e| format!("Failed to load config: {}", e))?
-    };
-    
-    // Initialize project (allow even if already initialized for GUI)
-    let project_name = idea.split_whitespace().take(3).collect::<Vec<_>>().join("_");
-    let mut index = if is_project_initialized() {
-        println!("[GUI] Loading existing project index");
-        load_project_index()
-            .map_err(|e| format!("Failed to load existing index: {}", e))?
-    } else {
-        println!("[GUI] Initializing new project");
-        let index = init_project_index(project_name)
-            .map_err(|e| format!("Failed to init project: {}", e))?;
-        
-        // Verify that index.json was created
-        let index_path = PathBuf::from(".cowork/index.json");
-        if !index_path.exists() {
-            return Err(format!("Failed to create index.json at {:?}", index_path));
-        }
-        
-        println!("[GUI] New project initialized successfully");
-        index
-    };
-    
-    let session_id = format!("session-{}", chrono::Utc::now().timestamp());
-    
-    // Create session record
-    let session_record = cowork_core::data::SessionRecord {
-        session_id: session_id.clone(),
-        session_type: cowork_core::data::SessionType::New,
-        created_at: chrono::Utc::now(),
-        completed_at: None,
-        status: cowork_core::data::SessionStatus::InProgress,
-        base_session_id: None,
-        input_description: idea.clone(),
-        change_request_id: None,
-    };
-    index.add_session(session_record);
-    save_project_index(&index)
-        .map_err(|e| format!("Failed to save index: {}", e))?;
-    
-    // Create interaction backend with shared pending_requests
-    let interaction = Arc::new(TauriBackend::new(
-        window.app_handle().clone(),
-        state.event_bus.clone(),
-        state.pending_requests.clone(),
-    ));
-
-    // Set global interaction backend for HITL tools
-    use cowork_core::tools::hitl_content_tools::set_interaction_backend;
-    set_interaction_backend(interaction.clone());
-
-    // Create pipeline
-    let pipeline = create_cowork_pipeline(&config, &session_id, interaction)
-        .map_err(|e| format!("Failed to create pipeline: {}", e))?;
-
-    // Save session input
-    let session_input = SessionInput {
-        session_id: session_id.clone(),
-        session_type: cowork_core::data::SessionType::New,
-        description: idea.clone(),
-        base_session_id: None,
-        created_at: chrono::Utc::now(),
-    };
-    save_session_input(&session_id, &session_input)
-        .map_err(|e| format!("Failed to save session input: {}", e))?;
-
-    // Ensure session directory exists
-    let _ = get_session_dir(&session_id)
-        .map_err(|e| format!("Failed to create session directory: {}", e))?;
-
-    // Execute pipeline in background
-    let pipeline_clone = pipeline.clone();
-    let session_id_clone = session_id.clone();
-    let window_clone = window.app_handle().clone();
-    let idea_clone = idea.clone();
-
-    tokio::spawn(async move {
-        use adk_core::{RunConfig, Content};
-        use adk_session::{CreateRequest, SessionService, InMemorySessionService};
-        use adk_runner::{Runner, RunnerConfig};
-        use futures::StreamExt;
-        use std::collections::HashMap;
-
-        let result = async {
-            // Create session service
-            let session_service = Arc::new(InMemorySessionService::new());
-
-            // Create session
-            let user_id = "cowork-gui-user".to_string();
-            let app_name = "cowork-forge".to_string();
-
-            let session = session_service
-                .create(CreateRequest {
-                    app_name: app_name.clone(),
-                    user_id: user_id.clone(),
-                    session_id: None,
-                    state: HashMap::<String, serde_json::Value>::new(),
-                })
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to create session: {}", e))?;
-
-            let session_id = session.id().to_string();
-
-            // Create runner
-            let runner = Runner::new(RunnerConfig {
-                app_name,
-                agent: pipeline_clone,
-                session_service,
-                artifact_service: None,
-                memory_service: None,
-                run_config: Some(RunConfig::default()),
-            })?;
-
-            // Execute
-            let content = Content::new("user").with_text(&idea_clone);
-            let mut event_stream = runner.run(user_id, session_id, content).await?;
-
-            // Process events
-            while let Some(event_result) = event_stream.next().await {
-                match event_result {
-                    Ok(event) => {
-                        // Extract content
-                        let content = if let Some(ref response_content) = event.llm_response.content {
-                            response_content.parts.iter()
-                                .filter_map(|part| part.text())
-                                .collect::<Vec<_>>()
-                                .join("")
-                        } else {
-                            "".to_string()
-                        };
-                        
-                        // Log to console for debugging
-                        if content.len() > 0 {
-                            println!("[Agent Event] Content length: {}", content.len());
-                        }
-                        
-                        // Get current stage name for agent identification
-                        let agent_name = get_current_stage_name();
-                        
-                        // Send structured event to frontend with agent name
-                        let _ = window_clone.emit("agent_event", serde_json::json!({
-                            "content": content,
-                            "is_thinking": content.is_empty(),
-                            "timestamp": chrono::Utc::now().to_rfc3339(),
-                            "agent_name": agent_name
-                        }));
-
-                        if content.is_empty() {
-                            let _ = window_clone.emit("session_completed", session_id_clone.clone());
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Agent event error: {}", e);
-                    }
-                }
-            }
-
-            Ok::<(), anyhow::Error>(())
-        }.await;
-
-        match result {
-            Ok(_) => {
-                println!("[Session] Marking as completed: {}", session_id_clone);
-                let _ = cowork_core::storage::mark_session_completed(&session_id_clone);
-                let _ = window_clone.emit("session_completed", session_id_clone);
-            }
-            Err(e) => {
-                println!("[Session] Marking as failed: {} - Error: {}", session_id_clone, e);
-                let _ = cowork_core::storage::mark_session_failed(&session_id_clone);
-                let _ = window_clone.emit("session_failed", (&session_id_clone, e.to_string()));
-            }
-        }
-    });
-
-    // Notify UI
-    let _ = window.emit("project_created", &session_id);
-
-    Ok(session_id)
-}
-
-#[tauri::command]
-async fn resume_project(
-    base_session_id: String,
-    window: tauri::Window,
-    state: State<'_, AppState>,
-) -> Result<String, String> {
-    use cowork_core::storage::*;
-    use cowork_core::pipeline::create_resume_pipeline;
-    use cowork_core::llm::ModelConfig;
-    use std::path::Path;
-    
-    info!("Resuming project from session: {}", base_session_id);
-
-    // Try to find .cowork directory
-    try_find_cowork_dir();
-
-    if !is_project_initialized() {
-        return Err("No project found".to_string());
-    }
-
-    // Verify base session exists
-    let index = load_project_index()
-        .map_err(|e| format!("Failed to load index: {}", e))?;
-    
-    let base_session = index.sessions.iter()
-        .find(|s| s.session_id == base_session_id)
-        .ok_or_else(|| format!("Base session {} not found", base_session_id))?;
-
-    if base_session.status != cowork_core::data::SessionStatus::Completed
-        && base_session.status != cowork_core::data::SessionStatus::InProgress {
-        return Err("Can only resume from completed or in-progress sessions".to_string());
-    }
-
-    // Create new session for resume
-    let session_id = format!("session-{}", chrono::Utc::now().timestamp());
-    
-    let mut index = load_project_index()
-        .map_err(|e| format!("Failed to load index: {}", e))?;
-    
-    let session_record = cowork_core::data::SessionRecord {
-        session_id: session_id.clone(),
-        session_type: cowork_core::data::SessionType::New,
-        created_at: chrono::Utc::now(),
-        completed_at: None,
-        status: cowork_core::data::SessionStatus::InProgress,
-        base_session_id: Some(base_session_id.clone()),
-        input_description: format!("Resume from: {}", base_session.input_description),
-        change_request_id: None,
-    };
-
-    index.add_session(session_record);
-    save_project_index(&index)
-        .map_err(|e| format!("Failed to save index: {}", e))?;
-    
-    // Save session input
-    let session_input = SessionInput {
-        session_id: session_id.clone(),
-        session_type: cowork_core::data::SessionType::New,
-        description: format!("Resume from: {}", base_session.input_description),
-        base_session_id: Some(base_session_id.clone()),
-        created_at: chrono::Utc::now(),
-    };
-    save_session_input(&session_id, &session_input)
-        .map_err(|e| format!("Failed to save session input: {}", e))?;
-
-    // Bootstrap session state from base session
-    init_session_from_base(&session_id, &base_session_id).map_err(|e| e.to_string())?;
-
-    // Load config - try working directory first, then exe directory
-    let config = if Path::new("config.toml").exists() {
-        ModelConfig::from_file("config.toml")
-            .map_err(|e| format!("Failed to load config from working directory: {}", e))?
-    } else if let Ok(exe_path) = std::env::current_exe() {
-        let exe_dir = exe_path.parent().unwrap_or(&exe_path);
-        let config_path = exe_dir.join("config.toml");
-        if config_path.exists() {
-            ModelConfig::from_file(config_path.to_str().unwrap())
-                .map_err(|e| format!("Failed to load config from exe directory: {}", e))?
-        } else {
-            ModelConfig::from_env()
-                .map_err(|e| format!("Failed to load config from env: {}", e))?
-        }
-    } else {
-        ModelConfig::from_env()
-            .map_err(|e| format!("Failed to load config: {}", e))?
-    };
-
-    // Create interaction backend
-    let interaction = Arc::new(TauriBackend::new(
-        window.app_handle().clone(),
-        state.event_bus.clone(),
-        state.pending_requests.clone(),
-    ));
-
-    // Set global interaction backend for HITL tools
-    use cowork_core::tools::hitl_content_tools::set_interaction_backend;
-    set_interaction_backend(interaction.clone());
-
-    // Create resume pipeline
-    let pipeline = create_resume_pipeline(&config, &session_id, &base_session_id, interaction).map_err(|e| e.to_string())?;
-
-    // Execute pipeline in background
-    let pipeline_clone = pipeline.clone();
-    let session_id_clone = session_id.clone();
-    let window_clone = window.app_handle().clone();
-
-    tokio::spawn(async move {
-        use adk_core::{RunConfig, Content};
-        use adk_session::{CreateRequest, SessionService, InMemorySessionService};
-        use adk_runner::{Runner, RunnerConfig};
-        use futures::StreamExt;
-        use std::collections::HashMap;
-
-        let result = async {
-            let session_service = Arc::new(InMemorySessionService::new());
-
-            let user_id = "cowork-gui-user".to_string();
-            let app_name = "cowork-forge".to_string();
-
-            let session = session_service
-                .create(CreateRequest {
-                    app_name: app_name.clone(),
-                    user_id: user_id.clone(),
-                    session_id: None,
-                    state: HashMap::new(),
-                })
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to create session: {}", e))?;
-
-            let session_id = session.id().to_string();
-
-            let runner = Runner::new(RunnerConfig {
-                app_name,
-                agent: pipeline_clone,
-                session_service,
-                artifact_service: None,
-                memory_service: None,
-                run_config: Some(RunConfig::default()),
-            })?;
-
-            let content = Content::new("user").with_text("Resume session");
-            let mut event_stream = runner.run(user_id, session_id, content).await?;
-
-            while let Some(event_result) = event_stream.next().await {
-                match event_result {
-                    Ok(event) => {
-                        let content = if let Some(ref response_content) = event.llm_response.content {
-                            response_content.parts.iter()
-                                .filter_map(|part| part.text())
-                                .collect::<Vec<_>>()
-                                .join("")
-                        } else {
-                            "".to_string()
-                        };
-                        
-                        if content.len() > 0 {
-                            println!("[Agent Event] Content length: {}", content.len());
-                        }
-                        
-                        // Get current stage name for agent identification
-                        let agent_name = get_current_stage_name();
-                        
-                        let _ = window_clone.emit("agent_event", serde_json::json!({
-                            "content": content,
-                            "is_thinking": content.is_empty(),
-                            "timestamp": chrono::Utc::now().to_rfc3339(),
-                            "agent_name": agent_name
-                        }));
-
-                        if content.is_empty() {
-                            let _ = window_clone.emit("session_completed", session_id_clone.clone());
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Agent event error: {}", e);
-                    }
-                }
-            }
-
-            Ok::<(), anyhow::Error>(())
-        }.await;
-
-        match result {
-            Ok(_) => {
-                println!("[Session] Marking as completed: {}", session_id_clone);
-                let _ = cowork_core::storage::mark_session_completed(&session_id_clone);
-                let _ = window_clone.emit("session_completed", session_id_clone);
-            }
-            Err(e) => {
-                println!("[Session] Marking as failed: {} - Error: {}", session_id_clone, e);
-                let _ = cowork_core::storage::mark_session_failed(&session_id_clone);
-                let _ = window_clone.emit("session_failed", (&session_id_clone, e.to_string()));
-            }
-        }
-    });
-
-    // Notify UI
-    let _ = window.emit("project_created", &session_id);
-
-    Ok(session_id)
+    // Legacy command - functionality moved to iteration-based architecture
+    Err("This command is deprecated. Please use the new Iteration-based API (gui_init_project, gui_create_iteration)".to_string())
 }
 
 #[tauri::command]
 async fn revert_project(
-    base_session_id: String,
-    from_stage: String,
-    window: tauri::Window,
-    _state: State<'_, AppState>,
+    _base_session_id: String,
+    _from_stage: String,
 ) -> Result<String, String> {
-    use cowork_core::storage::*;
-    use cowork_core::llm::ModelConfig;
-    use cowork_core::pipeline::create_resume_pipeline;
-    use std::path::Path;
-    
-    info!("Reverting project from session: {} at stage: {}", base_session_id, from_stage);
-
-    // Try to find .cowork directory
-    try_find_cowork_dir();
-
-    if !is_project_initialized() {
-        return Err("No project found".to_string());
-    }
-
-    // Verify base session exists and is completed
-    let index = load_project_index()
-        .map_err(|e| format!("Failed to load index: {}", e))?;
-    
-    let base_session = index.sessions.iter()
-        .find(|s| s.session_id == base_session_id)
-        .ok_or_else(|| format!("Base session {} not found", base_session_id))?;
-
-    if base_session.status != cowork_core::data::SessionStatus::Completed {
-        return Err("Can only revert from completed sessions".to_string());
-    }
-
-    // Create new session for revert
-    let session_id = format!("session-{}", chrono::Utc::now().timestamp());
-    
-    let mut index = load_project_index()
-        .map_err(|e| format!("Failed to load index: {}", e))?;
-    
-    let session_record = cowork_core::data::SessionRecord {
-        session_id: session_id.clone(),
-        session_type: cowork_core::data::SessionType::Revert,
-        created_at: chrono::Utc::now(),
-        completed_at: None,
-        status: cowork_core::data::SessionStatus::InProgress,
-        base_session_id: Some(base_session_id.clone()),
-        input_description: format!("Revert from {} stage", from_stage),
-        change_request_id: None,
-    };
-
-    index.add_session(session_record);
-    save_project_index(&index)
-        .map_err(|e| format!("Failed to save index: {}", e))?;
-    
-    // Save session input
-    let session_input = SessionInput {
-        session_id: session_id.clone(),
-        session_type: cowork_core::data::SessionType::Revert,
-        description: format!("Revert from {} stage", from_stage),
-        base_session_id: Some(base_session_id.clone()),
-        created_at: chrono::Utc::now(),
-    };
-    save_session_input(&session_id, &session_input)
-        .map_err(|e| format!("Failed to save session input: {}", e))?;
-
-    // Bootstrap session state from base session
-    init_session_from_base(&session_id, &base_session_id).map_err(|e| e.to_string())?;
-
-    // Load config - try working directory first, then exe directory
-    let config = if Path::new("config.toml").exists() {
-        ModelConfig::from_file("config.toml")
-            .map_err(|e| format!("Failed to load config from working directory: {}", e))?
-    } else if let Ok(exe_path) = std::env::current_exe() {
-        let exe_dir = exe_path.parent().unwrap_or(&exe_path);
-        let config_path = exe_dir.join("config.toml");
-        if config_path.exists() {
-            ModelConfig::from_file(config_path.to_str().unwrap())
-                .map_err(|e| format!("Failed to load config from exe directory: {}", e))?
-        } else {
-            ModelConfig::from_env()
-                .map_err(|e| format!("Failed to load config from env: {}", e))?
-        }
-    } else {
-        ModelConfig::from_env()
-            .map_err(|e| format!("Failed to load config: {}", e))?
-    };
-
-    // Create interaction backend
-    let interaction = Arc::new(TauriBackend::new(
-        window.app_handle().clone(),
-        _state.event_bus.clone(),
-        _state.pending_requests.clone(),
-    ));
-
-    // Set global interaction backend for HITL tools
-    use cowork_core::tools::hitl_content_tools::set_interaction_backend;
-    set_interaction_backend(interaction.clone());
-
-    // Create resume pipeline
-    let pipeline = create_resume_pipeline(&config, &session_id, &base_session_id, interaction).map_err(|e| e.to_string())?;
-
-    // Execute pipeline in background
-    let pipeline_clone = pipeline.clone();
-    let session_id_clone = session_id.clone();
-    let window_clone = window.app_handle().clone();
-
-    tokio::spawn(async move {
-        use adk_core::{RunConfig, Content};
-        use adk_session::{CreateRequest, SessionService, InMemorySessionService};
-        use adk_runner::{Runner, RunnerConfig};
-        use futures::StreamExt;
-        use std::collections::HashMap;
-
-        let result = async {
-            let session_service = Arc::new(InMemorySessionService::new());
-
-            let user_id = "cowork-gui-user".to_string();
-            let app_name = "cowork-forge".to_string();
-
-            let session = session_service
-                .create(CreateRequest {
-                    app_name: app_name.clone(),
-                    user_id: user_id.clone(),
-                    session_id: None,
-                    state: HashMap::new(),
-                })
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to create session: {}", e))?;
-
-            let session_id = session.id().to_string();
-
-            let runner = Runner::new(RunnerConfig {
-                app_name,
-                agent: pipeline_clone,
-                session_service,
-                artifact_service: None,
-                memory_service: None,
-                run_config: Some(RunConfig::default()),
-            })?;
-
-            let content = Content::new("user").with_text("Revert session");
-            let mut event_stream = runner.run(user_id, session_id, content).await?;
-
-            while let Some(event_result) = event_stream.next().await {
-                match event_result {
-                    Ok(event) => {
-                        let content = if let Some(ref response_content) = event.llm_response.content {
-                            response_content.parts.iter()
-                                .filter_map(|part| part.text())
-                                .collect::<Vec<_>>()
-                                .join("")
-                        } else {
-                            "".to_string()
-                        };
-                        
-                        if content.len() > 0 {
-                            println!("[Agent Event] Content length: {}", content.len());
-                        }
-                        
-                        // Get current stage name for agent identification
-                        let agent_name = get_current_stage_name();
-                        
-                        let _ = window_clone.emit("agent_event", serde_json::json!({
-                            "content": content,
-                            "is_thinking": content.is_empty(),
-                            "timestamp": chrono::Utc::now().to_rfc3339(),
-                            "agent_name": agent_name
-                        }));
-
-                        if content.is_empty() {
-                            let _ = window_clone.emit("session_completed", session_id_clone.clone());
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Agent event error: {}", e);
-                    }
-                }
-            }
-
-            Ok::<(), anyhow::Error>(())
-        }.await;
-
-        match result {
-            Ok(_) => {
-                println!("[Session] Marking as completed: {}", session_id_clone);
-                let _ = cowork_core::storage::mark_session_completed(&session_id_clone);
-                let _ = window_clone.emit("session_completed", session_id_clone);
-            }
-            Err(e) => {
-                println!("[Session] Marking as failed: {} - Error: {}", session_id_clone, e);
-                let _ = cowork_core::storage::mark_session_failed(&session_id_clone);
-                let _ = window_clone.emit("session_failed", (&session_id_clone, e.to_string()));
-            }
-        }
-    });
-
-    // Notify UI
-    let _ = window.emit("project_created", &session_id);
-
-    Ok(session_id)
+    // Legacy command - functionality moved to iteration-based architecture
+    Err("This command is deprecated. Please use the new Iteration-based API".to_string())
 }
 
 #[tauri::command]
 async fn modify_project(
-    base_session_id: String,
-    idea: String,
-    window: tauri::Window,
-    _state: State<'_, AppState>,
+    _base_session_id: String,
+    _idea: String,
 ) -> Result<String, String> {
-    use cowork_core::storage::*;
-    use cowork_core::interaction::CliBackend;
-    use cowork_core::llm::ModelConfig;
-    use cowork_core::pipeline::create_modify_pipeline;
-    use std::path::Path;
-    
-    info!("Modifying project from session: {} with idea: {}", base_session_id, idea);
-
-    // Try to find .cowork directory
-    try_find_cowork_dir();
-
-    if !is_project_initialized() {
-        return Err("No project found".to_string());
-    }
-
-    // Verify base session exists and is completed
-    let index = load_project_index()
-        .map_err(|e| format!("Failed to load index: {}", e))?;
-    
-    let base_session = index.sessions.iter()
-        .find(|s| s.session_id == base_session_id)
-        .ok_or_else(|| format!("Base session {} not found", base_session_id))?;
-
-    if base_session.status != cowork_core::data::SessionStatus::Completed {
-        return Err("Can only modify completed sessions".to_string());
-    }
-
-    // Create new session for modify
-    let session_id = format!("session-{}", chrono::Utc::now().timestamp());
-    
-    let mut index = load_project_index()
-        .map_err(|e| format!("Failed to load index: {}", e))?;
-    
-    let session_record = cowork_core::data::SessionRecord {
-        session_id: session_id.clone(),
-        session_type: cowork_core::data::SessionType::Modify,
-        created_at: chrono::Utc::now(),
-        completed_at: None,
-        status: cowork_core::data::SessionStatus::InProgress,
-        base_session_id: Some(base_session_id.clone()),
-        input_description: idea.clone(),
-        change_request_id: None,
-    };
-
-    index.add_session(session_record);
-    save_project_index(&index)
-        .map_err(|e| format!("Failed to save index: {}", e))?;
-    
-    // Save session input
-    let session_input = SessionInput {
-        session_id: session_id.clone(),
-        session_type: cowork_core::data::SessionType::Modify,
-        description: idea.clone(),
-        base_session_id: Some(base_session_id.clone()),
-        created_at: chrono::Utc::now(),
-    };
-    save_session_input(&session_id, &session_input)
-        .map_err(|e| format!("Failed to save session input: {}", e))?;
-
-    // Bootstrap session state from base session
-    init_session_from_base(&session_id, &base_session_id).map_err(|e| e.to_string())?;
-
-    // Load config - try working directory first, then exe directory
-    let config = if Path::new("config.toml").exists() {
-        ModelConfig::from_file("config.toml")
-            .map_err(|e| format!("Failed to load config from working directory: {}", e))?
-    } else if let Ok(exe_path) = std::env::current_exe() {
-        let exe_dir = exe_path.parent().unwrap_or(&exe_path);
-        let config_path = exe_dir.join("config.toml");
-        if config_path.exists() {
-            ModelConfig::from_file(config_path.to_str().unwrap())
-                .map_err(|e| format!("Failed to load config from exe directory: {}", e))?
-        } else {
-            ModelConfig::from_env()
-                .map_err(|e| format!("Failed to load config from env: {}", e))?
-        }
-    } else {
-        ModelConfig::from_env()
-            .map_err(|e| format!("Failed to load config: {}", e))?
-    };
-
-    // Create interaction backend
-    let event_bus = Arc::new(EventBus::new());
-    let interaction = Arc::new(CliBackend::new(event_bus));
-
-    // Create modify pipeline
-    let pipeline = create_modify_pipeline(&config, &session_id, &base_session_id, interaction).map_err(|e| e.to_string())?;
-
-    // Execute pipeline in background
-    let pipeline_clone = pipeline.clone();
-    let session_id_clone = session_id.clone();
-    let window_clone = window.app_handle().clone();
-
-    tokio::spawn(async move {
-        use adk_core::{RunConfig, Content};
-        use adk_session::{CreateRequest, SessionService, InMemorySessionService};
-        use adk_runner::{Runner, RunnerConfig};
-        use futures::StreamExt;
-        use std::collections::HashMap;
-
-        let result = async {
-            let session_service = Arc::new(InMemorySessionService::new());
-
-            let user_id = "cowork-gui-user".to_string();
-            let app_name = "cowork-forge".to_string();
-
-            let session = session_service
-                .create(CreateRequest {
-                    app_name: app_name.clone(),
-                    user_id: user_id.clone(),
-                    session_id: None,
-                    state: HashMap::new(),
-                })
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to create session: {}", e))?;
-
-            let session_id = session.id().to_string();
-
-            let runner = Runner::new(RunnerConfig {
-                app_name,
-                agent: pipeline_clone,
-                session_service,
-                artifact_service: None,
-                memory_service: None,
-                run_config: Some(RunConfig::default()),
-            })?;
-
-            let content = Content::new("user").with_text("Modify session");
-            let mut event_stream = runner.run(user_id, session_id, content).await?;
-
-            while let Some(event_result) = event_stream.next().await {
-                match event_result {
-                    Ok(event) => {
-                        let content = if let Some(ref response_content) = event.llm_response.content {
-                            response_content.parts.iter()
-                                .filter_map(|part| part.text())
-                                .collect::<Vec<_>>()
-                                .join("")
-                        } else {
-                            "".to_string()
-                        };
-                        
-                        if content.len() > 0 {
-                            println!("[Agent Event] Content length: {}", content.len());
-                        }
-                        
-                        // Get current stage name for agent identification
-                        let agent_name = get_current_stage_name();
-                        
-                        let _ = window_clone.emit("agent_event", serde_json::json!({
-                            "content": content,
-                            "is_thinking": content.is_empty(),
-                            "timestamp": chrono::Utc::now().to_rfc3339(),
-                            "agent_name": agent_name
-                        }));
-
-                        if content.is_empty() {
-                            let _ = window_clone.emit("session_completed", session_id_clone.clone());
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Agent event error: {}", e);
-                    }
-                }
-            }
-
-            Ok::<(), anyhow::Error>(())
-        }.await;
-
-        match result {
-            Ok(_) => {
-                println!("[Session] Marking as completed: {}", session_id_clone);
-                let _ = cowork_core::storage::mark_session_completed(&session_id_clone);
-                let _ = window_clone.emit("session_completed", session_id_clone);
-            }
-            Err(e) => {
-                println!("[Session] Marking as failed: {} - Error: {}", session_id_clone, e);
-                let _ = cowork_core::storage::mark_session_failed(&session_id_clone);
-                let _ = window_clone.emit("session_failed", (&session_id_clone, e.to_string()));
-            }
-        }
-    });
-
-    // Notify UI
-    let _ = window.emit("project_created", &session_id);
-
-    Ok(session_id)
+    // Legacy command - functionality moved to iteration-based architecture
+    Err("This command is deprecated. Please use the new Iteration-based API (gui_create_iteration)".to_string())
 }
 
 #[tauri::command]
+async fn resume_project(
+    _base_session_id: String,
+) -> Result<String, String> {
+    // Legacy command - functionality moved to iteration-based architecture
+    Err("This command is deprecated. Please use the new Iteration-based API (gui_continue_iteration)".to_string())
+}
+
+// ============================================================================
+// Legacy Session Commands (use iteration-based API instead)
+// ============================================================================
+
+#[tauri::command]
 fn get_sessions(state: State<'_, AppState>) -> Result<Vec<SessionInfo>, String> {
-    use cowork_core::storage::*;
+    use std::path::Path;
     
     // Get the current workspace from app state
     let workspace = state.workspace_path.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
     
-    // If workspace is set, ensure we're in that directory
+    // Check for V2 project structure
     if let Some(ref workspace_path) = *workspace {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| format!("Failed to get current directory: {}", e))?;
+        let project_file = Path::new(workspace_path).join(".cowork-v2").join("project.json");
+        if project_file.exists() {
+            // V2 project - return empty list (iterations are separate)
+            return Ok(vec![]);
+        }
         
-        let workspace_path = std::path::Path::new(workspace_path);
-        if current_dir != workspace_path {
-            println!("[GUI] Current directory {:?} doesn't match workspace {:?}, switching...", 
-                     current_dir, workspace_path);
-            std::env::set_current_dir(workspace_path)
-                .map_err(|e| format!("Failed to set workspace directory: {}", e))?;
-        }
-    } else {
-        // Only try to find .cowork directory if no workspace is set
-        try_find_cowork_dir();
-    }
-    drop(workspace);
-
-    // Check if project is initialized
-    if !is_project_initialized() {
-        return Ok(vec![]); // Return empty list if not initialized
-    }
-
-    let index = load_project_index()
-        .map_err(|e| format!("Failed to load index: {}", e))?;
-
-    Ok(index.sessions.into_iter().map(|s| SessionInfo {
-        id: s.session_id,
-        status: format!("{:?}", s.status),
-        created_at: s.created_at.to_rfc3339(),
-        description: s.input_description,
-    }).collect())
-}
-
-fn try_find_cowork_dir() -> bool {
-    use std::path::Path;
-use cowork_core::llm::ModelConfig;
-    let current_dir = std::env::current_dir().unwrap();
-    let mut search_dir = current_dir.clone();
-
-    for _ in 0..5 {
-        let cowork_path = search_dir.join(".cowork");
-        if cowork_path.exists() && cowork_path.join("index.json").exists() {
-            std::env::set_current_dir(&search_dir).unwrap();
-            println!("[GUI] Working directory set to: {:?}", search_dir);
-            return true;
-        }
-
-        if let Ok(entries) = std::fs::read_dir(&search_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    let cowork_path = path.join(".cowork");
-                    if cowork_path.exists() && cowork_path.join("index.json").exists() {
-                        std::env::set_current_dir(&path).unwrap();
-                        println!("[GUI] Working directory set to: {:?}", path);
-                        return true;
+        // Check for old V1 structure
+        let v1_index = Path::new(workspace_path).join(".cowork").join("index.json");
+        if v1_index.exists() {
+            // Try to load old sessions
+            match std::fs::read_to_string(&v1_index) {
+                Ok(content) => {
+                    if let Ok(index) = serde_json::from_str::<cowork_core::data::ProjectIndex>(&content) {
+                        return Ok(index.sessions.into_iter().map(|s| SessionInfo {
+                            id: s.session_id,
+                            status: format!("{:?}", s.status),
+                            created_at: s.created_at.to_rfc3339(),
+                            description: s.input_description,
+                        }).collect());
                     }
                 }
+                Err(_) => {}
             }
         }
-
-        search_dir = search_dir.parent().unwrap_or(&search_dir).to_path_buf();
-        if search_dir == current_dir {
-            break;
-        }
     }
-    false
+    
+    Ok(vec![])
 }
-
-// ============================================================================
-// Session Info
-// ============================================================================
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct SessionInfo {
-    id: String,
-    status: String,
-    created_at: String,
-    description: String,
-}
-
-// ============================================================================
-// HITL Commands
-// ============================================================================
 
 #[tauri::command]
 async fn submit_input_response(
     request_id: String,
     response: String,
-    response_type: String, // "text" or "selection"
+    response_type: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let input_response = match response_type.as_str() {
@@ -1648,107 +561,33 @@ async fn submit_input_response(
     }
 }
 
-// ============================================================================
-// Session Management Commands
-// ============================================================================
-
 #[tauri::command]
 async fn delete_session(
-    session_id: String,
-    window: tauri::Window,
+    _session_id: String,
+    _window: tauri::Window,
 ) -> Result<(), String> {
-    use cowork_core::storage::*;
-    
-    // Check if this is the current session in workspace
-    let workspace = std::env::current_dir()
-        .map_err(|e| format!("Failed to get current directory: {}", e))?;
-    
-    let index = load_project_index()
-        .map_err(|e| format!("Failed to load index: {}", e))?;
-    
-    // Check if session exists
-    let session_exists = index.sessions.iter().any(|s| s.session_id == session_id);
-    if !session_exists {
-        return Err(format!("Session not found: {}", session_id));
-    }
-    
-    // Delete session from index
-    let mut index = load_project_index()
-        .map_err(|e| format!("Failed to load index: {}", e))?;
-    
-    index.sessions.retain(|s| s.session_id != session_id);
-    
-    // Update latest successful session if needed
-    if let Some(ref latest) = index.latest_successful_session {
-        if latest == &session_id {
-            index.latest_successful_session = None;
-        }
-    }
-    
-    save_project_index(&index)
-        .map_err(|e| format!("Failed to save index: {}", e))?;
-    
-    // Delete session directory
-    let session_dir = workspace.join(".cowork").join("sessions").join(&session_id);
-    if session_dir.exists() {
-        std::fs::remove_dir_all(&session_dir)
-            .map_err(|e| format!("Failed to delete session directory: {}", e))?;
-    }
-    
-    // Emit event to refresh sessions
-    let _ = window.emit("session_deleted", &session_id);
-    
-    Ok(())
+    // Legacy command - use gui_delete_iteration for V2 API
+    Err("This command is deprecated for V2 projects. Use gui_delete_iteration instead.".to_string())
 }
 
 #[tauri::command]
 async fn get_session_logs(
-    session_id: String,
+    _session_id: String,
 ) -> Result<Vec<SessionLogEntry>, String> {
-    use std::fs;
-    use std::path::PathBuf;
-    
-    let current_dir = std::env::current_dir()
-        .map_err(|e| format!("Failed to get current directory: {}", e))?;
-    
-    let logs_dir = current_dir
-        .join(".cowork")
-        .join("sessions")
-        .join(&session_id)
-        .join("logs");
-    
-    if !logs_dir.exists() {
-        return Ok(vec![]);
-    }
-    
-    let mut logs = Vec::new();
-    
-    // Read all log files
-    let entries = fs::read_dir(&logs_dir)
-        .map_err(|e| format!("Failed to read logs directory: {}", e))?;
-    
-    for entry in entries {
-        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
-        let path = entry.path();
-        
-        if path.is_file() {
-            let content = fs::read_to_string(&path)
-                .map_err(|e| format!("Failed to read log file: {}", e))?;
-            
-            logs.push(SessionLogEntry {
-                file: path.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("unknown")
-                    .to_string(),
-                content,
-            });
-        }
-    }
-    
-    // Sort logs by file name (assuming timestamp-based naming)
-    logs.sort_by(|a, b| a.file.cmp(&b.file));
-    
-    Ok(logs)
+    // Legacy command - logs are now per-iteration in V2
+    Ok(vec![])
+}
+
+// ============================================================================
+// Session Info Types
+// ============================================================================
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SessionInfo {
+    id: String,
+    status: String,
+    created_at: String,
+    description: String,
 }
 
 #[derive(serde::Serialize)]
@@ -1783,6 +622,7 @@ pub fn run() {
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             greet,
+            // Legacy commands (for backward compatibility during transition)
             create_project,
             revert_project,
             modify_project,
@@ -1791,6 +631,16 @@ pub fn run() {
             submit_input_response,
             delete_session,
             get_session_logs,
+            // New Iteration-based commands
+            iteration_commands::gui_init_project,
+            iteration_commands::gui_get_project,
+            iteration_commands::gui_delete_project,
+            iteration_commands::gui_create_iteration,
+            iteration_commands::gui_get_iterations,
+            iteration_commands::gui_get_iteration,
+            iteration_commands::gui_execute_iteration,
+            iteration_commands::gui_continue_iteration,
+            iteration_commands::gui_delete_iteration,
             // GUI-specific commands
             gui_commands::get_session_artifacts,
             gui_commands::read_file_content,
@@ -1862,7 +712,3 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-
-
-
-

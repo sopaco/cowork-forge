@@ -63,6 +63,14 @@ const CommandPalette = ({ visible, onClose, onCommandSelect }) => {
     },
     // View commands
     {
+      id: 'view-iterations',
+      label: 'View Iterations',
+      icon: <ThunderboltOutlined />,
+      category: 'View',
+      shortcut: 'Ctrl+0',
+      action: () => onCommandSelect('view-iterations'),
+    },
+    {
       id: 'view-chat',
       label: 'View Chat',
       icon: <FileTextOutlined />,
@@ -109,6 +117,14 @@ const CommandPalette = ({ visible, onClose, onCommandSelect }) => {
       category: 'View',
       shortcut: 'Ctrl+6',
       action: () => onCommandSelect('view-memory'),
+    },
+    {
+      id: 'view-projects',
+      label: 'View Projects',
+      icon: <FolderOpenOutlined />,
+      category: 'View',
+      shortcut: 'Ctrl+7',
+      action: () => onCommandSelect('view-projects'),
     },
     // Tools commands
     {
