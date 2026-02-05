@@ -9,7 +9,7 @@ import { Tabs, Spin, Alert, Empty, Button, Space } from 'antd';
 import { FileTextOutlined, ProjectOutlined, DatabaseOutlined, BuildOutlined, CheckCircleOutlined, FileMarkdownOutlined } from '@ant-design/icons';
 import 'highlight.js/styles/atom-one-dark.css';
 
-const ArtifactsViewer = ({ sessionId }) => {
+const ArtifactsViewer = ({ iterationId }) => {
   const [artifacts, setArtifacts] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -17,16 +17,18 @@ const ArtifactsViewer = ({ sessionId }) => {
   const [viewModes, setViewModes] = useState({});
 
   useEffect(() => {
-    if (sessionId) {
+    if (iterationId) {
       loadArtifacts();
     }
-  }, [sessionId]);
+  }, [iterationId]);
 
   const loadArtifacts = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await invoke('get_session_artifacts', { sessionId });
+      // Try new V2 API first, fall back to legacy API
+      const data = await invoke('get_iteration_artifacts', { iterationId })
+        .catch(() => invoke('get_session_artifacts', { sessionId: iterationId }));
       setArtifacts(data);
     } catch (err) {
       setError(err.toString());

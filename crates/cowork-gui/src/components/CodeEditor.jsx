@@ -13,7 +13,7 @@ try {
   console.warn('react-window not installed. Install it with: npm install react-window');
 }
 
-const CodeEditor = ({ sessionId }) => {
+const CodeEditor = ({ iterationId }) => {
   const [fileTree, setFileTree] = useState(null);
   const [openFiles, setOpenFiles] = useState([]);
   const [activeFile, setActiveFile] = useState(null);
@@ -23,10 +23,10 @@ const CodeEditor = ({ sessionId }) => {
   const [formatting, setFormatting] = useState(false);
 
   useEffect(() => {
-    if (sessionId) {
+    if (iterationId) {
       loadFileTree();
     }
-  }, [sessionId]);
+  }, [iterationId]);
 
   // Flatten file tree for virtual scrolling
   const flatFileTree = useMemo(() => {
@@ -55,7 +55,9 @@ const CodeEditor = ({ sessionId }) => {
     setLoading(true);
     setError(null);
     try {
-      const tree = await invoke('get_file_tree', { sessionId });
+      // Try new V2 API first, fall back to legacy API
+      const tree = await invoke('get_iteration_file_tree', { iterationId })
+        .catch(() => invoke('get_file_tree', { sessionId: iterationId }));
       setFileTree(tree);
     } catch (err) {
       setError(err.toString());
@@ -67,7 +69,8 @@ const CodeEditor = ({ sessionId }) => {
   const formatAllCode = async () => {
     setFormatting(true);
     const result = await tryExecute(async () => {
-      return await invoke('format_code', { sessionId, filePath: null });
+      return await invoke('format_code', { iterationId, filePath: null })
+        .catch(() => invoke('format_code', { sessionId: iterationId, filePath: null }));
     }, 'Failed to format code');
     
     setFormatting(false);
@@ -86,7 +89,8 @@ const CodeEditor = ({ sessionId }) => {
     
     setFormatting(true);
     const result = await tryExecute(async () => {
-      return await invoke('format_code', { sessionId, filePath: activeFile });
+      return await invoke('format_code', { iterationId, filePath: activeFile })
+        .catch(() => invoke('format_code', { sessionId: iterationId, filePath: activeFile }));
     }, 'Failed to format file');
     
     setFormatting(false);
@@ -100,12 +104,17 @@ const CodeEditor = ({ sessionId }) => {
 
   const loadFileContent = async (filePath) => {
     const result = await tryExecute(async () => {
-      const result = await invoke('read_file_content', { 
-        sessionId, 
+      const result = await invoke('read_iteration_file', { 
+        iterationId, 
         filePath,
         offset: null,
         limit: null
-      });
+      }).catch(() => invoke('read_file_content', { 
+        sessionId: iterationId, 
+        filePath,
+        offset: null,
+        limit: null
+      }));
       
       // Handle both old format (string) and new format (FileReadResult)
       let content = result;
@@ -125,7 +134,8 @@ const CodeEditor = ({ sessionId }) => {
 
   const saveFileContent = async (filePath, content) => {
     const success = await tryExecute(async () => {
-      await invoke('save_file_content', { sessionId, filePath, content });
+      await invoke('save_iteration_file', { iterationId, filePath, content })
+        .catch(() => invoke('save_file_content', { sessionId: iterationId, filePath, content }));
       return true;
     }, 'Failed to save file');
     
@@ -388,11 +398,4 @@ const CodeEditor = ({ sessionId }) => {
             margin: 0, 
             background: 'var(--bg-container)'
           }}
-          className="code-editor-tabs"
-        />
-      </div>
-    </div>
-  );
-};
-
-export default CodeEditor;
+          cla

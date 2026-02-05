@@ -641,7 +641,7 @@ pub fn run() {
             iteration_commands::gui_execute_iteration,
             iteration_commands::gui_continue_iteration,
             iteration_commands::gui_delete_iteration,
-            // GUI-specific commands
+            // GUI-specific commands (Legacy)
             gui_commands::get_session_artifacts,
             gui_commands::read_file_content,
             gui_commands::save_file_content,
@@ -651,6 +651,15 @@ pub fn run() {
             gui_commands::start_project,
             gui_commands::stop_project,
             gui_commands::execute_project_command,
+            // GUI-specific commands (V2 API - Iteration based)
+            gui_commands::get_iteration_artifacts,
+            gui_commands::read_iteration_file,
+            gui_commands::save_iteration_file,
+            gui_commands::get_iteration_file_tree,
+            gui_commands::start_iteration_preview,
+            gui_commands::stop_iteration_preview,
+            gui_commands::start_iteration_project,
+            gui_commands::stop_iteration_project,
             // Memory commands
             gui_commands::query_memory_index,
             gui_commands::load_memory_detail,

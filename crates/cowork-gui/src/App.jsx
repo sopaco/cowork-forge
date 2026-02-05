@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { Layout, Menu, Button, Spin, Empty, Modal, message, Tooltip, Badge } from 'antd';
+import { Layout, Menu, Button, Spin, Empty, Modal, message, Tooltip, Badge, Input, Tag } from 'antd';
 import {
   FolderOutlined,
   FileTextOutlined,
@@ -374,28 +374,28 @@ function App() {
 
       case 'artifacts':
         return currentIteration ? (
-          <ArtifactsViewer sessionId={currentIteration.id} />
+          <ArtifactsViewer iterationId={currentIteration.id} />
         ) : (
           <Empty description="Select an iteration" style={{ marginTop: '40px' }} />
         );
 
       case 'code':
         return currentIteration ? (
-          <CodeEditor sessionId={currentIteration.id} />
+          <CodeEditor iterationId={currentIteration.id} />
         ) : (
           <Empty description="Select an iteration" style={{ marginTop: '40px' }} />
         );
 
       case 'preview':
         return currentIteration ? (
-          <PreviewPanel sessionId={currentIteration.id} />
+          <PreviewPanel iterationId={currentIteration.id} />
         ) : (
           <Empty description="Select an iteration" style={{ marginTop: '40px' }} />
         );
 
       case 'run':
         return currentIteration ? (
-          <RunnerPanel sessionId={currentIteration.id} />
+          <RunnerPanel iterationId={currentIteration.id} />
         ) : (
           <Empty description="Select an iteration" style={{ marginTop: '40px' }} />
         );

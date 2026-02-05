@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Spin, Alert, Button, Space } from 'antd';
 import { ReloadOutlined, FullscreenOutlined, StopOutlined } from '@ant-design/icons';
 
-const PreviewPanel = ({ sessionId }) => {
+const PreviewPanel = ({ iterationId }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -13,7 +13,9 @@ const PreviewPanel = ({ sessionId }) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await invoke('start_preview', { sessionId });
+      // Try new V2 API first, fall back to legacy API
+      const result = await invoke('start_iteration_preview', { iterationId })
+        .catch(() => invoke('start_preview', { sessionId: iterationId }));
       setPreviewUrl(result.url);
       setIsRunning(true);
     } catch (err) {
@@ -26,7 +28,8 @@ const PreviewPanel = ({ sessionId }) => {
   const stopPreview = async () => {
     setLoading(true);
     try {
-      await invoke('stop_preview', { sessionId });
+      await invoke('stop_iteration_preview', { iterationId })
+        .catch(() => invoke('stop_preview', { sessionId: iterationId }));
       setPreviewUrl(null);
       setIsRunning(false);
     } catch (err) {

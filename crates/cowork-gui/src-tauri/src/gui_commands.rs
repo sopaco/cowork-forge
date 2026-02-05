@@ -5,6 +5,8 @@ use crate::AppState;
 use crate::preview_server::PreviewServerManager;
 use crate::project_runner::ProjectRunner;
 use cowork_core::storage::*;
+use cowork_core::persistence::{IterationStore, ProjectStore};
+use cowork_core::data::{Requirements, DesignSpec, ImplementationPlan};
 use tauri::{State, Window};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -24,46 +26,109 @@ pub fn init_app_handle(handle: tauri::AppHandle) {
 }
 
 // ============================================================================
-// Get Session Artifacts
+// Get Iteration Artifacts (New V2 API)
+// ============================================================================
+
+#[tauri::command]
+pub async fn get_iteration_artifacts(
+    iteration_id: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<SessionArtifacts, String> {
+    println!("[GUI] Getting artifacts for iteration: {}", iteration_id);
+
+    let iteration_store = IterationStore::new();
+    let iteration = iteration_store.load(&iteration_id)
+        .map_err(|e| format!("Failed to load iteration: {}", e))?;
+
+    // Get iteration artifacts directory
+    let iteration_dir = iteration_store.iteration_path(&iteration_id)
+        .map_err(|e| format!("Failed to get iteration dir: {}", e))?;
+    let artifacts_dir = iteration_dir.join("artifacts");
+
+    // Load artifacts from .cowork-v2 structure
+    let idea = fs::read_to_string(artifacts_dir.join("idea.md")).ok();
+    let prd = fs::read_to_string(artifacts_dir.join("prd.md")).ok();
+    let design_content = fs::read_to_string(artifacts_dir.join("design.md")).ok();
+    let plan_content = fs::read_to_string(artifacts_dir.join("plan.md")).ok();
+    let delivery_report = fs::read_to_string(artifacts_dir.join("delivery_report.md")).ok();
+    let check_report = fs::read_to_string(artifacts_dir.join("check_report.md")).ok();
+
+    // Load workspace code files if available
+    let workspace = iteration_store.workspace_path(&iteration_id)
+        .map_err(|e| format!("Failed to get workspace: {}", e))?;
+    let code_files = if workspace.exists() {
+        collect_files(&workspace)
+    } else {
+        vec![]
+    };
+
+    // Parse PRD content into structured requirements (if possible)
+    let requirements = prd.as_ref().and_then(|_content| {
+        // Simple parsing - extract requirements sections
+        use chrono::Utc;
+        Some(Requirements {
+            schema_version: "1.0".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            requirements: vec![], // TODO: Parse from markdown
+        })
+    });
+
+    // Parse design content - return None for now as DesignSpec has complex structure
+    let design: Option<DesignSpec> = None; // TODO: Parse from markdown
+
+    // Parse plan content - return None for now as ImplementationPlan has complex structure
+    let plan: Option<ImplementationPlan> = None; // TODO: Parse from markdown
+
+    Ok(SessionArtifacts {
+        session_id: iteration_id.clone(),
+        idea,
+        requirements,
+        features: None,
+        design,
+        plan,
+        code_files,
+        delivery_report,
+    })
+}
+
+// ============================================================================
+// Get Session Artifacts (Legacy - for backward compatibility)
 // ============================================================================
 
 #[tauri::command]
 pub async fn get_session_artifacts(
     session_id: String,
-    _window: Window,
-    _state: State<'_, AppState>,
+    window: Window,
+    state: State<'_, AppState>,
 ) -> Result<SessionArtifacts, String> {
-    println!("[GUI] Getting artifacts for session: {}", session_id);
+    // Try to load as iteration first (V2)
+    let iteration_store = IterationStore::new();
+    if iteration_store.exists(&session_id) {
+        return get_iteration_artifacts(session_id, window, state).await;
+    }
 
-    // Get session directory
+    // Fall back to legacy session-based loading (V1)
+    println!("[GUI] Getting artifacts for session (legacy): {}", session_id);
+
     let session_dir = get_session_dir(&session_id)
         .map_err(|e| format!("Failed to get session dir: {}", e))?;
 
     let code_dir = session_dir.join("code");
 
-    // Load idea
     let idea = load_idea(&session_id).ok();
-
-    // Load requirements
     let requirements = load_requirements(&session_id).ok();
-
-    // Load features
     let features = load_feature_list(&session_id).ok();
-
-    // Load design
     let design = load_design_spec(&session_id).ok();
-
-    // Load plan
     let plan = load_implementation_plan(&session_id).ok();
 
-    // Load code files
     let code_files = if code_dir.exists() {
         collect_files(&code_dir)
     } else {
         vec![]
     };
 
-    // Load delivery report
     let delivery_report = fs::read_to_string(session_dir.join("delivery_report.md")).ok();
 
     Ok(SessionArtifacts {
@@ -79,24 +144,39 @@ pub async fn get_session_artifacts(
 }
 
 // ============================================================================
-// File Operations
+// File Operations (Iteration-based V2 API)
 // ============================================================================
 
+// Legacy alias for read_iteration_file
 #[tauri::command]
 pub async fn read_file_content(
     session_id: String,
     file_path: String,
     offset: Option<usize>,
     limit: Option<usize>,
+    window: Window,
+    state: State<'_, AppState>,
+) -> Result<FileReadResult, String> {
+    // Delegate to the V2 implementation
+    read_iteration_file(session_id, file_path, offset, limit, window, state).await
+}
+
+#[tauri::command]
+pub async fn read_iteration_file(
+    iteration_id: String,
+    file_path: String,
+    offset: Option<usize>,
+    limit: Option<usize>,
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<FileReadResult, String> {
-    println!("[GUI] Reading file: {}", file_path);
+    println!("[GUI] Reading file for iteration {}: {}", iteration_id, file_path);
 
-    let project_root = cowork_core::storage::get_project_root()
-        .map_err(|e| format!("Failed to get project root: {}", e))?;
+    let iteration_store = IterationStore::new();
+    let workspace = iteration_store.workspace_path(&iteration_id)
+        .map_err(|e| format!("Failed to get workspace: {}", e))?;
 
-    let full_path = project_root.join(&file_path);
+    let full_path = workspace.join(&file_path);
 
     // Get file metadata
     let metadata = fs::metadata(&full_path)
@@ -148,7 +228,7 @@ pub async fn read_file_content(
 
 #[tauri::command]
 pub async fn save_file_content(
-    session_id: String,
+    _session_id: String,
     file_path: String,
     content: String,
     _window: Window,
@@ -160,6 +240,35 @@ pub async fn save_file_content(
         .map_err(|e| format!("Failed to get project root: {}", e))?;
 
     let full_path = project_root.join(&file_path);
+
+    // Create parent directories if needed
+    if let Some(parent) = full_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create directories: {}", e))?;
+    }
+
+    fs::write(&full_path, content)
+        .map_err(|e| format!("Failed to write file: {}", e))?;
+
+    println!("[GUI] File saved successfully");
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn save_iteration_file(
+    iteration_id: String,
+    file_path: String,
+    content: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<(), String> {
+    println!("[GUI] Saving file for iteration {}: {}", iteration_id, file_path);
+
+    let iteration_store = IterationStore::new();
+    let workspace = iteration_store.workspace_path(&iteration_id)
+        .map_err(|e| format!("Failed to get workspace: {}", e))?;
+
+    let full_path = workspace.join(&file_path);
 
     // Create parent directories if needed
     if let Some(parent) = full_path.parent() {
@@ -202,6 +311,33 @@ pub async fn get_file_tree(
     }
 
     build_file_tree(&project_root, &project_root, 0)
+        .map_err(|e| format!("Failed to build file tree: {}", e))
+}
+
+#[tauri::command]
+pub async fn get_iteration_file_tree(
+    iteration_id: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<FileTreeNode, String> {
+    println!("[GUI] Getting file tree for iteration: {}", iteration_id);
+
+    let iteration_store = IterationStore::new();
+    let workspace = iteration_store.workspace_path(&iteration_id)
+        .map_err(|e| format!("Failed to get workspace: {}", e))?;
+
+    if !workspace.exists() {
+        return Ok(FileTreeNode {
+            name: workspace.file_name().unwrap_or(workspace.as_os_str()).to_string_lossy().to_string(),
+            path: ".".to_string(),
+            is_dir: true,
+            children: Some(vec![]),
+            is_expanded: true,
+            language: None,
+        });
+    }
+
+    build_file_tree(&workspace, &workspace, 0)
         .map_err(|e| format!("Failed to build file tree: {}", e))
 }
 
@@ -271,6 +407,75 @@ pub async fn stop_project(
 ) -> Result<(), String> {
     println!("[GUI] Stopping project for session: {}", session_id);
     PROJECT_RUNNER.stop(session_id).await
+}
+
+// ============================================================================
+// Iteration-based Preview and Run Commands (V2 API)
+// ============================================================================
+
+#[tauri::command]
+pub async fn start_iteration_preview(
+    iteration_id: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<PreviewInfo, String> {
+    println!("[GUI] Starting preview for iteration: {}", iteration_id);
+
+    let iteration_store = IterationStore::new();
+    let workspace = iteration_store.workspace_path(&iteration_id)
+        .map_err(|e| format!("Failed to get workspace: {}", e))?;
+
+    if !workspace.exists() {
+        return Err(format!("Workspace directory not found: {}", workspace.display()));
+    }
+
+    PREVIEW_SERVER_MANAGER.start(iteration_id, workspace).await
+}
+
+#[tauri::command]
+pub async fn stop_iteration_preview(
+    iteration_id: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<(), String> {
+    println!("[GUI] Stopping preview for iteration: {}", iteration_id);
+    PREVIEW_SERVER_MANAGER.stop(iteration_id).await
+}
+
+#[tauri::command]
+pub async fn start_iteration_project(
+    iteration_id: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<RunInfo, String> {
+    println!("[GUI] Starting project for iteration: {}", iteration_id);
+
+    let iteration_store = IterationStore::new();
+    let workspace = iteration_store.workspace_path(&iteration_id)
+        .map_err(|e| format!("Failed to get workspace: {}", e))?;
+
+    let command = detect_start_command(&workspace)?;
+
+    println!("[GUI] Detected start command: {}", command);
+
+    let command_clone = command.clone();
+    let pid = PROJECT_RUNNER.start(iteration_id.clone(), command).await?;
+
+    Ok(RunInfo {
+        status: RunStatus::Running,
+        process_id: Some(pid),
+        command: Some(command_clone),
+    })
+}
+
+#[tauri::command]
+pub async fn stop_iteration_project(
+    iteration_id: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<(), String> {
+    println!("[GUI] Stopping project for iteration: {}", iteration_id);
+    PROJECT_RUNNER.stop(iteration_id).await
 }
 
 #[tauri::command]

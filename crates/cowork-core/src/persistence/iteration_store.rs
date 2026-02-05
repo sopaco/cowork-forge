@@ -86,6 +86,11 @@ impl IterationStore {
         Ok(workspace)
     }
 
+    /// Get iteration directory path (contains artifacts subdirectory)
+    pub fn iteration_path(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
+        Ok(get_cowork_dir()?.join("iterations").join(iteration_id))
+    }
+
     fn iteration_file_path(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
         Ok(get_cowork_dir()?.join("iterations").join(format!("{}.json", iteration_id)))
     }

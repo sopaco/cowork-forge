@@ -7,7 +7,7 @@ import { showError, showSuccess } from '../utils/errorHandler.jsx';
 
 const { TextArea } = Input;
 
-const RunnerPanel = ({ sessionId }) => {
+const RunnerPanel = ({ iterationId }) => {
   const [logs, setLogs] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -37,10 +37,11 @@ const RunnerPanel = ({ sessionId }) => {
 
     // Listen for project log events
     listen('project_log', (event) => {
-      const { session_id: logSessionId, stream, content } = event.payload;
+      const { iteration_id: logIterationId, session_id: logSessionId, stream, content } = event.payload;
       
-      // Only process logs for current session
-      if (logSessionId !== sessionId) {
+      // Only process logs for current iteration (support both new and old event format)
+      const targetId = logIterationId || logSessionId;
+      if (targetId !== iterationId) {
         return;
       }
 
@@ -53,8 +54,9 @@ const RunnerPanel = ({ sessionId }) => {
 
     // Listen for project stopped events
     listen('project_stopped', (event) => {
-      const { session_id: stoppedSessionId } = event.payload;
-      if (stoppedSessionId === sessionId) {
+      const { iteration_id: stoppedIterationId, session_id: stoppedSessionId } = event.payload;
+      const targetId = stoppedIterationId || stoppedSessionId;
+      if (targetId === iterationId) {
         setIsRunning(false);
       }
     }).then(unlisten => cleanupFunctions.push(unlisten));
@@ -72,7 +74,9 @@ const RunnerPanel = ({ sessionId }) => {
     setLogs(prev => [...prev, { type: 'system', content: '> Starting project...\n', timestamp: new Date() }]);
     
     const result = await tryExecute(async () => {
-      return await invoke('start_project', { sessionId });
+      // Try new V2 API first, fall back to legacy API
+      return await invoke('start_iteration_project', { iterationId })
+        .catch(() => invoke('start_project', { sessionId: iterationId }));
     }, 'Failed to start project');
     
     setLoading(false);
@@ -88,7 +92,8 @@ const RunnerPanel = ({ sessionId }) => {
     setLogs(prev => [...prev, { type: 'system', content: '> Stopping project...\n', timestamp: new Date() }]);
     
     const success = await tryExecute(async () => {
-      await invoke('stop_project', { sessionId });
+      await invoke('stop_iteration_project', { iterationId })
+        .catch(() => invoke('stop_project', { sessionId: iterationId }));
       return true;
     }, 'Failed to stop project');
     
@@ -222,12 +227,4 @@ const RunnerPanel = ({ sessionId }) => {
         <Tag color={isRunning ? 'green' : 'default'}>
           Status: {isRunning ? 'Running' : 'Stopped'}
         </Tag>
-        <span style={{ color: '#888', fontSize: '12px' }}>
-          {logs.length} total lines
-        </span>
-      </div>
-    </div>
-  );
-};
-
-export default RunnerPanel;
+        <span style={{ color: 
