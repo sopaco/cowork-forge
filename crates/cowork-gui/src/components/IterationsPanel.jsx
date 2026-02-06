@@ -54,8 +54,10 @@ const IterationsPanel = ({ onSelectIteration, selectedIterationId }) => {
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showInitProjectModal, setShowInitProjectModal] = useState(false);
   const [selectedIteration, setSelectedIteration] = useState(null);
   const [executingId, setExecutingId] = useState(null);
+  const [newProjectName, setNewProjectName] = useState('');
 
   // Form state
   const [newIterationTitle, setNewIterationTitle] = useState('');
@@ -178,6 +180,23 @@ const IterationsPanel = ({ onSelectIteration, selectedIterationId }) => {
     setNewIterationInheritance('full');
   };
 
+  const handleInitProject = async () => {
+    if (!newProjectName.trim()) {
+      message.warning('Please enter a project name');
+      return;
+    }
+
+    try {
+      await invoke('gui_init_project', { name: newProjectName });
+      message.success('Project initialized successfully');
+      setShowInitProjectModal(false);
+      setNewProjectName('');
+      loadData();
+    } catch (error) {
+      message.error('Failed to initialize project: ' + error);
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'completed': return 'success';
@@ -225,10 +244,36 @@ const IterationsPanel = ({ onSelectIteration, selectedIterationId }) => {
           description="No project initialized"
           image={Empty.PRESENTED_IMAGE_SIMPLE}
         >
-          <Button type="primary" onClick={() => setShowCreateModal(true)}>
+          <Button type="primary" onClick={() => setShowInitProjectModal(true)}>
             Initialize Project
           </Button>
         </Empty>
+
+        {/* Initialize Project Modal */}
+        <Modal
+          title="Initialize Project"
+          open={showInitProjectModal}
+          onOk={handleInitProject}
+          onCancel={() => {
+            setShowInitProjectModal(false);
+            setNewProjectName('');
+          }}
+          okText="Initialize"
+          cancelText="Cancel"
+        >
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+              Project Name:
+            </label>
+            <Input
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
+              placeholder="Enter project name"
+              autoFocus
+              onPressEnter={handleInitProject}
+            />
+          </div>
+        </Modal>
       </div>
     );
   }

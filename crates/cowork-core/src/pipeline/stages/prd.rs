@@ -28,13 +28,32 @@ impl Stage for PrdStage {
         ctx: &PipelineContext,
         interaction: Arc<dyn InteractiveBackend>,
     ) -> StageResult {
+        self.generate_prd(ctx, interaction, None).await
+    }
+
+    async fn execute_with_feedback(
+        &self,
+        ctx: &PipelineContext,
+        interaction: Arc<dyn InteractiveBackend>,
+        feedback: &str,
+    ) -> StageResult {
         interaction
             .show_message(
                 crate::interaction::MessageLevel::Info,
-                "Generating Product Requirements Document with AI...".to_string(),
+                "Regenerating PRD based on your feedback...".to_string(),
             )
             .await;
+        self.generate_prd(ctx, interaction, Some(feedback)).await
+    }
+}
 
+impl PrdStage {
+    async fn generate_prd(
+        &self,
+        ctx: &PipelineContext,
+        interaction: Arc<dyn InteractiveBackend>,
+        feedback: Option<&str>,
+    ) -> StageResult {
         // Load LLM config
         let config = match load_config() {
             Ok(cfg) => cfg,
@@ -68,9 +87,43 @@ impl Stage for PrdStage {
             }
         }
 
-        // Generate PRD using LLM
-        let prompt = format!(
-            r#"You are a product manager. Create a comprehensive Product Requirements Document (PRD) based on the following information.
+        // Build prompt
+        let prompt = if let Some(feedback_text) = feedback {
+            format!(
+                r#"You are a product manager. Please REVISE the Product Requirements Document (PRD) based on the following user feedback.
+
+**Iteration:** #{} - {}
+
+**Original Request:**
+{}
+
+{}
+
+**User Feedback for Revision:**
+{}
+
+Please create an IMPROVED PRD addressing the feedback. Include:
+
+1. **Overview** - Brief summary of the product/feature
+2. **Goals** - What we want to achieve
+3. **User Stories** - As a [user], I want [feature] so that [benefit]
+4. **Functional Requirements** - Detailed list of features and behaviors
+5. **Non-Functional Requirements** - Performance, security, usability requirements
+6. **UI/UX Requirements** - Interface guidelines and user experience expectations
+7. **Data Requirements** - Data models, storage needs
+8. **API Requirements** - External/internal API specifications
+9. **Open Questions** - Issues that need clarification
+
+Write the response in professional Markdown format suitable for a technical team."#,
+                ctx.iteration.number,
+                ctx.iteration.title,
+                ctx.iteration.description,
+                idea_content,
+                feedback_text
+            )
+        } else {
+            format!(
+                r#"You are a product manager. Create a comprehensive Product Requirements Document (PRD) based on the following information.
 
 **Iteration:** #{} - {}
 
@@ -92,19 +145,26 @@ Please create a detailed PRD that includes:
 9. **Open Questions** - Issues that need clarification
 
 Write the response in professional Markdown format suitable for a technical team."#,
-            ctx.iteration.number,
-            ctx.iteration.title,
-            ctx.iteration.description,
-            idea_content
-        );
+                ctx.iteration.number,
+                ctx.iteration.title,
+                ctx.iteration.description,
+                idea_content
+            )
+        };
 
         let content = Content::new("user").with_text(prompt);
         let request = LlmRequest::new(&config.llm.model_name, vec![content]);
         
+        let status_msg = if feedback.is_some() {
+            "Regenerating PRD with your feedback..."
+        } else {
+            "Generating PRD..."
+        };
+        
         interaction
             .show_message(
                 crate::interaction::MessageLevel::Info,
-                "Generating PRD...".to_string(),
+                status_msg.to_string(),
             )
             .await;
 
@@ -138,22 +198,37 @@ Write the response in professional Markdown format suitable for a technical team
         }
 
         // Write to file
-        let prd_content = format!(
-            "# Product Requirements Document (PRD)\n\n**Iteration:** #{} - {}\n\n**Generated:** {}\n\n---\n\n{}",
-            ctx.iteration.number,
-            ctx.iteration.title,
-            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-            generated_text
-        );
+        let header = if feedback.is_some() {
+            format!("# Product Requirements Document (PRD) - Revised\n\n**Iteration:** #{} - {}\n\n**Generated:** {}\n\n**Applied Feedback:**\n{}\n\n---\n\n",
+                ctx.iteration.number,
+                ctx.iteration.title,
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                feedback.unwrap()
+            )
+        } else {
+            format!("# Product Requirements Document (PRD)\n\n**Iteration:** #{} - {}\n\n**Generated:** {}\n\n---\n\n",
+                ctx.iteration.number,
+                ctx.iteration.title,
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+            )
+        };
+        
+        let prd_content = format!("{}{}", header, generated_text);
 
         if let Err(e) = std::fs::write(&artifact_path, prd_content) {
             return StageResult::Failed(format!("Failed to write PRD file: {}", e));
         }
 
+        let success_msg = if feedback.is_some() {
+            format!("PRD revised: {}", artifact_path)
+        } else {
+            format!("PRD generated: {}", artifact_path)
+        };
+        
         interaction
             .show_message(
                 crate::interaction::MessageLevel::Success,
-                format!("PRD generated: {}", artifact_path),
+                success_msg,
             )
             .await;
 

@@ -16,6 +16,9 @@ import {
   BranchesOutlined,
   CheckCircleOutlined,
   RocketOutlined,
+  CloseCircleOutlined,
+  EditOutlined,
+  SendOutlined,
 } from '@ant-design/icons';
 import ArtifactsViewer from './components/ArtifactsViewer';
 import CodeEditor from './components/CodeEditor';
@@ -43,7 +46,8 @@ function App() {
   const [project, setProject] = useState(null);
   const [iterations, setIterations] = useState([]);
   const [currentIteration, setCurrentIteration] = useState(null);
-  const [activeView, setActiveView] = useState('iterations'); // iterations, chat, artifacts, code, preview, run, memory, projects
+  const [activeView, setActiveView] = useState('projects'); // Default to projects tab when no project is loaded
+  const [hasInitialProject, setHasInitialProject] = useState(false);
   const [messages, setMessages] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStage, setCurrentStage] = useState(null);
@@ -76,6 +80,16 @@ function App() {
           );
           setCurrentIteration(iteration || null);
         }
+
+        // If we have a project and haven't switched to iterations yet, do it now
+        if (!hasInitialProject) {
+          setActiveView('iterations');
+          setHasInitialProject(true);
+        }
+      } else {
+        // No project loaded, ensure we're on projects tab
+        setActiveView('projects');
+        setHasInitialProject(false);
       }
     } catch (error) {
       console.error('[App] Failed to load data:', error);
@@ -148,8 +162,32 @@ function App() {
 
       await listen('input_request', (event) => {
         const [requestId, prompt, options] = event.payload;
-        setInputRequest({ requestId, prompt, options });
+        // Check if this is an artifact confirmation request
+        const artifactMatch = prompt.match(/\[ARTIFACT_TYPE:(\w+)\]$/);
+        if (artifactMatch) {
+          const artifactType = artifactMatch[1];
+          const cleanPrompt = prompt.replace(/\[ARTIFACT_TYPE:\w+\]$/, '').trim();
+          setInputRequest({ 
+            requestId, 
+            prompt: cleanPrompt, 
+            options,
+            isArtifactConfirmation: true,
+            artifactType
+          });
+        } else {
+          setInputRequest({ requestId, prompt, options });
+        }
         setUserInput('');
+      });
+
+      await listen('project_loaded', () => {
+        loadData();
+        message.success('Project loaded');
+      });
+
+      await listen('project_initialized', () => {
+        loadData();
+        message.success('Project initialized');
       });
     };
 
@@ -235,6 +273,26 @@ function App() {
   const handleSelectOption = async (option) => {
     if (!inputRequest) return;
 
+    // Handle view artifact option specially
+    if (option.id === 'view_artifact' && inputRequest.isArtifactConfirmation) {
+      // Switch to artifacts tab
+      setActiveView('artifacts');
+      message.info(`Switched to Artifacts tab to review ${inputRequest.artifactType}`);
+      // Keep the input request active so user can confirm after viewing
+      return;
+    }
+
+    // Handle feedback option - show feedback input mode
+    if (option.id === 'feedback' && inputRequest.isArtifactConfirmation) {
+      setInputRequest({
+        ...inputRequest,
+        isFeedbackMode: true,
+        feedbackPrompt: 'Please enter your feedback or suggestions for improvement:'
+      });
+      setUserInput('');
+      return;
+    }
+
     setMessages((prev) => [
       ...prev,
       { type: 'user', content: option.label, timestamp: new Date().toISOString() },
@@ -248,6 +306,39 @@ function App() {
 
     setInputRequest(null);
     setUserInput('');
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!inputRequest || !userInput.trim()) return;
+
+    const feedback = userInput.trim();
+    
+    setMessages((prev) => [
+      ...prev,
+      { type: 'user', content: `Feedback: ${feedback}`, timestamp: new Date().toISOString() },
+    ]);
+
+    // Send feedback as text response
+    await invoke('submit_input_response', {
+      requestId: inputRequest.requestId,
+      response: feedback,
+      responseType: 'text',
+    });
+
+    setInputRequest(null);
+    setUserInput('');
+    message.info('Feedback submitted. Agent will regenerate based on your input...');
+  };
+
+  const handleCancelFeedback = () => {
+    // Cancel feedback mode and go back to confirmation options
+    if (inputRequest) {
+      setInputRequest({
+        ...inputRequest,
+        isFeedbackMode: false,
+      });
+      setUserInput('');
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -344,16 +435,69 @@ function App() {
 
             {inputRequest && (
               <div style={{ padding: '16px', borderTop: '1px solid #e8e8e8', background: '#fafafa' }}>
-                <div style={{ marginBottom: '12px', fontWeight: 'bold' }}>
-                  {inputRequest.prompt}
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {inputRequest.options.map((option) => (
-                    <Button key={option.id} onClick={() => handleSelectOption(option)}>
-                      {option.label}
-                    </Button>
-                  ))}
-                </div>
+                {inputRequest.isFeedbackMode ? (
+                  // Feedback input mode
+                  <>
+                    <div style={{ marginBottom: '12px', fontWeight: 'bold' }}>
+                      <Tag color="orange" style={{ marginRight: '8px' }}>
+                        <EditOutlined /> Feedback Mode
+                      </Tag>
+                      {inputRequest.feedbackPrompt}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <Input.TextArea
+                        value={userInput}
+                        onChange={(e) => setUserInput(e.target.value)}
+                        placeholder="Enter your feedback or suggestions for improvement..."
+                        rows={4}
+                        autoFocus
+                      />
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <Button onClick={handleCancelFeedback}>
+                          Cancel
+                        </Button>
+                        <Button 
+                          type="primary" 
+                          icon={<SendOutlined />}
+                          onClick={handleSubmitFeedback}
+                          disabled={!userInput.trim()}
+                        >
+                          Submit Feedback
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  // Normal confirmation mode
+                  <>
+                    <div style={{ marginBottom: '12px', fontWeight: 'bold' }}>
+                      {inputRequest.isArtifactConfirmation && (
+                        <Tag color="blue" style={{ marginRight: '8px' }}>
+                          <EyeOutlined /> Review Required
+                        </Tag>
+                      )}
+                      {inputRequest.prompt}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {inputRequest.options.map((option) => (
+                        <Button 
+                          key={option.id} 
+                          type={option.id === 'yes' ? 'primary' : option.id === 'view_artifact' ? 'dashed' : option.id === 'feedback' ? 'dashed' : 'default'}
+                          danger={option.id === 'no'}
+                          icon={
+                            option.id === 'view_artifact' ? <EyeOutlined /> : 
+                            option.id === 'yes' ? <CheckCircleOutlined /> : 
+                            option.id === 'no' ? <CloseCircleOutlined /> : 
+                            option.id === 'feedback' ? <EditOutlined /> : null
+                          }
+                          onClick={() => handleSelectOption(option)}
+                        >
+                          {option.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

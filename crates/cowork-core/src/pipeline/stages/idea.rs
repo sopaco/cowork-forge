@@ -23,13 +23,32 @@ impl Stage for IdeaStage {
         ctx: &PipelineContext,
         interaction: Arc<dyn InteractiveBackend>,
     ) -> StageResult {
+        self.generate_idea(ctx, interaction, None).await
+    }
+
+    async fn execute_with_feedback(
+        &self,
+        ctx: &PipelineContext,
+        interaction: Arc<dyn InteractiveBackend>,
+        feedback: &str,
+    ) -> StageResult {
         interaction
             .show_message(
                 crate::interaction::MessageLevel::Info,
-                "Analyzing your requirements with AI...".to_string(),
+                "Regenerating idea document based on your feedback...".to_string(),
             )
             .await;
+        self.generate_idea(ctx, interaction, Some(feedback)).await
+    }
+}
 
+impl IdeaStage {
+    async fn generate_idea(
+        &self,
+        ctx: &PipelineContext,
+        interaction: Arc<dyn InteractiveBackend>,
+        feedback: Option<&str>,
+    ) -> StageResult {
         // Load LLM config
         let config = match load_config() {
             Ok(cfg) => cfg,
@@ -60,9 +79,31 @@ impl Stage for IdeaStage {
             }
         }
 
-        // Generate idea using LLM
-        let prompt = format!(
-            r#"You are a product analyst. Based on the following user request, create a structured idea document.
+        // Build prompt
+        let prompt = if let Some(feedback_text) = feedback {
+            format!(
+                r#"You are a product analyst. Please REVISE the idea document based on the following user feedback.
+
+**Original Request:**
+{}
+
+**User Feedback for Revision:**
+{}
+
+Please create an IMPROVED idea document addressing the feedback. Include:
+1. Problem Statement - What problem are we solving?
+2. Target Users - Who will use this?
+3. Core Features - What are the main features?
+4. Success Criteria - How do we measure success?
+5. Constraints - Any limitations or requirements?
+
+Write the response in Markdown format."#,
+                ctx.iteration.description,
+                feedback_text
+            )
+        } else {
+            format!(
+                r#"You are a product analyst. Based on the following user request, create a structured idea document.
 
 User Request: {}
 
@@ -74,16 +115,23 @@ Please analyze this request and create a comprehensive idea document that includ
 5. Constraints - Any limitations or requirements?
 
 Write the response in Markdown format."#,
-            ctx.iteration.description
-        );
+                ctx.iteration.description
+            )
+        };
 
         let content = Content::new("user").with_text(prompt);
         let request = LlmRequest::new(&config.llm.model_name, vec![content]);
         
+        let status_msg = if feedback.is_some() {
+            "Regenerating idea document with your feedback..."
+        } else {
+            "Generating idea document..."
+        };
+        
         interaction
             .show_message(
                 crate::interaction::MessageLevel::Info,
-                "Generating idea document...".to_string(),
+                status_msg.to_string(),
             )
             .await;
 
@@ -118,22 +166,37 @@ Write the response in Markdown format."#,
         }
 
         // Write to file
-        let idea_content = format!(
-            "# Idea Document\n\n**Iteration:** #{} - {}\n\n**Original Request:**\n{}\n\n---\n\n{}",
-            ctx.iteration.number,
-            ctx.iteration.title,
-            ctx.iteration.description,
-            generated_text
-        );
+        let header = if feedback.is_some() {
+            format!("# Idea Document (Revised)\n\n**Iteration:** #{} - {}\n\n**Original Request:**\n{}\n\n**Applied Feedback:**\n{}\n\n---\n\n", 
+                ctx.iteration.number,
+                ctx.iteration.title,
+                ctx.iteration.description,
+                feedback.unwrap()
+            )
+        } else {
+            format!("# Idea Document\n\n**Iteration:** #{} - {}\n\n**Original Request:**\n{}\n\n---\n\n", 
+                ctx.iteration.number,
+                ctx.iteration.title,
+                ctx.iteration.description
+            )
+        };
+        
+        let idea_content = format!("{}{}", header, generated_text);
 
         if let Err(e) = std::fs::write(&artifact_path, idea_content) {
             return StageResult::Failed(format!("Failed to write idea file: {}", e));
         }
 
+        let success_msg = if feedback.is_some() {
+            format!("Idea document revised: {}", artifact_path)
+        } else {
+            format!("Idea document generated: {}", artifact_path)
+        };
+        
         interaction
             .show_message(
                 crate::interaction::MessageLevel::Success,
-                format!("Idea document generated: {}", artifact_path),
+                success_msg,
             )
             .await;
 

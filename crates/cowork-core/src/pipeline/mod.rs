@@ -18,6 +18,7 @@ pub enum StageResult {
     Success(Option<String>), // Artifact path
     Failed(String),          // Error message
     Paused,                  // Waiting for human confirmation
+    NeedsRevision(String),   // Needs revision with feedback
 }
 
 /// Pipeline context for stage execution
@@ -55,6 +56,18 @@ pub trait Stage: Send + Sync {
         ctx: &PipelineContext,
         interaction: Arc<dyn InteractiveBackend>,
     ) -> StageResult;
+
+    /// Execute the stage with feedback (for revision)
+    async fn execute_with_feedback(
+        &self,
+        ctx: &PipelineContext,
+        interaction: Arc<dyn InteractiveBackend>,
+        _feedback: &str,
+    ) -> StageResult {
+        // Default implementation just calls execute
+        // Stages that support revision should override this
+        self.execute(ctx, interaction).await
+    }
 }
 
 /// Get all available stages in order
@@ -79,5 +92,5 @@ pub fn get_stages_from(start_stage: &str) -> Vec<Box<dyn Stage>> {
 
 /// Determine if a stage needs human confirmation
 pub fn is_critical_stage(stage_name: &str) -> bool {
-    matches!(stage_name, "prd" | "design" | "plan" | "coding")
+    matches!(stage_name, "idea" | "prd" | "design" | "plan" | "coding")
 }

@@ -248,68 +248,165 @@ impl IterationExecutor {
                     tokio::time::sleep(tokio::time::Duration::from_millis(RETRY_DELAY_MS)).await;
                 }
 
-                // Execute stage
-                let result = stage.execute(&ctx, self.interaction.clone()).await;
+                // Execute stage (with feedback loop for revisions)
+                let mut feedback_loop_count = 0;
+                const MAX_FEEDBACK_LOOPS: u32 = 5;
+                let mut current_feedback: Option<String> = None;
+                
+                loop {
+                    // Execute or re-execute stage
+                    let result = if let Some(ref feedback) = current_feedback {
+                        stage.execute_with_feedback(&ctx, self.interaction.clone(), feedback).await
+                    } else {
+                        stage.execute(&ctx, self.interaction.clone()).await
+                    };
 
-                match result {
-                    StageResult::Success(artifact_path) => {
-                        // Complete stage
-                        iteration.complete_stage(&stage_name, artifact_path);
-                        self.iteration_store.save(&iteration)?;
-                        success = true;
+                    match result {
+                        StageResult::Success(artifact_path) => {
+                            // Complete stage
+                            iteration.complete_stage(&stage_name, artifact_path.clone());
+                            self.iteration_store.save(&iteration)?;
 
-                        // Show success message on retry
-                        if attempt > 0 {
-                            self.interaction
-                                .show_message(
-                                    crate::interaction::MessageLevel::Success,
-                                    format!("Stage '{}' succeeded after {} retries", stage_name, attempt),
-                                )
-                                .await;
+                            // Show success message on retry or revision
+                            if attempt > 0 || feedback_loop_count > 0 {
+                                self.interaction
+                                    .show_message(
+                                        crate::interaction::MessageLevel::Success,
+                                        format!("Stage '{}' {}succeeded", 
+                                            stage_name,
+                                            if feedback_loop_count > 0 { "revised and " } else { "" }
+                                        ),
+                                    )
+                                    .await;
+                            }
+
+                            // Check if needs human confirmation and feedback loop
+                            if is_critical_stage(&stage_name) {
+                                iteration.pause();
+                                self.iteration_store.save(&iteration)?;
+
+                                // Determine artifact type for viewing
+                                let artifact_type = match stage_name.as_str() {
+                                    "idea" => "idea",
+                                    "prd" => "requirements",
+                                    "design" => "design",
+                                    "plan" => "plan",
+                                    "coding" => "code",
+                                    _ => "artifacts",
+                                };
+
+                                // Request confirmation with feedback support
+                                let action = self
+                                    .interaction
+                                    .request_confirmation_with_feedback(&format!(
+                                        "Stage '{}' completed. Please review the generated {} document.{}",
+                                        stage_name,
+                                        stage_name.to_uppercase(),
+                                        if feedback_loop_count > 0 { 
+                                            format!(" (Revision {})", feedback_loop_count) 
+                                        } else { 
+                                            String::new() 
+                                        }
+                                    ), artifact_type)
+                                    .await;
+
+                                match action {
+                                    ConfirmationAction::Continue => {
+                                        iteration.resume();
+                                        self.iteration_store.save(&iteration)?;
+                                        success = true;
+                                        break; // Exit feedback loop
+                                    }
+                                    ConfirmationAction::ViewArtifact => {
+                                        // User wants to view artifact, stay in loop
+                                        current_feedback = None;
+                                        continue;
+                                    }
+                                    ConfirmationAction::ProvideFeedback(feedback) => {
+                                        if feedback_loop_count >= MAX_FEEDBACK_LOOPS {
+                                            self.interaction
+                                                .show_message(
+                                                    crate::interaction::MessageLevel::Warning,
+                                                    format!("Maximum revision attempts ({}) reached. Proceeding...", MAX_FEEDBACK_LOOPS),
+                                                )
+                                                .await;
+                                            iteration.resume();
+                                            self.iteration_store.save(&iteration)?;
+                                            success = true;
+                                            break;
+                                        }
+                                        
+                                        feedback_loop_count += 1;
+                                        current_feedback = Some(feedback);
+                                        self.interaction
+                                            .show_message(
+                                                crate::interaction::MessageLevel::Info,
+                                                format!("Regenerating {} based on your feedback (revision {} of {})...", 
+                                                    stage_name, feedback_loop_count, MAX_FEEDBACK_LOOPS),
+                                            )
+                                            .await;
+                                        continue; // Re-execute with feedback
+                                    }
+                                    ConfirmationAction::Cancel => {
+                                        return Ok(()); // User cancelled
+                                    }
+                                }
+                            } else {
+                                success = true;
+                                break; // Success, exit retry loop
+                            }
                         }
-
-                        // Check if needs human confirmation
-                        if is_critical_stage(&stage_name) {
+                        StageResult::Failed(error) => {
+                            last_error = Some(error);
+                            // Continue to next retry
+                            break; // Exit feedback loop to retry
+                        }
+                        StageResult::Paused => {
                             iteration.pause();
                             self.iteration_store.save(&iteration)?;
 
-                            // Request confirmation
-                            let confirmed = self
-                                .interaction
-                                .request_confirmation(&format!(
-                                    "Stage '{}' completed. Review the output and confirm to continue.",
-                                    stage_name
-                                ))
-                                .await;
+                            self.interaction
+                                .show_message(
+                                    crate::interaction::MessageLevel::Info,
+                                    format!("Stage '{}' paused. Use 'continue' to resume.", stage_name),
+                                )
+                            .await;
 
-                            if !confirmed {
-                                return Ok(()); // User cancelled
-                            }
-
-                            iteration.resume();
-                            self.iteration_store.save(&iteration)?;
+                            return Ok(());
                         }
-                        break; // Success, exit retry loop
-                    }
-                    StageResult::Failed(error) => {
-                        last_error = Some(error);
-                        // Continue to next retry
-                    }
-                    StageResult::Paused => {
-                        iteration.pause();
-                        self.iteration_store.save(&iteration)?;
-
-                        self.interaction
-                            .show_message(
-                                crate::interaction::MessageLevel::Info,
-                                format!("Stage '{}' paused. Use 'continue' to resume.", stage_name),
-                            )
-                        .await;
-
-                        return Ok(());
+                        StageResult::NeedsRevision(feedback) => {
+                            // Stage itself is requesting revision
+                            if feedback_loop_count >= MAX_FEEDBACK_LOOPS {
+                                self.interaction
+                                    .show_message(
+                                        crate::interaction::MessageLevel::Warning,
+                                        format!("Maximum revision attempts reached. Proceeding..."),
+                                    )
+                                    .await;
+                                iteration.resume();
+                                self.iteration_store.save(&iteration)?;
+                                success = true;
+                                break;
+                            }
+                            
+                            feedback_loop_count += 1;
+                            current_feedback = Some(feedback);
+                            self.interaction
+                                .show_message(
+                                    crate::interaction::MessageLevel::Info,
+                                    format!("Stage '{}' requesting revision ({} of {})...", 
+                                        stage_name, feedback_loop_count, MAX_FEEDBACK_LOOPS),
+                                )
+                                .await;
+                            continue; // Re-execute with feedback
+                        }
                     }
                 }
-            }
+                
+                if success {
+                    break; // Exit retry loop
+                }
+            } // End of for attempt in 0..MAX_STAGE_RETRIES
 
             // If all retries failed
             if !success {
@@ -326,7 +423,7 @@ impl IterationExecutor {
 
                 return Err(anyhow::anyhow!("Iteration failed at stage '{}' after {} retries", stage_name, MAX_STAGE_RETRIES));
             }
-        }
+        } // End of for stage in stages
 
         // Complete iteration
         iteration.complete();
@@ -386,9 +483,20 @@ impl IterationExecutor {
     }
 }
 
+/// Confirmation action for user interaction
+#[derive(Debug, Clone)]
+pub enum ConfirmationAction {
+    Continue,           // User confirmed to continue
+    ViewArtifact,       // User wants to view the artifact
+    ProvideFeedback(String), // User provided feedback for revision
+    Cancel,             // User cancelled
+}
+
 #[async_trait::async_trait]
 pub trait InteractionExt {
     async fn request_confirmation(&self, prompt: &str) -> bool;
+    async fn request_confirmation_with_artifact(&self, prompt: &str, artifact_type: &str) -> bool;
+    async fn request_confirmation_with_feedback(&self, prompt: &str, artifact_type: &str) -> ConfirmationAction;
 }
 
 #[async_trait::async_trait]
@@ -412,6 +520,104 @@ impl InteractionExt for dyn InteractiveBackend {
         match self.request_input(prompt, options, None).await {
             Ok(InputResponse::Selection(id)) => id == "yes",
             _ => false,
+        }
+    }
+
+    async fn request_confirmation_with_artifact(&self, prompt: &str, artifact_type: &str) -> bool {
+        use crate::interaction::{InputOption, InputResponse};
+
+        let options = vec![
+            InputOption {
+                id: "yes".to_string(),
+                label: "Continue".to_string(),
+                description: Some("Confirm and proceed to next stage".to_string()),
+            },
+            InputOption {
+                id: "view_artifact".to_string(),
+                label: "View Artifact".to_string(),
+                description: Some(format!("Open {} tab to review", artifact_type)),
+            },
+            InputOption {
+                id: "no".to_string(),
+                label: "Cancel".to_string(),
+                description: Some("Stop the iteration".to_string()),
+            },
+        ];
+
+        let full_prompt = format!("{}\n[ARTIFACT_TYPE:{}]", prompt, artifact_type);
+
+        match self.request_input(&full_prompt, options, None).await {
+            Ok(InputResponse::Selection(id)) => match id.as_str() {
+                "yes" => true,
+                "view_artifact" => {
+                    // Emit event to frontend to view artifact
+                    let _ = self.show_message(
+                        crate::interaction::MessageLevel::Info,
+                        format!("[VIEW_ARTIFACT:{}]", artifact_type)
+                    ).await;
+                    // Return false to pause, user will need to continue after viewing
+                    false
+                }
+                _ => false,
+            }
+            _ => false,
+        }
+    }
+
+    async fn request_confirmation_with_feedback(&self, prompt: &str, artifact_type: &str) -> ConfirmationAction {
+        use crate::interaction::{InputOption, InputResponse};
+
+        let options = vec![
+            InputOption {
+                id: "yes".to_string(),
+                label: "Continue".to_string(),
+                description: Some("Confirm and proceed to next stage".to_string()),
+            },
+            InputOption {
+                id: "view_artifact".to_string(),
+                label: "View Artifact".to_string(),
+                description: Some(format!("Open {} tab to review", artifact_type)),
+            },
+            InputOption {
+                id: "feedback".to_string(),
+                label: "Provide Feedback".to_string(),
+                description: Some("Enter feedback to regenerate".to_string()),
+            },
+            InputOption {
+                id: "no".to_string(),
+                label: "Cancel".to_string(),
+                description: Some("Stop the iteration".to_string()),
+            },
+        ];
+
+        let full_prompt = format!("{}\n[ARTIFACT_TYPE:{}]", prompt, artifact_type);
+
+        match self.request_input(&full_prompt, options, None).await {
+            Ok(InputResponse::Selection(id)) => match id.as_str() {
+                "yes" => ConfirmationAction::Continue,
+                "view_artifact" => ConfirmationAction::ViewArtifact,
+                "feedback" => {
+                    // Request feedback text
+                    let feedback_options = vec![
+                        InputOption {
+                            id: "submit".to_string(),
+                            label: "Submit Feedback".to_string(),
+                            description: Some("Submit your feedback".to_string()),
+                        },
+                    ];
+                    
+                    let feedback_prompt = "Please enter your feedback or suggestions for improvement:";
+                    
+                    match self.request_input(feedback_prompt, feedback_options, Some(String::new())).await {
+                        Ok(InputResponse::Text(feedback)) => ConfirmationAction::ProvideFeedback(feedback),
+                        Ok(InputResponse::Selection(_)) => ConfirmationAction::ViewArtifact, // If user selects option, go back
+                        _ => ConfirmationAction::Cancel,
+                    }
+                }
+                _ => ConfirmationAction::Cancel,
+            }
+            Ok(InputResponse::Text(feedback)) => ConfirmationAction::ProvideFeedback(feedback),
+            _ => ConfirmationAction::Cancel,
         }
     }
 }
