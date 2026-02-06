@@ -4,129 +4,307 @@
   box-sizing: border-box;
 }
 
+/* ==========================================
+   清新浅色主题 - Fresh Light Theme
+   ========================================== */
 :root {
-  --bg-base: #141414;
-  --bg-container: #1f1f1f;
-  --bg-elevated: #2a2a2a;
-  --bg-elevated-hover: #303030;
-  --border-color: #303030;
-  --text-primary: #ffffff;
-  --text-secondary: #888888;
-  --text-tertiary: #666666;
-  --primary: #1890ff;
-  --primary-hover: #40a9ff;
-  --success: #52c41a;
-  --warning: #faad14;
-  --error: #ff4d4f;
-  --info: #1890ff;
+  /* 主色调 - 清新的蓝色系 */
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-light: #dbeafe;
+  --primary-lighter: #eff6ff;
+  
+  /* 背景色 - 纯净白色系 */
+  --bg-base: #ffffff;
+  --bg-container: #f8fafc;
+  --bg-elevated: #f1f5f9;
+  --bg-elevated-hover: #e2e8f0;
+  --bg-sidebar: #f8fafc;
+  
+  /* 边框颜色 - 柔和的灰色 */
+  --border-color: #e2e8f0;
+  --border-light: #f1f5f9;
+  
+  /* 文字颜色 - 清晰的层次 */
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+  --text-muted: #cbd5e1;
+  
+  /* 状态颜色 */
+  --success: #10b981;
+  --success-light: #d1fae5;
+  --warning: #f59e0b;
+  --warning-light: #fef3c7;
+  --error: #ef4444;
+  --error-light: #fee2e2;
+  --info: #3b82f6;
+  --info-light: #dbeafe;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   background: var(--bg-base);
   color: var(--text-primary);
   height: 100vh;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Ant Design 暗色主题优化 */
+/* ==========================================
+   Ant Design 浅色主题覆盖
+   ========================================== */
+
+/* Layout */
 .ant-layout {
   background: var(--bg-base) !important;
 }
 
 .ant-layout-header {
-  background: var(--bg-container) !important;
+  background: var(--bg-base) !important;
   border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .ant-layout-sider {
-  background: var(--bg-container) !important;
+  background: var(--bg-sidebar) !important;
   border-right: 1px solid var(--border-color);
 }
 
-.ant-menu-dark {
+/* Menu */
+.ant-menu {
   background: transparent !important;
+  border-right: none !important;
 }
 
-.ant-menu-dark .ant-menu-item-selected {
-  background: rgba(24, 144, 255, 0.2) !important;
+.ant-menu-item {
+  color: var(--text-secondary) !important;
+  border-radius: 8px !important;
+  margin: 4px 12px !important;
+  padding-left: 16px !important;
+  transition: all 0.2s ease !important;
 }
 
-.ant-menu-dark .ant-menu-item:hover {
-  background: rgba(255, 255, 255, 0.05) !important;
+.ant-menu-item:hover {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
 }
 
+.ant-menu-item-selected {
+  background: var(--primary-light) !important;
+  color: var(--primary) !important;
+  font-weight: 500;
+}
+
+.ant-menu-item-selected::after {
+  display: none !important;
+}
+
+/* Tabs */
 .ant-tabs {
-  background: var(--bg-container);
+  background: var(--bg-base);
+}
+
+.ant-tabs-nav {
+  margin-bottom: 0 !important;
+}
+
+.ant-tabs-tab {
+  color: var(--text-secondary) !important;
+  border-radius: 6px 6px 0 0 !important;
+  transition: all 0.2s ease !important;
+}
+
+.ant-tabs-tab:hover {
+  color: var(--text-primary) !important;
+}
+
+.ant-tabs-tab-active {
+  color: var(--primary) !important;
+  background: var(--bg-base) !important;
+  font-weight: 500;
 }
 
 .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
-  background: var(--bg-elevated);
-  border-color: var(--border-color);
-  color: var(--text-secondary);
+  background: var(--bg-container) !important;
+  border-color: var(--border-color) !important;
 }
 
 .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab-active {
-  background: var(--bg-elevated-hover);
-  color: var(--text-primary);
-  border-color: var(--border-color);
+  background: var(--bg-base) !important;
+  border-bottom-color: var(--bg-base) !important;
 }
 
 .ant-tabs-content-holder {
-  background: var(--bg-container);
+  background: var(--bg-base);
 }
 
+/* Button */
 .ant-btn {
-  background: var(--bg-elevated);
+  background: var(--bg-base);
   border-color: var(--border-color);
   color: var(--text-primary);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
 }
 
 .ant-btn:hover {
-  background: var(--bg-elevated-hover);
+  background: var(--bg-elevated);
   border-color: var(--primary);
-  color: var(--primary-hover);
+  color: var(--primary);
 }
 
 .ant-btn-primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: white;
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: white !important;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
 }
 
 .ant-btn-primary:hover {
-  background: var(--primary-hover);
-  border-color: var(--primary-hover);
+  background: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
 }
 
-.ant-input {
-  background: var(--bg-elevated);
+/* Input */
+.ant-input,
+.ant-input-affix-wrapper {
+  background: var(--bg-container) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+  border-radius: 10px !important;
+  transition: all 0.2s ease;
+}
+
+.ant-input:hover,
+.ant-input-affix-wrapper:hover {
+  border-color: var(--primary) !important;
+}
+
+.ant-input:focus,
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused {
+  background: var(--bg-base) !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--primary-light) !important;
+}
+
+/* Select */
+.ant-select:not(.ant-select-customize-input) .ant-select-selector {
+  background: var(--bg-container) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+  border-radius: 8px !important;
+}
+
+.ant-select:not(.ant-select-customize-input) .ant-select-selector:hover {
+  border-color: var(--primary) !important;
+}
+
+.ant-select-focused .ant-select-selector {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--primary-light) !important;
+}
+
+/* Dropdown */
+.ant-dropdown-menu {
+  background: var(--bg-base) !important;
+  border: 1px solid var(--border-color);
+  border-radius: 12px !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1) !important;
+  padding: 8px !important;
+}
+
+.ant-dropdown-menu-item {
+  border-radius: 8px !important;
+  color: var(--text-primary) !important;
+}
+
+.ant-dropdown-menu-item:hover {
+  background: var(--bg-elevated) !important;
+}
+
+/* Card */
+.ant-card {
+  background: var(--bg-base);
   border-color: var(--border-color);
-  color: var(--text-primary);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.ant-input:hover {
-  border-color: var(--primary);
+/* Modal */
+.ant-modal-content {
+  background: var(--bg-base) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15) !important;
 }
 
-.ant-input:focus {
-  background: var(--bg-elevated-hover);
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+.ant-modal-header {
+  background: var(--bg-base) !important;
+  border-bottom-color: var(--border-color) !important;
+  border-radius: 16px 16px 0 0 !important;
 }
 
-/* Scrollbar */
+/* Tag */
+.ant-tag {
+  border-radius: 6px;
+  border: none;
+  padding: 4px 10px;
+}
+
+/* Alert */
+.ant-alert {
+  border-radius: 10px;
+  border: none;
+}
+
+.ant-alert-success {
+  background: var(--success-light);
+}
+
+.ant-alert-warning {
+  background: var(--warning-light);
+}
+
+.ant-alert-error {
+  background: var(--error-light);
+}
+
+.ant-alert-info {
+  background: var(--info-light);
+}
+
+/* Spin */
+.ant-spin {
+  color: var(--primary);
+}
+
+.ant-spin-dot-item {
+  background-color: var(--primary);
+}
+
+/* Empty */
+.ant-empty-description {
+  color: var(--text-secondary);
+}
+
+/* ==========================================
+   滚动条样式
+   ========================================== */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-container);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
+  background: var(--text-muted);
   border-radius: 4px;
 }
 
@@ -134,19 +312,22 @@ body {
   background: var(--text-tertiary);
 }
 
-/* Chat 消息样式 */
+/* ==========================================
+   Chat 消息样式
+   ========================================== */
 .messages-container {
   overflow-y: auto;
-  padding: 20px;
+  padding: 24px;
   background: var(--bg-base);
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .message {
   animation: fadeIn 0.3s ease-in;
+  max-width: 85%;
 }
 
 @keyframes fadeIn {
@@ -160,46 +341,55 @@ body {
   }
 }
 
+.message-agent {
+  align-self: flex-start;
+}
+
+.message-user {
+  align-self: flex-end;
+}
+
 .agent-name {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   margin-bottom: 6px;
+  margin-left: 12px;
 }
 
 .message-content {
   background: var(--bg-container);
-  border-radius: 12px;
-  padding: 14px 18px;
+  border-radius: 18px;
+  padding: 16px 20px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
   white-space: pre-wrap;
   border: 1px solid var(--border-color);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .message-agent .message-content {
-  border-left: 3px solid var(--primary);
-  margin-left: 8px;
+  border-bottom-left-radius: 4px;
 }
 
 .message-user .message-content {
-  background: linear-gradient(135deg, var(--primary), #096dd9);
+  background: linear-gradient(135deg, var(--primary), #1d4ed8);
   color: white;
   border: none;
-  margin-right: 8px;
-  margin-left: auto;
-  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
 }
 
-/* Markdown 内容样式 */
+/* ==========================================
+   Markdown 内容样式
+   ========================================== */
 .markdown-content {
   color: var(--text-primary);
-  line-height: 1.7;
-  padding: 20px;
+  line-height: 1.8;
+  padding: 24px;
   background: var(--bg-container);
-  border-radius: 8px;
+  border-radius: 12px;
   overflow-y: auto;
   max-height: calc(100vh - 200px);
 }
@@ -211,7 +401,7 @@ body {
 .markdown-content h5,
 .markdown-content h6 {
   color: var(--text-primary);
-  margin-top: 24px;
+  margin-top: 32px;
   margin-bottom: 16px;
   font-weight: 600;
   line-height: 1.3;
@@ -220,13 +410,13 @@ body {
 .markdown-content h1 {
   font-size: 28px;
   border-bottom: 2px solid var(--border-color);
-  padding-bottom: 8px;
+  padding-bottom: 12px;
 }
 
 .markdown-content h2 {
   font-size: 24px;
   border-bottom: 1px solid var(--border-color);
-  padding-bottom: 6px;
+  padding-bottom: 8px;
 }
 
 .markdown-content h3 {
@@ -252,7 +442,7 @@ body {
 }
 
 .markdown-content strong {
-  color: var(--primary-hover);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -263,36 +453,36 @@ body {
 
 .markdown-content code {
   background: var(--bg-elevated);
-  color: #ff7b72;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  color: var(--primary);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
   font-size: 0.9em;
   border: 1px solid var(--border-color);
 }
 
 .markdown-content pre {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 16px;
-  margin: 16px 0;
+  background: #1e293b;
+  border: none;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 20px 0;
   overflow-x: auto;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .markdown-content pre code {
   background: transparent;
   border: none;
   padding: 0;
-  color: var(--text-primary);
+  color: #e2e8f0;
   font-size: 0.9em;
 }
 
 .markdown-content ul,
 .markdown-content ol {
   margin: 16px 0;
-  padding-left: 32px;
+  padding-left: 28px;
 }
 
 .markdown-content li {
@@ -311,10 +501,10 @@ body {
 
 .markdown-content blockquote {
   border-left: 4px solid var(--primary);
-  padding: 12px 20px;
-  margin: 16px 0;
-  background: rgba(24, 144, 255, 0.1);
-  border-radius: 0 8px 8px 0;
+  padding: 16px 24px;
+  margin: 20px 0;
+  background: var(--primary-lighter);
+  border-radius: 0 12px 12px 0;
   color: var(--text-secondary);
 }
 
@@ -331,21 +521,22 @@ body {
 
 .markdown-content a:hover {
   color: var(--primary-hover);
-  border-bottom-color: var(--primary-hover);
+  border-bottom-color: var(--primary);
 }
 
 .markdown-content table {
   width: 100%;
   border-collapse: collapse;
-  margin: 16px 0;
-  background: var(--bg-container);
-  border-radius: 8px;
+  margin: 20px 0;
+  background: var(--bg-base);
+  border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .markdown-content th,
 .markdown-content td {
-  padding: 12px 16px;
+  padding: 14px 18px;
   text-align: left;
   border-bottom: 1px solid var(--border-color);
 }
@@ -354,30 +545,35 @@ body {
   background: var(--bg-elevated);
   color: var(--text-primary);
   font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .markdown-content tr:hover {
-  background: rgba(24, 144, 255, 0.05);
+  background: var(--bg-elevated-hover);
 }
 
 .markdown-content hr {
   border: none;
-  border-top: 2px solid var(--border-color);
+  border-top: 1px solid var(--border-color);
   margin: 32px 0;
 }
 
 .markdown-content img {
   max-width: 100%;
-  border-radius: 8px;
-  margin: 16px 0;
-  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  margin: 20px 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
-/* Artifacts 样式 */
+/* ==========================================
+   Artifacts 样式
+   ========================================== */
 .artifact-content {
-  padding: 20px;
+  padding: 24px;
   background: var(--bg-container);
-  border-radius: 8px;
+  border-radius: 12px;
   color: var(--text-primary);
   height: 100%;
   overflow-y: auto;
@@ -412,7 +608,9 @@ body {
   overflow: auto;
 }
 
-/* Code Editor Tabs 样式 */
+/* ==========================================
+   Code Editor Tabs 样式
+   ========================================== */
 .code-editor-tabs {
   height: 100%;
   display: flex;
@@ -461,41 +659,46 @@ body {
   height: 100% !important;
 }
 
-/* 输入区域 */
+/* ==========================================
+   输入区域
+   ========================================== */
 .chat-input-wrapper {
-  padding: 20px;
-  background: var(--bg-container);
+  padding: 20px 24px;
+  background: var(--bg-base);
   border-top: 1px solid var(--border-color);
 }
 
 .chat-input-wrapper input[type="text"] {
   flex: 1;
-  padding: 12px 16px;
-  background: var(--bg-elevated);
+  padding: 14px 20px;
+  background: var(--bg-container);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 12px;
   color: var(--text-primary);
-  font-size: 14px;
-  transition: all 0.2s;
+  font-size: 15px;
+  transition: all 0.2s ease;
 }
 
 .chat-input-wrapper input[type="text"]:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+  background: var(--bg-base);
+  box-shadow: 0 0 0 4px var(--primary-light);
 }
 
 .chat-input-wrapper input[type="text"]:hover {
   border-color: var(--text-tertiary);
 }
 
-/* 会话列表 */
+/* ==========================================
+   会话列表
+   ========================================== */
 .session-item {
-  padding: 10px 14px;
+  padding: 12px 16px;
   margin-bottom: 6px;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   border: 1px solid transparent;
 }
 
@@ -505,137 +708,25 @@ body {
 }
 
 .session-item.active {
-  background: rgba(24, 144, 255, 0.2);
+  background: var(--primary-light);
   border-color: var(--primary);
 }
 
 .session-item-title {
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
 }
 
 .session-item-time {
-  color: var(--text-secondary);
-  font-size: 11px;
+  color: var(--text-tertiary);
+  font-size: 12px;
   margin-top: 4px;
 }
 
-/* 加载状态 */
-.ant-spin {
-  color: var(--text-primary);
-}
-
-.ant-spin-dot-item {
-  background-color: var(--primary);
-}
-
-/* Alert 样式 */
-.ant-alert {
-  background: var(--bg-elevated);
-  border-color: var(--border-color);
-}
-
-.ant-alert-error {
-  background: rgba(255, 77, 79, 0.1);
-  border-color: var(--error);
-}
-
-.ant-alert-message,
-.ant-alert-description {
-  color: var(--text-primary);
-}
-
-/* Empty 样式 */
-.ant-empty-normal {
-  color: var(--text-secondary);
-}
-
-/* 代码高亮优化 */
-.hljs {
-  background: var(--bg-elevated) !important;
-  color: var(--text-primary) !important;
-  border-radius: 6px;
-  padding: 16px !important;
-}
-
-/* JSON View */
-.react-json-view {
-  background: var(--bg-elevated) !important;
-  padding: 20px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  font-size: 14px;
-  line-height: 1.8;
-}
-
-.react-json-view .string-key {
-  color: var(--primary-hover) !important;
-  font-weight: 600;
-}
-
-.react-json-view .object-key {
-  color: var(--primary-hover) !important;
-  font-weight: 600;
-}
-
-.react-json-view .string-value {
-  color: #a5d6ff !important;
-}
-
-.react-json-view .variable-value {
-  color: #a5d6ff !important;
-}
-
-.react-json-view .number-value {
-  color: #79c0ff !important;
-}
-
-.react-json-view .boolean-value {
-  color: #ffa657 !important;
-  font-weight: 500;
-}
-
-.react-json-view .null-value {
-  color: #ff7b72 !important;
-  font-weight: 500;
-}
-
-.react-json-view .array-key {
-  color: var(--primary-hover) !important;
-  font-weight: 600;
-}
-
-.react-json-view .string-literal {
-  color: #a5d6ff !important;
-}
-
-.react-json-view .object-name {
-  color: var(--primary-hover) !important;
-  font-weight: 600;
-}
-
-.react-json-view .array-name {
-  color: var(--primary-hover) !important;
-  font-weight: 600;
-}
-
-.react-json-view .br-row,
-.react-json-view .bracket {
-  color: var(--text-secondary) !important;
-}
-
-.react-json-view .colon {
-  color: var(--text-secondary) !important;
-}
-
-.react-json-view .arrow-icon,
-.react-json-view .expanded-icon,
-.react-json-view .collapsed-icon {
-  fill: var(--primary-hover) !important;
-}
-
-/* 欢迎界面 */
+/* ==========================================
+   欢迎界面
+   ========================================== */
 .welcome-screen {
   display: flex;
   flex-direction: column;
@@ -647,7 +738,23 @@ body {
   padding: 40px;
 }
 
-/* Agent Loading Indicator Animation */
+.welcome-screen h2 {
+  color: var(--text-primary);
+  font-size: 32px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.welcome-screen p {
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+/* ==========================================
+   Agent Loading Indicator
+   ========================================== */
 @keyframes pulse {
   0%, 100% {
     opacity: 0.3;
@@ -663,16 +770,157 @@ body {
   margin-left: 4px;
 }
 
-.welcome-screen h2 {
-  color: var(--text-primary);
-  font-size: 32px;
-  margin-bottom: 16px;
+/* ==========================================
+   代码高亮
+   ========================================== */
+.hljs {
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-radius: 12px;
+  padding: 20px !important;
+}
+
+/* ==========================================
+   JSON View
+   ========================================== */
+.react-json-view {
+  background: var(--bg-container) !important;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.react-json-view .string-key {
+  color: var(--primary) !important;
   font-weight: 600;
 }
 
-.welcome-screen p {
-  font-size: 16px;
-  line-height: 1.6;
-  max-width: 500px;
-  margin: 0 auto;
+.react-json-view .object-key {
+  color: var(--primary) !important;
+  font-weight: 600;
+}
+
+.react-json-view .string-value {
+  color: #059669 !important;
+}
+
+.react-json-view .variable-value {
+  color: #059669 !important;
+}
+
+.react-json-view .number-value {
+  color: #2563eb !important;
+}
+
+.react-json-view .boolean-value {
+  color: #d97706 !important;
+  font-weight: 500;
+}
+
+.react-json-view .null-value {
+  color: #dc2626 !important;
+  font-weight: 500;
+}
+
+.react-json-view .array-key {
+  color: var(--primary) !important;
+  font-weight: 600;
+}
+
+.react-json-view .string-literal {
+  color: #059669 !important;
+}
+
+.react-json-view .object-name {
+  color: var(--primary) !important;
+  font-weight: 600;
+}
+
+.react-json-view .array-name {
+  color: var(--primary) !important;
+  font-weight: 600;
+}
+
+.react-json-view .br-row,
+.react-json-view .bracket {
+  color: var(--text-tertiary) !important;
+}
+
+.react-json-view .colon {
+  color: var(--text-tertiary) !important;
+}
+
+.react-json-view .arrow-icon,
+.react-json-view .expanded-icon,
+.react-json-view .collapsed-icon {
+  fill: var(--primary) !important;
+}
+
+/* ==========================================
+   面板和布局
+   ========================================== */
+.runner-panel,
+.preview-panel,
+.code-editor-container {
+  background: var(--bg-base);
+}
+
+/* 侧边栏图标 */
+.ant-menu-item .anticon {
+  font-size: 18px;
+  margin-right: 12px;
+}
+
+/* 头部样式 */
+.app-header {
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* 迭代面板 */
+.iterations-panel {
+  background: var(--bg-sidebar);
+}
+
+/* 状态指示器 */
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-indicator.success {
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-light);
+}
+
+.status-indicator.processing {
+  background: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+  animation: pulse 2s infinite;
+}
+
+.status-indicator.error {
+  background: var(--error);
+  box-shadow: 0 0 0 3px var(--error-light);
+}
+
+/* 分割线 */
+.divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 16px 0;
 }
