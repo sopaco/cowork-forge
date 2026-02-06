@@ -14,6 +14,9 @@ pub struct SessionArtifacts {
     pub features: Option<FeatureList>,
     pub design: Option<DesignSpec>,
     pub plan: Option<ImplementationPlan>,
+    // Raw markdown content for display
+    pub design_raw: Option<String>,
+    pub plan_raw: Option<String>,
     pub code_files: Vec<FileInfo>,
     pub delivery_report: Option<String>,
 }

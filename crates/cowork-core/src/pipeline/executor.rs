@@ -195,7 +195,18 @@ impl IterationExecutor {
         let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace);
 
         // Determine starting stage
-        let start_stage = iteration.determine_start_stage();
+        // If iteration has a current_stage (e.g., when resuming), use it
+        // Otherwise determine based on inheritance mode
+        let start_stage = if let Some(ref current) = iteration.current_stage {
+            if iteration.status == crate::domain::IterationStatus::Paused {
+                // Resume from current stage
+                current.clone()
+            } else {
+                iteration.determine_start_stage()
+            }
+        } else {
+            iteration.determine_start_stage()
+        };
 
         // Get stages to execute
         let stages = get_stages_from(&start_stage);
@@ -216,32 +227,35 @@ impl IterationExecutor {
         // Execute stages with retry logic
         const MAX_STAGE_RETRIES: u32 = 3;
         const RETRY_DELAY_MS: u64 = 2000;
+        let total_stages = stages.len();
 
-        for stage in stages {
+        for (stage_idx, stage) in stages.into_iter().enumerate() {
             let stage_name = stage.name().to_string();
+            let stage_num = stage_idx + 1;
 
             // Update current stage
             iteration.set_stage(&stage_name);
             self.iteration_store.save(&iteration)?;
 
-            // Execute stage with retry
+            // Emit stage started event with progress info
+            self.interaction
+                .show_message(
+                    crate::interaction::MessageLevel::Info,
+                    format!("🚀 [{}/{}] Starting stage: {}", stage_num, total_stages, stage.description()),
+                )
+                .await;
+
+                        // Execute stage with retry
             let mut last_error = None;
             let mut success = false;
 
             for attempt in 0..MAX_STAGE_RETRIES {
-                // Emit stage started event
-                if attempt == 0 {
-                    self.interaction
-                        .show_message(
-                            crate::interaction::MessageLevel::Info,
-                            format!("Stage: {}", stage.description()),
-                        )
-                        .await;
-                } else {
+                // Emit retry message if needed
+                if attempt > 0 {
                     self.interaction
                         .show_message(
                             crate::interaction::MessageLevel::Warning,
-                            format!("Stage '{}' retry {}/{}...", stage_name, attempt, MAX_STAGE_RETRIES - 1),
+                            format!("🔄 Stage '{}' retry {}/{}...", stage_name, attempt, MAX_STAGE_RETRIES - 1),
                         )
                         .await;
                     // Wait before retry
@@ -267,18 +281,24 @@ impl IterationExecutor {
                             iteration.complete_stage(&stage_name, artifact_path.clone());
                             self.iteration_store.save(&iteration)?;
 
-                            // Show success message on retry or revision
-                            if attempt > 0 || feedback_loop_count > 0 {
-                                self.interaction
-                                    .show_message(
-                                        crate::interaction::MessageLevel::Success,
-                                        format!("Stage '{}' {}succeeded", 
-                                            stage_name,
-                                            if feedback_loop_count > 0 { "revised and " } else { "" }
-                                        ),
-                                    )
-                                    .await;
-                            }
+                            // Show success message with progress info
+                            let progress_msg = if feedback_loop_count > 0 {
+                                format!("✅ [{}/{}] Stage '{}' completed (revision {})",
+                                    stage_num, total_stages, stage_name, feedback_loop_count)
+                            } else if attempt > 0 {
+                                format!("✅ [{}/{}] Stage '{}' completed (after {} retries)",
+                                    stage_num, total_stages, stage_name, attempt)
+                            } else {
+                                format!("✅ [{}/{}] Stage '{}' completed",
+                                    stage_num, total_stages, stage_name)
+                            };
+
+                            self.interaction
+                                .show_message(
+                                    crate::interaction::MessageLevel::Success,
+                                    progress_msg,
+                                )
+                                .await;
 
                             // Check if needs human confirmation and feedback loop
                             if is_critical_stage(&stage_name) {

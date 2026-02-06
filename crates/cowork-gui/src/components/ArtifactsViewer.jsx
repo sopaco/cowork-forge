@@ -9,12 +9,19 @@ import { Tabs, Spin, Alert, Empty, Button, Space } from 'antd';
 import { FileTextOutlined, ProjectOutlined, DatabaseOutlined, BuildOutlined, CheckCircleOutlined, FileMarkdownOutlined } from '@ant-design/icons';
 import 'highlight.js/styles/atom-one-dark.css';
 
-const ArtifactsViewer = ({ iterationId }) => {
+const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChange }) => {
   const [artifacts, setArtifacts] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('idea');
   const [viewModes, setViewModes] = useState({});
+
+  // Sync with external active tab when provided
+  useEffect(() => {
+    if (externalActiveTab) {
+      setActiveTab(externalActiveTab);
+    }
+  }, [externalActiveTab]);
 
   useEffect(() => {
     if (iterationId) {
@@ -392,18 +399,19 @@ const ArtifactsViewer = ({ iterationId }) => {
     });
   }
 
-  if (artifacts.design) {
+  if (artifacts.design_raw || artifacts.design) {
     const designViewMode = viewModes['design'] || 'doc';
+    const designContent = artifacts.design_raw || designToMarkdown(artifacts.design);
     items.push({
       key: 'design',
       label: <span><BuildOutlined /> Design</span>,
       children: (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ 
-            padding: '10px 20px', 
-            borderBottom: '1px solid #303030', 
-            display: 'flex', 
-            justifyContent: 'space-between', 
+          <div style={{
+            padding: '10px 20px',
+            borderBottom: '1px solid #303030',
+            display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
             background: '#1f1f1f',
             flexShrink: 0
@@ -411,32 +419,34 @@ const ArtifactsViewer = ({ iterationId }) => {
             <span style={{ fontWeight: 'bold', color: '#fff' }}>
               Design Specification
             </span>
-            <Space>
-              <Button 
-                size="small" 
-                type={designViewMode === 'doc' ? 'primary' : 'default'}
-                icon={<FileMarkdownOutlined />}
-                onClick={() => toggleViewMode('design')}
-              >
-                Doc
-              </Button>
-              <Button 
-                size="small" 
-                type={designViewMode === 'json' ? 'primary' : 'default'}
-                onClick={() => toggleViewMode('design')}
-              >
-                JSON
-              </Button>
-            </Space>
+            {!artifacts.design_raw && (
+              <Space>
+                <Button
+                  size="small"
+                  type={designViewMode === 'doc' ? 'primary' : 'default'}
+                  icon={<FileMarkdownOutlined />}
+                  onClick={() => toggleViewMode('design')}
+                >
+                  Doc
+                </Button>
+                <Button
+                  size="small"
+                  type={designViewMode === 'json' ? 'primary' : 'default'}
+                  onClick={() => toggleViewMode('design')}
+                >
+                  JSON
+                </Button>
+              </Space>
+            )}
           </div>
           <div className="artifact-content" style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
-            {designViewMode === 'doc' ? (
+            {artifacts.design_raw || designViewMode === 'doc' ? (
               <div className="markdown-content">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeHighlight, rehypeRaw]}
                 >
-                  {designToMarkdown(artifacts.design)}
+                  {designContent}
                 </ReactMarkdown>
               </div>
             ) : (
@@ -459,18 +469,19 @@ const ArtifactsViewer = ({ iterationId }) => {
     });
   }
 
-  if (artifacts.plan) {
+  if (artifacts.plan_raw || artifacts.plan) {
     const planViewMode = viewModes['plan'] || 'doc';
+    const planContent = artifacts.plan_raw || planToMarkdown(artifacts.plan);
     items.push({
       key: 'plan',
       label: <span><CheckCircleOutlined /> Plan</span>,
       children: (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ 
-            padding: '10px 20px', 
-            borderBottom: '1px solid #303030', 
-            display: 'flex', 
-            justifyContent: 'space-between', 
+          <div style={{
+            padding: '10px 20px',
+            borderBottom: '1px solid #303030',
+            display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
             background: '#1f1f1f',
             flexShrink: 0
@@ -478,32 +489,34 @@ const ArtifactsViewer = ({ iterationId }) => {
             <span style={{ fontWeight: 'bold', color: '#fff' }}>
               Implementation Plan
             </span>
-            <Space>
-              <Button 
-                size="small" 
-                type={planViewMode === 'doc' ? 'primary' : 'default'}
-                icon={<FileMarkdownOutlined />}
-                onClick={() => toggleViewMode('plan')}
-              >
-                Doc
-              </Button>
-              <Button 
-                size="small" 
-                type={planViewMode === 'json' ? 'primary' : 'default'}
-                onClick={() => toggleViewMode('plan')}
-              >
-                JSON
-              </Button>
-            </Space>
+            {!artifacts.plan_raw && (
+              <Space>
+                <Button
+                  size="small"
+                  type={planViewMode === 'doc' ? 'primary' : 'default'}
+                  icon={<FileMarkdownOutlined />}
+                  onClick={() => toggleViewMode('plan')}
+                >
+                  Doc
+                </Button>
+                <Button
+                  size="small"
+                  type={planViewMode === 'json' ? 'primary' : 'default'}
+                  onClick={() => toggleViewMode('plan')}
+                >
+                  JSON
+                </Button>
+              </Space>
+            )}
           </div>
           <div className="artifact-content" style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
-            {planViewMode === 'doc' ? (
+            {artifacts.plan_raw || planViewMode === 'doc' ? (
               <div className="markdown-content">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeHighlight, rehypeRaw]}
                 >
-                  {planToMarkdown(artifacts.plan)}
+                  {planContent}
                 </ReactMarkdown>
               </div>
             ) : (
@@ -583,11 +596,19 @@ const ArtifactsViewer = ({ iterationId }) => {
     });
   }
 
+  // Handle tab change
+  const handleTabChange = (key) => {
+    setActiveTab(key);
+    if (onTabChange) {
+      onTabChange(key);
+    }
+  };
+
   return (
     <div className="artifacts-viewer" style={{ height: '100%' }}>
       <Tabs
         activeKey={activeTab}
-        onChange={setActiveTab}
+        onChange={handleTabChange}
         type="card"
         size="large"
         items={items}

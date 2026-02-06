@@ -57,6 +57,18 @@ impl TauriBackend {
 #[async_trait::async_trait]
 impl InteractiveBackend for TauriBackend {
     async fn show_message(&self, level: cowork_core::interaction::MessageLevel, content: String) {
+        // Determine agent name from message content
+        let agent_name = determine_agent_name(&content);
+        
+        // Emit agent_event for frontend processing display
+        let _ = self.app_handle.emit("agent_event", serde_json::json!({
+            "content": content,
+            "agent_name": agent_name,
+            "is_thinking": false,
+            "level": format!("{:?}", level)
+        }));
+        
+        // Also emit legacy message event for backward compatibility
         let _ = self.app_handle.emit("message", (level, content));
     }
 
@@ -115,6 +127,33 @@ impl InteractiveBackend for TauriBackend {
     fn event_bus(&self) -> Arc<EventBus> {
         self.event_bus.clone()
     }
+}
+
+/// Determine agent name from message content based on stage keywords
+fn determine_agent_name(content: &str) -> String {
+    let content_lower = content.to_lowercase();
+    
+    // Check for stage-specific keywords
+    if content_lower.contains("delivery") || content_lower.contains("delivering") {
+        return "Delivery Agent".to_string();
+    } else if content_lower.contains("coding") || content_lower.contains("generating code") || content_lower.contains("file") && content_lower.contains("generat") {
+        return "Coding Agent".to_string();
+    } else if content_lower.contains("plan") || content_lower.contains("implementation plan") {
+        return "Planning Agent".to_string();
+    } else if content_lower.contains("design") || content_lower.contains("architecture") {
+        return "Design Agent".to_string();
+    } else if content_lower.contains("prd") || content_lower.contains("requirement") {
+        return "Requirements Agent".to_string();
+    } else if content_lower.contains("idea") || content_lower.contains("concept") {
+        return "Ideation Agent".to_string();
+    } else if content_lower.contains("check") || content_lower.contains("validat") || content_lower.contains("test") {
+        return "Validation Agent".to_string();
+    } else if content_lower.contains("stage") && content_lower.contains("complet") {
+        return "Pipeline Controller".to_string();
+    }
+    
+    // Default agent name
+    "Cowork Agent".to_string()
 }
 
 // ============================================================================

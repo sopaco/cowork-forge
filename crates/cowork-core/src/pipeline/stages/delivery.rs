@@ -27,7 +27,7 @@ impl Stage for DeliveryStage {
         interaction
             .show_message(
                 crate::interaction::MessageLevel::Info,
-                "Generating delivery report with AI...".to_string(),
+                "📦 Starting delivery phase...".to_string(),
             )
             .await;
 
@@ -48,12 +48,26 @@ impl Stage for DeliveryStage {
         };
 
         // Gather all artifacts
+        interaction
+            .show_message(
+                crate::interaction::MessageLevel::Info,
+                "📚 Gathering artifacts from all stages...".to_string(),
+            )
+            .await;
+
         let idea_content = load_artifact(ctx, "idea.md");
         let prd_content = load_artifact(ctx, "prd.md");
         let design_content = load_artifact(ctx, "design.md");
         let plan_content = load_artifact(ctx, "plan.md");
         let check_content = load_artifact(ctx, "check_report.md");
         let code_summary = summarize_code(ctx);
+
+        interaction
+            .show_message(
+                crate::interaction::MessageLevel::Info,
+                "🤖 Generating delivery report with AI...".to_string(),
+            )
+            .await;
 
         // Generate delivery report using LLM
         let prompt = format!(
@@ -171,7 +185,7 @@ Format as a professional project delivery document."#,
         interaction
             .show_message(
                 crate::interaction::MessageLevel::Success,
-                format!("Iteration #{} '{}' completed successfully!", ctx.iteration.number, ctx.iteration.title),
+                format!("📝 Delivery report generated: {}", artifact_path),
             )
             .await;
 
@@ -179,7 +193,7 @@ Format as a professional project delivery document."#,
         interaction
             .show_message(
                 crate::interaction::MessageLevel::Info,
-                "Delivering code to project directory...".to_string(),
+                "🚚 Delivering generated code to project directory...".to_string(),
             )
             .await;
 
@@ -188,7 +202,7 @@ Format as a professional project delivery document."#,
                 interaction
                     .show_message(
                         crate::interaction::MessageLevel::Success,
-                        format!("Delivered {} files to project directory", delivered_files),
+                        format!("✅ Delivered {} files to project directory", delivered_files),
                     )
                     .await;
             }
@@ -196,11 +210,20 @@ Format as a professional project delivery document."#,
                 interaction
                     .show_message(
                         crate::interaction::MessageLevel::Warning,
-                        format!("Failed to deliver code to project directory: {}", e),
+                        format!("⚠️ Failed to deliver code to project directory: {}", e),
                     )
                     .await;
             }
         }
+
+        // Final completion message
+        interaction
+            .show_message(
+                crate::interaction::MessageLevel::Success,
+                format!("🎉 Iteration #{} '{}' completed successfully! All artifacts have been generated and delivered.",
+                    ctx.iteration.number, ctx.iteration.title),
+            )
+            .await;
 
         StageResult::Success(Some(artifact_path))
     }

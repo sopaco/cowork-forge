@@ -49,8 +49,8 @@ pub async fn get_iteration_artifacts(
     // Load artifacts from .cowork-v2 structure
     let idea = fs::read_to_string(artifacts_dir.join("idea.md")).ok();
     let prd = fs::read_to_string(artifacts_dir.join("prd.md")).ok();
-    let _design_content = fs::read_to_string(artifacts_dir.join("design.md")).ok();
-    let _plan_content = fs::read_to_string(artifacts_dir.join("plan.md")).ok();
+    let design_raw = fs::read_to_string(artifacts_dir.join("design.md")).ok();
+    let plan_raw = fs::read_to_string(artifacts_dir.join("plan.md")).ok();
     let delivery_report = fs::read_to_string(artifacts_dir.join("delivery_report.md")).ok();
     let _check_report = fs::read_to_string(artifacts_dir.join("check_report.md")).ok();
 
@@ -90,6 +90,8 @@ pub async fn get_iteration_artifacts(
         features: None,
         design,
         plan,
+        design_raw,
+        plan_raw,
         code_files,
         delivery_report,
     })
@@ -140,6 +142,8 @@ pub async fn get_session_artifacts(
         features,
         design,
         plan,
+        design_raw: None,
+        plan_raw: None,
         code_files,
         delivery_report,
     })

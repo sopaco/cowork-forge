@@ -55,6 +55,8 @@ function App() {
   const [userInput, setUserInput] = useState('');
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeArtifactTab, setActiveArtifactTab] = useState(null);
+  const [currentAgent, setCurrentAgent] = useState(null);
 
   const listenersRegistered = useRef(false);
   const messagesContainerRef = useRef(null);
@@ -73,8 +75,15 @@ function App() {
         const iterationsData = await invoke('gui_get_iterations');
         setIterations(iterationsData || []);
 
-        // Set current iteration
-        if (projectData.current_iteration_id) {
+        // Update current iteration if it exists
+        if (currentIteration) {
+          const updatedIteration = iterationsData?.find(
+            (i) => i.id === currentIteration.id
+          );
+          if (updatedIteration) {
+            setCurrentIteration(updatedIteration);
+          }
+        } else if (projectData.current_iteration_id) {
           const iteration = iterationsData?.find(
             (i) => i.id === projectData.current_iteration_id
           );
@@ -112,26 +121,36 @@ function App() {
       });
 
       await listen('iteration_started', (event) => {
+        const iterationId = event.payload;
         setIsProcessing(true);
+        handleExecuteStatusChange(iterationId, 'running');
         message.info('Iteration started');
       });
 
       await listen('iteration_completed', (event) => {
+        const iterationId = event.payload;
         setIsProcessing(false);
         setCurrentStage(null);
-        loadData();
+        setCurrentAgent(null);
+        handleExecuteStatusChange(iterationId, 'completed');
         message.success('Iteration completed');
       });
 
       await listen('iteration_failed', (event) => {
+        const [iterationId, error] = event.payload;
         setIsProcessing(false);
         setCurrentStage(null);
-        loadData();
-        message.error('Iteration failed');
+        setCurrentAgent(null);
+        handleExecuteStatusChange(iterationId, 'error');
+        message.error('Iteration failed: ' + error);
       });
 
       await listen('agent_event', (event) => {
         const { content, is_thinking, agent_name } = event.payload;
+        // Track current agent for processing display
+        if (agent_name) {
+          setCurrentAgent(agent_name);
+        }
         if (!is_thinking && content) {
           setMessages((prev) => {
             const lastMsg = prev[prev.length - 1];
@@ -218,6 +237,23 @@ function App() {
     setActiveView('chat');
   };
 
+  const handleExecuteStatusChange = (iterationId, status) => {
+    // Update local state when execution status changes
+    if (status === 'running') {
+      setIsProcessing(true);
+      // Find the iteration and update it
+      const iteration = iterations.find((i) => i.id === iterationId);
+      if (iteration) {
+        setCurrentIteration({ ...iteration, status: 'Running' });
+      }
+    } else if (status === 'completed') {
+      setIsProcessing(false);
+      loadData(); // Refresh data
+    } else if (status === 'error') {
+      setIsProcessing(false);
+    }
+  };
+
   const handleCreateGenesisIteration = async (title, description) => {
     try {
       const request = {
@@ -275,6 +311,18 @@ function App() {
 
     // Handle view artifact option specially
     if (option.id === 'view_artifact' && inputRequest.isArtifactConfirmation) {
+      // Map artifactType to tab key
+      const artifactTypeToTab = {
+        'idea': 'idea',
+        'requirements': 'requirements',
+        'design': 'design',
+        'plan': 'plan',
+        'code': 'code',
+      };
+      const targetTab = artifactTypeToTab[inputRequest.artifactType] || 'idea';
+      
+      // Set the active tab before switching view
+      setActiveArtifactTab(targetTab);
       // Switch to artifacts tab
       setActiveView('artifacts');
       message.info(`Switched to Artifacts tab to review ${inputRequest.artifactType}`);
@@ -293,9 +341,17 @@ function App() {
       return;
     }
 
+    // Add user message with context
+    let userMessageContent = option.label;
+    if (option.id === 'yes' && inputRequest.isArtifactConfirmation) {
+      userMessageContent = `✅ Confirmed: Proceed to next stage`;
+    } else if (option.id === 'no') {
+      userMessageContent = `❌ Cancelled: Stop iteration`;
+    }
+
     setMessages((prev) => [
       ...prev,
-      { type: 'user', content: option.label, timestamp: new Date().toISOString() },
+      { type: 'user', content: userMessageContent, timestamp: new Date().toISOString() },
     ]);
 
     await invoke('submit_input_response', {
@@ -313,9 +369,20 @@ function App() {
 
     const feedback = userInput.trim();
     
+    // Add system confirmation message before user feedback
     setMessages((prev) => [
       ...prev,
-      { type: 'user', content: `Feedback: ${feedback}`, timestamp: new Date().toISOString() },
+      { 
+        type: 'agent', 
+        content: `📝 Feedback received. Regenerating based on your input...`, 
+        agentName: 'System',
+        timestamp: new Date().toISOString() 
+      },
+      { 
+        type: 'user', 
+        content: `💬 Feedback:\n${feedback}`, 
+        timestamp: new Date().toISOString() 
+      },
     ]);
 
     // Send feedback as text response
@@ -327,7 +394,6 @@ function App() {
 
     setInputRequest(null);
     setUserInput('');
-    message.info('Feedback submitted. Agent will regenerate based on your input...');
   };
 
   const handleCancelFeedback = () => {
@@ -363,6 +429,7 @@ function App() {
           <IterationsPanel
             onSelectIteration={handleSelectIteration}
             selectedIterationId={currentIteration?.id}
+            onExecuteStatusChange={handleExecuteStatusChange}
           />
         );
 
@@ -425,10 +492,19 @@ function App() {
                 <div style={{ textAlign: 'center', padding: '20px' }}>
                   <Spin />
                   <div style={{ marginTop: '8px', color: '#888' }}>
-                    {currentIteration.current_stage
-                      ? `Executing ${currentIteration.current_stage} stage...`
-                      : 'Processing...'}
+                    {currentAgent ? (
+                      <>{currentAgent} is working...</>
+                    ) : currentIteration?.current_stage ? (
+                      `Executing ${currentIteration.current_stage} stage...`
+                    ) : (
+                      'Processing...'
+                    )}
                   </div>
+                  {currentIteration?.current_stage && (
+                    <div style={{ marginTop: '4px', fontSize: '12px', color: '#aaa' }}>
+                      Stage: {currentIteration.current_stage}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -518,7 +594,11 @@ function App() {
 
       case 'artifacts':
         return currentIteration ? (
-          <ArtifactsViewer iterationId={currentIteration.id} />
+          <ArtifactsViewer 
+            iterationId={currentIteration.id} 
+            activeTab={activeArtifactTab}
+            onTabChange={setActiveArtifactTab}
+          />
         ) : (
           <Empty description="Select an iteration" style={{ marginTop: '40px' }} />
         );
@@ -577,22 +657,14 @@ function App() {
           {currentIteration && (
             <>
               {getStatusBadge(currentIteration.status)}
-              {currentIteration.status === 'Draft' && (
+              {(currentIteration.status === 'Draft' || currentIteration.status === 'Paused') && (
                 <Button
                   type="primary"
-                  icon={<PlayCircleOutlined />}
+                  icon={currentIteration.status === 'Draft' ? <PlayCircleOutlined /> : <ReloadOutlined />}
                   onClick={handleExecuteIteration}
+                  loading={isProcessing}
                 >
-                  Start Iteration
-                </Button>
-              )}
-              {currentIteration.status === 'Paused' && (
-                <Button
-                  type="primary"
-                  icon={<ReloadOutlined />}
-                  onClick={handleExecuteIteration}
-                >
-                  Continue
+                  {currentIteration.status === 'Draft' ? 'Start Iteration' : 'Continue'}
                 </Button>
               )}
             </>
@@ -644,7 +716,7 @@ function App() {
           {isProcessing ? (
             <span style={{ color: '#1890ff' }}>
               <Spin size="small" style={{ marginRight: '8px' }} />
-              Processing...
+              {currentAgent ? `${currentAgent} is working...` : 'Processing...'}
             </span>
           ) : (
             <span style={{ color: '#52c41a' }}>

@@ -48,7 +48,7 @@ const STAGES = [
   { key: 'delivery', label: 'Delivery', icon: <RocketOutlined />, color: '#52c41a' },
 ];
 
-const IterationsPanel = ({ onSelectIteration, selectedIterationId }) => {
+const IterationsPanel = ({ onSelectIteration, selectedIterationId, onExecuteStatusChange }) => {
   const [iterations, setIterations] = useState([]);
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -131,22 +131,30 @@ const IterationsPanel = ({ onSelectIteration, selectedIterationId }) => {
   const handleExecuteIteration = async (iterationId) => {
     try {
       setExecutingId(iterationId);
+      // Notify parent about execution status change
+      onExecuteStatusChange?.(iterationId, 'running');
       await invoke('gui_execute_iteration', { iterationId });
       message.info('Iteration execution started');
     } catch (error) {
       message.error('Failed to execute iteration: ' + error);
       setExecutingId(null);
+      onExecuteStatusChange?.(iterationId, 'error');
     }
   };
 
   const handleContinueIteration = async (iterationId) => {
     try {
       setExecutingId(iterationId);
+      // Notify parent about execution status change
+      onExecuteStatusChange?.(iterationId, 'running');
+      // Auto-select the iteration being continued
+      onSelectIteration?.(iterationId);
       await invoke('gui_continue_iteration', { iterationId });
       message.info('Iteration continued');
     } catch (error) {
       message.error('Failed to continue iteration: ' + error);
       setExecutingId(null);
+      onExecuteStatusChange?.(iterationId, 'error');
     }
   };
 
