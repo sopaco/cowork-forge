@@ -52,7 +52,7 @@ pub async fn get_iteration_artifacts(
     let design_raw = fs::read_to_string(artifacts_dir.join("design.md")).ok();
     let plan_raw = fs::read_to_string(artifacts_dir.join("plan.md")).ok();
     let delivery_report = fs::read_to_string(artifacts_dir.join("delivery_report.md")).ok();
-    let _check_report = fs::read_to_string(artifacts_dir.join("check_report.md")).ok();
+    let check_report = fs::read_to_string(artifacts_dir.join("check_report.md")).ok();
 
     // Load workspace code files if available
     let workspace = iteration_store.workspace_path(&iteration_id)
@@ -93,6 +93,7 @@ pub async fn get_iteration_artifacts(
         design_raw,
         plan_raw,
         code_files,
+        check_report,
         delivery_report,
     })
 }
@@ -134,6 +135,7 @@ pub async fn get_session_artifacts(
     };
 
     let delivery_report = fs::read_to_string(session_dir.join("delivery_report.md")).ok();
+    let check_report = fs::read_to_string(session_dir.join("check_report.md")).ok();
 
     Ok(SessionArtifacts {
         session_id,
@@ -145,6 +147,7 @@ pub async fn get_session_artifacts(
         design_raw: None,
         plan_raw: None,
         code_files,
+        check_report,
         delivery_report,
     })
 }
@@ -437,10 +440,24 @@ pub async fn start_iteration_preview(
         return Err(format!("Workspace directory not found: {}", workspace.display()));
     }
 
-    // Install dependencies if needed
     install_dependencies_if_needed(&workspace).await?;
 
     PREVIEW_SERVER_MANAGER.start(iteration_id, workspace).await
+}
+
+#[tauri::command]
+pub async fn check_preview_status(
+    iteration_id: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<Option<PreviewInfo>, String> {
+    println!("[GUI] Checking preview status for iteration: {}", iteration_id);
+    
+    if PREVIEW_SERVER_MANAGER.is_running(&iteration_id) {
+        Ok(PREVIEW_SERVER_MANAGER.get_info(&iteration_id))
+    } else {
+        Ok(None)
+    }
 }
 
 /// Install dependencies if package.json exists and node_modules is missing

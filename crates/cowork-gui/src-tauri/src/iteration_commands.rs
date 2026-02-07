@@ -253,6 +253,50 @@ pub async fn gui_continue_iteration(
 }
 
 #[tauri::command]
+pub async fn gui_retry_iteration(
+    iteration_id: String,
+    window: Window,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let project_store = ProjectStore::new();
+
+    let mut project = project_store.load().map_err(|e| e.to_string())?
+        .ok_or_else(|| "Project not initialized".to_string())?;
+
+    // Create interaction backend
+    let interaction = Arc::new(TauriBackend::new(
+        window.app_handle().clone(),
+        state.event_bus.clone(),
+        state.pending_requests.clone(),
+    ));
+
+    let executor = IterationExecutor::new(interaction);
+
+    // Emit started event
+    let _ = window.emit("iteration_retrying", iteration_id.clone());
+
+    // Execute in background
+    let window_clone = window.app_handle().clone();
+    let iteration_id_clone = iteration_id.clone();
+
+    tokio::spawn(async move {
+        println!("[GUI] Starting retry_iteration for iteration: {}", iteration_id_clone);
+        match executor.retry_iteration(&mut project, &iteration_id_clone).await {
+            Ok(_) => {
+                println!("[GUI] retry_iteration completed successfully");
+                let _ = window_clone.emit("iteration_completed", iteration_id_clone);
+            }
+            Err(e) => {
+                println!("[GUI] retry_iteration failed: {}", e);
+                let _ = window_clone.emit("iteration_failed", (iteration_id_clone, e.to_string()));
+            }
+        }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn gui_delete_iteration(
     iteration_id: String,
     window: Window,

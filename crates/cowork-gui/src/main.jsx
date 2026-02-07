@@ -93,6 +93,8 @@ const lightTheme = {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <ConfigProvider theme={lightTheme}>
-    <App />
+    <App>
+      <App />
+    </App>
   </ConfigProvider>
 );

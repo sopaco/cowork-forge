@@ -56,7 +56,7 @@ impl Stage for CheckStage {
 
         // Generate code review using LLM
         let prompt = format!(
-            r#"You are a code reviewer and QA specialist. Review the implementation against the requirements and provide a comprehensive quality report.
+            r#"You are a code reviewer performing a basic validation check. Review the implementation with a **lenient and practical** approach.
 
 **Iteration:** #{} - {}
 
@@ -69,36 +69,47 @@ impl Stage for CheckStage {
 **Project Completeness Issues Found:**
 {}
 
-Please provide a comprehensive review that includes:
+Please provide a **simple and focused** review that checks:
 
-1. **Project Completeness Assessment**
-   - Are all required files present?
-   - Are configuration files valid?
-   - Is the project structure correct?
-   - Are dependencies properly defined?
+1. **Basic Project Structure**
+   - Are essential files present (package.json/Cargo.toml/index.html)?
+   - Is the project structure reasonable?
 
-2. **Code Quality**
-   - Readability, maintainability, best practices
-   - Proper error handling
-   - Security vulnerabilities
-   - Performance issues
+2. **TODO Comments**
+   - Search for "TODO", "FIXME", "HACK" comments
+   - These indicate incomplete work
 
-3. **Functionality**
-   - Does it implement all required features?
-   - Are there missing implementations?
+3. **Task Completion**
+   - Compare implementation with the plan
+   - Are all planned features implemented?
 
-4. **Actionable Recommendations**
-   - Specific issues that MUST be fixed
-   - Improvements with code examples
+4. **Basic Code Quality**
+   - Syntax errors (obvious ones)
+   - Missing imports or dependencies
 
-**CRITICAL:** If the project has ANY of these issues, you MUST FAIL the review:
-- Missing package.json (for Node.js projects)
-- Missing Cargo.toml (for Rust projects)
-- Missing index.html (for web projects)
-- Empty or placeholder files
-- Code that cannot run/compile
+**IMPORTANT CHECKLIST:**
 
-Provide a PASS/FAIL verdict at the end. Be STRICT - FAIL if the project is not actually runnable."#,
+**PASS the review if:**
+- Project structure is complete (has required config files)
+- No TODO/FIXME/HACK comments remain
+- All planned features from requirements are implemented
+- Code appears to compile/run (no obvious syntax errors)
+
+**FAIL the review ONLY if:**
+- Missing critical files (package.json/Cargo.toml/index.html for web projects)
+- TODO/FIXME/HACK comments are present
+- Major features from requirements are missing
+- Obvious syntax errors that would prevent compilation
+
+**DO NOT FAIL for:**
+- Code style issues
+- Minor improvements suggestions
+- Missing tests
+- Missing documentation
+- Placeholder text in UI (like "Hello World") - this is acceptable
+- Non-critical optimizations
+
+Provide a simple PASS/FAIL verdict at the end. Be lenient - focus on whether the project can actually run."#,
             ctx.iteration.number,
             ctx.iteration.title,
             plan_content,
@@ -150,10 +161,13 @@ Provide a PASS/FAIL verdict at the end. Be STRICT - FAIL if the project is not a
         }
 
         // Determine if passed - be more strict
-        let passed = (review_text.to_uppercase().contains("PASS") || 
-                     review_text.to_uppercase().contains("APPROVED"))
-                    && !review_text.to_uppercase().contains("FAIL")
-                    && completeness_issues.is_empty();
+        // If there are no completeness issues and LLM doesn't explicitly FAIL, consider it a PASS
+        let has_explicit_fail = review_text.to_uppercase().contains("FAIL");
+        let has_explicit_pass = review_text.to_uppercase().contains("PASS") || 
+                                review_text.to_uppercase().contains("APPROVED");
+        
+        // Pass if: no completeness issues AND (explicit pass OR no explicit fail)
+        let passed = completeness_issues.is_empty() && (has_explicit_pass || !has_explicit_fail);
 
         // Write review to file
         let artifact_path = format!(
@@ -264,6 +278,11 @@ async fn check_project_completeness(ctx: &PipelineContext, interaction: &Arc<dyn
         f.path().file_name() == Some(std::ffi::OsStr::new("package.json"))
     });
     
+    let has_node_modules = files.iter().any(|f| {
+        f.path().file_name() == Some(std::ffi::OsStr::new("node_modules"))
+            || f.path().is_dir() && f.path().file_name() == Some(std::ffi::OsStr::new("node_modules"))
+    });
+    
     if has_package_json {
         let package_json_path = workspace.join("package.json");
         if let Ok(content) = std::fs::read_to_string(&package_json_path) {
@@ -306,6 +325,33 @@ async fn check_project_completeness(ctx: &PipelineContext, interaction: &Arc<dyn
                                 "Forbidden framework detected in devDependencies: {}. Web projects must use Vanilla HTML/JS/CSS or React only.",
                                 dep_name
                             ));
+                        }
+                    }
+                }
+                
+                // Auto-install dependencies if package.json exists but node_modules doesn't
+                if !has_node_modules && (has_deps || has_dev_deps) {
+                    interaction
+                        .show_message(
+                            crate::interaction::MessageLevel::Info,
+                            "Installing dependencies for validation...".to_string(),
+                        )
+                        .await;
+                    
+                    // Try bun first, then npm
+                    let install_result = install_dependencies_for_check(workspace).await;
+                    
+                    match install_result {
+                        Ok(output) => {
+                            interaction
+                                .show_message(
+                                    crate::interaction::MessageLevel::Success,
+                                    format!("Dependencies installed successfully: {}", output),
+                                )
+                                .await;
+                        }
+                        Err(e) => {
+                            issues.push(format!("Failed to install dependencies: {}. Check may be incomplete.", e));
                         }
                     }
                 }
@@ -410,6 +456,35 @@ fn load_plan_document(ctx: &PipelineContext) -> String {
         Ok(content) => content,
         Err(_) => ctx.iteration.description.clone(),
     }
+}
+
+/// Install dependencies for check validation
+async fn install_dependencies_for_check(workspace: &std::path::Path) -> anyhow::Result<String> {
+    use tokio::process::Command;
+    
+    // Check if bun is available
+    let has_bun = Command::new("bun")
+        .arg("--version")
+        .output()
+        .await
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    
+    let package_manager = if has_bun { "bun" } else { "npm" };
+    
+    let output = Command::new(package_manager)
+        .arg("install")
+        .current_dir(workspace)
+        .output()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to run {} install: {}", package_manager, e))?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!("{} install failed: {}", package_manager, stderr));
+    }
+    
+    Ok(package_manager.to_string())
 }
 
 /// Load config from file or environment

@@ -249,7 +249,8 @@ const CodeEditor = ({ iterationId }) => {
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '40px' }}>
-        <Spin size="large" tip="Loading files..." />
+        <Spin size="large" />
+        <div style={{ marginTop: '16px', color: '#999' }}>Loading files...</div>
       </div>
     );
   }

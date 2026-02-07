@@ -6,7 +6,7 @@ use crate::domain::{Iteration, IterationStatus, Project};
 use crate::interaction::InteractiveBackend;
 use crate::persistence::{IterationStore, ProjectStore};
 
-use super::{get_stages_from, is_critical_stage, PipelineContext, StageResult};
+use super::{get_stages_from, is_critical_stage, PipelineContext, StageResult, Stage};
 
 /// Iteration Executor - Manages the complete iteration lifecycle
 pub struct IterationExecutor {
@@ -197,8 +197,8 @@ impl IterationExecutor {
         // Prepare workspace
         let workspace = self.prepare_workspace(&iteration).await?;
 
-        // Create pipeline context
-        let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace);
+        // Create pipeline context (clone workspace for later use in self-healing)
+        let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
 
         // Determine starting stage
         // If resume_stage is provided (resuming from pause), use it
@@ -453,17 +453,104 @@ impl IterationExecutor {
             // If all retries failed
             if !success {
                 let error = last_error.unwrap_or_else(|| "Unknown error after retries".to_string());
-                iteration.fail();
-                self.iteration_store.save(&iteration)?;
+                
+                // Special handling for Check stage failure - attempt self-healing
+                if stage_name == "check" {
+                    self.interaction
+                        .show_message(
+                            crate::interaction::MessageLevel::Warning,
+                            "Check stage failed. Attempting self-healing by returning to previous stage...".to_string(),
+                        )
+                        .await;
+                    
+                    // Try to go back to coding stage with the error as feedback
+                    let feedback = format!("Validation failed with the following issues:\n\n{}\n\nPlease fix these issues in the code.", error);
+                    
+                    // Re-execute coding stage with feedback (clone workspace for reuse)
+                    let ctx_for_healing = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
+                    
+                    let coding_stage = crate::pipeline::stages::CodingStage;
+                    
+                    match coding_stage.execute_with_feedback(&ctx_for_healing, self.interaction.clone(), &feedback).await {
+                        StageResult::Success(artifact_path) => {
+                            self.interaction
+                                .show_message(
+                                    crate::interaction::MessageLevel::Success,
+                                    "Self-healing successful! Code has been fixed based on validation feedback.".to_string(),
+                                )
+                                .await;
+                            
+                            // Save the updated artifact
+                            iteration.complete_stage("coding", artifact_path.clone());
+                            self.iteration_store.save(&iteration)?;
+                            
+                            // Retry check stage again
+                            self.interaction
+                                .show_message(
+                                    crate::interaction::MessageLevel::Info,
+                                    "Re-running validation after self-healing...".to_string(),
+                                )
+                                .await;
+                            
+                            // Retry check (single attempt)
+                            match stage.execute(&ctx_for_healing, self.interaction.clone()).await {
+                                StageResult::Success(_) => {
+                                    self.interaction
+                                        .show_message(
+                                            crate::interaction::MessageLevel::Success,
+                                            "✅ Validation passed after self-healing!".to_string(),
+                                        )
+                                        .await;
+                                    iteration.complete_stage(&stage_name, None);
+                                    self.iteration_store.save(&iteration)?;
+                                    success = true;
+                                }
+                                StageResult::Failed(e) => {
+                                    self.interaction
+                                        .show_message(
+                                            crate::interaction::MessageLevel::Error,
+                                            format!("Self-healing failed: Validation still fails after fix: {}", e),
+                                        )
+                                        .await;
+                                    // Fall through to failure handling
+                                }
+                                _ => {
+                                    self.interaction
+                                        .show_message(
+                                            crate::interaction::MessageLevel::Error,
+                                            "Self-healing failed: Unexpected result from validation".to_string(),
+                                        )
+                                        .await;
+                                    // Fall through to failure handling
+                                }
+                            }
+                        }
+                        StageResult::Failed(e) => {
+                            self.interaction
+                                .show_message(
+                                    crate::interaction::MessageLevel::Error,
+                                    format!("Self-healing failed: Unable to fix code: {}", e),
+                                )
+                                .await;
+                        }
+                        _ => {}
+                    }
+                }
+                
+                // If still failed after self-healing attempt
+                if !success {
+                    iteration.fail();
+                    self.iteration_store.save(&iteration)?;
 
-                self.interaction
-                    .show_message(
-                        crate::interaction::MessageLevel::Error,
-                        format!("Stage '{}' failed after {} attempts: {}", stage_name, MAX_STAGE_RETRIES, error),
-                    )
-                    .await;
+                    self.interaction
+                        .show_message(
+                            crate::interaction::MessageLevel::Error,
+                            format!("Stage '{}' failed after {} attempts: {}", stage_name, MAX_STAGE_RETRIES, error),
+                        )
+                        .await;
 
-                return Err(anyhow::anyhow!("Iteration failed at stage '{}' after {} retries", stage_name, MAX_STAGE_RETRIES));
+                    return Err(anyhow::anyhow!("Iteration failed at stage '{}' after {} retries", stage_name, MAX_STAGE_RETRIES));
+                }
             }
         } // End of for stage in stages
 
@@ -504,9 +591,53 @@ impl IterationExecutor {
         iteration.resume();
         self.iteration_store.save(&iteration)?;
 
+        // Notify that iteration has been resumed and is ready to continue
+        self.interaction
+            .show_message(
+                crate::interaction::MessageLevel::Info,
+                format!("Iteration '{}' resumed from stage: {}", iteration_id, resume_stage.as_ref().unwrap_or(&"unknown".to_string())),
+            )
+            .await;
+
         // Resume execution from the saved stage
         println!("[Executor] Calling execute with resume_stage...");
         self.execute(project, iteration_id, resume_stage).await
+    }
+
+    /// Retry a failed iteration
+    pub async fn retry_iteration(&self, project: &mut Project, iteration_id: &str) -> anyhow::Result<()> {
+        let mut iteration = self.iteration_store.load(iteration_id)?;
+
+        println!("[Executor] Retrying failed iteration '{}' (status: {:?}, current_stage: {:?})", 
+            iteration_id, iteration.status, iteration.current_stage);
+
+        if iteration.status != IterationStatus::Failed {
+            println!("[Executor] Error: Iteration is not failed (current status: {:?})", iteration.status);
+            return Err(anyhow::anyhow!("Iteration is not failed"));
+        }
+
+        // Determine which stage to retry from
+        // For failed iterations, we want to retry from the stage that failed
+        // If current_stage is set, use it; otherwise default to "check" for validation failures
+        let retry_stage = if let Some(ref current) = iteration.current_stage {
+            current.clone()
+        } else {
+            // If no current_stage, default to "check" since that's where most failures happen
+            // This is safer than determine_start_stage() which would go back to "idea"
+            println!("[Executor] No current_stage found, defaulting to 'check' for retry");
+            "check".to_string()
+        };
+
+        println!("[Executor] Retrying from stage: {:?}", retry_stage);
+
+        // Reset iteration status to running
+        iteration.start();
+        self.iteration_store.save(&iteration)?;
+        self.project_store.set_current_iteration(project, iteration_id.to_string())?;
+
+        // Execute from the retry stage
+        println!("[Executor] Calling execute for retry...");
+        self.execute(project, iteration_id, Some(retry_stage)).await
     }
 
     /// Copy directory recursively

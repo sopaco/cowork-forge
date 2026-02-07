@@ -90,7 +90,8 @@ impl Iteration {
 
     pub fn fail(&mut self) {
         self.status = IterationStatus::Failed;
-        self.current_stage = None;
+        // Keep current_stage to know which stage failed for retry
+        // Only clear it if explicitly needed
     }
 
     pub fn set_stage(&mut self, stage: impl Into<String>) {

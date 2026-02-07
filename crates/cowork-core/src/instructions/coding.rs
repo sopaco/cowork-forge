@@ -78,6 +78,18 @@ During implementation, you may discover that the plan needs adjustments. You now
 - create_task(title, description, feature_id, component_id, files_to_create, dependencies, acceptance_criteria)
 - update_task(task_id, reason, title?, description?, dependencies?, files_to_create?, acceptance_criteria?)
 - delete_task(task_id, reason)
+- save_insight(title, description) - Save important observations or discoveries to iteration memory
+- save_issue(title, description, severity) - Record problems or bugs encountered during development
+- save_learning(title, description) - Document knowledge gained or lessons learned
+
+# Memory Management Guidelines
+- **Use save_insight** when you discover important patterns, optimizations, or architectural insights
+- **Use save_issue** when you encounter bugs, limitations, or obstacles that need tracking
+- **Use save_learning** when you learn something valuable that could help future development
+- Examples:
+  - save_insight: "Database query optimization - using indexes improved performance by 10x"
+  - save_issue: "API rate limiting not implemented - may cause issues with high traffic"
+  - save_learning: "React state management - useReducer is better for complex state logic"
 
 # Code Style - SIMPLE APPROACH
 ```

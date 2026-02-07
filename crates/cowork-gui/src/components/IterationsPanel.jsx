@@ -27,6 +27,7 @@ import {
   CloseCircleOutlined,
   DeleteOutlined,
   ReloadOutlined,
+  RedoOutlined,
   BranchesOutlined,
   RocketOutlined,
   CodeOutlined,
@@ -87,22 +88,45 @@ const IterationsPanel = ({ onSelectIteration, selectedIterationId, onExecuteStat
     loadData();
 
     // Listen for events
-    const unlistenCreated = listen('iteration_created', () => loadData());
-    const unlistenCompleted = listen('iteration_completed', () => {
-      loadData();
-      setExecutingId(null);
-    });
-    const unlistenFailed = listen('iteration_failed', () => {
-      loadData();
-      setExecutingId(null);
-    });
-
-    return () => {
-      unlistenCreated.then(fn => fn()).catch(() => {});
-      unlistenCompleted.then(fn => fn()).catch(() => {});
-      unlistenFailed.then(fn => fn()).catch(() => {});
-    };
-  }, []);
+        const unlistenCreated = listen('iteration_created', () => loadData());
+        const unlistenStarted = listen('iteration_started', () => {
+          // Delay refresh to allow backend to update the iteration state
+          setTimeout(() => {
+            loadData();
+          }, 500);
+        });
+        const unlistenContinued = listen('iteration_continued', () => {
+          // Delay refresh to allow backend to update the iteration state
+          setTimeout(() => {
+            loadData();
+          }, 500);
+        });
+        const unlistenAgentEvent = listen('agent_event', (event) => {
+          const content = event.payload?.content || '';
+          // Refresh data when a stage starts (to get updated current_stage)
+          if (content.includes('Starting stage:')) {
+            setTimeout(() => {
+              loadData();
+            }, 100);
+          }
+        });
+        const unlistenCompleted = listen('iteration_completed', () => {
+          loadData();
+          setExecutingId(null);
+        });
+        const unlistenFailed = listen('iteration_failed', () => {
+          loadData();
+          setExecutingId(null);
+        });
+    
+        return () => {
+          unlistenCreated.then(fn => fn()).catch(() => {});
+          unlistenStarted.then(fn => fn()).catch(() => {});
+          unlistenContinued.then(fn => fn()).catch(() => {});
+          unlistenAgentEvent.then(fn => fn()).catch(() => {});
+          unlistenCompleted.then(fn => fn()).catch(() => {});
+          unlistenFailed.then(fn => fn()).catch(() => {});
+        };  }, []);
 
   const handleCreateIteration = async () => {
     if (!newIterationTitle.trim()) {
@@ -153,6 +177,22 @@ const IterationsPanel = ({ onSelectIteration, selectedIterationId, onExecuteStat
       message.info('Iteration continued');
     } catch (error) {
       message.error('Failed to continue iteration: ' + error);
+      setExecutingId(null);
+      onExecuteStatusChange?.(iterationId, 'error');
+    }
+  };
+
+  const handleRetryIteration = async (iterationId) => {
+    try {
+      setExecutingId(iterationId);
+      // Notify parent about execution status change
+      onExecuteStatusChange?.(iterationId, 'running');
+      // Auto-select the iteration being retried
+      onSelectIteration?.(iterationId);
+      await invoke('gui_retry_iteration', { iterationId });
+      message.info('Retrying iteration...');
+    } catch (error) {
+      message.error('Failed to retry iteration: ' + error);
       setExecutingId(null);
       onExecuteStatusChange?.(iterationId, 'error');
     }
@@ -351,6 +391,18 @@ const IterationsPanel = ({ onSelectIteration, selectedIterationId, onExecuteStat
                     Continue
                   </Button>
                 ),
+                iteration.status === 'Failed' && (
+                  <Button
+                    type="link"
+                    icon={<RedoOutlined />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRetryIteration(iteration.id);
+                    }}
+                  >
+                    Retry
+                  </Button>
+                ),
                 iteration.status === 'Running' && (
                   <Spin size="small" style={{ marginRight: '8px' }} />
                 ),
@@ -436,7 +488,15 @@ const IterationsPanel = ({ onSelectIteration, selectedIterationId, onExecuteStat
                   {/* Stages */}
                   <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                     {STAGES.map((stage) => {
-                      const isCompleted = iteration.completed_stages?.includes(stage.key);
+                      // For running/paused iterations, only show stages before current_stage as completed
+                      // For completed iterations, use completed_stages
+                      const currentStageIndex = STAGES.findIndex(s => s.key === iteration.current_stage);
+                      const stageIndex = STAGES.findIndex(s => s.key === stage.key);
+
+                      const isCompleted = iteration.status === 'Completed'
+                        ? iteration.completed_stages?.includes(stage.key)
+                        : currentStageIndex >= 0 && stageIndex < currentStageIndex;
+
                       const isCurrent = iteration.current_stage === stage.key;
 
                       return (
@@ -583,7 +643,15 @@ const IterationsPanel = ({ onSelectIteration, selectedIterationId, onExecuteStat
               <h4>Stages</h4>
               <Timeline
                 items={STAGES.map((stage) => {
-                  const isCompleted = selectedIteration.completed_stages?.includes(stage.key);
+                  // For running/paused iterations, only show stages before current_stage as completed
+                  // For completed iterations, use completed_stages
+                  const currentStageIndex = STAGES.findIndex(s => s.key === selectedIteration.current_stage);
+                  const stageIndex = STAGES.findIndex(s => s.key === stage.key);
+
+                  const isCompleted = selectedIteration.status === 'Completed'
+                    ? selectedIteration.completed_stages?.includes(stage.key)
+                    : currentStageIndex >= 0 && stageIndex < currentStageIndex;
+
                   const isCurrent = selectedIteration.current_stage === stage.key;
 
                   return {

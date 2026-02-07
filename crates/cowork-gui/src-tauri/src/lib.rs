@@ -132,11 +132,14 @@ impl InteractiveBackend for TauriBackend {
 /// Determine agent name from message content based on stage keywords
 fn determine_agent_name(content: &str) -> String {
     let content_lower = content.to_lowercase();
-    
-    // Check for stage-specific keywords
+
+    // Check for stage-specific keywords - order matters!
+    // Put more specific keywords first
     if content_lower.contains("delivery") || content_lower.contains("delivering") {
         return "Delivery Agent".to_string();
-    } else if content_lower.contains("coding") || content_lower.contains("generating code") || content_lower.contains("file") && content_lower.contains("generat") {
+    } else if content_lower.contains("check") || content_lower.contains("validat") || content_lower.contains("test") {
+        return "Validation Agent".to_string();
+    } else if content_lower.contains("coding") || content_lower.contains("generating code") || (content_lower.contains("file") && content_lower.contains("generat")) {
         return "Coding Agent".to_string();
     } else if content_lower.contains("plan") || content_lower.contains("implementation plan") {
         return "Planning Agent".to_string();
@@ -146,12 +149,10 @@ fn determine_agent_name(content: &str) -> String {
         return "Requirements Agent".to_string();
     } else if content_lower.contains("idea") || content_lower.contains("concept") {
         return "Ideation Agent".to_string();
-    } else if content_lower.contains("check") || content_lower.contains("validat") || content_lower.contains("test") {
-        return "Validation Agent".to_string();
     } else if content_lower.contains("stage") && content_lower.contains("complet") {
         return "Pipeline Controller".to_string();
     }
-    
+
     // Default agent name
     "Cowork Agent".to_string()
 }
@@ -718,6 +719,7 @@ pub fn run() {
             iteration_commands::gui_get_iteration,
             iteration_commands::gui_execute_iteration,
             iteration_commands::gui_continue_iteration,
+            iteration_commands::gui_retry_iteration,
             iteration_commands::gui_delete_iteration,
             // GUI-specific commands (Legacy)
             gui_commands::get_session_artifacts,
@@ -736,6 +738,7 @@ pub fn run() {
             gui_commands::get_iteration_file_tree,
             gui_commands::start_iteration_preview,
             gui_commands::stop_iteration_preview,
+            gui_commands::check_preview_status,
             gui_commands::start_iteration_project,
             gui_commands::stop_iteration_project,
             // Memory commands

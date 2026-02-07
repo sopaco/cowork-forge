@@ -84,6 +84,32 @@ impl PreviewServerManager {
             project_type,
         })
     }
+    
+    /// Check if a server is currently running for a session
+    pub fn is_running(&self, session_id: &str) -> bool {
+        let servers = self.servers.lock().unwrap();
+        if let Some(server) = servers.get(session_id) {
+            *server.running.lock().unwrap()
+        } else {
+            false
+        }
+    }
+    
+    /// Get preview info for a running server
+    pub fn get_info(&self, session_id: &str) -> Option<PreviewInfo> {
+        let servers = self.servers.lock().unwrap();
+        if let Some(server) = servers.get(session_id) {
+            let is_running = *server.running.lock().unwrap();
+            Some(PreviewInfo {
+                url: format!("http://localhost:{}", server.port),
+                port: server.port,
+                status: if is_running { PreviewStatus::Running } else { PreviewStatus::Stopped },
+                project_type: Self::detect_project_type(&server.base_dir),
+            })
+        } else {
+            None
+        }
+    }
 
     pub async fn stop(&self, session_id: String) -> Result<(), String> {
         let mut servers = self.servers.lock().unwrap();

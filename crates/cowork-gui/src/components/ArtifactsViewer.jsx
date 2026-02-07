@@ -216,7 +216,8 @@ const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChang
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '40px' }}>
-        <Spin size="large" tip="Loading artifacts..." />
+        <Spin size="large" />
+        <div style={{ marginTop: '16px', color: '#999' }}>Loading artifacts...</div>
       </div>
     );
   }
@@ -577,10 +578,29 @@ const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChang
     });
   }
 
+  if (artifacts.check_report) {
+    items.push({
+      key: 'check_report',
+      label: <span><CheckCircleOutlined /> Check Report</span>,
+      children: (
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight, rehypeRaw]}
+            >
+              {artifacts.check_report}
+            </ReactMarkdown>
+          </div>
+        </div>
+      ),
+    });
+  }
+
   if (artifacts.delivery_report) {
     items.push({
-      key: 'report',
-      label: <span><CheckCircleOutlined /> Report</span>,
+      key: 'delivery_report',
+      label: <span><CheckCircleOutlined /> Delivery Report</span>,
       children: (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
