@@ -427,15 +427,17 @@ pub async fn start_iteration_preview(
 ) -> Result<PreviewInfo, String> {
     println!("[GUI] Starting preview for iteration: {}", iteration_id);
 
-    // Use project root directory for preview (delivered code location)
-    let project_root = cowork_core::storage::get_project_root()
-        .map_err(|e| format!("Failed to get project root: {}", e))?;
+    // Use workspace directory for preview (working code location)
+    // This ensures consistency with Code editor
+    let iteration_store = IterationStore::new();
+    let workspace = iteration_store.workspace_path(&iteration_id)
+        .map_err(|e| format!("Failed to get workspace: {}", e))?;
 
-    if !project_root.exists() {
-        return Err(format!("Project directory not found: {}", project_root.display()));
+    if !workspace.exists() {
+        return Err(format!("Workspace directory not found: {}", workspace.display()));
     }
 
-    PREVIEW_SERVER_MANAGER.start(iteration_id, project_root).await
+    PREVIEW_SERVER_MANAGER.start(iteration_id, workspace).await
 }
 
 #[tauri::command]
@@ -456,11 +458,13 @@ pub async fn start_iteration_project(
 ) -> Result<RunInfo, String> {
     println!("[GUI] Starting project for iteration: {}", iteration_id);
 
-    // Use project root directory for running (delivered code location)
-    let project_root = cowork_core::storage::get_project_root()
-        .map_err(|e| format!("Failed to get project root: {}", e))?;
+    // Use workspace directory for running (working code location)
+    // This ensures consistency with Code editor and Preview
+    let iteration_store = IterationStore::new();
+    let workspace = iteration_store.workspace_path(&iteration_id)
+        .map_err(|e| format!("Failed to get workspace: {}", e))?;
 
-    let command = detect_start_command(&project_root)?;
+    let command = detect_start_command(&workspace)?;
 
     println!("[GUI] Detected start command: {}", command);
 
