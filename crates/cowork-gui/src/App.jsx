@@ -8,7 +8,6 @@ import {
   CodeOutlined,
   EyeOutlined,
   PlayCircleOutlined,
-  PlusOutlined,
   ReloadOutlined,
   MessageOutlined,
   AppstoreOutlined,
@@ -17,8 +16,6 @@ import {
   CheckCircleOutlined,
   RocketOutlined,
   CloseCircleOutlined,
-  EditOutlined,
-  SendOutlined,
 } from '@ant-design/icons';
 import ArtifactsViewer from './components/ArtifactsViewer';
 import CodeEditor from './components/CodeEditor';

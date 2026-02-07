@@ -1,7 +1,6 @@
-// Validation tools for checking data quality (Session-scoped)
-use crate::storage::*;
-use adk_core::{Tool, ToolContext};
-
+// Validation tools - Quality assurance and testing
+// NOTE: This module contains V1 legacy tools that are not used in V2 iteration architecture
+use adk_core::{Tool, ToolContext, AdkError};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::sync::Arc;

@@ -4,7 +4,6 @@ use super::gui_types::FileReadResult;
 use crate::AppState;
 use crate::preview_server::PreviewServerManager;
 use crate::project_runner::ProjectRunner;
-use cowork_core::storage::*;
 use cowork_core::persistence::IterationStore;
 use cowork_core::data::{Requirements, DesignSpec, ImplementationPlan};
 use tauri::{State, Window};
@@ -150,77 +149,9 @@ pub async fn get_iteration_artifacts(
     })
 }
 
-// ============================================================================
-// Get Session Artifacts (Legacy - for backward compatibility)
-// ============================================================================
 
-#[tauri::command]
-pub async fn get_session_artifacts(
-    session_id: String,
-    window: Window,
-    state: State<'_, AppState>,
-) -> Result<SessionArtifacts, String> {
-    // Try to load as iteration first (V2)
-    let iteration_store = IterationStore::new();
-    if iteration_store.exists(&session_id) {
-        return get_iteration_artifacts(session_id, window, state).await;
-    }
 
-    // Fall back to legacy session-based loading (V1)
-    println!("[GUI] Getting artifacts for session (legacy): {}", session_id);
 
-    let session_dir = get_session_dir(&session_id)
-        .map_err(|e| format!("Failed to get session dir: {}", e))?;
-
-    let code_dir = session_dir.join("code");
-
-    let idea = load_idea(&session_id).ok();
-    let requirements = load_requirements(&session_id).ok();
-    let features = load_feature_list(&session_id).ok();
-    let design = load_design_spec(&session_id).ok();
-    let plan = load_implementation_plan(&session_id).ok();
-
-    let code_files = if code_dir.exists() {
-        collect_files(&code_dir)
-    } else {
-        vec![]
-    };
-
-    let delivery_report = fs::read_to_string(session_dir.join("delivery_report.md")).ok();
-    let check_report = fs::read_to_string(session_dir.join("check_report.md")).ok();
-
-    Ok(SessionArtifacts {
-        session_id,
-        idea,
-        requirements,
-        features,
-        design,
-        plan,
-        design_raw: None,
-        plan_raw: None,
-        code_files,
-        check_report,
-        delivery_report,
-    })
-}
-
-// ============================================================================
-// File Operations (Iteration-based V2 API)
-// ============================================================================
-
-// Legacy alias for read_iteration_file
-#[tauri::command]
-pub async fn read_file_content(
-    session_id: String,
-    file_path: String,
-    offset: Option<usize>,
-    limit: Option<usize>,
-    window: Window,
-    state: State<'_, AppState>,
-) -> Result<FileReadResult, String> {
-    // Delegate to the V2 implementation
-    read_iteration_file(session_id, file_path, offset, limit, window, state).await
-}
 
 #[tauri::command]
 pub async fn read_iteration_file(
@@ -287,33 +218,7 @@ pub async fn read_iteration_file(
     }
 }
 
-#[tauri::command]
-pub async fn save_file_content(
-    _session_id: String,
-    file_path: String,
-    content: String,
-    _window: Window,
-    _state: State<'_, AppState>,
-) -> Result<(), String> {
-    println!("[GUI] Saving file: {}", file_path);
 
-    let project_root = cowork_core::storage::get_project_root()
-        .map_err(|e| format!("Failed to get project root: {}", e))?;
-
-    let full_path = project_root.join(&file_path);
-
-    // Create parent directories if needed
-    if let Some(parent) = full_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create directories: {}", e))?;
-    }
-
-    fs::write(&full_path, content)
-        .map_err(|e| format!("Failed to write file: {}", e))?;
-
-    println!("[GUI] File saved successfully");
-    Ok(())
-}
 
 #[tauri::command]
 pub async fn save_iteration_file(
@@ -344,36 +249,7 @@ pub async fn save_iteration_file(
     Ok(())
 }
 
-// ============================================================================
-// File Tree
-// ============================================================================
 
-#[tauri::command]
-pub async fn get_file_tree(
-    session_id: String,
-    _window: Window,
-    _state: State<'_, AppState>,
-) -> Result<FileTreeNode, String> {
-    println!("[GUI] Getting file tree for session: {}", session_id);
-
-    // Use project root directory instead of session code directory
-    let project_root = cowork_core::storage::get_project_root()
-        .map_err(|e| format!("Failed to get project root: {}", e))?;
-
-    if !project_root.exists() {
-        return Ok(FileTreeNode {
-            name: project_root.file_name().unwrap_or(project_root.as_os_str()).to_string_lossy().to_string(),
-            path: ".".to_string(),
-            is_dir: true,
-            children: Some(vec![]),
-            is_expanded: true,
-            language: None,
-        });
-    }
-
-    build_file_tree(&project_root, &project_root, 0)
-        .map_err(|e| format!("Failed to build file tree: {}", e))
-}
 
 #[tauri::command]
 pub async fn get_iteration_file_tree(
@@ -402,73 +278,7 @@ pub async fn get_iteration_file_tree(
         .map_err(|e| format!("Failed to build file tree: {}", e))
 }
 
-// ============================================================================
-// Preview and Run Commands
-// ============================================================================
 
-#[tauri::command]
-pub async fn start_preview(
-    session_id: String,
-    _window: Window,
-    _state: State<'_, AppState>,
-) -> Result<PreviewInfo, String> {
-    println!("[GUI] Starting preview for session: {}", session_id);
-
-    let project_root = cowork_core::storage::get_project_root()
-        .map_err(|e| format!("Failed to get project root: {}", e))?;
-
-    if !project_root.exists() {
-        return Err(format!("Project directory not found: {}", project_root.display()));
-    }
-
-    PREVIEW_SERVER_MANAGER.start(session_id, project_root).await
-}
-
-#[tauri::command]
-pub async fn stop_preview(
-    session_id: String,
-    _window: Window,
-    _state: State<'_, AppState>,
-) -> Result<(), String> {
-    println!("[GUI] Stopping preview for session: {}", session_id);
-    PREVIEW_SERVER_MANAGER.stop(session_id).await
-}
-
-#[tauri::command]
-pub async fn start_project(
-    session_id: String,
-    _window: Window,
-    _state: State<'_, AppState>,
-) -> Result<RunInfo, String> {
-    println!("[GUI] Starting project for session: {}", session_id);
-
-    // Use project root directory
-    let project_root = cowork_core::storage::get_project_root()
-        .map_err(|e| format!("Failed to get project root: {}", e))?;
-
-    let command = detect_start_command(&project_root)?;
-
-    println!("[GUI] Detected start command: {}", command);
-
-    let command_clone = command.clone();
-    let pid = PROJECT_RUNNER.start(session_id, command).await?;
-
-    Ok(RunInfo {
-        status: RunStatus::Running,
-        process_id: Some(pid),
-        command: Some(command_clone),
-    })
-}
-
-#[tauri::command]
-pub async fn stop_project(
-    session_id: String,
-    _window: Window,
-    _state: State<'_, AppState>,
-) -> Result<(), String> {
-    println!("[GUI] Stopping project for session: {}", session_id);
-    PROJECT_RUNNER.stop(session_id).await
-}
 
 // ============================================================================
 // Iteration-based Preview and Run Commands (V2 API)
@@ -624,24 +434,7 @@ pub async fn check_project_status(
     Ok(PROJECT_RUNNER.is_running(&iteration_id))
 }
 
-#[tauri::command]
-pub async fn execute_project_command(
-    session_id: String,
-    command: String,
-    _window: Window,
-    _state: State<'_, AppState>,
-) -> Result<CommandResult, String> {
-    println!("[GUI] Executing command for session {}: {}", session_id, command);
 
-    let result = PROJECT_RUNNER.execute_command(session_id, command).await?;
-
-    Ok(CommandResult {
-        status: "completed".to_string(),
-        exit_code: Some(0),
-        stdout: result,
-        stderr: String::new(),
-    })
-}
 
 // ============================================================================
 // Helper Functions
@@ -1216,11 +1009,11 @@ pub async fn format_code(
 ) -> Result<FormatResult, String> {
     println!("[GUI] Formatting code in project root");
 
-    let project_root = cowork_core::storage::get_project_root()
-        .map_err(|e| format!("Failed to get project root: {}", e))?;
+    let project_root = std::env::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?;
 
     let code_dir = &project_root;
-    
+
     if !code_dir.exists() {
         return Err("Project directory not found".to_string());
     }
@@ -1309,11 +1102,11 @@ pub async fn check_formatter_available(
 ) -> Result<FormatterAvailability, String> {
     println!("[GUI] Checking formatter availability in project root");
 
-    let project_root = cowork_core::storage::get_project_root()
-        .map_err(|e| format!("Failed to get project root: {}", e))?;
+    let project_root = std::env::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?;
 
     let code_dir = &project_root;
-    
+
     let mut prettier_available = false;
     let mut rustfmt_available = false;
 
@@ -1401,11 +1194,11 @@ pub async fn export_template(
 ) -> Result<ProjectTemplate, String> {
     println!("[GUI] Exporting template from project root");
 
-    let project_root = cowork_core::storage::get_project_root()
-        .map_err(|e| format!("Failed to get project root: {}", e))?;
+    let project_root = std::env::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?;
 
     let code_dir = &project_root;
-    
+
     if !code_dir.exists() {
         return Err("Project directory not found".to_string());
     }

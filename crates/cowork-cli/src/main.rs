@@ -6,7 +6,6 @@ use cowork_core::domain::IterationStatus;
 use cowork_core::interaction::CliBackend;
 use cowork_core::persistence::{IterationStore, ProjectStore};
 use cowork_core::pipeline::IterationExecutor;
-use cowork_core::event_bus::EventBus;
 use std::sync::Arc;
 use tracing::{info, error, warn};
 
@@ -135,9 +134,8 @@ async fn cmd_iter(
 
     let description = description.unwrap_or_else(|| title.clone());
 
-    // Create interaction backend
-    let event_bus = Arc::new(EventBus::new());
-    let interaction = Arc::new(CliBackend::new(event_bus));
+    // Create interaction backend (V2 - no event_bus)
+    let interaction = Arc::new(CliBackend::new());
 
     // Create executor
     let executor = IterationExecutor::new(interaction);
@@ -406,9 +404,8 @@ async fn cmd_continue(iteration_id: Option<String>) -> Result<()> {
     println!("   Current stage: {:?}", iteration.current_stage);
     println!();
 
-    // Create executor
-    let event_bus = Arc::new(EventBus::new());
-    let interaction = Arc::new(CliBackend::new(event_bus));
+    // Create executor (V2 - no event_bus)
+    let interaction = Arc::new(CliBackend::new());
     let executor = IterationExecutor::new(interaction);
 
     match executor.continue_iteration(&mut project, &iteration_id).await {

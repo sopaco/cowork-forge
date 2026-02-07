@@ -2,19 +2,18 @@
 // Uses console and stdin for terminal-based interaction with UTF-8 support
 
 use super::{InteractiveBackend, InputOption, InputResponse, MessageLevel, ProgressInfo};
-use crate::event_bus::EventBus;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::Arc;
 use std::io::{self, Write};
 
 pub struct CliBackend {
-    event_bus: Arc<EventBus>,
+    // event_bus removed in V2
 }
 
 impl CliBackend {
-    pub fn new(event_bus: Arc<EventBus>) -> Self {
-        Self { event_bus }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -126,9 +125,5 @@ impl InteractiveBackend for CliBackend {
     async fn submit_response(&self, _request_id: String, _response: String) -> Result<()> {
         // CLI doesn't use async HITL, responses are handled synchronously
         Ok(())
-    }
-
-    fn event_bus(&self) -> Arc<EventBus> {
-        self.event_bus.clone()
     }
 }

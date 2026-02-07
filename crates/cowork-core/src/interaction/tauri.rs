@@ -2,19 +2,17 @@
 // Actual implementation will be in cowork-gui crate
 
 use super::{InteractiveBackend, InputOption, InputResponse, MessageLevel, ProgressInfo};
-use crate::event_bus::EventBus;
 use anyhow::Result;
 use async_trait::async_trait;
-use std::sync::Arc;
 
 /// Tauri backend placeholder - will be properly implemented in cowork-gui crate
 pub struct TauriBackend {
-    event_bus: Arc<EventBus>,
+    // event_bus removed in V2
 }
 
 impl TauriBackend {
-    pub fn new(event_bus: Arc<EventBus>) -> Self {
-        Self { event_bus }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -45,9 +43,5 @@ impl InteractiveBackend for TauriBackend {
         // Tauri implementation will handle async HITL responses
         println!("[Tauri HITL] Response for {}: {}", request_id, response);
         Ok(())
-    }
-
-    fn event_bus(&self) -> Arc<EventBus> {
-        self.event_bus.clone()
     }
 }

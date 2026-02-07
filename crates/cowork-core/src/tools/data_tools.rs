@@ -1,6 +1,6 @@
 // Data operation tools - Create and modify structured data (Session-scoped)
+// NOTE: This module contains V1 legacy tools that are not used in V2 iteration architecture
 use crate::data::*;
-use crate::storage::*;
 use adk_core::{Tool, ToolContext, AdkError};
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -836,7 +836,8 @@ impl Tool for UpdateTaskTool {
             suggested_fix: None,
             timestamp: chrono::Utc::now(),
         };
-        let _ = crate::storage::append_feedback(&self.session_id, &feedback);
+        // NOTE: V1 tool - append_feedback removed
+        // let _ = crate::storage::append_feedback(&self.session_id, &feedback);
 
         Ok(json!({
             "status": "success",
@@ -958,7 +959,8 @@ impl Tool for DeleteTaskTool {
             suggested_fix: None,
             timestamp: chrono::Utc::now(),
         };
-        let _ = crate::storage::append_feedback(&self.session_id, &feedback);
+        // NOTE: V1 tool - append_feedback removed
+        // let _ = crate::storage::append_feedback(&self.session_id, &feedback);
 
         Ok(json!({
             "status": "success",

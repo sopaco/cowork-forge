@@ -178,10 +178,9 @@ pub async fn gui_execute_iteration(
     let mut project = project_store.load().map_err(|e| e.to_string())?
         .ok_or_else(|| "Project not initialized".to_string())?;
 
-    // Create interaction backend
+    // Create interaction backend (V2 - no event_bus parameter)
     let interaction = Arc::new(TauriBackend::new(
         window.app_handle().clone(),
-        state.event_bus.clone(),
         state.pending_requests.clone(),
     ));
 
@@ -219,10 +218,9 @@ pub async fn gui_continue_iteration(
     let mut project = project_store.load().map_err(|e| e.to_string())?
         .ok_or_else(|| "Project not initialized".to_string())?;
 
-    // Create interaction backend
+    // Create interaction backend (V2 - no event_bus parameter)
     let interaction = Arc::new(TauriBackend::new(
         window.app_handle().clone(),
-        state.event_bus.clone(),
         state.pending_requests.clone(),
     ));
 
@@ -263,10 +261,9 @@ pub async fn gui_retry_iteration(
     let mut project = project_store.load().map_err(|e| e.to_string())?
         .ok_or_else(|| "Project not initialized".to_string())?;
 
-    // Create interaction backend
+    // Create interaction backend (V2 - no event_bus parameter)
     let interaction = Arc::new(TauriBackend::new(
         window.app_handle().clone(),
-        state.event_bus.clone(),
         state.pending_requests.clone(),
     ));
 

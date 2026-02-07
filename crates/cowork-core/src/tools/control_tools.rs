@@ -1,6 +1,5 @@
 // Control tools - provide_feedback, ask_user, etc. (Session-scoped)
 use crate::data::*;
-use crate::storage::*;
 use adk_core::{Tool, ToolContext};
 
 use async_trait::async_trait;
@@ -82,7 +81,8 @@ impl Tool for RequestReplanningTool {
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         use crate::data::{Feedback, FeedbackType, Severity};
-        use crate::storage::append_feedback;
+        // NOTE: V1 tool - append_feedback removed, this tool is no longer used
+        // use crate::storage::append_feedback;
 
         let issue_type = args.get("issue_type")
             .and_then(|v| v.as_str())
@@ -138,8 +138,9 @@ impl Tool for RequestReplanningTool {
             timestamp: chrono::Utc::now(),
         };
 
-        append_feedback(&self.session_id, &feedback)
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+        // NOTE: V1 tool - append_feedback removed
+        // append_feedback(&self.session_id, &feedback)
+        //     .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
 
         // Print warning to console
         println!("\n⚠️  REPLANNING REQUESTED ⚠️");
@@ -238,7 +239,8 @@ impl Tool for ProvideFeedbackTool {
             timestamp: chrono::Utc::now(),
         };
 
-        append_feedback(&self.session_id, &feedback).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+        // NOTE: V1 tool - append_feedback removed
+        // append_feedback(&self.session_id, &feedback).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
 
         Ok(json!({
             "status": "feedback_recorded",
@@ -364,7 +366,8 @@ impl Tool for RequestHumanReviewTool {
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         use crate::data::{Feedback, FeedbackType, Severity};
-        use crate::storage::append_feedback;
+        // NOTE: V1 tool - append_feedback removed
+        // use crate::storage::append_feedback;
 
         let reason = args.get("reason")
             .and_then(|v| v.as_str())
@@ -398,8 +401,9 @@ impl Tool for RequestHumanReviewTool {
             timestamp: chrono::Utc::now(),
         };
 
-        append_feedback(&self.session_id, &feedback)
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+        // NOTE: V1 tool - append_feedback removed
+        // append_feedback(&self.session_id, &feedback)
+        //     .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
 
         // Print prominent warning to console
         println!("\n╔═══════════════════════════════════════════════════════════╗");

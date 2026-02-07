@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex};
 use std::fs;
 use tauri::{Emitter, Manager, State, Window};
 use cowork_core::interaction::{InteractiveBackend, InputResponse};
-use cowork_core::event_bus::EventBus;
 use std::collections::HashMap;
 use tokio::sync::oneshot;
 use anyhow::Context;
@@ -20,15 +19,7 @@ mod project_manager;
 mod iteration_commands;
 use project_manager::*;
 
-// ============================================================================
-// Iterative Assistant Types
-// ============================================================================
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatActionResult {
-    pub action_type: String,
-    pub data: Option<serde_json::Value>,
-}
 
 // ============================================================================
 // TauriBackend - GUI implementation of InteractiveBackend
@@ -36,19 +27,16 @@ pub struct ChatActionResult {
 
 pub struct TauriBackend {
     app_handle: tauri::AppHandle,
-    event_bus: Arc<EventBus>,
     pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<InputResponse>>>>,
 }
 
 impl TauriBackend {
     pub fn new(
         app_handle: tauri::AppHandle,
-        event_bus: Arc<EventBus>,
         pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<InputResponse>>>>,
     ) -> Self {
         Self {
             app_handle,
-            event_bus,
             pending_requests,
         }
     }
@@ -124,9 +112,7 @@ impl InteractiveBackend for TauriBackend {
         Ok(())
     }
 
-    fn event_bus(&self) -> Arc<EventBus> {
-        self.event_bus.clone()
-    }
+    
 }
 
 /// Determine agent name from message content based on stage keywords
@@ -162,19 +148,17 @@ fn determine_agent_name(content: &str) -> String {
 // ============================================================================
 
 pub struct AppState {
-    pub event_bus: Arc<EventBus>,
     pub pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<InputResponse>>>>,
     pub project_registry_manager: Arc<Mutex<ProjectRegistryManager>>,
     pub workspace_path: Arc<Mutex<Option<String>>>,
 }
 
 impl AppState {
-    pub fn new(event_bus: Arc<EventBus>) -> Result<Self, anyhow::Error> {
+    pub fn new() -> Result<Self, anyhow::Error> {
         let project_registry_manager = ProjectRegistryManager::new()
             .context("Failed to initialize project registry manager")?;
         
         Ok(Self {
-            event_bus,
             pending_requests: Arc::new(Mutex::new(HashMap::new())),
             project_registry_manager: Arc::new(Mutex::new(project_registry_manager)),
             workspace_path: Arc::new(Mutex::new(None)),
@@ -508,113 +492,13 @@ async fn get_workspace(
     Ok(workspace.clone())
 }
 
-// ============================================================================
-// Legacy Commands (Deprecated - use iteration-based API instead)
-// ============================================================================
 
-#[tauri::command]
-async fn send_chat_message(
-    _session_id: String,
-    _message: String,
-) -> Result<ChatActionResult, String> {
-    // Legacy command - functionality moved to iteration-based architecture
-    Err("This command is deprecated. Please use the new Iteration-based API".to_string())
-}
 
-#[tauri::command]
-async fn confirm_modify(
-    _session_id: String,
-    _suggestion_str: String,
-) -> Result<String, String> {
-    // Legacy command - functionality moved to iteration-based architecture
-    Err("This command is deprecated. Please use the new Iteration-based API (gui_create_iteration, gui_execute_iteration)".to_string())
-}
 
-// ============================================================================
-// Core Commands
-// ============================================================================
-
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! Welcome to Cowork Forge GUI!", name)
-}
-
-#[tauri::command]
-async fn create_project(
-    _idea: String,
-) -> Result<String, String> {
-    // Legacy command - functionality moved to iteration-based architecture
-    Err("This command is deprecated. Please use the new Iteration-based API (gui_init_project, gui_create_iteration)".to_string())
-}
-
-#[tauri::command]
-async fn revert_project(
-    _base_session_id: String,
-    _from_stage: String,
-) -> Result<String, String> {
-    // Legacy command - functionality moved to iteration-based architecture
-    Err("This command is deprecated. Please use the new Iteration-based API".to_string())
-}
-
-#[tauri::command]
-async fn modify_project(
-    _base_session_id: String,
-    _idea: String,
-) -> Result<String, String> {
-    // Legacy command - functionality moved to iteration-based architecture
-    Err("This command is deprecated. Please use the new Iteration-based API (gui_create_iteration)".to_string())
-}
-
-#[tauri::command]
-async fn resume_project(
-    _base_session_id: String,
-) -> Result<String, String> {
-    // Legacy command - functionality moved to iteration-based architecture
-    Err("This command is deprecated. Please use the new Iteration-based API (gui_continue_iteration)".to_string())
-}
 
 // ============================================================================
 // Legacy Session Commands (use iteration-based API instead)
 // ============================================================================
-
-#[tauri::command]
-fn get_sessions(state: State<'_, AppState>) -> Result<Vec<SessionInfo>, String> {
-    use std::path::Path;
-    
-    // Get the current workspace from app state
-    let workspace = state.workspace_path.lock()
-        .map_err(|e| format!("Failed to acquire lock: {}", e))?;
-    
-    // Check for V2 project structure
-    if let Some(ref workspace_path) = *workspace {
-        let project_file = Path::new(workspace_path).join(".cowork-v2").join("project.json");
-        if project_file.exists() {
-            // V2 project - return empty list (iterations are separate)
-            return Ok(vec![]);
-        }
-        
-        // Check for old V1 structure
-        let v1_index = Path::new(workspace_path).join(".cowork").join("index.json");
-        if v1_index.exists() {
-            // Try to load old sessions
-            match std::fs::read_to_string(&v1_index) {
-                Ok(content) => {
-                    if let Ok(index) = serde_json::from_str::<cowork_core::data::ProjectIndex>(&content) {
-                        return Ok(index.sessions.into_iter().map(|s| SessionInfo {
-                            id: s.session_id,
-                            status: format!("{:?}", s.status),
-                            created_at: s.created_at.to_rfc3339(),
-                            description: s.input_description,
-                        }).collect());
-                    }
-                }
-                Err(_) => {}
-            }
-        }
-    }
-    
-    Ok(vec![])
-}
 
 #[tauri::command]
 async fn submit_input_response(
@@ -640,50 +524,13 @@ async fn submit_input_response(
     }
 }
 
-#[tauri::command]
-async fn delete_session(
-    _session_id: String,
-    _window: tauri::Window,
-) -> Result<(), String> {
-    // Legacy command - use gui_delete_iteration for V2 API
-    Err("This command is deprecated for V2 projects. Use gui_delete_iteration instead.".to_string())
-}
-
-#[tauri::command]
-async fn get_session_logs(
-    _session_id: String,
-) -> Result<Vec<SessionLogEntry>, String> {
-    // Legacy command - logs are now per-iteration in V2
-    Ok(vec![])
-}
-
-// ============================================================================
-// Session Info Types
-// ============================================================================
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct SessionInfo {
-    id: String,
-    status: String,
-    created_at: String,
-    description: String,
-}
-
-#[derive(serde::Serialize)]
-struct SessionLogEntry {
-    file: String,
-    content: String,
-}
-
 // ============================================================================
 // Run Application
 // ============================================================================
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let event_bus = Arc::new(EventBus::new());
-    
-    let app_state = AppState::new(event_bus)
+    let app_state = AppState::new()
         .expect("Failed to initialize application state");
     
     // Check for --workspace argument
@@ -700,16 +547,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
-            greet,
-            // Legacy commands (for backward compatibility during transition)
-            create_project,
-            revert_project,
-            modify_project,
-            resume_project,
-            get_sessions,
+            // Input/Interaction commands
             submit_input_response,
-            delete_session,
-            get_session_logs,
             // New Iteration-based commands
             iteration_commands::gui_init_project,
             iteration_commands::gui_get_project,
@@ -721,17 +560,6 @@ pub fn run() {
             iteration_commands::gui_continue_iteration,
             iteration_commands::gui_retry_iteration,
             iteration_commands::gui_delete_iteration,
-            // GUI-specific commands (Legacy)
-            gui_commands::get_session_artifacts,
-            gui_commands::read_file_content,
-            gui_commands::save_file_content,
-            gui_commands::get_file_tree,
-            gui_commands::start_preview,
-            gui_commands::stop_preview,
-            gui_commands::start_project,
-            gui_commands::stop_project,
-            gui_commands::execute_project_command,
-            gui_commands::open_in_file_manager,
             // GUI-specific commands (V2 API - Iteration based)
             gui_commands::get_iteration_artifacts,
             gui_commands::read_iteration_file,
@@ -768,9 +596,6 @@ pub fn run() {
             set_workspace,
             get_workspace,
             has_open_project,
-            // Iterative assistant commands
-            send_chat_message,
-            confirm_modify,
         ])
         .setup(move |app| {
             // Initialize app handle for project runner

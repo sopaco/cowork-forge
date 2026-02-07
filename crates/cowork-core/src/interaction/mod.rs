@@ -70,9 +70,6 @@ pub trait InteractiveBackend: Send + Sync {
 
     /// Submit an async HITL response (for GUI backends)
     async fn submit_response(&self, request_id: String, response: String) -> Result<()>;
-
-    /// Get a clone of the event bus for subscription
-    fn event_bus(&self) -> Arc<crate::event_bus::EventBus>;
 }
 
 // Re-export implementations

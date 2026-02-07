@@ -207,8 +207,8 @@ impl ProjectRunner {
     pub async fn execute_command(&self, _session_id: String, command: String) -> Result<String, String> {
         println!("[Runner] Executing command: {}", command);
 
-        let project_root = cowork_core::storage::get_project_root()
-            .map_err(|e| format!("Failed to get project root: {}", e))?;
+        let project_root = std::env::current_dir()
+            .map_err(|e| format!("Failed to get current directory: {}", e))?;
 
         if !project_root.exists() {
             return Err(format!("Project directory not found: {}", project_root.display()));

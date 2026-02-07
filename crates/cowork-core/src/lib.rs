@@ -14,11 +14,9 @@ pub mod agents;
 pub mod pipeline;
 pub mod instructions;
 pub mod interaction;
-pub mod event_bus;
 
 // Legacy modules (will be removed)
 pub mod data;
-pub mod storage;
 pub mod memory;
 
 // Re-exports for convenience

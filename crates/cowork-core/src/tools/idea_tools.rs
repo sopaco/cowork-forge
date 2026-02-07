@@ -1,5 +1,5 @@
 // Idea artifact tools (Session-scoped)
-use crate::storage::*;
+// NOTE: This module contains V1 legacy tools that are not used in V2 iteration architecture
 use adk_core::{Tool, ToolContext};
 use async_trait::async_trait;
 use serde_json::{json, Value};

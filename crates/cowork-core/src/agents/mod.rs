@@ -1,5 +1,5 @@
 // Agents module - Agent builders using adk-rust
-// 
+//
 // IMPORTANT: This file uses StageExecutor instead of SequentialAgent to allow
 // LoopAgents to use ExitLoopTool without affecting other stages.
 //
@@ -23,9 +23,10 @@ pub mod iterative_assistant;
 pub use iterative_assistant::*;
 
 // ============================================================================
-// IdeaAgent - Simple agent to capture initial idea
+// V1 Legacy Agents (deprecated - not used in V2)
 // ============================================================================
-
+/*
+// IdeaAgent - Simple agent to capture initial idea
 pub fn create_idea_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {
     create_idea_agent_with_interaction(model, session_id, None)
 }
@@ -309,3 +310,4 @@ pub fn create_delivery_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Ar
 
     Ok(Arc::new(agent))
 }
+*/
