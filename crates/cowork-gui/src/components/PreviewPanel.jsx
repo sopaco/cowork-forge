@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Spin, Alert } from 'antd';
-import { PlayCircleOutlined, StopOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
+import { Button, Spin, Alert, Space, Typography } from 'antd';
+import { PlayCircleOutlined, StopOutlined, ReloadOutlined, EyeOutlined, GlobalOutlined } from '@ant-design/icons';
 import { invoke } from '@tauri-apps/api/core';
 import '../styles.css';
+
+const { Text, Title } = Typography;
 
 const PreviewPanel = ({ iterationId }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -68,62 +70,97 @@ const PreviewPanel = ({ iterationId }) => {
   };
 
   return (
-    <div className="preview-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <h3>🌐 Preview</h3>
-      
-      <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
-        {!isRunning ? (
-          <Button 
-            type="primary" 
-            icon={<PlayCircleOutlined />} 
-            onClick={startPreview}
-            loading={loading}
-          >
-            Start Preview
-          </Button>
-        ) : (
-          <>
+    <div className="preview-panel" style={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      backgroundColor: '#f8fafc',
+      padding: 0
+    }}>
+      {/* Header */}
+      <div style={{ 
+        padding: '16px 20px',
+        borderBottom: '1px solid #e2e8f0',
+        backgroundColor: '#ffffff',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <Space align="center">
+          <GlobalOutlined style={{ fontSize: 20, color: '#2563eb' }} />
+          <Title level={4} style={{ margin: 0, color: '#1e293b' }}>
+            Preview
+          </Title>
+        </Space>
+        
+        <Space size="small">
+          {!isRunning ? (
             <Button 
-              icon={<ReloadOutlined />} 
-              onClick={refreshPreview}
-            >
-              Refresh
-            </Button>
-            <Button 
-              danger 
-              icon={<StopOutlined />} 
-              onClick={stopPreview}
+              type="primary" 
+              icon={<PlayCircleOutlined />} 
+              onClick={startPreview}
               loading={loading}
+              size="middle"
             >
-              Stop
+              Start
             </Button>
-          </>
-        )}
+          ) : (
+            <>
+              <Button 
+                icon={<ReloadOutlined />} 
+                onClick={refreshPreview}
+                size="middle"
+              >
+                Refresh
+              </Button>
+              <Button 
+                danger 
+                icon={<StopOutlined />} 
+                onClick={stopPreview}
+                loading={loading}
+                size="middle"
+              >
+                Stop
+              </Button>
+            </>
+          )}
+        </Space>
       </div>
 
+      {/* Preview URL Bar */}
       {previewUrl && (
-        <Alert
-          message="Preview URL"
-          description={
-            <a href={previewUrl} target="_blank" rel="noopener noreferrer">
+        <div style={{ 
+          padding: '12px 20px',
+          backgroundColor: '#ffffff',
+          borderBottom: '1px solid #e2e8f0'
+        }}>
+          <Space align="center" style={{ width: '100%' }}>
+            <Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>
+              URL:
+            </Text>
+            <Text 
+              copyable={{ text: previewUrl }} 
+              style={{ 
+                color: '#2563eb',
+                fontSize: 13,
+                fontFamily: 'monospace'
+              }}
+            >
               {previewUrl}
-            </a>
-          }
-          type="info"
-          showIcon
-          closable
-          style={{ marginBottom: 16 }}
-        />
+            </Text>
+          </Space>
+        </div>
       )}
 
-      <div style={{ flex: 1, backgroundColor: '#f0f0f0', borderRadius: 4, overflow: 'hidden' }}>
+      {/* Preview Content */}
+      <div style={{ flex: 1, backgroundColor: '#f1f5f9', overflow: 'hidden' }}>
         {isRunning && previewUrl ? (
           <iframe
             src={previewUrl}
             className="preview-frame"
-            style={{ width: '100%', height: '100%', border: 'none' }}
+            style={{ width: '100%', height: '100%', border: 'none', backgroundColor: '#ffffff' }}
             title="Preview"
-            sandbox="allow-scripts allow-same-origin allow-forms"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
           />
         ) : loading ? (
           <div style={{ 
@@ -132,10 +169,11 @@ const PreviewPanel = ({ iterationId }) => {
             justifyContent: 'center', 
             height: '100%',
             flexDirection: 'column',
-            gap: 16
+            gap: 16,
+            backgroundColor: '#ffffff'
           }}>
             <Spin size="large" />
-            <div>Starting preview...</div>
+            <Text type="secondary">Starting preview server...</Text>
           </div>
         ) : (
           <div style={{ 
@@ -143,13 +181,13 @@ const PreviewPanel = ({ iterationId }) => {
             alignItems: 'center', 
             justifyContent: 'center', 
             height: '100%',
-            color: '#999',
-            textAlign: 'center',
-            padding: 20
+            backgroundColor: '#ffffff'
           }}>
-            <div>
-              <EyeOutlined style={{ fontSize: 48, marginBottom: 16, display: 'block' }} />
-              <div>Click "Start Preview" to preview your application</div>
+            <div style={{ textAlign: 'center', color: '#94a3b8' }}>
+              <EyeOutlined style={{ fontSize: 64, marginBottom: 16, display: 'block', opacity: 0.5 }} />
+              <Text style={{ fontSize: 14, color: '#64748b' }}>
+                Click "Start" to preview your application
+              </Text>
             </div>
           </div>
         )}

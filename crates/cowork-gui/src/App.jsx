@@ -47,7 +47,6 @@ function App() {
   const [iterations, setIterations] = useState([]);
   const [currentIteration, setCurrentIteration] = useState(null);
   const [activeView, setActiveView] = useState('projects'); // Default to projects tab when no project is loaded
-  const [hasInitialProject, setHasInitialProject] = useState(false);
   const [messages, setMessages] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStage, setCurrentStage] = useState(null);
@@ -90,15 +89,13 @@ function App() {
           setCurrentIteration(iteration || null);
         }
 
-        // If we have a project and haven't switched to iterations yet, do it now
-        if (!hasInitialProject) {
+        // Auto-switch to iterations when project is loaded (unless explicitly on projects tab)
+        if (activeView === 'projects') {
           setActiveView('iterations');
-          setHasInitialProject(true);
         }
       } else {
         // No project loaded, ensure we're on projects tab
         setActiveView('projects');
-        setHasInitialProject(false);
       }
     } catch (error) {
       console.error('[App] Failed to load data:', error);
@@ -733,6 +730,7 @@ function App() {
             onClick={({ key }) => setActiveView(key)}
             style={{ height: '100%', borderRight: 0 }}
             items={[
+              { key: 'projects', icon: <AppstoreOutlined />, label: 'Projects' },
               { key: 'iterations', icon: <BranchesOutlined />, label: 'Iterations' },
               { key: 'chat', icon: <MessageOutlined />, label: 'Chat' },
               { key: 'artifacts', icon: <FileTextOutlined />, label: 'Artifacts' },
@@ -740,7 +738,6 @@ function App() {
               { key: 'preview', icon: <EyeOutlined />, label: 'Preview' },
               { key: 'run', icon: <PlayCircleOutlined />, label: 'Run' },
               { key: 'memory', icon: <DatabaseOutlined />, label: 'Memory' },
-              { key: 'projects', icon: <AppstoreOutlined />, label: 'Projects' },
             ]}
           />
         </Sider>
