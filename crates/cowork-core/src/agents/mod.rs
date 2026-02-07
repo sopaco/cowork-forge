@@ -46,8 +46,7 @@ pub fn create_idea_agent_with_interaction(
         .tool(Arc::new(SaveIdeaTool::new(session_id.to_string())))
         .tool(Arc::new(LoadIdeaTool::new(session_id.to_string())))
         .tool(Arc::new(ReviewAndEditContentTool))
-        .tool(Arc::new(GetMemoryContextTool))
-        .tool(Arc::new(SaveSessionMemoryTool))
+        .tool(Arc::new(QueryMemoryTool::new(session_id.to_string())))
         .include_contents(IncludeContents::None)
         .build()?;
 
@@ -73,9 +72,9 @@ pub fn create_prd_loop(model: Arc<dyn Llm>, session_id: &str, interaction: Arc<d
         .tool(Arc::new(AddFeatureTool::new(session.clone())))
         .tool(Arc::new(GetRequirementsTool::new(session.clone())))
         .tool(Arc::new(SavePrdDocTool::new(session.clone())))
-        .tool(Arc::new(QueryMemoryIndexTool))
-        .tool(Arc::new(LoadMemoryDetailTool))
-        .tool(Arc::new(SaveSessionMemoryTool))
+        .tool(Arc::new(QueryMemoryTool::new(session.clone())))
+        .tool(Arc::new(SaveInsightTool::new(session.clone())))
+        .tool(Arc::new(SaveIssueTool::new(session.clone())))
         .include_contents(IncludeContents::None)
         .build()?;
 
@@ -85,10 +84,11 @@ pub fn create_prd_loop(model: Arc<dyn Llm>, session_id: &str, interaction: Arc<d
         .tool(Arc::new(ReadFileTool))
         .tool(Arc::new(GetRequirementsTool::new(session.clone())))
         .tool(Arc::new(ProvideFeedbackTool::new(session.clone()))) // Write feedback to file when checks fail
-        .tool(Arc::new(ExitLoopTool::new())) // Exit loop when checks pass
-        .tool(Arc::new(RequestHumanReviewTool::new(session.clone())))
-        .tool(Arc::new(QueryMemoryIndexTool))
-        .tool(Arc::new(PromoteToProjectMemoryTool))
+.tool(Arc::new(RequestHumanReviewTool::new(session.clone())))
+        .tool(Arc::new(QueryMemoryTool::new(session.clone())))
+        .tool(Arc::new(SaveLearningTool::new(session.clone())))
+        .tool(Arc::new(PromoteToDecisionTool::new(session.clone())))
+        .tool(Arc::new(PromoteToPatternTool::new(session.clone())))
         .include_contents(IncludeContents::Default)
         .build()?;
 
@@ -116,9 +116,9 @@ pub fn create_design_loop(model: Arc<dyn Llm>, session_id: &str, interaction: Ar
         .tool(Arc::new(ReviewWithFeedbackContentTool))
         .tool(Arc::new(CreateDesignComponentTool::new(session.clone())))
         .tool(Arc::new(SaveDesignDocTool::new(session.clone())))
-        .tool(Arc::new(QueryMemoryIndexTool))
-        .tool(Arc::new(LoadMemoryDetailTool))
-        .tool(Arc::new(SaveSessionMemoryTool))
+        .tool(Arc::new(QueryMemoryTool::new(session.clone())))
+        .tool(Arc::new(SaveInsightTool::new(session.clone())))
+        .tool(Arc::new(SaveIssueTool::new(session.clone())))
         .include_contents(IncludeContents::None)
         .build()?;
 
@@ -132,8 +132,10 @@ pub fn create_design_loop(model: Arc<dyn Llm>, session_id: &str, interaction: Ar
         .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))
         .tool(Arc::new(ExitLoopTool::new()))
         .tool(Arc::new(RequestHumanReviewTool::new(session.clone())))
-        .tool(Arc::new(QueryMemoryIndexTool))
-        .tool(Arc::new(PromoteToProjectMemoryTool))
+        .tool(Arc::new(QueryMemoryTool::new(session.clone())))
+        .tool(Arc::new(SaveLearningTool::new(session.clone())))
+        .tool(Arc::new(PromoteToDecisionTool::new(session.clone())))
+        .tool(Arc::new(PromoteToPatternTool::new(session.clone())))
         .include_contents(IncludeContents::Default)
         .build()?;
 
@@ -163,9 +165,9 @@ pub fn create_plan_loop(model: Arc<dyn Llm>, session_id: &str, interaction: Arc<
         .tool(Arc::new(CreateTaskTool::new(session.clone())))
         .tool(Arc::new(UpdateTaskTool::new(session.clone())))
         .tool(Arc::new(DeleteTaskTool::new(session.clone())))
-        .tool(Arc::new(QueryMemoryIndexTool))
-        .tool(Arc::new(LoadMemoryDetailTool))
-        .tool(Arc::new(SaveSessionMemoryTool))
+        .tool(Arc::new(QueryMemoryTool::new(session.clone())))
+        .tool(Arc::new(SaveInsightTool::new(session.clone())))
+        .tool(Arc::new(SaveIssueTool::new(session.clone())))
         .include_contents(IncludeContents::None)
         .build()?;
 
@@ -179,8 +181,10 @@ pub fn create_plan_loop(model: Arc<dyn Llm>, session_id: &str, interaction: Arc<
         .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))
         .tool(Arc::new(ExitLoopTool::new()))
         .tool(Arc::new(RequestHumanReviewTool::new(session.clone())))
-        .tool(Arc::new(QueryMemoryIndexTool))
-        .tool(Arc::new(PromoteToProjectMemoryTool))
+        .tool(Arc::new(QueryMemoryTool::new(session.clone())))
+        .tool(Arc::new(SaveLearningTool::new(session.clone())))
+        .tool(Arc::new(PromoteToDecisionTool::new(session.clone())))
+        .tool(Arc::new(PromoteToPatternTool::new(session.clone())))
         .include_contents(IncludeContents::Default)
         .build()?;
 
@@ -215,9 +219,9 @@ pub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str, interaction: Ar
         .tool(Arc::new(ListFilesTool))
         .tool(Arc::new(RunCommandTool))
         .tool(Arc::new(CheckTestsTool))
-        .tool(Arc::new(QueryMemoryIndexTool))
-        .tool(Arc::new(LoadMemoryDetailTool))
-        .tool(Arc::new(SaveSessionMemoryTool))
+        .tool(Arc::new(QueryMemoryTool::new(session.clone())))
+        .tool(Arc::new(SaveInsightTool::new(session.clone())))
+        .tool(Arc::new(SaveIssueTool::new(session.clone())))
         .include_contents(IncludeContents::None)
         .build()?;
 
@@ -231,8 +235,10 @@ pub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str, interaction: Ar
         .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))
         .tool(Arc::new(ExitLoopTool::new()))
         .tool(Arc::new(RequestReplanningTool::new(session.clone())))
-        .tool(Arc::new(QueryMemoryIndexTool))
-        .tool(Arc::new(PromoteToProjectMemoryTool))
+        .tool(Arc::new(QueryMemoryTool::new(session.clone())))
+        .tool(Arc::new(SaveLearningTool::new(session.clone())))
+        .tool(Arc::new(PromoteToDecisionTool::new(session.clone())))
+        .tool(Arc::new(PromoteToPatternTool::new(session.clone())))
         .include_contents(IncludeContents::Default)
         .build()?;
 
@@ -265,8 +271,10 @@ pub fn create_check_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<d
         .tool(Arc::new(CheckLintTool))
         .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))
         .tool(Arc::new(GotoStageTool::new(session.clone())))
-        .tool(Arc::new(QueryMemoryIndexTool))
-        .tool(Arc::new(PromoteToProjectMemoryTool))
+        .tool(Arc::new(QueryMemoryTool::new(session.clone())))
+        .tool(Arc::new(SaveLearningTool::new(session.clone())))
+        .tool(Arc::new(PromoteToDecisionTool::new(session.clone())))
+        .tool(Arc::new(PromoteToPatternTool::new(session.clone())))
         .include_contents(IncludeContents::None)
         .build()?;
 
@@ -292,8 +300,10 @@ pub fn create_delivery_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Ar
         .tool(Arc::new(SaveDeliveryReportTool::new(session.clone())))
         .tool(Arc::new(SavePrdDocTool::new(session.clone())))
         .tool(Arc::new(SaveDesignDocTool::new(session.clone())))
-        .tool(Arc::new(QueryMemoryIndexTool))
-        .tool(Arc::new(PromoteToProjectMemoryTool))
+        .tool(Arc::new(QueryMemoryTool::new(session.clone())))
+        .tool(Arc::new(SaveLearningTool::new(session.clone())))
+        .tool(Arc::new(PromoteToDecisionTool::new(session.clone())))
+        .tool(Arc::new(PromoteToPatternTool::new(session.clone())))
         .include_contents(IncludeContents::None)
         .build()?;
 

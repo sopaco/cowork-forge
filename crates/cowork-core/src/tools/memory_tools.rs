@@ -1,60 +1,69 @@
-// Memory Tools - Tools for the dual-layer memory system
+// Memory Tools - Tools for the iteration-based memory system
 //
 // These tools allow agents to:
-// - Query memory indices (project and session level)
-// - Load memory details
-// - Save session memories
-// - Promote session memories to project level
-// - Get memory context
+// - Query memory (project and iteration level)
+// - Save iteration memories (insights, issues, learnings)
+// - Promote iteration memories to project level (decisions, patterns)
 
 use adk_core::{Tool, ToolContext};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::sync::Arc;
-use crate::memory::*;
-use crate::storage::get_cowork_dir;
-use std::fs;
+use crate::domain::{
+    Decision, Importance, IterationMemory, Learning, MemoryQuery, MemoryQueryType,
+    MemoryScope, Pattern,
+};
+use crate::persistence::MemoryStore;
 
 // ============================================================================
-// Query Memory Index Tool
+// Query Memory Tool
 // ============================================================================
 
-pub struct QueryMemoryIndexTool;
+pub struct QueryMemoryTool {
+    iteration_id: String,
+}
+
+impl QueryMemoryTool {
+    pub fn new(iteration_id: String) -> Self {
+        Self { iteration_id }
+    }
+}
 
 #[async_trait]
-impl Tool for QueryMemoryIndexTool {
+impl Tool for QueryMemoryTool {
     fn name(&self) -> &str {
-        "query_memory_index"
+        "query_memory"
     }
 
     fn description(&self) -> &str {
-        "Query memory index to get a list of memory items (decisions, experiences, patterns, records). Use this before loading detailed memory content to find relevant items."
+        "Query memory to retrieve decisions, patterns, and insights. Use this to understand project context and previous experiences."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
         Some(json!({
             "type": "object",
             "properties": {
+                "scope": {
+                    "type": "string",
+                    "description": "Memory scope: 'project' (project-level only), 'iteration' (current iteration only), or 'smart' (merged, recommended)",
+                    "enum": ["project", "iteration", "smart"],
+                    "default": "smart"
+                },
                 "query_type": {
                     "type": "string",
-                    "description": "Which memory to query: 'all' (both project and session), 'project' (project-level only), or 'session' (current session only)",
-                    "enum": ["all", "project", "session"],
+                    "description": "Type of memory to query: 'decisions', 'patterns', 'insights', or 'all'",
+                    "enum": ["decisions", "patterns", "insights", "all"],
                     "default": "all"
                 },
-                "category": {
-                    "type": "string",
-                    "description": "Filter by memory category: 'decision', 'experience', 'pattern', 'record', or 'all' for all categories",
-                    "enum": ["decision", "experience", "pattern", "record", "all"],
-                    "default": "all"
-                },
-                "stage": {
-                    "type": "string",
-                    "description": "Filter by stage (e.g., 'idea', 'prd', 'design', 'plan', 'coding', 'check'). Optional.",
-                    "default": null
+                "keywords": {
+                    "type": "array",
+                    "description": "Keywords for filtering results (optional)",
+                    "items": {"type": "string"},
+                    "default": []
                 },
                 "limit": {
                     "type": "number",
-                    "description": "Maximum number of results to return. Default: 20",
+                    "description": "Maximum results per category. Default: 20",
                     "default": 20
                 }
             },
@@ -63,609 +72,429 @@ impl Tool for QueryMemoryIndexTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let query_type = args.get("query_type").and_then(|v| v.as_str()).unwrap_or("all");
-        let category = args.get("category").and_then(|v| v.as_str()).unwrap_or("all");
-        let stage = args.get("stage").and_then(|v| v.as_str());
-        let limit = args.get("limit").and_then(|v| v.as_i64()).unwrap_or(20);
+        let scope_str = args.get("scope").and_then(|v| v.as_str()).unwrap_or("smart");
+        let query_type_str = args.get("query_type").and_then(|v| v.as_str()).unwrap_or("all");
+        let keywords: Vec<String> = args.get("keywords")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+            .unwrap_or_default();
+        let limit = args.get("limit").and_then(|v| v.as_i64()).unwrap_or(20) as usize;
 
-        let mut results = Vec::new();
+        let scope = match scope_str {
+            "project" => MemoryScope::Project,
+            "iteration" => MemoryScope::Iteration,
+            "smart" => MemoryScope::Smart,
+            _ => MemoryScope::Smart,
+        };
 
-        // Query project memory
-        if query_type == "all" || query_type == "project" {
-            if let Ok(project_file) = get_project_memory_file() {
-                if let Ok(content) = fs::read_to_string(&project_file) {
-                    if let Ok(index) = serde_json::from_str::<ProjectMemoryIndex>(&content) {
-                        for item in Self::filter_items(index.key_decisions, category, stage, limit) {
-                            results.push(item);
-                        }
-                        for item in Self::filter_items(index.key_experiences, category, stage, limit) {
-                            results.push(item);
-                        }
-                        for item in Self::filter_items(index.patterns, category, stage, limit) {
-                            results.push(item);
-                        }
-                    }
-                }
-            }
-        }
+        let query_type = match query_type_str {
+            "decisions" => MemoryQueryType::Decisions,
+            "patterns" => MemoryQueryType::Patterns,
+            "insights" => MemoryQueryType::Insights,
+            "all" => MemoryQueryType::All,
+            _ => MemoryQueryType::All,
+        };
 
-        // Query session memory (get current session from .cowork/session.json)
-        if query_type == "all" || query_type == "session" {
-            if let Ok(cow_dir) = get_cowork_dir() {
-                if let Ok(index_content) = fs::read_to_string(cow_dir.join("session.json")) {
-                    if let Ok(index) = serde_json::from_str::<crate::data::ProjectIndex>(&index_content) {
-                        if let Some(current_session_id) = index.latest_successful_session {
-                            if let Ok(session_file) = get_session_memory_file(&current_session_id) {
-                                if let Ok(content) = fs::read_to_string(&session_file) {
-                                    if let Ok(session_index) = serde_json::from_str::<SessionMemoryIndex>(&content) {
-                                        for item in Self::filter_items(session_index.decisions, category, stage, limit) {
-                                            results.push(item);
-                                        }
-                                        for item in Self::filter_items(session_index.experiences, category, stage, limit) {
-                                            results.push(item);
-                                        }
-                                        for item in Self::filter_items(session_index.records, category, stage, limit) {
-                                            results.push(item);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        let query = MemoryQuery {
+            scope,
+            query_type,
+            keywords: keywords.clone(),
+            limit: Some(limit),
+        };
 
-        // Sort by created_at descending and apply limit
-        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-        results.truncate(limit as usize);
-
-        let total = results.len();
+        let store = MemoryStore::new();
+        
+        let result = store.query(&query, Some(&self.iteration_id))
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to query memory: {}", e)))?;
 
         Ok(json!({
-            "results": results,
-            "total": total
+            "decisions": result.decisions,
+            "patterns": result.patterns,
+            "insights": result.insights,
+            "total_decisions": result.decisions.len(),
+            "total_patterns": result.patterns.len(),
+            "total_insights": result.insights.len(),
+            "context_string": result.to_context_string()
         }))
     }
 }
 
-impl QueryMemoryIndexTool {
-    fn filter_items(items: Vec<MemoryItem>, category: &str, stage_filter: Option<&str>, _limit: i64) -> Vec<MemoryItem> {
-        items.into_iter()
-            .filter(|item| {
-                if category != "all" && item.category != category {
-                    return false;
-                }
-                if let Some(stage) = stage_filter {
-                    if let Some(item_stage) = &item.stage {
-                        if item_stage != stage {
-                            return false;
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-                true
-            })
-            .collect()
+// ============================================================================
+// Save Insight Tool
+// ============================================================================
+
+pub struct SaveInsightTool {
+    iteration_id: String,
+}
+
+impl SaveInsightTool {
+    pub fn new(iteration_id: String) -> Self {
+        Self { iteration_id }
     }
 }
 
-// ============================================================================
-// Load Memory Detail Tool
-// ============================================================================
-
-pub struct LoadMemoryDetailTool;
-
 #[async_trait]
-impl Tool for LoadMemoryDetailTool {
+impl Tool for SaveInsightTool {
     fn name(&self) -> &str {
-        "load_memory_detail"
+        "save_insight"
     }
 
     fn description(&self) -> &str {
-        "Load the detailed content of a memory item from its markdown file. Use this after querying the index to get the full details of a specific memory item."
+        "Save an insight to the current iteration's memory. Use this to record important observations, discoveries, or realizations during development."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
         Some(json!({
             "type": "object",
             "properties": {
-                "memory_id": {
-                    "type": "string",
-                    "description": "The ID of the memory item to load"
-                },
-                "file": {
-                    "type": "string",
-                    "description": "The file path to the memory detail (as returned by query_memory_index)"
-                }
-            },
-            "required": ["memory_id", "file"]
-        }))
-    }
-
-    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let memory_id = args.get("memory_id").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("memory_id is required".to_string()))?;
-        let file = args.get("file").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("file is required".to_string()))?;
-
-        let cow_dir = get_cowork_dir()
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get cow dir: {}", e)))?;
-        let full_path = cow_dir.join(file);
-
-        let content = fs::read_to_string(&full_path)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read memory file: {}", e)))?;
-
-        Ok(json!({
-            "memory_id": memory_id,
-            "content": content,
-            "file": file
-        }))
-    }
-}
-
-// ============================================================================
-// Save Session Memory Tool
-// ============================================================================
-
-pub struct SaveSessionMemoryTool;
-
-#[async_trait]
-impl Tool for SaveSessionMemoryTool {
-    fn name(&self) -> &str {
-        "save_session_memory"
-    }
-
-    fn description(&self) -> &str {
-        "Save a memory item to the current session's memory. Use this to record important decisions, experiences, or observations during the session."
-    }
-
-    fn parameters_schema(&self) -> Option<Value> {
-        Some(json!({
-            "type": "object",
-            "properties": {
-                "memory_type": {
-                    "type": "string",
-                    "description": "Type of memory: 'decision', 'experience', or 'record'",
-                    "enum": ["decision", "experience", "record"]
-                },
-                "title": {
-                    "type": "string",
-                    "description": "Title of the memory item"
-                },
-                "summary": {
-                    "type": "string",
-                    "description": "Brief summary of the memory (1-2 sentences)"
-                },
-                "content": {
-                    "type": "string",
-                    "description": "Detailed markdown content of the memory"
-                },
                 "stage": {
                     "type": "string",
                     "description": "The current stage (e.g., 'idea', 'prd', 'design', 'plan', 'coding', 'check')"
                 },
-                "category": {
+                "content": {
                     "type": "string",
-                    "description": "Category for better organization (e.g., 'technical', 'design', 'user-experience')"
+                    "description": "The insight content (what you discovered or realized)"
                 },
-                "impact": {
+                "importance": {
                     "type": "string",
-                    "description": "Impact level: 'high', 'medium', or 'low'",
-                    "enum": ["high", "medium", "low"],
-                    "default": "medium"
-                },
-                "tags": {
-                    "type": "array",
-                    "description": "Tags for better searchability",
-                    "items": {"type": "string"},
-                    "default": []
+                    "description": "Importance level: 'critical', 'important', or 'normal'",
+                    "enum": ["critical", "important", "normal"],
+                    "default": "important"
                 }
             },
-            "required": ["memory_type", "title", "summary", "content", "stage"]
+            "required": ["stage", "content"]
         }))
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let memory_type = args.get("memory_type").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("memory_type is required".to_string()))?;
-        let title = args.get("title").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("title is required".to_string()))?;
-        let summary = args.get("summary").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("summary is required".to_string()))?;
-        let content = args.get("content").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("content is required".to_string()))?;
         let stage = args.get("stage").and_then(|v| v.as_str())
             .ok_or_else(|| adk_core::AdkError::Tool("stage is required".to_string()))?;
-        let _category = args.get("category").and_then(|v| v.as_str()).unwrap_or("general");
-        let impact = args.get("impact").and_then(|v| v.as_str()).unwrap_or("medium");
-        let tags: Vec<String> = args.get("tags")
-            .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
-            .unwrap_or_default();
+        let content = args.get("content").and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("content is required".to_string()))?;
+        let importance_str = args.get("importance").and_then(|v| v.as_str()).unwrap_or("important");
 
-        // Get current session ID
-        let cow_dir = get_cowork_dir()
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get cow dir: {}", e)))?;
-        let index_content = fs::read_to_string(cow_dir.join("session.json"))
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read session index: {}", e)))?;
-        let index: crate::data::ProjectIndex = serde_json::from_str(&index_content)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to parse session index: {}", e)))?;
-        let session_id = index.latest_successful_session
-            .ok_or_else(|| adk_core::AdkError::Tool("No active session found".to_string()))?;
-
-        // Generate memory ID
-        let memory_id = format!("{}-{:04}",
-            memory_type.chars().next().unwrap_or('X'),
-            chrono::Utc::now().timestamp() % 10000
-        );
-
-        // Create detail directory and file
-        let detail_dir = get_session_memory_detail_dir(&session_id)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get session memory detail dir: {}", e)))?
-            .join(format!("{}s", memory_type));
-        fs::create_dir_all(&detail_dir)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to create detail directory: {}", e)))?;
-
-        let file_path = detail_dir.join(format!("{}.md", memory_id));
-        let file_relative = format!("sessions/sessions/{}/{}s/{}.md", session_id, memory_type, memory_id);
-
-        // Write markdown content
-        fs::write(&file_path, content)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to write memory file: {}", e)))?;
-
-        // Update session memory index
-        let session_index_file = get_session_memory_file(&session_id)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get session memory file: {}", e)))?;
-        let mut session_index: SessionMemoryIndex = if session_index_file.exists() {
-            let content = fs::read_to_string(&session_index_file)
-                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read session memory index: {}", e)))?;
-            serde_json::from_str(&content)
-                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to parse session memory index: {}", e)))?
-        } else {
-            SessionMemoryIndex {
-                session_id: session_id.clone(),
-                session_type: "modify".to_string(),
-                session_description: "".to_string(),
-                schema_version: "1.0".to_string(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
-                status: "active".to_string(),
-                overview: SessionOverview {
-                    stages_completed: vec![],
-                    key_achievements: vec![],
-                    challenges_faced: vec![],
-                },
-                decisions: vec![],
-                experiences: vec![],
-                records: vec![],
-            }
+        let importance = match importance_str {
+            "critical" => Importance::Critical,
+            "important" => Importance::Important,
+            "normal" => Importance::Normal,
+            _ => Importance::Important,
         };
 
-        // Add memory item to appropriate category
-        let item = MemoryItem {
-            id: memory_id.clone(),
-            title: title.to_string(),
-            category: memory_type.to_string(),
-            summary: summary.to_string(),
-            stage: Some(stage.to_string()),
-            session_id: Some(session_id.clone()),
+        let store = MemoryStore::new();
+        let mut memory = store.load_iteration_memory(&self.iteration_id)
+            .unwrap_or_else(|_| IterationMemory::new(&self.iteration_id));
+
+        memory.insights.push(crate::domain::Insight {
+            stage: stage.to_string(),
+            content: content.to_string(),
+            importance,
             created_at: chrono::Utc::now(),
-            impact: impact.to_string(),
-            status: "implemented".to_string(),
-            file: file_relative.clone(),
-            tags: tags.clone(),
-        };
+        });
 
-        match memory_type {
-            "decision" => session_index.decisions.push(item),
-            "experience" => session_index.experiences.push(item),
-            "record" => session_index.records.push(item),
-            _ => return Err(adk_core::AdkError::Tool(format!("Invalid memory type: {}", memory_type))),
-        }
-
-        session_index.updated_at = chrono::Utc::now();
-
-        // Save updated index
-        fs::write(&session_index_file, serde_json::to_string_pretty(&session_index).unwrap())
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to save session memory index: {}", e)))?;
+        store.save_iteration_memory(&memory)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to save insight: {}", e)))?;
 
         Ok(json!({
-            "memory_id": memory_id,
-            "file": file_relative,
-            "message": "Session memory saved successfully"
+            "message": "Insight saved successfully",
+            "iteration_id": self.iteration_id,
+            "total_insights": memory.insights.len()
         }))
     }
 }
 
 // ============================================================================
-// Promote to Project Memory Tool
+// Save Issue Tool
 // ============================================================================
 
-pub struct PromoteToProjectMemoryTool;
+pub struct SaveIssueTool {
+    iteration_id: String,
+}
+
+impl SaveIssueTool {
+    pub fn new(iteration_id: String) -> Self {
+        Self { iteration_id }
+    }
+}
 
 #[async_trait]
-impl Tool for PromoteToProjectMemoryTool {
+impl Tool for SaveIssueTool {
     fn name(&self) -> &str {
-        "promote_to_project_memory"
+        "save_issue"
     }
 
     fn description(&self) -> &str {
-        "Promote a session memory item to project-level memory. Use this for decisions or experiences that are valuable across sessions and should be remembered at the project level."
+        "Save an issue to the current iteration's memory. Use this to record problems, bugs, or obstacles encountered during development."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
         Some(json!({
             "type": "object",
             "properties": {
-                "memory_id": {
+                "stage": {
                     "type": "string",
-                    "description": "The ID of the session memory item to promote"
+                    "description": "The current stage where the issue occurred"
                 },
-                "reason": {
+                "content": {
                     "type": "string",
-                    "description": "Why this memory should be promoted to project level"
+                    "description": "The issue description (what problem occurred)"
                 }
             },
-            "required": ["memory_id", "reason"]
+            "required": ["stage", "content"]
         }))
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let memory_id = args.get("memory_id").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("memory_id is required".to_string()))?;
-        let reason = args.get("reason").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("reason is required".to_string()))?;
+        let stage = args.get("stage").and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("stage is required".to_string()))?;
+        let content = args.get("content").and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("content is required".to_string()))?;
 
-        // Get current session ID
-        let cow_dir = get_cowork_dir()
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get cow dir: {}", e)))?;
-        let index_content = fs::read_to_string(cow_dir.join("session.json"))
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read session index: {}", e)))?;
-        let index: crate::data::ProjectIndex = serde_json::from_str(&index_content)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to parse session index: {}", e)))?;
-        let session_id = index.latest_successful_session
-            .ok_or_else(|| adk_core::AdkError::Tool("No active session found".to_string()))?;
+        let store = MemoryStore::new();
+        let mut memory = store.load_iteration_memory(&self.iteration_id)
+            .unwrap_or_else(|_| IterationMemory::new(&self.iteration_id));
 
-        // Read session memory index
-        let session_index_file = get_session_memory_file(&session_id)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get session memory file: {}", e)))?;
-        let session_index_content = fs::read_to_string(&session_index_file)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read session memory index: {}", e)))?;
-        let session_index: SessionMemoryIndex = serde_json::from_str(&session_index_content)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to parse session memory index: {}", e)))?;
-
-        // Find the memory item
-        let memory_item = session_index.decisions.iter()
-            .chain(session_index.experiences.iter())
-            .chain(session_index.records.iter())
-            .find(|item| item.id == memory_id)
-            .ok_or_else(|| adk_core::AdkError::Tool(format!("Memory item not found: {}", memory_id)))?;
-
-        // Create project memory ID
-        let project_memory_id = format!("{}-{:04}",
-            memory_item.id.chars().next().unwrap_or('X'),
-            chrono::Utc::now().timestamp() % 10000
-        );
-
-        // Copy to project memory directory
-        let project_detail_dir = get_project_memory_detail_dir()
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get project memory detail dir: {}", e)))?
-            .join(format!("{}s", memory_item.category));
-        fs::create_dir_all(&project_detail_dir)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to create project memory directory: {}", e)))?;
-
-        let old_file = cow_dir.join(&memory_item.file);
-        let new_file = project_detail_dir.join(format!("{}.md", project_memory_id));
-        let new_file_relative = format!("project_memory/{}s/{}.md", memory_item.category, project_memory_id);
-
-        fs::copy(&old_file, &new_file)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to copy memory file: {}", e)))?;
-
-        // Update project memory index
-        let project_index_file = get_project_memory_file()
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get project memory file: {}", e)))?;
-        let mut project_index: ProjectMemoryIndex = if project_index_file.exists() {
-            let content = fs::read_to_string(&project_index_file)
-                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read project memory index: {}", e)))?;
-            serde_json::from_str(&content)
-                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to parse project memory index: {}", e)))?
-        } else {
-            ProjectMemoryIndex {
-                project_id: "default".to_string(),
-                project_name: "Default Project".to_string(),
-                schema_version: "1.0".to_string(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
-                key_decisions: vec![],
-                key_experiences: vec![],
-                patterns: vec![],
-                timeline: vec![],
-                statistics: MemoryStatistics {
-                    total_decisions: 0,
-                    total_experiences: 0,
-                    total_patterns: 0,
-                    total_sessions: 0,
-                },
-            }
-        };
-
-        // Add promoted item
-        let promoted_item = MemoryItem {
-            id: project_memory_id.clone(),
-            title: memory_item.title.clone(),
-            category: memory_item.category.clone(),
-            summary: memory_item.summary.clone(),
-            stage: memory_item.stage.clone(),
-            session_id: Some(session_id.clone()),
+        memory.issues.push(crate::domain::Issue {
+            stage: stage.to_string(),
+            content: content.to_string(),
+            resolved: false,
             created_at: chrono::Utc::now(),
-            impact: memory_item.impact.clone(),
-            status: "implemented".to_string(),
-            file: new_file_relative.clone(),
-            tags: memory_item.tags.clone(),
-        };
-
-        // Add timeline event
-        project_index.timeline.push(TimelineEvent {
-            timestamp: chrono::Utc::now(),
-            event_type: format!("promoted_{}", memory_item.category),
-            description: format!("Promoted from session {}: {}", session_id, reason),
-            related_memory_id: Some(project_memory_id.clone()),
+            resolved_at: None,
         });
 
-        // Add to appropriate category
-        match memory_item.category.as_str() {
-            "decision" => {
-                project_index.key_decisions.push(promoted_item);
-                project_index.statistics.total_decisions += 1;
-            }
-            "experience" => {
-                project_index.key_experiences.push(promoted_item);
-                project_index.statistics.total_experiences += 1;
-            }
-            "pattern" => {
-                project_index.patterns.push(promoted_item);
-                project_index.statistics.total_patterns += 1;
-            }
-            _ => {}
-        }
-
-        project_index.updated_at = chrono::Utc::now();
-
-        // Save updated index
-        fs::write(&project_index_file, serde_json::to_string_pretty(&project_index).unwrap())
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to save project memory index: {}", e)))?;
+        store.save_iteration_memory(&memory)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to save issue: {}", e)))?;
 
         Ok(json!({
-            "project_memory_id": project_memory_id,
-            "file": new_file_relative,
-            "message": "Memory promoted to project level successfully"
+            "message": "Issue saved successfully",
+            "iteration_id": self.iteration_id,
+            "total_issues": memory.issues.len()
         }))
     }
 }
 
 // ============================================================================
-// Get Memory Context Tool
+// Save Learning Tool
 // ============================================================================
 
-pub struct GetMemoryContextTool;
+pub struct SaveLearningTool {
+    iteration_id: String,
+}
+
+impl SaveLearningTool {
+    pub fn new(iteration_id: String) -> Self {
+        Self { iteration_id }
+    }
+}
 
 #[async_trait]
-impl Tool for GetMemoryContextTool {
+impl Tool for SaveLearningTool {
     fn name(&self) -> &str {
-        "get_memory_context"
+        "save_learning"
     }
 
     fn description(&self) -> &str {
-        "Get the current memory context including project memory summary, session memory summary, and general context information. Use this before making decisions to understand the current memory state."
+        "Save a learning to the current iteration's memory. Use this to record knowledge gained, lessons learned, or skills developed."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
         Some(json!({
             "type": "object",
-            "properties": {},
-            "required": []
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "The learning content (what you learned)"
+                }
+            },
+            "required": ["content"]
         }))
     }
 
-    async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
-        // Get project memory
-        let project_memory = if let Ok(project_file) = get_project_memory_file() {
-            if let Ok(content) = fs::read_to_string(&project_file) {
-                if let Ok(index) = serde_json::from_str::<ProjectMemoryIndex>(&content) {
-                    MemoryContextProject {
-                        total_decisions: index.key_decisions.len(),
-                        total_experiences: index.key_experiences.len(),
-                        key_decisions: index.key_decisions.iter()
-                            .take(5)
-                            .map(|d| (d.id.clone(), d.title.clone()))
-                            .collect(),
-                    }
-                } else {
-                    MemoryContextProject {
-                        total_decisions: 0,
-                        total_experiences: 0,
-                        key_decisions: vec![],
-                    }
-                }
-            } else {
-                MemoryContextProject {
-                    total_decisions: 0,
-                    total_experiences: 0,
-                    key_decisions: vec![],
-                }
-            }
-        } else {
-            MemoryContextProject {
-                total_decisions: 0,
-                total_experiences: 0,
-                key_decisions: vec![],
-            }
-        };
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let content = args.get("content").and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("content is required".to_string()))?;
 
-        // Get session memory
-        let session_memory = if let Ok(cow_dir) = get_cowork_dir() {
-            if let Ok(index_content) = fs::read_to_string(cow_dir.join("session.json")) {
-                if let Ok(index) = serde_json::from_str::<crate::data::ProjectIndex>(&index_content) {
-                    if let Some(current_session_id) = index.latest_successful_session {
-                        if let Ok(session_file) = get_session_memory_file(&current_session_id) {
-                            if let Ok(content) = fs::read_to_string(&session_file) {
-                                if let Ok(session_index) = serde_json::from_str::<SessionMemoryIndex>(&content) {
-                                    MemoryContextSession {
-                                        session_id: current_session_id.clone(),
-                                        status: session_index.status,
-                                        stages_completed: session_index.overview.stages_completed,
-                                        current_stage: "coding".to_string(), // Default stage
-                                        decisions: session_index.decisions.len(),
-                                        experiences: session_index.experiences.len(),
-                                    }
-                                } else {
-                                    MemoryContextSession::default()
-                                }
-                            } else {
-                                MemoryContextSession::default()
-                            }
-                        } else {
-                            MemoryContextSession::default()
-                        }
-                    } else {
-                        MemoryContextSession::default()
-                    }
-                } else {
-                    MemoryContextSession::default()
-                }
-            } else {
-                MemoryContextSession::default()
-            }
-        } else {
-            MemoryContextSession::default()
-        };
+        let store = MemoryStore::new();
+        let mut memory = store.load_iteration_memory(&self.iteration_id)
+            .unwrap_or_else(|_| IterationMemory::new(&self.iteration_id));
 
-        // Get context info
-        let context = MemoryContextInfo {
-            current_time: chrono::Utc::now().to_rfc3339(),
-            project_age: "Unknown".to_string(),
-            session_age: "Unknown".to_string(),
-        };
+        memory.learnings.push(Learning {
+            content: content.to_string(),
+            created_at: chrono::Utc::now(),
+        });
+
+        store.save_iteration_memory(&memory)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to save learning: {}", e)))?;
 
         Ok(json!({
-            "project_memory": project_memory,
-            "session_memory": session_memory,
-            "context": context
+            "message": "Learning saved successfully",
+            "iteration_id": self.iteration_id,
+            "total_learnings": memory.learnings.len()
         }))
     }
 }
 
-impl Default for MemoryContextSession {
-    fn default() -> Self {
-        Self {
-            session_id: "none".to_string(),
-            status: "inactive".to_string(),
-            stages_completed: vec![],
-            current_stage: "none".to_string(),
-            decisions: 0,
-            experiences: 0,
-        }
+// ============================================================================
+// Promote to Decision Tool
+// ============================================================================
+
+pub struct PromoteToDecisionTool {
+    iteration_id: String,
+}
+
+impl PromoteToDecisionTool {
+    pub fn new(iteration_id: String) -> Self {
+        Self { iteration_id }
+    }
+}
+
+#[async_trait]
+impl Tool for PromoteToDecisionTool {
+    fn name(&self) -> &str {
+        "promote_to_decision"
+    }
+
+    fn description(&self) -> &str {
+        "Promote an insight or learning to a project-level decision. Use this for important decisions that should be remembered across iterations."
+    }
+
+    fn parameters_schema(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Decision title (concise summary)"
+                },
+                "context": {
+                    "type": "string",
+                    "description": "Context and background for this decision"
+                },
+                "decision": {
+                    "type": "string",
+                    "description": "The actual decision made"
+                },
+                "consequences": {
+                    "type": "array",
+                    "description": "Expected consequences of this decision",
+                    "items": {"type": "string"},
+                    "default": []
+                }
+            },
+            "required": ["title", "context", "decision"]
+        }))
+    }
+
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let title = args.get("title").and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("title is required".to_string()))?;
+        let context = args.get("context").and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("context is required".to_string()))?;
+        let decision_str = args.get("decision").and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("decision is required".to_string()))?;
+        let consequences: Vec<String> = args.get("consequences")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+            .unwrap_or_default();
+
+        let mut new_decision = Decision::new(title, context, decision_str, &self.iteration_id);
+        new_decision.consequences = consequences;
+
+        let store = MemoryStore::new();
+        store.add_decision(new_decision)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to promote to decision: {}", e)))?;
+
+        Ok(json!({
+            "message": "Promoted to project decision successfully",
+            "iteration_id": self.iteration_id
+        }))
+    }
+}
+
+// ============================================================================
+// Promote to Pattern Tool
+// ============================================================================
+
+pub struct PromoteToPatternTool {
+    iteration_id: String,
+}
+
+impl PromoteToPatternTool {
+    pub fn new(iteration_id: String) -> Self {
+        Self { iteration_id }
+    }
+}
+
+#[async_trait]
+impl Tool for PromoteToPatternTool {
+    fn name(&self) -> &str {
+        "promote_to_pattern"
+    }
+
+    fn description(&self) -> &str {
+        "Promote an insight or learning to a project-level pattern. Use this for reusable solutions or best practices that apply across iterations."
+    }
+
+    fn parameters_schema(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Pattern name"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Pattern description (when and how to use it)"
+                },
+                "usage": {
+                    "type": "array",
+                    "description": "Usage examples or scenarios",
+                    "items": {"type": "string"},
+                    "default": []
+                },
+                "tags": {
+                    "type": "array",
+                    "description": "Tags for categorizing and searching the pattern",
+                    "items": {"type": "string"},
+                    "default": []
+                },
+                "code_example": {
+                    "type": "string",
+                    "description": "Optional code example (if applicable)",
+                    "default": null
+                }
+            },
+            "required": ["name", "description"]
+        }))
+    }
+
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let name = args.get("name").and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("name is required".to_string()))?;
+        let description = args.get("description").and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::Tool("description is required".to_string()))?;
+        let usage: Vec<String> = args.get("usage")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+            .unwrap_or_default();
+        let tags: Vec<String> = args.get("tags")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+            .unwrap_or_default();
+        let code_example = args.get("code_example").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+        let mut new_pattern = Pattern::new(name, description, &self.iteration_id);
+        new_pattern.usage = usage;
+        new_pattern.tags = tags;
+        new_pattern.code_example = code_example;
+
+        let store = MemoryStore::new();
+        store.add_pattern(new_pattern)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to promote to pattern: {}", e)))?;
+
+        Ok(json!({
+            "message": "Promoted to project pattern successfully",
+            "iteration_id": self.iteration_id
+        }))
     }
 }

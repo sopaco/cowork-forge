@@ -684,60 +684,154 @@ fn detect_start_command(code_dir: &Path) -> Result<String, String> {
 #[tauri::command]
 pub async fn query_memory_index(
     query_type: String,
-    category: String,
+    _category: String,
     stage: Option<String>,
     limit: i64,
+    iteration_id: Option<String>,
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    println!("[GUI] Querying memory index: query_type={}, category={}, stage={:?}, limit={}", 
-             query_type, category, stage, limit);
+    println!("[GUI] Querying memory index: query_type={}, stage={:?}, limit={}, iteration_id={:?}", 
+             query_type, stage, limit, iteration_id);
 
-    use cowork_core::tools::QueryMemoryIndexTool;
-    use adk_core::Tool;
-
-    let tool = QueryMemoryIndexTool;
+    let store = cowork_core::persistence::MemoryStore::new();
     
-    let args = serde_json::json!({
-        "query_type": query_type,
-        "category": category,
-        "stage": stage,
-        "limit": limit
-    });
-
-    // Create a simple tool context - we don't need full context for memory tools
-    // Since our memory tools use _ctx parameter, they don't actually use it
-    let ctx = std::sync::Arc::new(DummyToolContext);
+    // Convert parameters to new MemoryQuery format
+    let scope = cowork_core::domain::MemoryScope::Smart; // Default to smart query
+    let query_type_enum = match query_type.as_str() {
+        "decisions" => cowork_core::domain::MemoryQueryType::Decisions,
+        "patterns" => cowork_core::domain::MemoryQueryType::Patterns,
+        "insights" => cowork_core::domain::MemoryQueryType::Insights,
+        _ => cowork_core::domain::MemoryQueryType::All,
+    };
     
-    tool.execute(ctx, args)
-        .await
-        .map_err(|e| format!("Failed to query memory index: {}", e))
+    let keywords = if let Some(s) = stage {
+        vec![s]
+    } else {
+        vec![]
+    };
+    
+    let query = cowork_core::domain::MemoryQuery {
+        scope,
+        query_type: query_type_enum,
+        keywords,
+        limit: Some(limit as usize),
+    };
+    
+    let result = store.query(&query, iteration_id.as_deref())
+        .map_err(|e| format!("Failed to query memory: {}", e))?;
+    
+    Ok(serde_json::json!({
+        "decisions": result.decisions,
+        "patterns": result.patterns,
+        "insights": result.insights,
+        "total_decisions": result.decisions.len(),
+        "total_patterns": result.patterns.len(),
+        "total_insights": result.insights.len()
+    }))
 }
 
 #[tauri::command]
 pub async fn load_memory_detail(
     memory_id: String,
-    file: String,
+    _file: String,
+    iteration_id: Option<String>,
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    println!("[GUI] Loading memory detail: memory_id={}, file={}", memory_id, file);
+    println!("[GUI] Loading memory detail: memory_id={}, iteration_id={:?}", memory_id, iteration_id);
 
-    use cowork_core::tools::LoadMemoryDetailTool;
-    use adk_core::Tool;
-
-    let tool = LoadMemoryDetailTool;
+    let store = cowork_core::persistence::MemoryStore::new();
     
-    let args = serde_json::json!({
-        "memory_id": memory_id,
-        "file": file
-    });
-
-    let ctx = std::sync::Arc::new(DummyToolContext);
+    // Try to find the memory item in project memory first
+    let project_memory = store.load_project_memory()
+        .map_err(|e| format!("Failed to load project memory: {}", e))?;
     
-    tool.execute(ctx, args)
-        .await
-        .map_err(|e| format!("Failed to load memory detail: {}", e))
+    // Search in decisions
+    for decision in &project_memory.decisions {
+        if decision.id == memory_id {
+            return Ok(serde_json::json!({
+                "memory_id": memory_id,
+                "content": format!("**Context:** {}\n\n**Decision:** {}\n\n**Consequences:**\n{}", 
+                    decision.context, 
+                    decision.decision,
+                    decision.consequences.join("\n")),
+                "type": "decision"
+            }));
+        }
+    }
+    
+    // Search in patterns
+    for pattern in &project_memory.patterns {
+        if pattern.id == memory_id {
+            return Ok(serde_json::json!({
+                "memory_id": memory_id,
+                "content": format!("**Description:** {}\n\n**Usage:**\n{}\n\n**Tags:** {}\n\n**Code Example:**\n{}", 
+                    pattern.description,
+                    pattern.usage.join("\n"),
+                    pattern.tags.join(", "),
+                    pattern.code_example.as_deref().unwrap_or("None")),
+                "type": "pattern"
+            }));
+        }
+    }
+    
+    // Try iteration memory - use memory_id format like "insight-123" to identify items
+    if let Some(iter_id) = iteration_id {
+        if let Ok(iter_memory) = store.load_iteration_memory(&iter_id) {
+            // Search in insights by timestamp (memory_id may contain timestamp)
+            if memory_id.starts_with("insight-") {
+                if let Ok(ts) = memory_id.replace("insight-", "").parse::<i64>() {
+                    for insight in &iter_memory.insights {
+                        if insight.created_at.timestamp() == ts {
+                            return Ok(serde_json::json!({
+                                "memory_id": memory_id,
+                                "content": format!("**Stage:** {}\n\n**Content:** {}", 
+                                    insight.stage,
+                                    insight.content),
+                                "type": "insight"
+                            }));
+                        }
+                    }
+                }
+            }
+            
+            // Search in issues by timestamp
+            if memory_id.starts_with("issue-") {
+                if let Ok(ts) = memory_id.replace("issue-", "").parse::<i64>() {
+                    for issue in &iter_memory.issues {
+                        if issue.created_at.timestamp() == ts {
+                            return Ok(serde_json::json!({
+                                "memory_id": memory_id,
+                                "content": format!("**Stage:** {}\n\n**Issue:** {}\n\n**Resolved:** {}", 
+                                    issue.stage,
+                                    issue.content,
+                                    issue.resolved),
+                                "type": "issue"
+                            }));
+                        }
+                    }
+                }
+            }
+            
+            // Search in learnings by timestamp
+            if memory_id.starts_with("learning-") {
+                if let Ok(ts) = memory_id.replace("learning-", "").parse::<i64>() {
+                    for learning in &iter_memory.learnings {
+                        if learning.created_at.timestamp() == ts {
+                            return Ok(serde_json::json!({
+                                "memory_id": memory_id,
+                                "content": format!("**Learning:** {}", learning.content),
+                                "type": "learning"
+                            }));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    Err(format!("Memory item not found: {}", memory_id))
 }
 
 #[tauri::command]
@@ -747,82 +841,161 @@ pub async fn save_session_memory(
     summary: String,
     content: String,
     stage: String,
-    category: Option<String>,
-    impact: Option<String>,
-    tags: Option<Vec<String>>,
+    _category: Option<String>,
+    _impact: Option<String>,
+    _tags: Option<Vec<String>>,
+    iteration_id: String,
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    println!("[GUI] Saving session memory: memory_type={}, title={}", memory_type, title);
-
-    use cowork_core::tools::SaveSessionMemoryTool;
-    use adk_core::Tool;
-
-    let tool = SaveSessionMemoryTool;
+    println!("[GUI] Saving session memory: memory_type={}, title={}, iteration_id={}", memory_type, title, iteration_id);
     
-    let args = serde_json::json!({
-        "memory_type": memory_type,
-        "title": title,
-        "summary": summary,
-        "content": content,
-        "stage": stage,
-        "category": category.unwrap_or("general".to_string()),
-        "impact": impact.unwrap_or("medium".to_string()),
-        "tags": tags.unwrap_or_default()
-    });
-
-    let ctx = std::sync::Arc::new(DummyToolContext);
+    let store = cowork_core::persistence::MemoryStore::new();
+    let mut memory = store.load_iteration_memory(&iteration_id)
+        .map_err(|e| format!("Failed to load iteration memory: {}", e))?;
     
-    tool.execute(ctx, args)
-        .await
-        .map_err(|e| format!("Failed to save session memory: {}", e))
+    match memory_type.as_str() {
+        "decision" => {
+            let decision = cowork_core::domain::Decision::new(
+                &title,
+                &summary,
+                &content,
+                &iteration_id
+            );
+            store.add_decision(decision)
+                .map_err(|e| format!("Failed to add decision: {}", e))?;
+        }
+        "pattern" => {
+            let mut pattern = cowork_core::domain::Pattern::new(
+                &title,
+                &content,
+                &iteration_id
+            );
+            pattern.tags = vec![stage.clone()];
+            store.add_pattern(pattern)
+                .map_err(|e| format!("Failed to add pattern: {}", e))?;
+        }
+        "insight" => {
+            memory.add_insight(&stage, &format!("{}: {}", title, content));
+        }
+        "issue" => {
+            memory.add_issue(&stage, &format!("{}: {}", title, content));
+        }
+        "learning" => {
+            memory.add_learning(&format!("{}: {}", title, content));
+        }
+        _ => {
+            return Err(format!("Unknown memory type: {}", memory_type));
+        }
+    }
+    
+    store.save_iteration_memory(&memory)
+        .map_err(|e| format!("Failed to save iteration memory: {}", e))?;
+    
+    Ok(serde_json::json!({
+        "message": "Memory saved successfully",
+        "iteration_id": iteration_id
+    }))
 }
 
 #[tauri::command]
 pub async fn promote_to_project_memory(
     memory_id: String,
-    reason: String,
+    _reason: String,
+    iteration_id: String,
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    println!("[GUI] Promoting to project memory: memory_id={}, reason={}", memory_id, reason);
+    println!("[GUI] Promoting to project memory: memory_id={}, iteration_id={}", memory_id, iteration_id);
 
-    use cowork_core::tools::PromoteToProjectMemoryTool;
-    use adk_core::Tool;
-
-    let tool = PromoteToProjectMemoryTool;
+    let store = cowork_core::persistence::MemoryStore::new();
+    let iter_memory = store.load_iteration_memory(&iteration_id)
+        .map_err(|e| format!("Failed to load iteration memory: {}", e))?;
     
-    let args = serde_json::json!({
-        "memory_id": memory_id,
-        "reason": reason
-    });
-
-    let ctx = std::sync::Arc::new(DummyToolContext);
+    // Find and promote insight by timestamp
+    if memory_id.starts_with("insight-") {
+        if let Ok(ts) = memory_id.replace("insight-", "").parse::<i64>() {
+            for insight in &iter_memory.insights {
+                if insight.created_at.timestamp() == ts {
+                    let decision = cowork_core::domain::Decision::new(
+                        &format!("Insight from {}", insight.stage),
+                        &format!("Discovered during {} stage", insight.stage),
+                        &insight.content,
+                        &iteration_id
+                    );
+                    store.add_decision(decision)
+                        .map_err(|e| format!("Failed to add decision: {}", e))?;
+                    return Ok(serde_json::json!({
+                        "message": "Promoted to project decision successfully",
+                        "memory_id": memory_id
+                    }));
+                }
+            }
+        }
+    }
     
-    tool.execute(ctx, args)
-        .await
-        .map_err(|e| format!("Failed to promote to project memory: {}", e))
+    // Find and promote learning by timestamp
+    if memory_id.starts_with("learning-") {
+        if let Ok(ts) = memory_id.replace("learning-", "").parse::<i64>() {
+            for learning in &iter_memory.learnings {
+                if learning.created_at.timestamp() == ts {
+                    let pattern = cowork_core::domain::Pattern::new(
+                        "Learning",
+                        &learning.content,
+                        &iteration_id
+                    );
+                    store.add_pattern(pattern)
+                        .map_err(|e| format!("Failed to add pattern: {}", e))?;
+                    return Ok(serde_json::json!({
+                        "message": "Promoted to project pattern successfully",
+                        "memory_id": memory_id
+                    }));
+                }
+            }
+        }
+    }
+    
+    Err(format!("Memory item not found for promotion: {}", memory_id))
 }
 
 #[tauri::command]
 pub async fn get_memory_context(
+    iteration_id: Option<String>,
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    println!("[GUI] Getting memory context");
+    println!("[GUI] Getting memory context: iteration_id={:?}", iteration_id);
 
-    use cowork_core::tools::GetMemoryContextTool;
-    use adk_core::Tool;
-
-    let tool = GetMemoryContextTool;
+    let store = cowork_core::persistence::MemoryStore::new();
     
-    let args = serde_json::json!({});
-
-    let ctx = std::sync::Arc::new(DummyToolContext);
+    // Get project memory
+    let project_memory = store.load_project_memory()
+        .map_err(|e| format!("Failed to load project memory: {}", e))?;
     
-    tool.execute(ctx, args)
-        .await
-        .map_err(|e| format!("Failed to get memory context: {}", e))
+    // Get iteration memory if available
+    let iteration_memory = if let Some(iter_id) = iteration_id {
+        Some(store.load_iteration_memory(&iter_id)
+            .map_err(|e| format!("Failed to load iteration memory: {}", e))?)
+    } else {
+        None
+    };
+    
+    Ok(serde_json::json!({
+        "project_memory": {
+            "total_decisions": project_memory.decisions.len(),
+            "total_patterns": project_memory.patterns.len(),
+            "key_decisions": project_memory.decisions.iter()
+                .take(5)
+                .map(|d| serde_json::json!({"id": d.id, "title": d.title}))
+                .collect::<Vec<_>>()
+        },
+        "iteration_memory": iteration_memory.map(|mem| serde_json::json!({
+            "iteration_id": mem.iteration_id,
+            "total_insights": mem.insights.len(),
+            "total_issues": mem.issues.len(),
+            "total_learnings": mem.learnings.len()
+        }))
+    }))
 }
 
 // ============================================================================
