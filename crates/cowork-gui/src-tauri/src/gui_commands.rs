@@ -10,6 +10,7 @@ use cowork_core::data::{Requirements, DesignSpec, ImplementationPlan};
 use tauri::{State, Window};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 // Global instances
 lazy_static::lazy_static! {
@@ -23,6 +24,57 @@ lazy_static::lazy_static! {
 
 pub fn init_app_handle(handle: tauri::AppHandle) {
     PROJECT_RUNNER.set_app_handle(handle);
+}
+
+// ============================================================================
+// Open Folder Command
+// ============================================================================
+
+#[tauri::command]
+pub async fn open_in_file_manager(path: String, _window: Window) -> Result<(), String> {
+    use std::env;
+    
+    // Resolve the path
+    let resolved_path = if path.starts_with("workspace_") {
+        // It's a workspace path
+        let iteration_id = path.strip_prefix("workspace_").unwrap_or(&path);
+        let iteration_store = IterationStore::new();
+        iteration_store.workspace_path(iteration_id)
+            .map_err(|e| format!("Failed to get workspace path: {}", e))?
+    } else if path.contains("iter-") {
+        // It's an iteration artifacts path
+        let iteration_store = IterationStore::new();
+        iteration_store.iteration_path(&path)
+            .map_err(|e| format!("Failed to get iteration path: {}", e))?
+    } else {
+        // It's a direct path
+        PathBuf::from(path)
+    };
+    
+    if !resolved_path.exists() {
+        return Err(format!("Path does not exist: {}", resolved_path.display()));
+    }
+    
+    // Open in file manager based on OS
+    if cfg!(target_os = "windows") {
+        Command::new("explorer")
+            .arg(&resolved_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder: {}", e))?;
+    } else if cfg!(target_os = "macos") {
+        Command::new("open")
+            .arg(&resolved_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder: {}", e))?;
+    } else {
+        // Linux
+        Command::new("xdg-open")
+            .arg(&resolved_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder: {}", e))?;
+    }
+    
+    Ok(())
 }
 
 // ============================================================================

@@ -5,8 +5,8 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import JsonView from 'react-json-view';
-import { Tabs, Spin, Alert, Empty, Button, Space } from 'antd';
-import { FileTextOutlined, ProjectOutlined, DatabaseOutlined, BuildOutlined, CheckCircleOutlined, FileMarkdownOutlined } from '@ant-design/icons';
+import { Tabs, Spin, Alert, Empty, Button, Space, Tooltip, message } from 'antd';
+import { FileTextOutlined, ProjectOutlined, DatabaseOutlined, BuildOutlined, CheckCircleOutlined, FileMarkdownOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import 'highlight.js/styles/atom-one-dark.css';
 
 const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChange }) => {
@@ -49,6 +49,25 @@ const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChang
       ...prev,
       [tabKey]: prev[tabKey] === 'json' ? 'doc' : 'json'
     }));
+  };
+
+  const handleOpenArtifactsFolder = async () => {
+    try {
+      await invoke('open_in_file_manager', { path: iterationId });
+    } catch (error) {
+      console.error('Failed to open artifacts folder:', error);
+      message.error('Failed to open artifacts folder');
+    }
+  };
+
+  const handleOpenWorkspaceFolder = async () => {
+    try {
+      // Pass workspace prefix to indicate it's a workspace path
+      await invoke('open_in_file_manager', { path: `workspace_${iterationId}` });
+    } catch (error) {
+      console.error('Failed to open workspace folder:', error);
+      message.error('Failed to open workspace folder');
+    }
   };
 
   const requirementsToMarkdown = (req) => {
@@ -253,6 +272,28 @@ const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChang
       label: <span><FileTextOutlined /> Idea</span>,
       children: (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ 
+            padding: '10px 20px', 
+            borderBottom: '1px solid #303030', 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            background: '#1f1f1f',
+            flexShrink: 0
+          }}>
+            <span style={{ fontWeight: 'bold', color: '#fff' }}>
+              Idea Document
+            </span>
+            <Tooltip title="Open artifacts folder">
+              <Button 
+                size="small" 
+                icon={<FolderOpenOutlined />}
+                onClick={handleOpenArtifactsFolder}
+              >
+                Open Folder
+              </Button>
+            </Tooltip>
+          </div>
           <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
@@ -420,25 +461,36 @@ const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChang
             <span style={{ fontWeight: 'bold', color: '#fff' }}>
               Design Specification
             </span>
-            {!artifacts.design_raw && (
-              <Space>
-                <Button
-                  size="small"
-                  type={designViewMode === 'doc' ? 'primary' : 'default'}
-                  icon={<FileMarkdownOutlined />}
-                  onClick={() => toggleViewMode('design')}
+            <Space>
+              <Tooltip title="Open artifacts folder">
+                <Button 
+                  size="small" 
+                  icon={<FolderOpenOutlined />}
+                  onClick={handleOpenArtifactsFolder}
                 >
-                  Doc
+                  Open Folder
                 </Button>
-                <Button
-                  size="small"
-                  type={designViewMode === 'json' ? 'primary' : 'default'}
-                  onClick={() => toggleViewMode('design')}
-                >
-                  JSON
-                </Button>
-              </Space>
-            )}
+              </Tooltip>
+              {!artifacts.design_raw && (
+                <>
+                  <Button
+                    size="small"
+                    type={designViewMode === 'doc' ? 'primary' : 'default'}
+                    icon={<FileMarkdownOutlined />}
+                    onClick={() => toggleViewMode('design')}
+                  >
+                    Doc
+                  </Button>
+                  <Button
+                    size="small"
+                    type={designViewMode === 'json' ? 'primary' : 'default'}
+                    onClick={() => toggleViewMode('design')}
+                  >
+                    JSON
+                  </Button>
+                </>
+              )}
+            </Space>
           </div>
           <div className="artifact-content" style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
             {artifacts.design_raw || designViewMode === 'doc' ? (
@@ -490,25 +542,36 @@ const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChang
             <span style={{ fontWeight: 'bold', color: '#fff' }}>
               Implementation Plan
             </span>
-            {!artifacts.plan_raw && (
-              <Space>
-                <Button
-                  size="small"
-                  type={planViewMode === 'doc' ? 'primary' : 'default'}
-                  icon={<FileMarkdownOutlined />}
-                  onClick={() => toggleViewMode('plan')}
+            <Space>
+              <Tooltip title="Open artifacts folder">
+                <Button 
+                  size="small" 
+                  icon={<FolderOpenOutlined />}
+                  onClick={handleOpenArtifactsFolder}
                 >
-                  Doc
+                  Open Folder
                 </Button>
-                <Button
-                  size="small"
-                  type={planViewMode === 'json' ? 'primary' : 'default'}
-                  onClick={() => toggleViewMode('plan')}
-                >
-                  JSON
-                </Button>
-              </Space>
-            )}
+              </Tooltip>
+              {!artifacts.plan_raw && (
+                <>
+                  <Button
+                    size="small"
+                    type={planViewMode === 'doc' ? 'primary' : 'default'}
+                    icon={<FileMarkdownOutlined />}
+                    onClick={() => toggleViewMode('plan')}
+                  >
+                    Doc
+                  </Button>
+                  <Button
+                    size="small"
+                    type={planViewMode === 'json' ? 'primary' : 'default'}
+                    onClick={() => toggleViewMode('plan')}
+                  >
+                    JSON
+                  </Button>
+                </>
+              )}
+            </Space>
           </div>
           <div className="artifact-content" style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
             {artifacts.plan_raw || planViewMode === 'doc' ? (
@@ -558,6 +621,15 @@ const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChang
             <span style={{ fontWeight: 'bold', color: '#fff' }}>
               Code Files ({artifacts.code_files.length})
             </span>
+            <Tooltip title="Open workspace folder">
+              <Button 
+                size="small" 
+                icon={<FolderOpenOutlined />}
+                onClick={handleOpenWorkspaceFolder}
+              >
+                Open Folder
+              </Button>
+            </Tooltip>
           </div>
           <div className="artifact-content" style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
             <div style={{ overflow: 'auto', maxHeight: '100%' }}>
@@ -584,6 +656,28 @@ const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChang
       label: <span><CheckCircleOutlined /> Check Report</span>,
       children: (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ 
+            padding: '10px 20px', 
+            borderBottom: '1px solid #303030', 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            background: '#1f1f1f',
+            flexShrink: 0
+          }}>
+            <span style={{ fontWeight: 'bold', color: '#fff' }}>
+              Check Report
+            </span>
+            <Tooltip title="Open artifacts folder">
+              <Button 
+                size="small" 
+                icon={<FolderOpenOutlined />}
+                onClick={handleOpenArtifactsFolder}
+              >
+                Open Folder
+              </Button>
+            </Tooltip>
+          </div>
           <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
@@ -603,6 +697,28 @@ const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChang
       label: <span><CheckCircleOutlined /> Delivery Report</span>,
       children: (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ 
+            padding: '10px 20px', 
+            borderBottom: '1px solid #303030', 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            background: '#1f1f1f',
+            flexShrink: 0
+          }}>
+            <span style={{ fontWeight: 'bold', color: '#fff' }}>
+              Delivery Report
+            </span>
+            <Tooltip title="Open artifacts folder">
+              <Button 
+                size="small" 
+                icon={<FolderOpenOutlined />}
+                onClick={handleOpenArtifactsFolder}
+              >
+                Open Folder
+              </Button>
+            </Tooltip>
+          </div>
           <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}

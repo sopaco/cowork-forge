@@ -731,6 +731,7 @@ pub fn run() {
             gui_commands::start_project,
             gui_commands::stop_project,
             gui_commands::execute_project_command,
+            gui_commands::open_in_file_manager,
             // GUI-specific commands (V2 API - Iteration based)
             gui_commands::get_iteration_artifacts,
             gui_commands::read_iteration_file,

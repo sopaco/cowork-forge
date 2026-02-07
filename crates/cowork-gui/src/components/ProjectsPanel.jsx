@@ -21,6 +21,8 @@ import {
   EditOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  PlusOutlined,
+  FolderOutlined,
 } from "@ant-design/icons";
 
 const ProjectsPanel = () => {
@@ -32,6 +34,8 @@ const ProjectsPanel = () => {
   const [openDirPath, setOpenDirPath] = useState("");
   const [editProjectName, setEditProjectName] = useState("");
   const [editProjectDescription, setEditProjectDescription] = useState("");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
 
   const loadProjects = async () => {
     setLoading(true);
@@ -252,6 +256,25 @@ const ProjectsPanel = () => {
     }
   };
 
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim()) {
+      message.warning("Please enter a project name");
+      return;
+    }
+
+    try {
+      const project = await invoke("gui_init_project", {
+        name: newProjectName,
+      });
+      message.success(`Project created: ${project.name}`);
+      setShowCreateModal(false);
+      setNewProjectName("");
+      loadProjects();
+    } catch (error) {
+      message.error("Failed to create project: " + error);
+    }
+  };
+
   const handleSelectDirectory = async () => {
     try {
       const selected = await open({
@@ -315,12 +338,21 @@ const ProjectsPanel = () => {
         }}
       >
         <h2 style={{ margin: 0 }}>Projects</h2>
-        <Button
-          icon={<FolderOpenOutlined />}
-          onClick={() => setShowOpenDirModal(true)}
-        >
-          Open Directory
-        </Button>
+        <Space>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setShowCreateModal(true)}
+          >
+            Create Project
+          </Button>
+          <Button
+            icon={<FolderOpenOutlined />}
+            onClick={() => setShowOpenDirModal(true)}
+          >
+            Open Directory
+          </Button>
+        </Space>
       </div>
 
       {loading ? (
@@ -490,6 +522,42 @@ const ProjectsPanel = () => {
           ))}
         </div>
       )}
+
+      {/* Create Project Modal */}
+      <Modal
+        title="Create New Project"
+        open={showCreateModal}
+        onOk={handleCreateProject}
+        onCancel={() => {
+          setShowCreateModal(false);
+          setNewProjectName("");
+        }}
+        okText="Create"
+        cancelText="Cancel"
+      >
+        <div>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            Project Name:
+          </label>
+          <Input
+            value={newProjectName}
+            onChange={(e) => setNewProjectName(e.target.value)}
+            placeholder="Enter project name"
+            autoFocus
+            onPressEnter={handleCreateProject}
+          />
+          <div style={{ marginTop: "8px", fontSize: "12px", color: "#888" }}>
+            <FolderOutlined style={{ marginRight: "4px" }} />
+            Project will be created in the current workspace directory
+          </div>
+        </div>
+      </Modal>
 
       {/* Edit Project Modal */}
       <Modal
