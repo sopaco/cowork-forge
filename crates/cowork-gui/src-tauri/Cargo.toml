@@ -46,4 +46,5 @@ cowork-core = { path = "../../cowork-core" }
 adk-core = "0.2"
 adk-runner = "0.2"
 adk-session = "0.2"
+which = "8.0.0"
 

@@ -54,6 +54,10 @@ impl Stage for DesignStage {
         // Load PRD document
         let prd_content = load_prd_document(ctx);
 
+        // Detect project type and get tech stack constraints
+        let project_type = crate::tech_stack::detect_project_type(&ctx.iteration.description);
+        let tech_stack_instructions = crate::tech_stack::get_tech_stack_instructions(project_type.clone());
+
         // Prepare artifact path
         let artifact_path = format!(
             "{}/.cowork-v2/iterations/{}/artifacts/design.md",
@@ -68,11 +72,14 @@ impl Stage for DesignStage {
             }
         }
 
-        // Generate Design using LLM
+        // Generate Design using LLM with tech stack constraints
         let prompt = format!(
             r#"You are a software architect. Create a comprehensive technical design document based on the PRD.
 
 **Iteration:** #{} - {}
+**Project Type:** {}
+
+{}
 
 {}
 
@@ -82,16 +89,20 @@ Please create a detailed Technical Design Document that includes:
 2. **Component Design** - Key components and their responsibilities
 3. **Data Model** - Database schemas, entities, relationships
 4. **API Design** - REST/GraphQL endpoints, request/response formats
-5. **Technology Stack** - Recommended technologies and frameworks
+5. **Technology Stack** - You MUST follow the constraints above
 6. **Security Design** - Authentication, authorization, data protection
 7. **Performance Considerations** - Caching, optimization strategies
 8. **Integration Points** - External services and APIs
 9. **Deployment Architecture** - Infrastructure requirements
 
+**CRITICAL:** You MUST strictly follow the technology stack constraints specified above. Do not deviate from the required languages, frameworks, or tools.
+
 Write the response in professional Markdown format with code examples where appropriate."#,
             ctx.iteration.number,
             ctx.iteration.title,
-            prd_content
+            project_type,
+            prd_content,
+            tech_stack_instructions
         );
 
         let content = Content::new("user").with_text(prompt);

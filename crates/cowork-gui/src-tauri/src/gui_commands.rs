@@ -437,7 +437,62 @@ pub async fn start_iteration_preview(
         return Err(format!("Workspace directory not found: {}", workspace.display()));
     }
 
+    // Install dependencies if needed
+    install_dependencies_if_needed(&workspace).await?;
+
     PREVIEW_SERVER_MANAGER.start(iteration_id, workspace).await
+}
+
+/// Install dependencies if package.json exists and node_modules is missing
+async fn install_dependencies_if_needed(workspace: &std::path::Path) -> Result<(), String> {
+    let package_json = workspace.join("package.json");
+    let node_modules = workspace.join("node_modules");
+    
+    if package_json.exists() && !node_modules.exists() {
+        println!("[GUI] package.json found but node_modules missing, installing dependencies...");
+        
+        // Try bun first, then npm
+        let use_bun = which::which("bun").is_ok();
+        let use_npm = which::which("npm").is_ok();
+        
+        let install_cmd = if use_bun {
+            "bun install"
+        } else if use_npm {
+            "npm install"
+        } else {
+            return Err("Neither bun nor npm found. Cannot install dependencies.".to_string());
+        };
+        
+        println!("[GUI] Running: {} in {}", install_cmd, workspace.display());
+        
+        let output = std::process::Command::new(if use_bun { "bun" } else { "npm" })
+            .arg("install")
+            .current_dir(workspace)
+            .output();
+        
+        match output {
+            Ok(result) => {
+                if result.status.success() {
+                    println!("[GUI] Dependencies installed successfully");
+                    // Print summary
+                    if let Ok(stdout) = String::from_utf8(result.stdout) {
+                        let lines: Vec<&str> = stdout.lines().collect();
+                        if let Some(last_line) = lines.last() {
+                            println!("[GUI] {}", last_line);
+                        }
+                    }
+                } else {
+                    let stderr = String::from_utf8_lossy(&result.stderr);
+                    return Err(format!("Failed to install dependencies: {}", stderr));
+                }
+            }
+            Err(e) => {
+                return Err(format!("Failed to run install command: {}", e));
+            }
+        }
+    }
+    
+    Ok(())
 }
 
 #[tauri::command]
@@ -463,6 +518,9 @@ pub async fn start_iteration_project(
     let iteration_store = IterationStore::new();
     let workspace = iteration_store.workspace_path(&iteration_id)
         .map_err(|e| format!("Failed to get workspace: {}", e))?;
+
+    // Install dependencies if needed
+    install_dependencies_if_needed(&workspace).await?;
 
     let command = detect_start_command(&workspace)?;
 

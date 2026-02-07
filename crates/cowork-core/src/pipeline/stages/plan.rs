@@ -54,6 +54,10 @@ impl Stage for PlanStage {
         // Load design document
         let design_content = load_design_document(ctx);
 
+        // Detect project type and get tech stack constraints
+        let project_type = crate::tech_stack::detect_project_type(&ctx.iteration.description);
+        let tech_stack_instructions = crate::tech_stack::get_tech_stack_instructions(project_type.clone());
+
         // Prepare artifact path
         let artifact_path = format!(
             "{}/.cowork-v2/iterations/{}/artifacts/plan.md",
@@ -68,11 +72,14 @@ impl Stage for PlanStage {
             }
         }
 
-        // Generate Implementation Plan using LLM
+        // Generate Implementation Plan using LLM with tech stack constraints
         let prompt = format!(
             r#"You are a technical lead. Create a detailed implementation plan based on the design document.
 
 **Iteration:** #{} - {}
+**Project Type:** {}
+
+{}
 
 {}
 
@@ -83,16 +90,24 @@ Please create a comprehensive Implementation Plan that includes:
    - Task ID, Description, Estimated effort
    - Dependencies between tasks
 3. **File Structure** - Recommended project structure with file paths
+   - MUST follow the project structure specified in the tech stack constraints
 4. **Implementation Order** - Sequence of tasks with priorities
 5. **Key Algorithms/Logic** - Pseudocode or logic description for complex parts
 6. **Testing Strategy** - How to verify each component
 7. **Risk Mitigation** - Potential issues and solutions
 8. **Definition of Done** - Criteria for completing this iteration
 
+**CRITICAL:** 
+- You MUST strictly follow the technology stack constraints specified above
+- The file structure MUST match the requirements for the project type
+- Do not deviate from the required languages, frameworks, or tools
+
 Format the plan as a Markdown document with clear sections and checklists."#,
             ctx.iteration.number,
             ctx.iteration.title,
-            design_content
+            project_type,
+            design_content,
+            tech_stack_instructions
         );
 
         let content = Content::new("user").with_text(prompt);

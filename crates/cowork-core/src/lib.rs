@@ -4,6 +4,9 @@
 pub mod domain;
 pub mod persistence;
 
+// Tech stack configuration
+pub mod tech_stack;
+
 // Existing modules (to be gradually refactored)
 pub mod llm;
 pub mod tools;
@@ -22,6 +25,7 @@ pub mod memory;
 pub use domain::*;
 pub use persistence::*;
 pub use llm::*;
+pub use tech_stack::*;
 
 // Version info
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
