@@ -33,6 +33,7 @@ import {
   CodeOutlined,
   FileTextOutlined,
   EyeOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 
 const { TextArea } = Input;
@@ -597,54 +598,118 @@ const IterationsPanel = ({ onSelectIteration, selectedIterationId, onExecuteStat
 
       {/* Iteration Details Modal */}
       <Modal
-        title="Iteration Details"
         open={showDetailsModal}
         onCancel={() => setShowDetailsModal(false)}
         footer={null}
-        width={700}
+        width={680}
       >
         {selectedIteration && (
           <div>
-            <div style={{ marginBottom: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <span style={{ fontSize: '24px', fontWeight: 'bold' }}>
+            {/* Compact Header */}
+            <div style={{ 
+              marginBottom: '20px',
+              paddingBottom: '16px',
+              borderBottom: '1px solid #e8e8e8'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '10px',
+                marginBottom: '8px'
+              }}>
+                <span style={{ 
+                  fontSize: '13px', 
+                  fontWeight: 600,
+                  background: '#f0f0f0',
+                  padding: '2px 10px',
+                  borderRadius: '4px'
+                }}>
                   #{selectedIteration.number}
                 </span>
-                <span style={{ fontSize: '18px' }}>{selectedIteration.title}</span>
+                <Badge 
+                  status={getStatusColor(selectedIteration.status)} 
+                  text={selectedIteration.status}
+                />
               </div>
-              <Badge
-                status={getStatusColor(selectedIteration.status)}
-                text={selectedIteration.status}
-                style={{ marginRight: '16px' }}
-              />
-              <span style={{ color: '#888', fontSize: '12px' }}>
+              <h2 style={{ 
+                margin: 0, 
+                fontSize: '20px', 
+                fontWeight: 600,
+                marginBottom: '6px'
+              }}>
+                {selectedIteration.title}
+              </h2>
+              <div style={{ 
+                fontSize: '12px', 
+                color: '#999',
+                fontFamily: 'monospace'
+              }}>
                 ID: {selectedIteration.id}
-              </span>
+              </div>
             </div>
 
-            <div style={{ marginBottom: '24px' }}>
-              <h4>Description</h4>
-              <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: '4px' }}>
+            {/* Description */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{
+                padding: '12px',
+                background: '#fafafa',
+                borderRadius: '6px',
+                lineHeight: '1.5',
+                fontSize: '14px',
+                color: '#666'
+              }}>
                 {selectedIteration.description}
               </div>
             </div>
 
+            {/* Inheritance */}
             {selectedIteration.base_iteration_id && (
-              <div style={{ marginBottom: '24px' }}>
-                <h4>Inheritance</h4>
-                <div>
-                  Based on: <code>{selectedIteration.base_iteration_id}</code>
-                  <Tag style={{ marginLeft: '8px' }}>{selectedIteration.inheritance}</Tag>
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ 
+                  fontSize: '13px', 
+                  color: '#999', 
+                  marginBottom: '4px' 
+                }}>
+                  Based on: <code style={{ 
+                    background: '#f5f5f5', 
+                    padding: '2px 6px', 
+                    borderRadius: '3px',
+                    fontSize: '11px'
+                  }}>
+                    {selectedIteration.base_iteration_id.substring(0, 20)}...
+                  </code>
+                  <Tag style={{ marginLeft: '6px', fontSize: '11px' }}>
+                    {selectedIteration.inheritance}
+                  </Tag>
                 </div>
               </div>
             )}
 
-            <div style={{ marginBottom: '24px' }}>
-              <h4>Stages</h4>
-              <Timeline
-                items={STAGES.map((stage) => {
-                  // For running/paused iterations, only show stages before current_stage as completed
-                  // For completed iterations, use completed_stages
+            {/* Progress & Stages */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '10px'
+              }}>
+                <span style={{ fontSize: '13px', fontWeight: 600 }}>Progress</span>
+                <span style={{ fontSize: '13px', color: '#666' }}>
+                  {calculateProgress(selectedIteration.completed_stages)}%
+                </span>
+              </div>
+              <Progress 
+                percent={calculateProgress(selectedIteration.completed_stages)}
+                strokeColor="#52c41a"
+                size="small"
+                style={{ marginBottom: '12px' }}
+              />
+              <div style={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: '6px'
+              }}>
+                {STAGES.map((stage) => {
                   const currentStageIndex = STAGES.findIndex(s => s.key === selectedIteration.current_stage);
                   const stageIndex = STAGES.findIndex(s => s.key === stage.key);
 
@@ -654,29 +719,47 @@ const IterationsPanel = ({ onSelectIteration, selectedIterationId, onExecuteStat
 
                   const isCurrent = selectedIteration.current_stage === stage.key;
 
-                  return {
-                    color: isCompleted ? 'green' : isCurrent ? 'blue' : 'gray',
-                    dot: isCompleted ? <CheckCircleOutlined /> : isCurrent ? <PlayCircleOutlined /> : null,
-                    children: (
-                      <div>
-                        <strong>{stage.label}</strong>
-                        {isCurrent && <Tag color="blue" style={{ marginLeft: '8px' }}>Current</Tag>}
-                      </div>
-                    ),
-                  };
+                  return (
+                    <Tag
+                      key={stage.key}
+                      color={isCompleted ? 'success' : isCurrent ? 'processing' : 'default'}
+                      style={{
+                        margin: 0,
+                        fontSize: '12px',
+                        borderRadius: '4px',
+                        opacity: isCompleted || isCurrent ? 1 : 0.4
+                      }}
+                    >
+                      {stage.label}
+                    </Tag>
+                  );
                 })}
-              />
+              </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {/* Timestamps */}
+            <div style={{
+              display: 'flex',
+              gap: '24px',
+              paddingTop: '16px',
+              borderTop: '1px solid #e8e8e8'
+            }}>
               <div>
-                <h4>Created</h4>
-                <div>{formatDate(selectedIteration.created_at)}</div>
+                <div style={{ fontSize: '12px', color: '#999', marginBottom: '2px' }}>
+                  Created
+                </div>
+                <div style={{ fontSize: '13px', color: '#333' }}>
+                  {formatDate(selectedIteration.created_at)}
+                </div>
               </div>
               {selectedIteration.completed_at && (
                 <div>
-                  <h4>Completed</h4>
-                  <div>{formatDate(selectedIteration.completed_at)}</div>
+                  <div style={{ fontSize: '12px', color: '#999', marginBottom: '2px' }}>
+                    Completed
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#333' }}>
+                    {formatDate(selectedIteration.completed_at)}
+                  </div>
                 </div>
               )}
             </div>
