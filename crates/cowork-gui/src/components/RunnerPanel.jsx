@@ -18,6 +18,35 @@ const RunnerPanel = ({ iterationId }) => {
   const logsEndRef = useRef(null);
   const logsContainerRef = useRef(null);
   const listenersRegistered = useRef(false);
+  const isVisibleRef = useRef(true);
+
+  // Check project status when component becomes visible
+  useEffect(() => {
+    if (isVisibleRef.current && iterationId) {
+      checkProjectStatus();
+    }
+  }, [iterationId]);
+
+  // Track visibility and refresh status when component becomes visible again
+  useEffect(() => {
+    isVisibleRef.current = true;
+    
+    // Check status when component becomes visible
+    checkProjectStatus();
+
+    return () => {
+      isVisibleRef.current = false;
+    };
+  }, [iterationId]);
+
+  const checkProjectStatus = async () => {
+    try {
+      const running = await invoke('check_project_status', { iterationId });
+      setIsRunning(running);
+    } catch (error) {
+      console.error('Failed to check project status:', error);
+    }
+  };
 
   // Auto-scroll to bottom when new logs arrive
   useEffect(() => {

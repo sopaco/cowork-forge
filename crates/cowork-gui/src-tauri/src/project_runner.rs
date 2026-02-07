@@ -28,6 +28,11 @@ impl ProjectRunner {
         *app_handle_guard = Some(handle);
     }
 
+    pub fn is_running(&self, session_id: &str) -> bool {
+        let processes = self.processes.lock().unwrap();
+        processes.contains_key(session_id)
+    }
+
     pub async fn start(&self, session_id: String, command: String) -> Result<u32, String> {
         // Stop existing process if any
         if let Ok(()) = self.stop(session_id.clone()).await {

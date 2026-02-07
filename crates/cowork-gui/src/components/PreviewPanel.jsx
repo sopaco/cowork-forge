@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button, Spin, Alert, Space, Typography } from 'antd';
 import { PlayCircleOutlined, StopOutlined, ReloadOutlined, EyeOutlined, GlobalOutlined } from '@ant-design/icons';
 import { invoke } from '@tauri-apps/api/core';
@@ -10,10 +10,25 @@ const PreviewPanel = ({ iterationId }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const [loading, setLoading] = useState(false);
+  const isVisibleRef = useRef(true);
 
-  // Check server status on mount
+  // Check server status when component mounts or becomes visible
   useEffect(() => {
+    if (isVisibleRef.current) {
+      checkPreviewStatus();
+    }
+  }, [iterationId]);
+
+  // Track visibility and refresh when component becomes visible again
+  useEffect(() => {
+    isVisibleRef.current = true;
+    
+    // Check status when component becomes visible
     checkPreviewStatus();
+
+    return () => {
+      isVisibleRef.current = false;
+    };
   }, [iterationId]);
 
   const checkPreviewStatus = async () => {

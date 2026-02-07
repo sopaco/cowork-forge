@@ -616,6 +616,15 @@ pub async fn stop_iteration_project(
 }
 
 #[tauri::command]
+pub async fn check_project_status(
+    iteration_id: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<bool, String> {
+    Ok(PROJECT_RUNNER.is_running(&iteration_id))
+}
+
+#[tauri::command]
 pub async fn execute_project_command(
     session_id: String,
     command: String,

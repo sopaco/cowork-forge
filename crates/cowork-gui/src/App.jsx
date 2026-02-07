@@ -473,214 +473,64 @@ function App() {
   };
 
   const renderContent = () => {
-    switch (activeView) {
-      case 'iterations':
-        return (
-          <IterationsPanel
-            onSelectIteration={handleSelectIteration}
-            selectedIterationId={currentIteration?.id}
-            onExecuteStatusChange={handleExecuteStatusChange}
-          />
-        );
+  return (
+    <div style={{ height: '100%' }}>
+      <div style={{ height: '100%', display: activeView === 'iterations' ? 'block' : 'none' }}>
+        <IterationsPanel 
+          key="iterations"
+          onSelectIteration={handleSelectIteration}
+          selectedIterationId={currentIteration?.id}
+          onExecuteStatusChange={handleExecuteStatusChange}
+        />
+      </div>
 
-      case 'projects':
-        return <ProjectsPanel />;
+      <div style={{ height: '100%', display: activeView === 'projects' ? 'block' : 'none' }}>
+        <ProjectsPanel key="projects" />
+      </div>
 
-      case 'chat':
-        if (!currentIteration) {
-          return (
-            <Empty
-              description="Select an iteration to view chat"
-              style={{ marginTop: '40px' }}
-            >
-              <Button type="primary" onClick={() => setActiveView('iterations')}>
-                Go to Iterations
-              </Button>
-            </Empty>
-          );
-        }
-        return (
-          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <div
-              ref={messagesContainerRef}
-              style={{ flex: 1, overflow: 'auto', padding: '20px' }}
-            >
-              <div style={{ marginBottom: '20px', padding: '12px', background: '#f0f5ff', borderRadius: '8px' }}>
-                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                  <RocketOutlined style={{ marginRight: '8px' }} />
-                  #{currentIteration.number} - {currentIteration.title}
-                </div>
-                <div style={{ fontSize: '12px', color: '#666' }}>
-                  {getStatusBadge(currentIteration.status)}
-                  {currentIteration.current_stage && (
-                    <span style={{ marginLeft: '16px' }}>
-                      Current: <Tag color="blue">{currentIteration.current_stage}</Tag>
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {messages.map((msg, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    marginBottom: '16px',
-                    padding: '12px',
-                    background: msg.type === 'user' ? '#e6f7ff' : '#f6ffed',
-                    borderRadius: '8px',
-                    borderLeft: `4px solid ${msg.type === 'user' ? '#1890ff' : '#52c41a'}`,
-                  }}
-                >
-                  <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '12px', color: '#666' }}>
-                    {msg.type === 'user' ? 'You' : msg.agentName || 'AI Agent'}
-                  </div>
-                  <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
-                </div>
-              ))}
-
-              {isProcessing && (
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <Spin />
-                  <div style={{ marginTop: '8px', color: '#888' }}>
-                    {currentAgent ? (
-                      <>{currentAgent} is working...</>
-                    ) : currentIteration?.current_stage ? (
-                      `Executing ${currentIteration.current_stage} stage...`
-                    ) : (
-                      'Processing...'
-                    )}
-                  </div>
-                  {currentIteration?.current_stage && (
-                    <div style={{ marginTop: '4px', fontSize: '12px', color: '#aaa' }}>
-                      Stage: {currentIteration.current_stage}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {inputRequest && (
-              <div style={{ padding: '16px', borderTop: '1px solid #e8e8e8', background: '#fafafa' }}>
-                {inputRequest.isFeedbackMode ? (
-                  // Feedback input mode
-                  <>
-                    <div style={{ marginBottom: '12px', fontWeight: 'bold' }}>
-                      <Tag color="orange" style={{ marginRight: '8px' }}>
-                        <EditOutlined /> Feedback Mode
-                      </Tag>
-                      {inputRequest.feedbackPrompt}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <Input.TextArea
-                        value={userInput}
-                        onChange={(e) => setUserInput(e.target.value)}
-                        placeholder="Enter your feedback or suggestions for improvement..."
-                        rows={4}
-                        autoFocus
-                      />
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <Button onClick={handleCancelFeedback}>
-                          Cancel
-                        </Button>
-                        <Button 
-                          type="primary" 
-                          icon={<SendOutlined />}
-                          onClick={handleSubmitFeedback}
-                          disabled={!userInput.trim()}
-                        >
-                          Submit Feedback
-                        </Button>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  // Normal confirmation mode
-                  <>
-                    <div style={{ marginBottom: '12px', fontWeight: 'bold' }}>
-                      {inputRequest.isArtifactConfirmation && (
-                        <Tag color="blue" style={{ marginRight: '8px' }}>
-                          <EyeOutlined /> Review Required
-                        </Tag>
-                      )}
-                      {inputRequest.prompt}
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                      {inputRequest.options.map((option) => (
-                        <Button 
-                          key={option.id} 
-                          type={option.id === 'yes' ? 'primary' : option.id === 'view_artifact' ? 'dashed' : option.id === 'feedback' ? 'dashed' : 'default'}
-                          danger={option.id === 'no'}
-                          icon={
-                            option.id === 'view_artifact' ? <EyeOutlined /> : 
-                            option.id === 'yes' ? <CheckCircleOutlined /> : 
-                            option.id === 'no' ? <CloseCircleOutlined /> : 
-                            option.id === 'feedback' ? <EditOutlined /> : null
-                          }
-                          onClick={() => handleSelectOption(option)}
-                        >
-                          {option.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            <div style={{ padding: '16px', borderTop: '1px solid #e8e8e8', display: 'flex', gap: '8px' }}>
-              <Input
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                onPressEnter={handleSendUserMessage}
-                placeholder={inputRequest ? 'Type your response...' : 'Type a message...'}
-                disabled={!inputRequest}
-              />
-              <Button type="primary" onClick={handleSendUserMessage} disabled={!userInput.trim() || !inputRequest}>
-                Send
-              </Button>
-            </div>
-          </div>
-        );
-
-      case 'artifacts':
-        return currentIteration ? (
+      <div style={{ height: '100%', display: activeView === 'artifacts' ? 'block' : 'none' }}>
+        {currentIteration ? (
           <ArtifactsViewer 
+            key={`artifacts-${currentIteration.id}`}
             iterationId={currentIteration.id} 
             activeTab={activeArtifactTab}
             onTabChange={setActiveArtifactTab}
           />
         ) : (
           <Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-        );
+        )}
+      </div>
 
-      case 'code':
-        return currentIteration ? (
-          <CodeEditor iterationId={currentIteration.id} />
+      <div style={{ height: '100%', display: activeView === 'code' ? 'block' : 'none' }}>
+        {currentIteration ? (
+          <CodeEditor key={`code-${currentIteration.id}`} iterationId={currentIteration.id} />
         ) : (
           <Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-        );
+        )}
+      </div>
 
-      case 'preview':
-        return currentIteration ? (
-          <PreviewPanel iterationId={currentIteration.id} />
+      <div style={{ height: '100%', display: activeView === 'preview' ? 'block' : 'none' }}>
+        {currentIteration ? (
+          <PreviewPanel key={`preview-${currentIteration.id}`} iterationId={currentIteration.id} />
         ) : (
           <Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-        );
+        )}
+      </div>
 
-      case 'run':
-        return currentIteration ? (
-          <RunnerPanel iterationId={currentIteration.id} />
+      <div style={{ height: '100%', display: activeView === 'run' ? 'block' : 'none' }}>
+        {currentIteration ? (
+          <RunnerPanel key={`run-${currentIteration.id}`} iterationId={currentIteration.id} />
         ) : (
           <Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-        );
+        )}
+      </div>
 
-      case 'memory':
-        return <MemoryPanel currentSession={currentIteration?.id} />;
-
-      default:
-        return null;
-    }
-  };
+      <div style={{ height: '100%', display: activeView === 'memory' ? 'block' : 'none' }}>
+        <MemoryPanel key="memory" currentSession={currentIteration?.id} />
+      </div>
+    </div>
+  );
+};
 
   if (loading) {
     return (
