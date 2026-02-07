@@ -236,11 +236,14 @@ pub async fn gui_continue_iteration(
     let iteration_id_clone = iteration_id.clone();
 
     tokio::spawn(async move {
+        println!("[GUI] Starting continue_iteration for iteration: {}", iteration_id_clone);
         match executor.continue_iteration(&mut project, &iteration_id_clone).await {
             Ok(_) => {
+                println!("[GUI] continue_iteration completed successfully");
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);
             }
             Err(e) => {
+                println!("[GUI] continue_iteration failed: {}", e);
                 let _ = window_clone.emit("iteration_failed", (iteration_id_clone, e.to_string()));
             }
         }

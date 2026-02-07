@@ -385,6 +385,9 @@ async fn set_workspace(
     }
     drop(registry);
     
+    // Reset any "running" iterations to "paused" since there's no actual execution after reopening
+    reset_running_iterations();
+    
     // Store in app state
     let mut workspace = state.workspace_path.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
@@ -395,6 +398,39 @@ async fn set_workspace(
     
     println!("[GUI] Workspace set successfully");
     Ok(())
+}
+
+/// Reset all running iterations to paused state
+/// This should be called when opening a project to ensure no "orphaned" running states
+fn reset_running_iterations() {
+    use cowork_core::persistence::IterationStore;
+    use cowork_core::domain::IterationStatus;
+    
+    let iteration_store = IterationStore::new();
+    
+    match iteration_store.load_all() {
+        Ok(iterations) => {
+            let mut reset_count = 0;
+            for mut iteration in iterations {
+                // Check if iteration is in Running state
+                if iteration.status == IterationStatus::Running {
+                    println!("[GUI] Resetting iteration '{}' from Running to Paused", iteration.id);
+                    iteration.status = IterationStatus::Paused;
+                    if let Err(e) = iteration_store.save(&iteration) {
+                        eprintln!("[GUI] Warning: Failed to reset iteration {}: {}", iteration.id, e);
+                    } else {
+                        reset_count += 1;
+                    }
+                }
+            }
+            if reset_count > 0 {
+                println!("[GUI] Reset {} running iteration(s) to paused", reset_count);
+            }
+        }
+        Err(e) => {
+            eprintln!("[GUI] Warning: Failed to load iterations for reset: {}", e);
+        }
+    }
 }
 
 #[tauri::command]
@@ -448,6 +484,9 @@ async fn open_project_in_current_window(
     
     std::env::set_current_dir(path)
         .map_err(|e| format!("Failed to set current directory: {}", e))?;
+    
+    // Reset any "running" iterations to "paused" since there's no actual execution after reopening
+    reset_running_iterations();
     
     let mut workspace = state.workspace_path.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;

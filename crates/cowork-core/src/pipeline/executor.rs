@@ -223,6 +223,9 @@ impl IterationExecutor {
         self.iteration_store.save(&iteration)?;
         self.project_store.set_current_iteration(project, iteration_id.to_string())?;
 
+        println!("[Executor] Iteration '{}' started, will execute {} stages starting from '{}'", 
+            iteration.title, stages.len(), start_stage);
+
         // Emit event
         self.interaction
             .show_message(
@@ -230,6 +233,8 @@ impl IterationExecutor {
                 format!("Starting iteration '{}' from stage '{}'", iteration.title, start_stage),
             )
             .await;
+        
+        println!("[Executor] Starting stage execution loop...");
 
         // Execute stages with retry logic
         const MAX_STAGE_RETRIES: u32 = 3;
@@ -243,6 +248,8 @@ impl IterationExecutor {
             // Update current stage
             iteration.set_stage(&stage_name);
             self.iteration_store.save(&iteration)?;
+            
+            println!("[Executor] Stage updated: {} (iteration: {})", stage_name, iteration_id);
 
             // Emit stage started event with progress info
             self.interaction
@@ -379,6 +386,14 @@ impl IterationExecutor {
                                     }
                                 }
                             } else {
+                                // Non-critical stage completed, no confirmation needed
+                                self.interaction
+                                    .show_message(
+                                        crate::interaction::MessageLevel::Success,
+                                        format!("✅ [{}/{}] Stage '{}' completed (auto-continuing)", 
+                                            stage_num, total_stages, stage_name),
+                                    )
+                                    .await;
                                 success = true;
                                 break; // Success, exit retry loop
                             }
@@ -474,17 +489,23 @@ impl IterationExecutor {
     pub async fn continue_iteration(&self, project: &mut Project, iteration_id: &str) -> anyhow::Result<()> {
         let mut iteration = self.iteration_store.load(iteration_id)?;
 
+        println!("[Executor] Continuing iteration '{}' (status: {:?}, current_stage: {:?})", 
+            iteration_id, iteration.status, iteration.current_stage);
+
         if iteration.status != IterationStatus::Paused {
+            println!("[Executor] Error: Iteration is not paused (current status: {:?})", iteration.status);
             return Err(anyhow::anyhow!("Iteration is not paused"));
         }
 
         // Save the stage we're resuming from BEFORE calling resume()
         let resume_stage = iteration.current_stage.clone();
+        println!("[Executor] Resuming from stage: {:?}", resume_stage);
 
         iteration.resume();
         self.iteration_store.save(&iteration)?;
 
         // Resume execution from the saved stage
+        println!("[Executor] Calling execute with resume_stage...");
         self.execute(project, iteration_id, resume_stage).await
     }
 

@@ -123,8 +123,27 @@ function App() {
       await listen('iteration_started', (event) => {
         const iterationId = event.payload;
         setIsProcessing(true);
-        handleExecuteStatusChange(iterationId, 'running');
+        // Directly update currentIteration status if it matches
+        setCurrentIteration((prev) => {
+          if (prev && prev.id === iterationId) {
+            return { ...prev, status: 'Running' };
+          }
+          return prev;
+        });
         message.info('Iteration started');
+      });
+
+      await listen('iteration_continued', (event) => {
+        const iterationId = event.payload;
+        setIsProcessing(true);
+        // Directly update currentIteration status if it matches
+        setCurrentIteration((prev) => {
+          if (prev && prev.id === iterationId) {
+            return { ...prev, status: 'Running' };
+          }
+          return prev;
+        });
+        message.info('Iteration continued');
       });
 
       await listen('iteration_completed', (event) => {
@@ -132,7 +151,17 @@ function App() {
         setIsProcessing(false);
         setCurrentStage(null);
         setCurrentAgent(null);
-        handleExecuteStatusChange(iterationId, 'completed');
+        // Reset input request in case it was left open
+        setInputRequest(null);
+        // Update current iteration status
+        setCurrentIteration((prev) => {
+          if (prev && prev.id === iterationId) {
+            return { ...prev, status: 'Completed', current_stage: null };
+          }
+          return prev;
+        });
+        // Refresh all data to sync project state
+        loadData();
         message.success('Iteration completed');
       });
 
@@ -141,7 +170,17 @@ function App() {
         setIsProcessing(false);
         setCurrentStage(null);
         setCurrentAgent(null);
-        handleExecuteStatusChange(iterationId, 'error');
+        // Reset input request in case it was left open
+        setInputRequest(null);
+        // Update current iteration status
+        setCurrentIteration((prev) => {
+          if (prev && prev.id === iterationId) {
+            return { ...prev, status: 'Failed', current_stage: null };
+          }
+          return prev;
+        });
+        // Refresh all data
+        loadData();
         message.error('Iteration failed: ' + error);
       });
 
@@ -200,11 +239,25 @@ function App() {
       });
 
       await listen('project_loaded', () => {
+        // Reset execution states when loading a different project
+        setIsProcessing(false);
+        setCurrentAgent(null);
+        setInputRequest(null);
+        setMessages([]);
+        setCurrentIteration(null); // Reset current iteration when switching projects
+        setActiveView('iterations'); // Switch to iterations view
         loadData();
         message.success('Project loaded');
       });
 
       await listen('project_initialized', () => {
+        // Reset execution states
+        setIsProcessing(false);
+        setCurrentAgent(null);
+        setInputRequest(null);
+        setMessages([]);
+        setCurrentIteration(null); // Reset current iteration
+        setActiveView('iterations'); // Switch to iterations view
         loadData();
         message.success('Project initialized');
       });
