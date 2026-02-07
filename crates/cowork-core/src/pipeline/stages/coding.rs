@@ -330,8 +330,9 @@ Provide ONLY the code for this file, no explanations."#,
             )
             .await;
 
-        // Coding stage doesn't produce an artifact file, it writes to workspace
-        StageResult::Success(None)
+        // Return workspace path as the artifact so it can be tracked
+        let workspace_str = workspace_path.to_string_lossy().to_string();
+        StageResult::Success(Some(workspace_str))
     }
 }
 

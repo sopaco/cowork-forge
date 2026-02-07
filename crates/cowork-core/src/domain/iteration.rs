@@ -108,6 +108,7 @@ impl Iteration {
             "prd" => self.artifacts.prd = Some(path),
             "design" => self.artifacts.design = Some(path),
             "plan" => self.artifacts.plan = Some(path),
+            "coding" => self.artifacts.coding = Some(path), // Track coding workspace path
             "delivery" => self.artifacts.delivery = Some(path),
             _ => {}
         }
@@ -199,6 +200,7 @@ pub struct Artifacts {
     pub prd: Option<String>,
     pub design: Option<String>,
     pub plan: Option<String>,
+    pub coding: Option<String>,  // Workspace path where code is generated
     pub delivery: Option<String>,
 }
 
@@ -209,6 +211,7 @@ impl Artifacts {
             "prd" => self.prd.as_ref(),
             "design" => self.design.as_ref(),
             "plan" => self.plan.as_ref(),
+            "coding" => self.coding.as_ref(),
             "delivery" => self.delivery.as_ref(),
             _ => None,
         }
@@ -220,6 +223,7 @@ impl Artifacts {
             "prd" => self.prd = Some(path),
             "design" => self.design = Some(path),
             "plan" => self.plan = Some(path),
+            "coding" => self.coding = Some(path),
             "delivery" => self.delivery = Some(path),
             _ => {}
         }

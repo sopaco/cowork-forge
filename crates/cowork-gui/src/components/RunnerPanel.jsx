@@ -67,7 +67,7 @@ const RunnerPanel = ({ iterationId }) => {
       });
       listenersRegistered.current = false;
     };
-  }, [sessionId, maxLogs]);
+  }, [iterationId, maxLogs]);
 
   const startProject = async () => {
     setLoading(true);

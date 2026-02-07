@@ -369,7 +369,11 @@ const CodeEditor = ({ iterationId }) => {
           ) : (
             // Fallback to regular rendering for small file trees
             <div style={{ overflow: 'auto', height: '100%' }}>
-              {flatFileTree.map((node) => renderFileTreeRow({ index: flatFileTree.indexOf(node), style: {} }))}
+              {flatFileTree.map((node, index) => (
+                <div key={node.path || index}>
+                  {renderFileTreeRow({ index, style: {} })}
+                </div>
+              ))}
             </div>
           )}
         </div>
