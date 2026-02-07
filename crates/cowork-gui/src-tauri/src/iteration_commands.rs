@@ -195,7 +195,7 @@ pub async fn gui_execute_iteration(
     let iteration_id_clone = iteration_id.clone();
 
     tokio::spawn(async move {
-        match executor.execute(&mut project, &iteration_id_clone).await {
+        match executor.execute(&mut project, &iteration_id_clone, None).await {
             Ok(_) => {
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);
             }

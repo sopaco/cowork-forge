@@ -196,7 +196,7 @@ async fn cmd_iter(
     println!("🚀 Starting iteration execution...");
     println!();
 
-    match executor.execute(&mut project, &iteration.id).await {
+    match executor.execute(&mut project, &iteration.id, None).await {
         Ok(_) => {
             println!("\n✅ Iteration '{}' completed successfully!", iteration.title);
             println!("   Iteration ID: {}", iteration.id);

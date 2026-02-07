@@ -184,7 +184,13 @@ impl IterationExecutor {
     }
 
     /// Execute an iteration
-    pub async fn execute(&self, project: &mut Project, iteration_id: &str) -> anyhow::Result<()> {
+    /// If resume_stage is provided, it means we're resuming from a paused state
+    pub async fn execute(
+        &self, 
+        project: &mut Project, 
+        iteration_id: &str,
+        resume_stage: Option<String>
+    ) -> anyhow::Result<()> {
         // Load iteration
         let mut iteration = self.iteration_store.load(iteration_id)?;
 
@@ -195,16 +201,17 @@ impl IterationExecutor {
         let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace);
 
         // Determine starting stage
-        // If iteration has a current_stage (e.g., when resuming), use it
+        // If resume_stage is provided (resuming from pause), use it
+        // Otherwise if iteration has a current_stage, use it
         // Otherwise determine based on inheritance mode
-        let start_stage = if let Some(ref current) = iteration.current_stage {
-            if iteration.status == crate::domain::IterationStatus::Paused {
-                // Resume from current stage
-                current.clone()
-            } else {
-                iteration.determine_start_stage()
-            }
+        let start_stage = if let Some(stage) = resume_stage {
+            // Resuming from a paused state - use the provided stage
+            stage
+        } else if let Some(ref current) = iteration.current_stage {
+            // Continue from current stage (for non-resume scenarios)
+            current.clone()
         } else {
+            // Fresh start - determine based on inheritance
             iteration.determine_start_stage()
         };
 
@@ -471,11 +478,14 @@ impl IterationExecutor {
             return Err(anyhow::anyhow!("Iteration is not paused"));
         }
 
+        // Save the stage we're resuming from BEFORE calling resume()
+        let resume_stage = iteration.current_stage.clone();
+
         iteration.resume();
         self.iteration_store.save(&iteration)?;
 
-        // Resume execution from current stage
-        self.execute(project, iteration_id).await
+        // Resume execution from the saved stage
+        self.execute(project, iteration_id, resume_stage).await
     }
 
     /// Copy directory recursively
