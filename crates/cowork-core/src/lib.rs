@@ -1,23 +1,19 @@
 // Cowork Forge - Core Library (Iteration Architecture)
 
-// New domain-driven modules
+// Domain-driven modules
 pub mod domain;
 pub mod persistence;
 
 // Tech stack configuration
 pub mod tech_stack;
 
-// Existing modules (to be gradually refactored)
+// Core modules
 pub mod llm;
 pub mod tools;
 pub mod agents;
 pub mod pipeline;
 pub mod instructions;
 pub mod interaction;
-
-// Legacy modules (will be removed)
-pub mod data;
-pub mod memory;
 
 // Re-exports for convenience
 pub use domain::*;

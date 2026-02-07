@@ -1,6 +1,5 @@
 // GUI-specific data types for enhanced functionality
 use serde::{Deserialize, Serialize};
-use cowork_core::data::{Requirements, FeatureList, DesignSpec, ImplementationPlan};
 
 // ============================================================================
 // Session Artifacts
@@ -10,13 +9,9 @@ use cowork_core::data::{Requirements, FeatureList, DesignSpec, ImplementationPla
 pub struct SessionArtifacts {
     pub session_id: String,
     pub idea: Option<String>,
-    pub requirements: Option<Requirements>,
-    pub features: Option<FeatureList>,
-    pub design: Option<DesignSpec>,
-    pub plan: Option<ImplementationPlan>,
-    // Raw markdown content for display
-    pub design_raw: Option<String>,
-    pub plan_raw: Option<String>,
+    pub requirements: Option<String>,  // Simplified to markdown string
+    pub design: Option<String>,        // Simplified to markdown string
+    pub plan: Option<String>,          // Simplified to markdown string
     pub code_files: Vec<FileInfo>,
     pub check_report: Option<String>,
     pub delivery_report: Option<String>,

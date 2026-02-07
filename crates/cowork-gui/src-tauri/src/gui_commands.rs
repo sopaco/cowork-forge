@@ -5,7 +5,6 @@ use crate::AppState;
 use crate::preview_server::PreviewServerManager;
 use crate::project_runner::ProjectRunner;
 use cowork_core::persistence::IterationStore;
-use cowork_core::data::{Requirements, DesignSpec, ImplementationPlan};
 use tauri::{State, Window};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -114,35 +113,12 @@ pub async fn get_iteration_artifacts(
         vec![]
     };
 
-    // Parse PRD content into structured requirements
-    let requirements = prd.as_ref().and_then(|content| {
-        use chrono::Utc;
-        
-        let parsed_reqs = parse_requirements_from_prd(content);
-        
-        Some(Requirements {
-            schema_version: "1.0".to_string(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            requirements: parsed_reqs,
-        })
-    });
-
-    // Parse design content - return None for now as DesignSpec has complex structure
-    let design: Option<DesignSpec> = None; // TODO: Parse from markdown
-
-    // Parse plan content - return None for now as ImplementationPlan has complex structure
-    let plan: Option<ImplementationPlan> = None; // TODO: Parse from markdown
-
     Ok(SessionArtifacts {
         session_id: iteration_id.clone(),
         idea,
-        requirements,
-        features: None,
-        design,
-        plan,
-        design_raw,
-        plan_raw,
+        requirements: prd,
+        design: design_raw,
+        plan: plan_raw,
         code_files,
         check_report,
         delivery_report,
@@ -1427,182 +1403,4 @@ fn replace_template_variables(content: &str, variables: &serde_json::Value, conf
     }
     
     result
-}
-
-// ============================================================================
-// PRD Parsing Helper Functions
-// ============================================================================
-
-use cowork_core::data::{Requirement, Priority, RequirementCategory};
-
-/// Parse requirements from PRD markdown content
-fn parse_requirements_from_prd(content: &str) -> Vec<Requirement> {
-    let mut requirements = Vec::new();
-    let mut req_id_counter = 1;
-    
-    // Parse functional requirements section
-    if let Some(func_section) = extract_section(content, "Functional Requirements", "Non-Functional") {
-        for line in func_section.lines() {
-            let line = line.trim();
-            if line.starts_with('-') || line.starts_with("*") || 
-               (line.len() > 3 && line.chars().nth(0).map(|c| c.is_numeric()).unwrap_or(false)) {
-                // Extract requirement text
-                let text = line.trim_start_matches(|c: char| !c.is_alphabetic())
-                    .trim_start_matches("-")
-                    .trim_start_matches("*")
-                    .trim_start_matches(|c: char| c.is_numeric() || c == '.' || c == ')')
-                    .trim();
-                
-                if !text.is_empty() {
-                    let (title, description) = if text.contains(':') {
-                        let parts: Vec<&str> = text.splitn(2, ':').collect();
-                        (parts[0].trim().to_string(), parts[1].trim().to_string())
-                    } else if text.len() > 100 {
-                        // Long text - use first sentence as title
-                        let first_sentence = text.split('.').next().unwrap_or(&text);
-                        (first_sentence.to_string() + ".", text.to_string())
-                    } else {
-                        (text.to_string(), String::new())
-                    };
-                    
-                    requirements.push(Requirement {
-                        id: format!("REQ-{:03}", req_id_counter),
-                        title,
-                        description,
-                        priority: Priority::High,
-                        category: RequirementCategory::Functional,
-                        acceptance_criteria: vec![],
-                        related_features: vec![],
-                    });
-                    req_id_counter += 1;
-                }
-            }
-        }
-    }
-    
-    // Parse non-functional requirements section
-    if let Some(non_func_section) = extract_section(content, "Non-Functional Requirements", "UI/UX") {
-        for line in non_func_section.lines() {
-            let line = line.trim();
-            if line.starts_with('-') || line.starts_with("*") || 
-               (line.len() > 3 && line.chars().nth(0).map(|c| c.is_numeric()).unwrap_or(false)) {
-                let text = line.trim_start_matches(|c: char| !c.is_alphabetic())
-                    .trim_start_matches("-")
-                    .trim_start_matches("*")
-                    .trim_start_matches(|c: char| c.is_numeric() || c == '.' || c == ')')
-                    .trim();
-                
-                if !text.is_empty() {
-                    let (title, description) = if text.contains(':') {
-                        let parts: Vec<&str> = text.splitn(2, ':').collect();
-                        (parts[0].trim().to_string(), parts[1].trim().to_string())
-                    } else if text.len() > 100 {
-                        let first_sentence = text.split('.').next().unwrap_or(&text);
-                        (first_sentence.to_string() + ".", text.to_string())
-                    } else {
-                        (text.to_string(), String::new())
-                    };
-                    
-                    requirements.push(Requirement {
-                        id: format!("REQ-{:03}", req_id_counter),
-                        title,
-                        description,
-                        priority: Priority::Medium,
-                        category: RequirementCategory::NonFunctional,
-                        acceptance_criteria: vec![],
-                        related_features: vec![],
-                    });
-                    req_id_counter += 1;
-                }
-            }
-        }
-    }
-    
-    // If no structured requirements found, extract from user stories section
-    if requirements.is_empty() {
-        if let Some(stories_section) = extract_section(content, "User Stories", "Functional") {
-            for line in stories_section.lines() {
-                let line = line.trim();
-                if line.to_lowercase().starts_with("as a") || 
-                   line.to_lowercase().starts_with("- as a") ||
-                   line.to_lowercase().starts_with("* as a") {
-                    let text = line.trim_start_matches("-").trim_start_matches("*").trim();
-                    if !text.is_empty() {
-                        requirements.push(Requirement {
-                            id: format!("REQ-{:03}", req_id_counter),
-                            title: text.chars().take(80).collect::<String>() + "...",
-                            description: text.to_string(),
-                            priority: Priority::High,
-                            category: RequirementCategory::Functional,
-                            acceptance_criteria: vec![],
-                            related_features: vec![],
-                        });
-                        req_id_counter += 1;
-                    }
-                }
-            }
-        }
-    }
-    
-    // If still empty, create a single requirement from PRD summary
-    if requirements.is_empty() {
-        // Extract overview/goals section as a requirement
-        let summary = content.lines()
-            .take(10)
-            .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
-            .take(3)
-            .collect::<Vec<_>>()
-            .join(" ");
-        
-        if !summary.is_empty() {
-            requirements.push(Requirement {
-                id: "REQ-001".to_string(),
-                title: "PRD Requirements".to_string(),
-                description: summary,
-                priority: Priority::High,
-                category: RequirementCategory::Functional,
-                acceptance_criteria: vec![],
-                related_features: vec![],
-            });
-        }
-    }
-    
-    requirements
-}
-
-/// Extract a section from markdown content
-fn extract_section(content: &str, section_start: &str, section_end: &str) -> Option<String> {
-    let lines: Vec<&str> = content.lines().collect();
-    let mut in_section = false;
-    let mut section_lines = Vec::new();
-    
-    for line in &lines {
-        let line_lower = line.to_lowercase();
-        
-        // Check for section start
-        if line_lower.contains(&section_start.to_lowercase()) && 
-           (line.starts_with("#") || line.starts_with("**")) {
-            in_section = true;
-            continue;
-        }
-        
-        // Check for section end
-        if in_section && 
-           (line_lower.contains(&section_end.to_lowercase()) ||
-            line.starts_with("# ") || 
-            line.starts_with("## ")) &&
-           !line_lower.contains(&section_start.to_lowercase()) {
-            break;
-        }
-        
-        if in_section {
-            section_lines.push(*line);
-        }
-    }
-    
-    if section_lines.is_empty() {
-        None
-    } else {
-        Some(section_lines.join("\n"))
-    }
 }

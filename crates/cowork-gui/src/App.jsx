@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { Layout, Menu, Button, Spin, Empty, Modal, message, Tooltip, Badge, Input, Tag } from 'antd';
+import { Layout, Menu, Button, Spin, Empty, Modal, message, Tooltip, Badge, Input, Tag, Space } from 'antd';
 import {
   FolderOutlined,
   FileTextOutlined,
@@ -524,6 +524,144 @@ function App() {
 
       <div style={{ height: '100%', display: activeView === 'memory' ? 'block' : 'none' }}>
         <MemoryPanel key="memory" currentSession={currentIteration?.id} />
+      </div>
+
+      <div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
+        {currentIteration ? (
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '16px' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <h3 style={{ margin: 0 }}>Chat - {currentIteration.title}</h3>
+              <p style={{ margin: '4px 0 0 0', color: '#888', fontSize: '12px' }}>
+                {currentIteration.description}
+              </p>
+            </div>
+            
+            <div 
+              ref={messagesContainerRef}
+              style={{ 
+                flex: 1, 
+                overflow: 'auto', 
+                border: '1px solid #e8e8e8', 
+                borderRadius: '4px',
+                padding: '16px',
+                marginBottom: '16px',
+                backgroundColor: '#fafafa'
+              }}
+            >
+              {messages.length === 0 ? (
+                <div style={{ color: '#888', textAlign: 'center', marginTop: '40px' }}>
+                  {isProcessing ? 'Waiting for agent response...' : 'No messages yet. Start the iteration to begin chatting.'}
+                </div>
+              ) : (
+                messages.map((msg, index) => (
+                  <div key={index} style={{ marginBottom: '16px' }}>
+                    {msg.type === 'user' ? (
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ 
+                          display: 'inline-block', 
+                          backgroundColor: '#1890ff', 
+                          color: '#fff', 
+                          padding: '8px 12px', 
+                          borderRadius: '4px',
+                          maxWidth: '70%',
+                          wordBreak: 'break-word'
+                        }}>
+                          {msg.content}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>
+                          {msg.agentName || 'AI Agent'}
+                        </div>
+                        <div style={{ 
+                          backgroundColor: '#fff', 
+                          padding: '8px 12px', 
+                          borderRadius: '4px',
+                          border: '1px solid #e8e8e8',
+                          maxWidth: '70%',
+                          wordBreak: 'break-word',
+                          whiteSpace: 'pre-wrap'
+                        }}>
+                          {msg.content}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {inputRequest && (
+              <div style={{ 
+                padding: '16px', 
+                backgroundColor: '#fff7e6', 
+                border: '1px solid #ffd591', 
+                borderRadius: '4px',
+                marginBottom: '16px'
+              }}>
+                <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
+                  {inputRequest.isArtifactConfirmation 
+                    ? `Confirm ${inputRequest.artifactType}`
+                    : 'Input Required'}
+                </div>
+                <div style={{ marginBottom: '12px', color: '#666' }}>
+                  {inputRequest.isFeedbackMode ? inputRequest.feedbackPrompt : inputRequest.prompt}
+                </div>
+                {inputRequest.options && !inputRequest.isFeedbackMode && (
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    {inputRequest.options.map((option) => (
+                      <Button 
+                        key={option.id} 
+                        onClick={() => handleSelectOption(option)}
+                        block
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
+                  </Space>
+                )}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Input
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                onPressEnter={handleSendUserMessage}
+                placeholder={inputRequest ? 'Type your response...' : 'Type a message...'}
+                disabled={isProcessing && !inputRequest}
+              />
+              {inputRequest ? (
+                <Button 
+                  onClick={handleSubmitFeedback} 
+                  type="primary"
+                  disabled={!userInput.trim()}
+                >
+                  Send Feedback
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleSendUserMessage} 
+                  type="primary"
+                  disabled={!userInput.trim()}
+                >
+                  Send
+                </Button>
+              )}
+              {inputRequest && inputRequest.isFeedbackMode && (
+                <Button onClick={handleCancelFeedback}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <Empty 
+            description="Select an iteration to view chat" 
+            style={{ marginTop: '40px' }} 
+          />
+        )}
       </div>
     </div>
   );

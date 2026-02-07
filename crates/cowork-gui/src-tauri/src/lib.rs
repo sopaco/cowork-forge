@@ -561,6 +561,7 @@ pub fn run() {
             iteration_commands::gui_retry_iteration,
             iteration_commands::gui_delete_iteration,
             // GUI-specific commands (V2 API - Iteration based)
+            gui_commands::open_in_file_manager,
             gui_commands::get_iteration_artifacts,
             gui_commands::read_iteration_file,
             gui_commands::save_iteration_file,
