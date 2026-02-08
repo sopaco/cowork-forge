@@ -26,15 +26,15 @@ impl PreviewServerManager {
         }
     }
 
-    pub async fn start(&self, session_id: String, base_dir: PathBuf) -> Result<PreviewInfo, String> {
+    pub async fn start(&self, iteration_id: String, base_dir: PathBuf) -> Result<PreviewInfo, String> {
         // Stop existing server if any
-        if let Ok(()) = self.stop(session_id.clone()).await {
-            println!("[Preview] Stopped existing server for session: {}", session_id);
+        if let Ok(()) = self.stop(iteration_id.clone()).await {
+            println!("[Preview] Stopped existing server for iteration: {}", iteration_id);
         }
 
         let port = self.find_available_port()?;
         let base_dir_clone = base_dir.clone();
-        let session_id_clone = session_id.clone();
+        let iteration_id_clone = iteration_id.clone();
 
         // Create running flag
         let running = Arc::new(Mutex::new(true));
@@ -42,7 +42,7 @@ impl PreviewServerManager {
         let running_clone = running.clone();
 
         let handle = thread::spawn(move || {
-            println!("[Preview] Starting server on port {} for session: {}", port, session_id_clone);
+            println!("[Preview] Starting server on port {} for iteration: {}", port, iteration_id_clone);
             
             match Server::http(format!("0.0.0.0:{}", port)) {
                 Ok(server) => {
@@ -54,7 +54,7 @@ impl PreviewServerManager {
                             break;
                         }
 
-                        let response = Self::handle_request(&request, &base_dir_clone, &session_id_clone);
+                        let response = Self::handle_request(&request, &base_dir_clone);
                         let _ = request.respond(response);
                     }
                 }
@@ -63,12 +63,12 @@ impl PreviewServerManager {
                 }
             }
             
-            println!("[Preview] Server stopped for session: {}", session_id_clone);
+            println!("[Preview] Server stopped for iteration: {}", iteration_id_clone);
         });
 
         let base_dir_clone2 = base_dir.clone();
         let mut servers = self.servers.lock().unwrap();
-        servers.insert(session_id.clone(), PreviewServer {
+        servers.insert(iteration_id.clone(), PreviewServer {
             port,
             base_dir,
             handle: Some(handle),
@@ -85,10 +85,10 @@ impl PreviewServerManager {
         })
     }
     
-    /// Check if a server is currently running for a session
-    pub fn is_running(&self, session_id: &str) -> bool {
+    /// Check if a server is currently running for an iteration
+    pub fn is_running(&self, iteration_id: &str) -> bool {
         let servers = self.servers.lock().unwrap();
-        if let Some(server) = servers.get(session_id) {
+        if let Some(server) = servers.get(iteration_id) {
             *server.running.lock().unwrap()
         } else {
             false
@@ -96,9 +96,9 @@ impl PreviewServerManager {
     }
     
     /// Get preview info for a running server
-    pub fn get_info(&self, session_id: &str) -> Option<PreviewInfo> {
+    pub fn get_info(&self, iteration_id: &str) -> Option<PreviewInfo> {
         let servers = self.servers.lock().unwrap();
-        if let Some(server) = servers.get(session_id) {
+        if let Some(server) = servers.get(iteration_id) {
             let is_running = *server.running.lock().unwrap();
             Some(PreviewInfo {
                 url: format!("http://localhost:{}", server.port),
@@ -111,11 +111,11 @@ impl PreviewServerManager {
         }
     }
 
-    pub async fn stop(&self, session_id: String) -> Result<(), String> {
+    pub async fn stop(&self, iteration_id: String) -> Result<(), String> {
         let mut servers = self.servers.lock().unwrap();
         
-        if let Some(mut server) = servers.remove(&session_id) {
-            println!("[Preview] Stopping server for session: {}", session_id);
+        if let Some(mut server) = servers.remove(&iteration_id) {
+            println!("[Preview] Stopping server for iteration: {}", iteration_id);
             
             // Signal the server to stop
             *server.running.lock().unwrap() = false;
@@ -132,7 +132,7 @@ impl PreviewServerManager {
             
             Ok(())
         } else {
-            Err(format!("No running server for session: {}", session_id))
+            Err(format!("No running server for iteration: {}", iteration_id))
         }
     }
 
@@ -171,7 +171,7 @@ impl PreviewServerManager {
         ProjectType::Unknown
     }
 
-    fn handle_request(request: &Request, base_dir: &Path, _session_id: &str) -> Response<std::io::Cursor<Vec<u8>>> {
+    fn handle_request(request: &Request, base_dir: &Path) -> Response<std::io::Cursor<Vec<u8>>> {
         let url = request.url();
         let path_str = url.trim_start_matches('/');
         let path = if path_str.is_empty() || path_str == "/" {

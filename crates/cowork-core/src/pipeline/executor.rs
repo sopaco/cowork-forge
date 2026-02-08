@@ -161,7 +161,7 @@ impl IterationExecutor {
             let dest_path = dst.join(file_name);
 
             if path.is_dir() {
-                // Skip node_modules, target, .git, etc.
+                // Skip cowork directories and common build directories
                 let dir_name = file_name.to_string_lossy();
                 if matches!(dir_name.as_ref(), "node_modules" | "target" | ".git" | "dist" | "build" | ".cowork" | ".cowork-v2") {
                     continue;
@@ -222,6 +222,12 @@ impl IterationExecutor {
         iteration.start();
         self.iteration_store.save(&iteration)?;
         self.project_store.set_current_iteration(project, iteration_id.to_string())?;
+
+        // Ensure iteration memory exists (V2 architecture)
+        let memory_store = crate::persistence::MemoryStore::new();
+        if let Err(e) = memory_store.ensure_iteration_memory(iteration_id) {
+            println!("[Executor] Warning: Failed to create iteration memory: {}", e);
+        }
 
         println!("[Executor] Iteration '{}' started, will execute {} stages starting from '{}'", 
             iteration.title, stages.len(), start_stage);
@@ -557,6 +563,25 @@ impl IterationExecutor {
         // Complete iteration
         iteration.complete();
         self.iteration_store.save(&iteration)?;
+
+        // Promote insights to decisions (V2 architecture - memory elevation)
+        let memory_store = crate::persistence::MemoryStore::new();
+        match memory_store.promote_insights_to_decisions(iteration_id) {
+            Ok(count) => {
+                if count > 0 {
+                    println!("[Executor] Promoted {} insights to project decisions", count);
+                    self.interaction
+                        .show_message(
+                            crate::interaction::MessageLevel::Info,
+                            format!("Promoted {} insights to project memory", count),
+                        )
+                        .await;
+                }
+            }
+            Err(e) => {
+                println!("[Executor] Warning: Failed to promote insights: {}", e);
+            }
+        }
 
         // Update project
         project.current_iteration_id = Some(iteration_id.to_string());

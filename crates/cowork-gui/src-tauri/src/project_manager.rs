@@ -59,8 +59,8 @@ pub enum ProjectStatus {
 /// Project Metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectMetadata {
-    pub session_count: usize,
-    pub last_session_id: Option<String>,
+    pub iteration_count: usize,
+    pub last_iteration_id: Option<String>,
     pub technology_stack: Vec<String>,
     pub project_type: String,
 }
@@ -68,8 +68,8 @@ pub struct ProjectMetadata {
 impl Default for ProjectMetadata {
     fn default() -> Self {
         Self {
-            session_count: 0,
-            last_session_id: None,
+            iteration_count: 0,
+            last_iteration_id: None,
             technology_stack: Vec::new(),
             project_type: "unknown".to_string(),
         }
@@ -117,25 +117,71 @@ impl ProjectRegistryManager {
         })
     }
     
-    /// Load registry from file
-    fn load_registry_from_file(path: &Path) -> Result<ProjectRegistry> {
-        let content = fs::read_to_string(path)
-            .context("Failed to read registry file")?;
-        
-        let registry: ProjectRegistry = serde_json::from_str(&content)
-            .context("Failed to parse registry file")?;
-        
-        // Validate schema version
-        if registry.schema_version != SCHEMA_VERSION {
-            tracing::warn!(
-                "Registry schema version mismatch: expected {}, got {}",
-                SCHEMA_VERSION,
-                registry.schema_version
-            );
+/// Load registry from file
+fn load_registry_from_file(path: &Path) -> Result<ProjectRegistry> {
+    let content = fs::read_to_string(path)
+        .context("Failed to read registry file")?;
+    
+    // Try to parse with new schema first
+    let registry: ProjectRegistry = match serde_json::from_str(&content) {
+        Ok(r) => r,
+        Err(_) => {
+            // If parsing fails, try to migrate from old schema
+            // This handles the case where session_count was renamed to iteration_count
+            let mut json: serde_json::Value = serde_json::from_str(&content)
+                .context("Failed to parse registry as JSON")?;
+            
+            // Migrate each project's metadata
+            if let Some(projects) = json.get("projects").and_then(|p| p.as_array()) {
+                let mut migrated_projects = Vec::new();
+                for project in projects {
+                    let mut project = project.clone();
+                    
+                    // Migrate metadata if it exists
+                    if let Some(metadata) = project.get_mut("metadata") {
+                        if metadata.is_object() {
+                            let obj = metadata.as_object_mut().unwrap();
+                            
+                            // Rename session_count to iteration_count
+                            if let Some(session_count) = obj.remove("session_count") {
+                                obj.insert("iteration_count".to_string(), session_count);
+                            }
+                            
+                            // Rename last_session_id to last_iteration_id
+                            if let Some(last_session_id) = obj.remove("last_session_id") {
+                                obj.insert("last_iteration_id".to_string(), last_session_id);
+                            }
+                        }
+                    }
+                    
+                    migrated_projects.push(project);
+                }
+                
+                // Update JSON with migrated projects
+                if let Some(ref mut projects_json) = json.as_object_mut() {
+                    projects_json.insert("projects".to_string(), serde_json::Value::Array(migrated_projects));
+                }
+                
+                // Parse migrated JSON
+                serde_json::from_value(json)
+                    .context("Failed to parse migrated registry")?
+            } else {
+                anyhow::bail!("Failed to parse registry: no projects found")
+            }
         }
-        
-        Ok(registry)
+    };
+    
+    // Validate schema version
+    if registry.schema_version != SCHEMA_VERSION {
+        anyhow::bail!(
+            "Registry schema version mismatch: expected {}, got {}",
+            SCHEMA_VERSION,
+            registry.schema_version
+        );
     }
+    
+    Ok(registry)
+}
     
     /// Save registry to file
     fn save_registry_to_file(&self) -> Result<()> {
@@ -384,8 +430,9 @@ fn get_registry_path() -> Result<PathBuf> {
 
 /// Check if a directory is a Cowork project
 fn is_cowork_project(path: &Path) -> Result<bool> {
-    let cowork_dir = path.join(".cowork");
-    Ok(cowork_dir.exists() && cowork_dir.is_dir())
+    // Only check for V2 architecture (.cowork-v2)
+    let cowork_v2_dir = path.join(".cowork-v2");
+    Ok(cowork_v2_dir.exists() && cowork_v2_dir.is_dir())
 }
 
 /// Detect project metadata from workspace
@@ -398,18 +445,18 @@ fn detect_project_metadata(workspace: &Path) -> Result<ProjectMetadata> {
     // Detect technology stack
     metadata.technology_stack = detect_technology_stack(workspace);
     
-    // Count sessions
-    let sessions_dir = workspace.join(".cowork").join("sessions");
-    if sessions_dir.exists() {
-        metadata.session_count = fs::read_dir(sessions_dir)
+    // Count iterations (V2 architecture)
+    let iterations_dir = workspace.join(".cowork-v2").join("iterations");
+    if iterations_dir.exists() {
+        metadata.iteration_count = fs::read_dir(&iterations_dir)
             .map(|entries| entries.filter_map(Result::ok).count())
             .unwrap_or(0);
         
-        // Find last session ID
-        if let Ok(entries) = fs::read_dir(&workspace.join(".cowork").join("sessions")) {
+        // Find last iteration ID
+        if let Ok(entries) = fs::read_dir(&iterations_dir) {
             if let Some(Ok(last_entry)) = entries.last() {
                 if let Some(name) = last_entry.file_name().to_str() {
-                    metadata.last_session_id = Some(name.to_string());
+                    metadata.last_iteration_id = Some(name.to_string());
                 }
             }
         }
@@ -511,8 +558,8 @@ mod tests {
     #[test]
     fn test_project_metadata_default() {
         let metadata = ProjectMetadata::default();
-        assert_eq!(metadata.session_count, 0);
-        assert!(metadata.last_session_id.is_none());
+        assert_eq!(metadata.iteration_count, 0);
+        assert!(metadata.last_iteration_id.is_none());
         assert!(metadata.technology_stack.is_empty());
     }
 }

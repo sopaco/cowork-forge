@@ -11,7 +11,7 @@ pub use project_store::*;
 
 const COWORK_DIR: &str = ".cowork-v2";
 
-/// Get the .cowork directory path
+/// Get the .cowork-v2 directory path
 pub fn get_cowork_dir() -> anyhow::Result<PathBuf> {
     let path = PathBuf::from(COWORK_DIR);
     std::fs::create_dir_all(&path)?;

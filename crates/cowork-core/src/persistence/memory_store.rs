@@ -75,6 +75,32 @@ impl MemoryStore {
         Ok(memory)
     }
 
+    /// Promote insights to decisions (P1 - memory elevation)
+    pub fn promote_insights_to_decisions(&self, iteration_id: &str) -> anyhow::Result<usize> {
+        let iteration_memory = self.load_iteration_memory(iteration_id)?;
+        let mut project_memory = self.load_project_memory()?;
+        
+        let mut promoted_count = 0;
+        
+        // Promote critical insights to decisions
+        for insight in &iteration_memory.insights {
+            if insight.importance == crate::domain::Importance::Critical {
+                let decision = crate::domain::Decision::new(
+                    format!("Decision from iteration stage: {}", insight.stage),
+                    insight.content.clone(),
+                    format!("Critical insight: {}", insight.content),
+                    iteration_id
+                );
+                
+                project_memory.add_decision(decision);
+                promoted_count += 1;
+            }
+        }
+        
+        self.save_project_memory(&project_memory)?;
+        Ok(promoted_count)
+    }
+
     // Query
 
     /// Query memory based on scope and type

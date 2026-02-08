@@ -1,4 +1,5 @@
-// File operation tools with SECURITY constraints
+// File operation tools with workspace support
+
 use adk_core::{Tool, ToolContext};
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -7,22 +8,26 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
+use super::get_required_string_param;
+use crate::persistence::IterationStore;
+use crate::storage::get_iteration_id;
+
 // ============================================================================
 // Security Helper - Path Validation
 // ============================================================================
 
-/// Validate that a path is safe to access
+/// Validate that a path is safe to access within a workspace
 /// Rules:
 /// 1. Must be relative path (no absolute paths like /tmp, C:\)
-/// 2. Must not escape current directory (no ..)
-/// 3. Must be within current working directory or .cowork
-fn validate_path_security(path: &str) -> Result<PathBuf, String> {
+/// 2. Must not escape workspace directory (no ..)
+/// 3. Must be within the provided workspace directory
+fn validate_path_security_within_workspace(path: &str, workspace_dir: &Path) -> Result<PathBuf, String> {
     let path_obj = Path::new(path);
     
     // Rule 1: Reject absolute paths
     if path_obj.is_absolute() {
         return Err(format!(
-            "Security: Absolute paths are not allowed. Path '{}' must be relative to current directory.",
+            "Security: Absolute paths are not allowed. Path '{}' must be relative to workspace. Use relative paths like 'src/index.html' or 'components/Button.jsx'.",
             path
         ));
     }
@@ -30,21 +35,18 @@ fn validate_path_security(path: &str) -> Result<PathBuf, String> {
     // Rule 2: Reject parent directory access (..)
     if path.contains("..") {
         return Err(format!(
-            "Security: Parent directory access (..) is not allowed. Path: '{}'",
+            "Security: Parent directory access (..) is not allowed. Path: '{}'. Files must be within the iteration workspace directory.",
             path
         ));
     }
     
-    // Rule 3: Canonicalize and verify it's within current directory
-    let current_dir = std::env::current_dir()
-        .map_err(|e| format!("Failed to get current directory: {}", e))?;
-    
-    let full_path = current_dir.join(path);
+    // Rule 3: Construct full path and verify it's within workspace
+    let full_path = workspace_dir.join(path);
     
     // Canonicalize both paths for reliable comparison
     // On Windows, canonicalize() returns \\?\ prefix paths
-    let normalized_current_dir = current_dir.canonicalize()
-        .map_err(|e| format!("Failed to canonicalize current directory: {}", e))?;
+    let normalized_workspace_dir = workspace_dir.canonicalize()
+        .map_err(|e| format!("Failed to canonicalize workspace directory: {}", e))?;
     
     let canonical_path = if full_path.exists() {
         full_path.canonicalize()
@@ -65,14 +67,14 @@ fn validate_path_security(path: &str) -> Result<PathBuf, String> {
         }
     };
     
-    // Verify the path is within current directory
+    // Verify the path is within workspace directory
     // Use normalized paths for comparison to handle Windows UNC path prefixes
-    if !canonical_path.starts_with(&normalized_current_dir) {
+    if !canonical_path.starts_with(&normalized_workspace_dir) {
         return Err(format!(
-            "Security: Path escapes current directory. Path '{}' resolves to '{}', expected to be within '{}'",
+            "Security: Path escapes workspace directory. Path '{}' resolves to '{}', expected to be within workspace: '{}'",
             path,
             canonical_path.display(),
-            normalized_current_dir.display()
+            normalized_workspace_dir.display()
         ));
     }
     
@@ -122,8 +124,20 @@ impl Tool for ListFilesTool {
             .and_then(|v| v.as_str())
             .unwrap_or(".");
         
-        // Security check
-        let safe_path = match validate_path_security(path) {
+        // Get iteration workspace path
+        let iteration_id = get_iteration_id()
+            .ok_or_else(|| adk_core::AdkError::Tool("Iteration ID not set. Cannot list files without an active iteration.".to_string()))?;
+        
+        let iteration_store = IterationStore::new();
+        let workspace_dir = iteration_store.workspace_path(&iteration_id)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e)))?;
+        
+        // Ensure workspace exists
+        fs::create_dir_all(&workspace_dir)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to create workspace: {}", e)))?;
+        
+        // Security check - ensure path doesn't escape workspace
+        let safe_path = match validate_path_security_within_workspace(path, &workspace_dir) {
             Ok(p) => p,
             Err(e) => {
                 return Ok(json!({
@@ -133,6 +147,9 @@ impl Tool for ListFilesTool {
             }
         };
         
+        // Construct full path in workspace
+        let full_path = workspace_dir.join(&safe_path);
+        
         let recursive = args.get("recursive")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
@@ -141,10 +158,10 @@ impl Tool for ListFilesTool {
             .and_then(|v| v.as_u64())
             .unwrap_or(3) as usize;
 
-        if !safe_path.exists() {
+        if !full_path.exists() {
             return Ok(json!({
                 "status": "error",
-                "message": format!("Path not found: {}", path)
+                "message": format!("Path not found: {} (in workspace: {})", path, iteration_id)
             }));
         }
 
@@ -153,10 +170,7 @@ impl Tool for ListFilesTool {
 
         if recursive {
             // Recursive listing with max depth
-            let cwd = std::env::current_dir()
-                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get current dir: {}", e)))?;
-
-            for entry in WalkDir::new(&safe_path)
+            for entry in WalkDir::new(&full_path)
                 .max_depth(max_depth)
                 .follow_links(false)
                 .into_iter()
@@ -171,8 +185,8 @@ impl Tool for ListFilesTool {
                 })
                 .filter_map(|e| e.ok())
             {
-                // Convert to relative path for stable ignore matching
-                let rel = entry.path().strip_prefix(&cwd).unwrap_or(entry.path());
+                // Convert to relative path (relative to workspace)
+                let rel = entry.path().strip_prefix(&workspace_dir).unwrap_or(entry.path());
                 let rel_str = rel.to_string_lossy();
                 let path_str = format!("./{}", rel_str.trim_start_matches("./"));
 
@@ -189,10 +203,7 @@ impl Tool for ListFilesTool {
             }
         } else {
             // Non-recursive listing
-            let cwd = std::env::current_dir()
-                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get current dir: {}", e)))?;
-
-            let entries = fs::read_dir(&safe_path)
+            let entries = fs::read_dir(&full_path)
                 .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read directory: {}", e)))?;
 
             for entry in entries {
@@ -206,7 +217,7 @@ impl Tool for ListFilesTool {
                 }
 
                 let full = entry.path().to_path_buf();
-                let rel = full.strip_prefix(&cwd).unwrap_or(&full);
+                let rel = full.strip_prefix(&workspace_dir).unwrap_or(&full);
                 let rel_str = rel.to_string_lossy();
                 let path_str = format!("./{}", rel_str.trim_start_matches("./"));
 
@@ -228,7 +239,8 @@ impl Tool for ListFilesTool {
             "files": files,
             "directories": directories,
             "total_files": files.len(),
-            "total_directories": directories.len()
+            "total_directories": directories.len(),
+            "workspace": workspace_dir.to_string_lossy().to_string()
         }))
     }
 }
@@ -246,11 +258,12 @@ fn should_ignore(path: &str) -> bool {
 
     // 2) Common ignore patterns
     let ignore_patterns = [
-        "./.git", "./target", "./node_modules", "./.cowork", "./.litho",
+        "./.git", "./target", "./node_modules", "./.litho",
         "./.idea", "./.vscode", "./dist", "./build", "./docs", "./tests",
         "__tests__", "./.archived",
         ".DS_Store", "Thumbs.db",
     ];
+    // Note: .cowork-v2 is NOT ignored - it's the V2 architecture directory structure
 
     ignore_patterns.iter().any(|pattern| path.contains(pattern))
 }
@@ -285,11 +298,19 @@ impl Tool for ReadFileTool {
         }))
     }
 
-    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let path = args["path"].as_str().unwrap();
+async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let path = get_required_string_param(&args, "path")?;
 
-        // Security check
-        let safe_path = match validate_path_security(path) {
+        // Get iteration workspace path
+        let iteration_id = get_iteration_id()
+            .ok_or_else(|| adk_core::AdkError::Tool("Iteration ID not set. Cannot read files without an active iteration.".to_string()))?;
+        
+        let iteration_store = IterationStore::new();
+        let workspace_dir = iteration_store.workspace_path(&iteration_id)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e)))?;
+
+        // Security check - ensure path is within workspace
+        let safe_path = match validate_path_security_within_workspace(path, &workspace_dir) {
             Ok(p) => p,
             Err(e) => {
                 return Ok(json!({
@@ -299,18 +320,23 @@ impl Tool for ReadFileTool {
             }
         };
 
-        if !safe_path.exists() {
+        // Construct full path in workspace
+        let full_path = workspace_dir.join(&safe_path);
+
+        if !full_path.exists() {
             return Ok(json!({
                 "status": "error",
-                "message": format!("File not found: {}", path)
+                "message": format!("File not found: {} (in workspace: {})", path, iteration_id)
             }));
         }
         
-        match fs::read_to_string(&safe_path) {
+        match fs::read_to_string(&full_path) {
             Ok(content) => Ok(json!({
                 "status": "success",
                 "path": path,
-                "content": content
+                "workspace_path": full_path.to_string_lossy().to_string(),
+                "content": content,
+                "workspace": workspace_dir.to_string_lossy().to_string()
             })),
             Err(e) => Ok(json!({
                 "status": "error",
@@ -355,11 +381,23 @@ impl Tool for WriteFileTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let path = args["path"].as_str().unwrap();
-        let content = args["content"].as_str().unwrap();
+        let path = get_required_string_param(&args, "path")?;
+        let content = get_required_string_param(&args, "content")?;
 
-        // Security check
-        let safe_path = match validate_path_security(path) {
+        // Get iteration workspace path
+        let iteration_id = get_iteration_id()
+            .ok_or_else(|| adk_core::AdkError::Tool("Iteration ID not set. Cannot write files without an active iteration.".to_string()))?;
+        
+        let iteration_store = IterationStore::new();
+        let workspace_dir = iteration_store.workspace_path(&iteration_id)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e)))?;
+        
+        // Ensure workspace exists
+        fs::create_dir_all(&workspace_dir)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to create workspace: {}", e)))?;
+
+        // Security check - ensure path is within workspace
+        let safe_path = match validate_path_security_within_workspace(path, &workspace_dir) {
             Ok(p) => p,
             Err(e) => {
                 return Ok(json!({
@@ -369,19 +407,24 @@ impl Tool for WriteFileTool {
             }
         };
 
+        // Construct full path in workspace
+        let full_path = workspace_dir.join(&safe_path);
+
         // Create parent directories if needed
-        if let Some(parent) = safe_path.parent() {
+        if let Some(parent) = full_path.parent() {
             fs::create_dir_all(parent).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
         }
 
-        match fs::write(&safe_path, content) {
+        match fs::write(&full_path, content) {
             Ok(_) => {
                 // Log file creation for user visibility
-                println!("📝 Writing file: {} ({} lines)", path, content.lines().count());
+                println!("📝 Writing file: {} ({} lines) [iteration: {}]", path, content.lines().count(), iteration_id);
                 Ok(json!({
                     "status": "success",
                     "path": path,
-                    "lines_written": content.lines().count()
+                    "workspace_path": full_path.to_string_lossy().to_string(),
+                    "lines_written": content.lines().count(),
+                    "workspace": workspace_dir.to_string_lossy().to_string()
                 }))
             },
             Err(e) => Ok(json!({
@@ -450,7 +493,7 @@ impl Tool for RunCommandTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let command = args["command"].as_str().unwrap();
+        let command = get_required_string_param(&args, "command")?;
 
         // Check if command would block
         if is_blocking_service_command(command) {
@@ -465,13 +508,21 @@ impl Tool for RunCommandTool {
             }));
         }
 
-        // Execute command with timeout
+        // Get iteration workspace path
+        let iteration_id = get_iteration_id()
+            .ok_or_else(|| adk_core::AdkError::Tool("Iteration ID not set. Cannot run command without an active iteration.".to_string()))?;
+        
+        let iteration_store = IterationStore::new();
+        let workspace_dir = iteration_store.workspace_path(&iteration_id)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e)))?;
+
+        // Execute command with timeout in workspace directory
         let output = tokio::time::timeout(
             std::time::Duration::from_secs(30),
             tokio::process::Command::new("sh")
                 .arg("-c")
                 .arg(command)
-                .current_dir(std::env::current_dir().unwrap()) // Run in current dir
+                .current_dir(&workspace_dir) // Run in workspace
                 .output()
         )
         .await;
@@ -485,7 +536,8 @@ impl Tool for RunCommandTool {
                     "status": if output.status.success() { "success" } else { "failed" },
                     "exit_code": output.status.code(),
                     "stdout": stdout,
-                    "stderr": stderr
+                    "stderr": stderr,
+                    "workspace": workspace_dir.to_string_lossy().to_string()
                 }))
             }
             Ok(Err(e)) => {

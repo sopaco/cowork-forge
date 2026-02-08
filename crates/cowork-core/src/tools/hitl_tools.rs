@@ -5,6 +5,7 @@ use dialoguer::{Confirm, Editor, Input};
 use serde_json::{json, Value};
 use std::fs;
 use std::sync::Arc;
+use super::get_required_string_param;
 
 /// ReviewAndEditFileTool - Original HITL tool (used in Idea stage)
 pub struct ReviewAndEditFileTool;
@@ -39,8 +40,8 @@ impl Tool for ReviewAndEditFileTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let file_path = args["file_path"].as_str().unwrap();
-        let title = args["title"].as_str().unwrap();
+        let file_path = get_required_string_param(&args, "file_path")?;
+        let title = get_required_string_param(&args, "title")?;
 
         // Read current file content
         let content = fs::read_to_string(file_path)
@@ -144,8 +145,8 @@ impl Tool for ReviewWithFeedbackTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let file_path = args["path"].as_str().unwrap();
-        let title = args["title"].as_str().unwrap();
+        let file_path = get_required_string_param(&args, "path")?;
+        let title = get_required_string_param(&args, "title")?;
         let default_prompt = "输入 'edit' 编辑，'pass' 继续，或直接输入修改建议";
         let prompt = args["prompt"].as_str().unwrap_or(default_prompt);
 

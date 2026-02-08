@@ -8,9 +8,11 @@ use crate::interaction::InteractiveBackend;
 
 pub mod executor;
 pub mod stages;
+pub mod stage_executor;
 
 pub use executor::*;
 pub use stages::*;
+pub use stage_executor::*;
 
 /// Stage execution result
 #[derive(Debug)]

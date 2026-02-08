@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -6,15 +6,20 @@ import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import JsonView from 'react-json-view';
 import { Tabs, Spin, Alert, Empty, Button, Space, Tooltip, message } from 'antd';
-import { FileTextOutlined, ProjectOutlined, DatabaseOutlined, BuildOutlined, CheckCircleOutlined, FileMarkdownOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { FileTextOutlined, ProjectOutlined, DatabaseOutlined, BuildOutlined, CheckCircleOutlined, FileMarkdownOutlined, FolderOpenOutlined, ReloadOutlined } from '@ant-design/icons';
 import 'highlight.js/styles/atom-one-dark.css';
 
-const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChange }) => {
+const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChange, refreshTrigger }) => {
   const [artifacts, setArtifacts] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('idea');
   const [viewModes, setViewModes] = useState({});
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const isVisibleRef = useRef(true);
+  const pollingIntervalRef = useRef(null);
+  const lastLoadTimeRef = useRef(0);
+  const prevRefreshTriggerRef = useRef(0);
 
   // Sync with external active tab when provided
   useEffect(() => {
@@ -23,13 +28,61 @@ const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChang
     }
   }, [externalActiveTab]);
 
+  // Load artifacts when iterationId changes
   useEffect(() => {
     if (iterationId) {
       loadArtifacts();
     }
   }, [iterationId]);
 
+  // Track visibility and set up polling
+  useEffect(() => {
+    isVisibleRef.current = true;
+
+    // Load artifacts when component becomes visible
+    if (iterationId) {
+      loadArtifacts();
+
+      // Set up polling to refresh artifacts periodically
+      if (autoRefresh) {
+        pollingIntervalRef.current = setInterval(() => {
+          if (isVisibleRef.current && iterationId) {
+            const now = Date.now();
+            // Only refresh if at least 3 seconds have passed since last load
+            if (now - lastLoadTimeRef.current > 3000) {
+              loadArtifacts();
+            }
+          }
+        }, 5000); // Check every 5 seconds
+      }
+    }
+
+    return () => {
+      isVisibleRef.current = false;
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [iterationId, autoRefresh]);
+
+  // Listen for refresh trigger changes (immediate refresh)
+  useEffect(() => {
+    if (refreshTrigger !== undefined && refreshTrigger !== prevRefreshTriggerRef.current) {
+      prevRefreshTriggerRef.current = refreshTrigger;
+      console.log('[ArtifactsViewer] Refresh trigger changed, reloading artifacts...');
+      loadArtifacts();
+    }
+  }, [refreshTrigger]);
+
   const loadArtifacts = async () => {
+    // Prevent duplicate requests within 1 second
+    const now = Date.now();
+    if (now - lastLoadTimeRef.current < 1000) {
+      return;
+    }
+    lastLoadTimeRef.current = now;
+
     setLoading(true);
     setError(null);
     try {
@@ -469,7 +522,40 @@ const ArtifactsViewer = ({ iterationId, activeTab: externalActiveTab, onTabChang
   };
 
   return (
-    <div className="artifacts-viewer" style={{ height: '100%' }}>
+    <div className="artifacts-viewer" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Header with refresh controls */}
+      <div style={{ 
+        padding: '10px 20px', 
+        borderBottom: '1px solid #e8e8e8', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        background: '#fafafa',
+        flexShrink: 0
+      }}>
+        <span style={{ fontWeight: 'bold', color: '#333' }}>
+          Artifacts
+        </span>
+        <Space>
+          <Tooltip title={autoRefresh ? "Auto-refresh is ON" : "Auto-refresh is OFF"}>
+            <Button
+              size="small"
+              type={autoRefresh ? "primary" : "default"}
+              onClick={() => setAutoRefresh(!autoRefresh)}
+            >
+              Auto-refresh
+            </Button>
+          </Tooltip>
+          <Button
+            size="small"
+            icon={<ReloadOutlined />}
+            onClick={loadArtifacts}
+            loading={loading}
+          >
+            Refresh
+          </Button>
+        </Space>
+      </div>
       <Tabs
         activeKey={activeTab}
         onChange={handleTabChange}

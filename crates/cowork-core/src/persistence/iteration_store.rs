@@ -74,14 +74,14 @@ impl IterationStore {
         Ok(iterations.into_iter().map(|i| i.to_summary()).collect())
     }
 
-    /// Get workspace path for iteration
-    pub fn workspace_path(&self, _iteration_id: &str) -> anyhow::Result<PathBuf> {
-        Ok(get_cowork_dir()?.join("workspace"))
+    /// Get workspace path for iteration (V2 architecture: iteration-specific workspace)
+    pub fn workspace_path(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
+        Ok(get_cowork_dir()?.join("iterations").join(iteration_id).join("workspace"))
     }
 
-    /// Ensure workspace exists
-    pub fn ensure_workspace(&self, _iteration_id: &str) -> anyhow::Result<PathBuf> {
-        let workspace = get_cowork_dir()?.join("workspace");
+    /// Ensure workspace exists for iteration (V2 architecture: iteration-specific workspace)
+    pub fn ensure_workspace(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
+        let workspace = self.workspace_path(iteration_id)?;
         std::fs::create_dir_all(&workspace)?;
         Ok(workspace)
     }

@@ -28,23 +28,23 @@ impl ProjectRunner {
         *app_handle_guard = Some(handle);
     }
 
-    pub fn is_running(&self, session_id: &str) -> bool {
+    pub fn is_running(&self, iteration_id: &str) -> bool {
         let processes = self.processes.lock().unwrap();
-        processes.contains_key(session_id)
+        processes.contains_key(iteration_id)
     }
 
-    pub async fn start(&self, session_id: String, command: String) -> Result<u32, String> {
+    pub async fn start(&self, iteration_id: String, command: String) -> Result<u32, String> {
         // Stop existing process if any
-        if let Ok(()) = self.stop(session_id.clone()).await {
-            println!("[Runner] Stopped existing process for session: {}", session_id);
+        if let Ok(()) = self.stop(iteration_id.clone()).await {
+            println!("[Runner] Stopped existing process for iteration: {}", iteration_id);
         }
 
-        // Get session directory
-        let code_dir = format!(".cowork/sessions/{}/code", session_id);
+        // Get iteration workspace directory (V2 architecture)
+        let code_dir = format!(".cowork-v2/iterations/{}/workspace", iteration_id);
         let code_path = std::path::Path::new(&code_dir);
 
         if !code_path.exists() {
-            return Err(format!("Code directory not found: {}", code_dir));
+            return Err(format!("Workspace directory not found: {}", code_dir));
         }
 
         println!("[Runner] Starting command: {}", command);
@@ -62,7 +62,7 @@ impl ProjectRunner {
 
         // Get app handle for event emission
         let app_handle_opt = self.app_handle.lock().unwrap().clone();
-        let session_id_clone = session_id.clone();
+        let iteration_id_clone = iteration_id.clone();
 
         // Create channels for output
         let (stdout_tx, _stdout_rx) = mpsc::unbounded_channel();
@@ -76,9 +76,9 @@ impl ProjectRunner {
         let stdout_tx_spawn = stdout_tx.clone();
         let stderr_tx_spawn = stderr_tx.clone();
         
-        // Clone app_handle and session_id for stdout task
+        // Clone app_handle and iteration_id for stdout task
         let app_handle_stdout = app_handle_opt.clone();
-        let session_id_stdout = session_id_clone.clone();
+        let iteration_id_stdout = iteration_id_clone.clone();
 
         // Spawn task to read stdout and emit events
         tokio::spawn(async move {
@@ -95,7 +95,7 @@ impl ProjectRunner {
                         // Emit event to frontend
                         if let Some(ref handle) = app_handle_stdout {
                             if let Err(e) = handle.emit("process_output", serde_json::json!({
-                                "session_id": session_id_stdout,
+                                "iteration_id": iteration_id_stdout,
                                 "output_type": "stdout",
                                 "content": line.clone()
                             })) {
@@ -111,7 +111,7 @@ impl ProjectRunner {
                         // Emit error event
                         if let Some(ref handle) = app_handle_stdout {
                             if let Err(e) = handle.emit("process_error", serde_json::json!({
-                                "session_id": session_id_stdout,
+                                "iteration_id": iteration_id_stdout,
                                 "error": e.to_string()
                             })) {
                                 eprintln!("[Runner] Failed to emit process_error event: {}", e);
@@ -138,7 +138,7 @@ impl ProjectRunner {
                         // Emit event to frontend
                         if let Some(ref handle) = app_handle_opt {
                             if let Err(e) = handle.emit("process_output", serde_json::json!({
-                                "session_id": session_id_clone,
+                                "iteration_id": iteration_id_clone,
                                 "output_type": "stderr",
                                 "content": line.clone()
                             })) {
@@ -154,7 +154,7 @@ impl ProjectRunner {
                         // Emit error event
                         if let Some(ref handle) = app_handle_opt {
                             if let Err(e) = handle.emit("process_error", serde_json::json!({
-                                "session_id": session_id_clone,
+                                "iteration_id": iteration_id_clone,
                                 "error": e.to_string()
                             })) {
                                 eprintln!("[Runner] Failed to emit process_error event: {}", e);
@@ -167,7 +167,7 @@ impl ProjectRunner {
         });
 
         let mut processes = self.processes.lock().unwrap();
-        processes.insert(session_id, ProjectProcess {
+        processes.insert(iteration_id, ProjectProcess {
             child,
             output_tx: stdout_tx,
         });
@@ -176,15 +176,15 @@ impl ProjectRunner {
         Ok(pid)
     }
 
-    pub async fn stop(&self, session_id: String) -> Result<(), String> {
+    pub async fn stop(&self, iteration_id: String) -> Result<(), String> {
         // Remove process from map and release lock before await
         let process = {
             let mut processes = self.processes.lock().unwrap();
-            processes.remove(&session_id)
+            processes.remove(&iteration_id)
         };
         
         if let Some(mut process) = process {
-            println!("[Runner] Stopping process for session: {}", session_id);
+            println!("[Runner] Stopping process for iteration: {}", iteration_id);
             
             process.child.kill()
                 .await
@@ -193,14 +193,14 @@ impl ProjectRunner {
             // Emit stopped event
             if let Some(ref handle) = *self.app_handle.lock().unwrap() {
                 let _ = handle.emit("process_stopped", serde_json::json!({
-                    "session_id": session_id
+                    "iteration_id": iteration_id
                 }));
             }
             
             println!("[Runner] Process stopped");
             Ok(())
         } else {
-            Err(format!("No running process for session: {}", session_id))
+            Err(format!("No running process for iteration: {}", iteration_id))
         }
     }
 

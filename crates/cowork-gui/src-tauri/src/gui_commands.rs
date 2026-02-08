@@ -84,7 +84,7 @@ pub async fn get_iteration_artifacts(
     iteration_id: String,
     _window: Window,
     _state: State<'_, AppState>,
-) -> Result<SessionArtifacts, String> {
+) -> Result<IterationArtifacts, String> {
     println!("[GUI] Getting artifacts for iteration: {}", iteration_id);
 
     let iteration_store = IterationStore::new();
@@ -96,6 +96,21 @@ pub async fn get_iteration_artifacts(
         .map_err(|e| format!("Failed to get iteration dir: {}", e))?;
     let artifacts_dir = iteration_dir.join("artifacts");
 
+    println!("[GUI] Current dir: {:?}", std::env::current_dir());
+    println!("[GUI] Iteration dir: {:?}", iteration_dir);
+    println!("[GUI] Artifacts dir: {:?}", artifacts_dir);
+    println!("[GUI] Artifacts dir exists: {}", artifacts_dir.exists());
+
+    // List files in artifacts directory for debugging
+    if artifacts_dir.exists() {
+        if let Ok(entries) = fs::read_dir(&artifacts_dir) {
+            println!("[GUI] Files in artifacts dir:");
+            for entry in entries.flatten() {
+                println!("[GUI]   - {:?}", entry.file_name());
+            }
+        }
+    }
+
     // Load artifacts from .cowork-v2 structure
     let idea = fs::read_to_string(artifacts_dir.join("idea.md")).ok();
     let prd = fs::read_to_string(artifacts_dir.join("prd.md")).ok();
@@ -103,6 +118,9 @@ pub async fn get_iteration_artifacts(
     let plan_raw = fs::read_to_string(artifacts_dir.join("plan.md")).ok();
     let delivery_report = fs::read_to_string(artifacts_dir.join("delivery_report.md")).ok();
     let check_report = fs::read_to_string(artifacts_dir.join("check_report.md")).ok();
+
+    println!("[GUI] Idea loaded: {}", idea.is_some());
+    println!("[GUI] PRD loaded: {}", prd.is_some());
 
     // Load workspace code files if available
     let workspace = iteration_store.workspace_path(&iteration_id)
@@ -113,8 +131,8 @@ pub async fn get_iteration_artifacts(
         vec![]
     };
 
-    Ok(SessionArtifacts {
-        session_id: iteration_id.clone(),
+    Ok(IterationArtifacts {
+        iteration_id: iteration_id.clone(),
         idea,
         requirements: prd,
         design: design_raw,
@@ -924,7 +942,7 @@ impl ReadonlyContext for DummyToolContext {
     }
     
     fn session_id(&self) -> &str {
-        "dummy_session"
+        "dummy_iteration"
     }
     
     fn agent_name(&self) -> &str {

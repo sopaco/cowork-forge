@@ -4,6 +4,10 @@
 pub mod domain;
 pub mod persistence;
 
+// Data models and storage
+pub mod data;
+pub mod storage;
+
 // Tech stack configuration
 pub mod tech_stack;
 
@@ -18,6 +22,8 @@ pub mod interaction;
 // Re-exports for convenience
 pub use domain::*;
 pub use persistence::*;
+pub use data::*;
+pub use storage::*;
 pub use llm::*;
 pub use tech_stack::*;
 

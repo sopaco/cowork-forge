@@ -53,6 +53,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [activeArtifactTab, setActiveArtifactTab] = useState(null);
   const [currentAgent, setCurrentAgent] = useState(null);
+  const [artifactsRefreshTrigger, setArtifactsRefreshTrigger] = useState(0);
 
   const listenersRegistered = useRef(false);
   const messagesContainerRef = useRef(null);
@@ -372,6 +373,8 @@ function App() {
       setActiveArtifactTab(targetTab);
       // Switch to artifacts tab
       setActiveView('artifacts');
+      // Trigger refresh to load latest artifacts
+      setArtifactsRefreshTrigger(prev => prev + 1);
       message.info(`Switched to Artifacts tab to review ${inputRequest.artifactType}`);
       // Keep the input request active so user can confirm after viewing
       return;
@@ -492,6 +495,7 @@ function App() {
             iterationId={currentIteration.id} 
             activeTab={activeArtifactTab}
             onTabChange={setActiveArtifactTab}
+            refreshTrigger={artifactsRefreshTrigger}
           />
         ) : (
           <Empty description="Select an iteration" style={{ marginTop: '40px' }} />

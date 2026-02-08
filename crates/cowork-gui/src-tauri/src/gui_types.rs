@@ -2,12 +2,12 @@
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
-// Session Artifacts
+// Iteration Artifacts
 // ============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionArtifacts {
-    pub session_id: String,
+pub struct IterationArtifacts {
+    pub iteration_id: String,
     pub idea: Option<String>,
     pub requirements: Option<String>,  // Simplified to markdown string
     pub design: Option<String>,        // Simplified to markdown string
