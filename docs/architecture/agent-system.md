@@ -1,381 +1,500 @@
-# Agent系统 - AI驱动的角色化协作
+# Agent 系统
 
-## Agent系统概述
+## 概述
 
-Cowork Forge 的 Agent 系统是整个开发流程的核心执行引擎，它通过模拟真实开发团队的角色分工，将大型语言模型(LLM)的能力组织成结构化的、专业化的开发单元。每个 Agent 都代表开发过程中的特定角色，如产品经理、架构师、开发工程师等，它们在迭代流程中协同工作，完成从创意到交付的完整开发过程。
+Cowork Forge 的 Agent 系统基于 [adk-rust](https://adk-rust.com/) 框架构建，提供了一套专业化、可协作的 AI 智能体，模拟真实开发团队的角色分工。每个 Agent 都有明确的职责、专用的工具和优化的指令，能够独立完成特定阶段的开发任务。
 
-## Agent角色设计
+### 设计理念
 
-### 1. Idea Agent - 产品创意助理
+Agent 系统遵循以下设计原则：
 
-**角色定位**: 捕获、理解和结构化用户的初始创意
+1. **角色专业化**：每个 Agent 专注于特定领域，职责清晰
+2. **权限最小化**：只提供完成任务所需的最小工具集
+3. **质量保证**：复杂阶段采用 Actor-Critic 循环确保产出质量
+4. **协作机制**：通过共享记忆和制品实现 Agent 间协作
+5. **可扩展性**：基于 adk-rust 框架，易于扩展和定制
 
-**核心能力**:
-- 理解用户模糊的创意描述
-- 提炼问题陈述和目标
-- 识别目标用户和核心需求
-- 生成结构化的创意文档
+### Agent 类型
 
-```rust
-pub fn create_idea_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {
-    let agent = LlmAgentBuilder::new("idea_agent")
-        .instruction(IDEA_AGENT_INSTRUCTION)
-        .model(model)
-        .tool(Arc::new(SaveIdeaTool::new(session_id.to_string())))
-        .tool(Arc::new(LoadIdeaTool::new(session_id.to_string())))
-        .tool(Arc::new(ReviewAndEditContentTool))
-        .tool(Arc::new(GetMemoryContextTool))
-        .tool(Arc::new(SaveSessionMemoryTool))
-        .include_contents(IncludeContents::None)
-        .build()?;
+Cowork Forge 有 8 个专业智能体，分为两种类型：
 
-    Ok(Arc::new(agent))
-}
-```
+| 类型 | Agent | 说明 |
+|------|-------|------|
+| **单一 Agent** | Idea Agent | 无 Critic，直接生成内容 |
+| **单一 Agent** | Check Agent | 无 Critic，执行质量检查 |
+| **单一 Agent** | Delivery Agent | 无 Critic，生成交付报告 |
+| **LoopAgent** | PRD Loop | Actor + Critic，最多 1 轮迭代 |
+| **LoopAgent** | Design Loop | Actor + Critic，最多 1 轮迭代 |
+| **LoopAgent** | Plan Loop | Actor + Critic，最多 1 轮迭代 |
+| **LoopAgent** | Coding Loop | Actor + Critic，最多 5 轮迭代 |
 
-**关键工具**:
-- `SaveIdeaTool`: 保存/更新创意文档
-- `ReviewAndEditContentTool`: 与用户交互编辑内容
-- `GetMemoryContextTool`: 获取相关的历史决策和模式
+## adk-rust 框架
 
-### 2. PRD Loop Agent - 产品需求团队
+### 框架简介
 
-**角色定位**: 将创意转化为结构化的产品需求文档
+adk-rust 是一个 Rust AI Agent 框架，提供了构建复杂 Agent 系统所需的核心功能：
 
-**协作模式**: Actor + Critic 循环协作
+- **LlmAgent**：单一智能体，支持工具调用和自定义指令
+- **LoopAgent**：循环智能体，支持多轮迭代和多智能体协作
+- **工具系统**：类型安全的工具接口，支持异步执行
+- **上下文管理**：自动管理对话历史和上下文传递
+- **错误处理**：完善的错误处理和重试机制
+
+### 创建单一 Agent
 
 ```rust
-pub fn create_prd_loop(model: Arc<dyn Llm>, session_id: &str, interaction: Arc<dyn InteractiveBackend>) -> Result<Arc<dyn adk_core::Agent>> {
-    // PRD Actor - 负责需求编写
-    let prd_actor = LlmAgentBuilder::new("prd_actor")
-        .instruction(PRD_ACTOR_INSTRUCTION)
-        .model(model.clone())
-        .tool(Arc::new(LoadIdeaTool::new(session.clone())))
-        .tool(Arc::new(CreateRequirementTool::new(session.clone())))
-        .tool(Arc::new(AddFeatureTool::new(session.clone())))
-        .tool(Arc::new(SavePrdDocTool::new(session.clone())))
-        .build()?;
+use adk_core::agent::LlmAgentBuilder;
+use std::sync::Arc;
 
-    // PRD Critic - 负责质量检查
-    let prd_critic = LlmAgentBuilder::new("prd_critic")
-        .instruction(PRD_CRITIC_INSTRUCTION)
-        .model(model)
-        .tool(Arc::new(ReadFileTool))
-        .tool(Arc::new(CheckFeatureCoverageTool::new(session.clone())))
-        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))
-        .tool(Arc::new(ExitLoopTool::new()))
-        .build()?;
-
-    let loop_agent = LoopAgent::new("prd_loop", vec![Arc::new(prd_actor), Arc::new(prd_critic)]);
-    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent), interaction)))
-}
+let agent = LlmAgentBuilder::new("idea_agent")
+    .instruction(IDEA_AGENT_INSTRUCTION)
+    .model(model)
+    .tool(Arc::new(SaveIdeaTool))
+    .include_contents(IncludeContents::None)
+    .build()?;
 ```
 
-**PRD Actor 职责**:
-- 分析创意文档提取核心需求
-- 编写结构化的功能规格说明
-- 定义用户故事和验收标准
-- 创建功能优先级和依赖关系
+### 创建 LoopAgent
 
-**PRD Critic 职责**:
-- 检查需求的完整性和一致性
-- 验证功能覆盖是否充分
-- 识别潜在的需求冲突
-- 提供改进建议和反馈
+```rust
+use adk_core::agent::LoopAgent;
 
-**关键工具**:
-- `CreateRequirementTool`: 创建新需求项
-- `AddFeatureTool`: 添加功能特性
-- `CheckFeatureCoverageTool`: 检查功能覆盖度
-- `ProvideFeedbackTool`: 提供改进反馈
-
-### 3. Design Loop Agent - 系统设计团队
-
-**角色定位**: 将产品需求转化为技术设计方案
-
-**协作模式**: Actor + Critic 循环协作
-
-**Design Actor 职责**:
-- 分析需求设计系统架构
-- 定义组件和接口设计
-- 设计数据模型和流程
-- 制定技术选型和标准
-
-**Design Critic 职责**:
-- 评估架构的合理性和可扩展性
-- 检查设计的一致性和完整性
-- 验证技术选型的适用性
-- 识别潜在的设计风险
-
-**关键工具**:
-- `CreateDesignComponentTool`: 创建设计组件
-- `GetRequirementsTool`: 获取需求信息
-- `GetDesignTool`: 管理设计文档
-
-### 4. Plan Loop Agent - 开发规划团队
-
-**角色定位**: 将设计方案转化为具体的开发计划
-
-**协作模式**: Actor + Critic 循环协作
-
-**Plan Actor 职责**:
-- 分解功能为开发任务
-- 估算工作量和时间
-- 排定任务优先级和依赖
-- 制定开发里程碑
-
-**Plan Critic 职责**:
-- 检查任务分解的合理性
-- 验证依赖关系的正确性
-- 评估时间估算的准确性
-- 识别计划中的风险点
-
-**关键工具**:
-- `CreateTaskTool`: 创建开发任务
-- `UpdateTaskTool`: 更新任务状态
-- `CheckTaskDependenciesTool`: 检查任务依赖
-
-### 5. Coding Loop Agent - 代码实现团队
-
-**角色定位**: 根据开发计划实现功能代码
-
-**协作模式**: Actor + Critic 循环协作
-
-**Coding Actor 职责**:
-- 实现具体功能代码
-- 编写单元测试
-- 更新技术文档
-- 修复代码问题
-
-**Coding Critic 职责**:
-- 代码质量审查
-- 检查功能和测试覆盖
-- 验证代码规范性
-- 提供优化建议
-
-**关键工具**:
-- `ReadFileTool`: 读取文件内容
-- `WriteFileTool`: 写入文件内容
-- `RunCommandTool`: 执行命令
-- `CheckTestsTool`: 运行测试
-
-### 6. Check Agent - 质量保证专员
-
-**角色定位**: 全面检查迭代交付质量
-
-**检查维度**:
-- 需求覆盖度和一致性
-- 设计完整性和合理性
-- 代码质量和测试覆盖
-- 文档完整性和准确性
-
-**关键工具**:
-- `CheckDataFormatTool`: 检查数据格式
-- `RunCommandTool`: 执行质量检查命令
-- `CheckLintTool`: 代码规范检查
-
-### 7. Delivery Agent - 交付管理专员
-
-**角色定位**: 整理迭代交付内容，生成完整交付报告
-
-**交付内容**:
-- 功能清单和实现情况
-- 技术设计和架构文档
-- 代码库和部署指南
-- 测试报告和质量指标
-
-## Agent协作模式
-
-### 1. 顺序协作
-
-最基础的协作模式，Agent按预定义顺序执行：
-```mermaid
-sequenceDiagram
-    participant Idea
-    participant PRD
-    participant Design
-    participant Plan
-    participant Coding
-    participant Check
-    participant Delivery
-    
-    Idea->>PRD: 创意文档
-    PRD->>Design: 需求文档
-    Design->>Plan: 设计文档
-    Plan->>Coding: 开发计划
-    Coding->>Check: 实现代码
-    Check->>Delivery: 检查报告
-    Delivery->>Idea: 交付报告
+let loop_agent = LoopAgent::new(
+    "prd_loop",
+    vec![Arc::new(prd_actor), Arc::new(prd_critic)]
+).with_max_iterations(1);
 ```
 
-### 2. Actor-Critic 循环协作
+**重要设计决策**：
 
-复杂阶段采用的专业协作模式，通过内部循环提升质量：
-```mermaid
-graph TB
-    subgraph "PRD Loop"
-        Actor[PRD Actor]
-        Critic[PRD Critic]
-    end
-    
-    subgraph "Design Loop"
-        DActor[Design Actor]
-        DCritic[Design Critic]
-    end
-    
-    Actor -->|编写需求| Critic
-    Critic -->|反馈建议| Actor
-    Critic -->|质量达标| DActor
-    DActor -->|设计方案| DCritic
-    DCritic -->|改进建议| DActor
+- **不使用 SequentialAgent**：避免 ExitLoopTool 终止外层 SequentialAgent 的问题
+- **max_iterations=1**：为未来调优准备，当前保持简洁
+- **ExitLoopTool 配置**：支持未来扩展多轮迭代
+
+## Agent 详细说明
+
+### Idea Agent
+
+**类型**：单一 Agent（无 Critic）
+
+**职责**：理解用户创意，生成 idea.md 文档
+
+**工作流程**：
+1. 分析用户输入的创意描述和变更历史
+2. 生成结构化的 idea.md 文档，包含：
+   - 项目背景和目标
+   - 核心功能概述
+   - 目标用户群体
+   - 技术方向和约束
+3. 调用 `save_idea()` 保存最终文档
+4. 完成（Pipeline 层验证 Artifacts 并触发 HITL 用户审查）
+
+**工具清单**：
+- `SaveIdeaTool`：保存 idea.md 到 artifacts 目录
+- `QueryMemoryTool`（可选）：查询迭代记忆
+- `SaveInsightTool`（可选）：保存洞见到记忆系统
+
+**指令文件**：`crates/cowork-core/src/instructions/idea.rs`
+
+### PRD Loop
+
+**类型**：LoopAgent（Actor + Critic）
+
+**职责**：生成产品需求文档，创建结构化需求
+
+#### PRD Actor
+
+**工作流程**：
+1. 调用 `load_idea()` 读取 idea.md 获取项目背景
+2. 分析需求，创建结构化需求列表（Requirements）
+3. 为每个需求添加功能特性（Features）
+4. 生成 PRD 文档（markdown 格式）
+5. 调用 `save_prd_doc()` 保存最终文档
+
+**工具清单**：
+- `LoadIdeaTool`：读取 idea.md 文档
+- `CreateRequirementTool`：创建需求条目
+- `AddFeatureTool`：添加功能特性
+- `UpdateRequirementTool`：更新需求（增量更新）
+- `UpdateFeatureTool`：更新功能（增量更新）
+- `DeleteRequirementTool`：删除需求（增量更新）
+- `GetRequirementsTool`：读取需求列表
+- `SavePrdDocTool`：保存 prd.md 文档
+
+#### PRD Critic
+
+**工作流程**：
+1. 调用 `get_requirements()` 读取结构化需求
+2. 调用 `load_idea()` 验证与创意文档的一致性
+3. 检查需求完整性、优先级合理性、验收标准明确性
+4. 提供反馈或通过验证
+
+**工具清单**：
+- `GetRequirementsTool`：读取结构化需求
+- `LoadIdeaTool`：读取 idea.md 验证一致性
+- `ProvideFeedbackTool`：提供反馈
+
+**指令文件**：`crates/cowork-core/src/instructions/prd.rs`
+
+### Design Loop
+
+**类型**：LoopAgent（Actor + Critic）
+
+**职责**：设计系统架构，创建设计规范
+
+#### Design Actor
+
+**工作流程**：
+1. 调用 `get_requirements()` 读取需求列表
+2. 调用 `load_prd_doc()` 读取 PRD 文档
+3. 设计系统架构（技术栈选择、模块划分、接口设计）
+4. 创建设计组件（DesignComponents）
+5. 生成 Design 文档（markdown 格式）
+6. 调用 `save_design_doc()` 保存最终文档
+
+**工具清单**：
+- `GetRequirementsTool`：读取需求列表
+- `GetDesignTool`：读取设计规范
+- `LoadPrdDocTool`：读取 PRD 文档
+- `CreateDesignComponentTool`：创建设计组件
+- `SaveDesignDocTool`：保存 design.md 文档
+
+#### Design Critic
+
+**工作流程**：
+1. 调用 `get_requirements()` 读取需求
+2. 调用 `get_design()` 读取设计规范
+3. 调用 `load_design_doc()` 验证 markdown 文档
+4. 检查功能覆盖度、架构合理性、接口完整性
+5. 提供反馈或通过验证
+
+**工具清单**：
+- `GetRequirementsTool`：读取需求列表
+- `GetDesignTool`：读取设计规范
+- `LoadDesignDocTool`：读取 design.md 验证
+- `CheckFeatureCoverageTool`：检查功能覆盖度
+- `ProvideFeedbackTool`：提供反馈
+
+**指令文件**：`crates/cowork-core/src/instructions/design.rs`
+
+### Plan Loop
+
+**类型**：LoopAgent（Actor + Critic）
+
+**职责**：制定实施计划，分解任务
+
+#### Plan Actor
+
+**工作流程**：
+1. 调用 `get_requirements()` 读取需求
+2. 调用 `get_design()` 读取设计规范
+3. 调用 `load_prd_doc()` 读取 PRD 文档
+4. 调用 `load_design_doc()` 读取 Design 文档
+5. 分解实施任务（Tasks），设置优先级和依赖关系
+6. 制定里程碑（Milestones）
+7. 生成 Plan 文档（markdown 格式）
+8. 调用 `save_plan_doc()` 保存最终文档
+
+**工具清单**：
+- `GetRequirementsTool`：读取需求列表
+- `GetDesignTool`：读取设计规范
+- `GetPlanTool`：读取实施计划
+- `LoadPrdDocTool`：读取 PRD 文档
+- `LoadDesignDocTool`：读取 Design 文档
+- `CreateTaskTool`：创建任务
+- `SavePlanDocTool`：保存 plan.md 文档
+
+#### Plan Critic
+
+**工作流程**：
+1. 调用 `get_plan()` 读取实施计划
+2. 调用 `get_requirements()` 读取需求
+3. 调用 `load_plan_doc()` 验证 markdown 文档
+4. 检查任务依赖关系、实施可行性、时间估算
+5. 提供反馈或通过验证
+
+**工具清单**：
+- `GetPlanTool`：读取实施计划
+- `GetRequirementsTool`：读取需求列表
+- `LoadPlanDocTool`：读取 plan.md 验证
+- `CheckTaskDependenciesTool`：检查任务依赖
+- `ProvideFeedbackTool`：提供反馈
+
+**指令文件**：`crates/cowork-core/src/instructions/plan.rs`
+
+### Coding Loop
+
+**类型**：LoopAgent（Actor + Critic，最多 5 轮迭代）
+
+**职责**：生成代码，实现功能
+
+#### Coding Actor
+
+**工作流程**：
+1. 调用 `get_plan()` 读取任务列表（结构化数据，非 LoadPlanDoc）
+2. 选择下一个待执行任务
+3. 读取现有代码文件（ReadFile）
+4. 生成/更新代码文件（WriteFile，在 workspace 内）
+5. 列出工作空间文件（ListFiles）
+6. 运行测试验证（RunCommand + CheckTests）
+7. 更新任务状态（UpdateTaskStatus）
+8. 更新功能状态（UpdateFeatureStatus）
+
+**工具清单**：
+- `GetPlanTool`：读取任务列表（结构化数据）
+- `UpdateTaskStatusTool`：更新任务状态
+- `UpdateFeatureStatusTool`：更新功能状态
+- `ReadFileTool`：读取代码文件（从 workspace）
+- `WriteFileTool`：写入代码文件（到 workspace）
+- `ListFilesTool`：列出工作空间文件
+- `RunCommandTool`：运行测试和构建命令（在 workspace）
+- `CheckTestsTool`：检查测试通过率
+
+#### Coding Critic
+
+**工作流程**：
+1. 调用 `get_plan()` 读取任务列表
+2. 读取代码文件验证实现
+3. 运行测试检查功能正确性
+4. 提供代码审查反馈
+
+**工具清单**：
+- `GetPlanTool`：读取任务列表
+- `ReadFileTool`：读取代码文件（从 workspace）
+- `ListFilesTool`：列出工作空间文件
+- `RunCommandTool`：运行测试验证（在 workspace）
+- `ProvideFeedbackTool`：提供反馈
+
+**指令文件**：`crates/cowork-core/src/instructions/coding.rs`
+
+### Check Agent
+
+**类型**：单一 Agent
+
+**职责**：质量检查，验证功能完整性
+
+**工作流程**：
+1. 调用 `get_requirements()` 读取需求列表
+2. 调用 `get_design()` 读取设计规范
+3. 调用 `get_plan()` 读取任务列表
+4. 检查数据格式完整性（CheckDataFormat）
+5. 检查功能覆盖度（CheckFeatureCoverage）
+6. 检查任务依赖关系（CheckTaskDependencies）
+7. 读取代码文件和列出文件（从 workspace）
+8. 运行测试（CheckTests）
+9. 运行代码检查（CheckLint）
+10. 综合评估：
+    - 如果全部通过，进入 Delivery 阶段
+    - 如果发现问题，调用 `goto_stage()` 返回 Coding 阶段修复
+
+**工具清单**：
+- `GetRequirementsTool`：读取需求列表
+- `GetDesignTool`：读取设计规范
+- `GetPlanTool`：读取任务列表
+- `CheckDataFormatTool`：检查数据格式
+- `CheckFeatureCoverageTool`：检查功能覆盖度
+- `CheckTaskDependenciesTool`：检查任务依赖
+- `RunCommandTool`：运行测试和构建
+- `ReadFileTool`：读取代码文件（从 workspace）
+- `ListFilesTool`：列出工作空间文件
+- `CheckTestsTool`：检查测试通过率
+- `CheckLintTool`：运行代码检查
+- `ProvideFeedbackTool`：提供反馈
+- `GotoStageTool`：返回之前阶段
+
+**指令文件**：`crates/cowork-core/src/instructions/check.rs`
+
+### Delivery Agent
+
+**类型**：单一 Agent
+
+**职责**：生成交付报告，部署代码
+
+**工作流程**：
+1. 调用 `get_requirements()` 读取需求列表
+2. 调用 `get_design()` 读取设计规范
+3. 调用 `get_plan()` 读取任务列表
+4. 调用 `load_feedback_history()` 读取反馈历史
+5. 调用 `load_idea()` 读取 idea.md
+6. 调用 `load_prd_doc()` 读取 prd.md
+7. 调用 `load_design_doc()` 读取 design.md
+8. 列出项目文件验证交付物
+9. 生成交付报告（delivery.md），包含：
+    - 功能实现清单
+    - 测试覆盖率
+    - 已知问题和限制
+    - 使用说明
+10. 调用 `save_delivery_report()` 保存报告
+11. 调用 `copy_workspace_to_project(confirm=true)` 部署代码到项目根目录
+
+**工具清单**：
+- `GetRequirementsTool`：读取需求列表
+- `GetDesignTool`：读取设计规范
+- `GetPlanTool`：读取任务列表
+- `LoadFeedbackHistoryTool`：读取反馈历史
+- `ListFilesTool`：列出项目文件
+- `LoadIdeaTool`：读取 idea.md
+- `LoadPrdDocTool`：读取 prd.md
+- `LoadDesignDocTool`：读取 design.md
+- `SaveDeliveryReportTool`：保存 delivery.md
+- `CopyWorkspaceToProjectTool`：复制代码到项目根目录
+
+**指令文件**：`crates/cowork-core/src/instructions/delivery.rs`
+
+## Actor-Critic 循环机制
+
+### 工作原理
+
+Actor-Critic 循环是一种双智能体协作模式，通过 Actor 生成内容、Critic 验证质量的循环确保产出质量。
+
+```
+┌─────────────┐
+│   Actor     │  生成内容
+└──────┬──────┘
+       │
+       ↓
+┌─────────────┐
+│   Critic    │  验证质量
+└──────┬──────┘
+       │
+       ↓
+   通过？
+   ├─ Yes → 完成
+   └─ No  → 提供反馈 → Actor 改进
 ```
 
-### 3. 记忆共享协作
+### 循环控制
 
-所有Agent通过共享的记忆系统获取上下文：
-```mermaid
-graph LR
-    subgraph "记忆系统"
-        ProjectMemory[项目记忆]
-        SessionMemory[会话记忆]
-        ToolMemory[工具记忆]
-    end
-    
-    subgraph "Agent系统"
-        IDEA[Idea Agent]
-        PRD[PRD Loop]
-        DESIGN[Design Loop]
-        PLAN[Plan Loop]
-        CODING[Coding Loop]
-    end
-    
-    ProjectMemory --> IDEA
-    ProjectMemory --> PRD
-    ProjectMemory --> DESIGN
-    ProjectMemory --> PLAN
-    ProjectMemory --> CODING
-    
-    IDEA --> SessionMemory
-    PRD --> SessionMemory
-    DESIGN --> SessionMemory
-    PLAN --> SessionMemory
-    CODING --> SessionMemory
+| Agent 类型 | max_iterations | 说明 |
+|-----------|----------------|------|
+| PRD Loop | 1 | 为未来调优准备 |
+| Design Loop | 1 | 为未来调优准备 |
+| Plan Loop | 1 | 为未来调优准备 |
+| Coding Loop | 5 | 允许多轮迭代完善代码 |
+
+### Critic 验证逻辑
+
+Critic 使用以下标准验证 Actor 的产出：
+
+1. **完整性检查**：是否包含所有必需的组件
+2. **一致性检查**：是否与前置阶段的内容一致
+3. **质量检查**：是否符合最佳实践和质量标准
+4. **可行性检查**：是否可实现和维护
+
+### 反馈机制
+
+Critic 可以通过以下方式提供反馈：
+
+1. **直接反馈**：通过 `ProvideFeedbackTool` 提供文本反馈
+2. **结构化反馈**：通过更新结构化数据（如 Requirements）提供反馈
+3. **跳转反馈**：通过 `GotoStageTool` 跳转到之前阶段
+
+## 工具配置
+
+### 工具权限矩阵
+
+| 阶段 | ReadFile | WriteFile | LoadIdea | LoadPrd | LoadDesign | LoadPlan | SaveXxx | ListFiles | RunCommand | GetRequirements | GetDesign | GetPlan | CreateXxx | UpdateXxx | CheckXxx | CopyWorkspace |
+|------|----------|-----------|----------|---------|------------|---------|---------|-----------|------------|-----------------|-------------|----------|-----------|-----------|----------|----------------|
+| Idea | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ save_idea | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| PRD Actor | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ save_prd_doc | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ create_requirement/add_feature | ✅ update_requirement/update_feature/delete_requirement | ❌ | ❌ |
+| PRD Critic | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Design Actor | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ save_design_doc | ❌ | ❌ | ✅ | ✅ | ❌ | ✅ create_design_component | ❌ | ❌ | ❌ |
+| Design Critic | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ check_feature_coverage | ❌ |
+| Plan Actor | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ✅ save_plan_doc | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ create_task | ❌ | ❌ | ❌ |
+| Plan Critic | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ check_task_dependencies | ❌ |
+| Coding Actor | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ update_task/update_feature | ✅ check_tests | ❌ |
+| Coding Critic | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Check Agent | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ check_data_format/check_feature_coverage/check_task_dependencies/check_tests/check_lint | ❌ |
+| Delivery Agent | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ save_delivery_report | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ copy_workspace |
+
+### 工具注册
+
+所有工具在 `crates/cowork-core/src/agents/mod.rs` 中注册：
+
+```rust
+use crate::tools::*;
+
+// Idea Agent
+.tool(Arc::new(SaveIdeaTool))
+
+// PRD Agent
+.tool(Arc::new(LoadIdeaTool))
+.tool(Arc::new(CreateRequirementTool))
+.tool(Arc::new(AddFeatureTool))
+.tool(Arc::new(SavePrdDocTool))
+
+// Delivery Agent
+.tool(Arc::new(CopyWorkspaceToProjectTool))
 ```
 
-## Agent工具系统
+## 指令系统
 
-### 工具分类
+### 指令文件结构
 
-1. **内容操作工具**
-   - `ReadFileTool`: 读取文件内容
-   - `WriteFileTool`: 写入文件内容
-   - `ListFilesTool`: 列出目录文件
+每个 Agent 都有对应的指令文件，位于 `crates/cowork-core/src/instructions/` 目录：
 
-2. **数据管理工具**
-   - `SaveIdeaTool`: 保存创意文档
-   - `CreateRequirementTool`: 创建需求项
-   - `CreateDesignComponentTool`: 创建设计组件
-   - `CreateTaskTool`: 创建开发任务
-
-3. **质量控制工具**
-   - `CheckFeatureCoverageTool`: 检查功能覆盖
-   - `CheckTaskDependenciesTool`: 检查任务依赖
-   - `CheckTestsTool`: 运行测试检查
-   - `CheckLintTool`: 代码规范检查
-
-4. **交互反馈工具**
-   - `ReviewAndEditContentTool`: 内容编辑交互
-   - `ProvideFeedbackTool`: 提供反馈建议
-   - `RequestHumanReviewTool`: 请求人工评审
-
-5. **记忆管理工具**
-   - `GetMemoryContextTool`: 获取记忆上下文
-   - `SaveSessionMemoryTool`: 保存会话记忆
-   - `PromoteToProjectMemoryTool`: 提升到项目记忆
-
-### 工具设计原则
-
-1. **单一职责**: 每个工具专注于特定功能
-2. **明确接口**: 标准化的输入输出格式
-3. **错误处理**: 完善的错误处理和回滚机制
-4. **可测试性**: 工具逻辑可独立测试
-5. **可组合性**: 工具可灵活组合使用
-
-## Agent指令系统
-
-### 指令设计原则
-
-1. **角色清晰**: 明确定义Agent的角色和职责
-2. **流程规范**: 详细说明工作流程和决策规则
-3. **工具指导**: 明确指出何时使用何种工具
-4. **质量标准**: 定义产出标准和检查要点
-5. **协作协议**: 说明与其他Agent的协作方式
-
-### 指令示例 - PRD Actor
-
-```text
-你是 PRD Actor，负责将用户创意转化为结构化的产品需求文档。
-
-# 你的角色
-你是专业的产品经理，擅长将模糊的创意转化为清晰、可执行的产品需求。
-
-# 工作流程
-1. **分析创意文档**: 使用 load_idea() 获取创意文档
-2. **提取核心需求**: 识别核心功能和用户故事
-3. **创建需求项**: 使用 create_requirement() 添加需求
-4. **添加功能特性**: 使用 add_feature() 详细描述功能
-5. **生成PRD文档**: 使用 save_prd_doc() 保存完整文档
-
-# 质量标准
-- 每个需求包含用户故事和验收标准
-- 功能按优先级排序，依赖关系清晰
-- 涵盖核心用户场景和边界情况
-- 语言简洁明确，无歧义
-
-# 注意事项
-- 优先考虑核心功能，避免功能蔓延
-- 确保需求可测试、可验证
-- 保持与技术团队的沟通渠道
+```
+instructions/
+├── idea.rs         # Idea Agent 指令
+├── prd.rs          # PRD Agent 指令
+├── design.rs       # Design Agent 指令
+├── plan.rs         # Plan Agent 指令
+├── coding.rs       # Coding Agent 指令
+├── check.rs        # Check Agent 指令
+└── delivery.rs     # Delivery Agent 指令
 ```
 
-## Agent系统优势
+### 指令模板
 
-### 1. **专业化分工**
+指令模板包含以下部分：
 
-不同Agent专注于不同领域的专业工作，确保每个阶段都有最适合的角色来处理，提升产出质量。
+1. **角色定义**：Agent 的身份和职责
+2. **任务描述**：具体要完成的任务
+3. **工作流程**：详细的执行步骤
+4. **输出格式**：期望的输出格式
+5. **工具使用说明**：如何使用可用工具
+6. **质量标准**：产出的质量要求
 
-### 2. **质量保证循环**
+### 指令最佳实践
 
-Actor-Critic模式通过内部循环不断优化产出，确保每个阶段的交付物都达到质量标准。
+- **清晰明确**：指令应该清晰、具体、无歧义
+- **步骤化**：将复杂任务分解为简单步骤
+- **示例驱动**：提供示例帮助 Agent 理解期望
+- **强调工具使用**：明确指示 Agent 必须调用哪些工具
+- **质量优先**：强调质量而非速度
 
-### 3. **上下文感知**
+## 协作机制
 
-通过记忆系统，Agent能够获取相关历史信息，做出更符合项目实际情况的决策。
+### 记忆共享
 
-### 4. **人机协作**
+所有 Agent 通过共享的记忆系统获取上下文：
 
-关键决策点保留人类参与，利用人类的直觉和创意解决复杂问题，同时让AI处理重复性工作。
+- **项目级记忆**：存储项目级别的决策和学习
+- **迭代级记忆**：存储特定迭代的学习和决策
 
-### 5. **可扩展性**
+### 制品传递
 
-模块化的Agent设计便于添加新角色或调整现有角色，适应不同项目和场景需求。
+Agent 通过读取和写入制品实现协作：
 
-## Agent系统优化方向
+1. **Idea Agent** 生成 `idea.md`
+2. **PRD Agent** 读取 `idea.md`，生成 `prd.md` 和 `requirements.json`
+3. **Design Agent** 读取 `idea.md` 和 `prd.md`，生成 `design.md` 和 `design_spec.json`
+4. **Plan Agent** 读取前置制品，生成 `plan.md` 和 `implementation_plan.json`
+5. **Coding Agent** 读取结构化数据，在 workspace 生成代码
+6. **Check Agent** 验证所有制品和代码
+7. **Delivery Agent** 整合所有信息，生成交付报告
 
-### 1. **更智能的角色分工**
+### 反馈循环
 
-基于项目特征自动调整Agent构成和权重，例如技术项目强化技术Agent，设计项目强化设计Agent。
+Agent 之间通过反馈机制实现协作：
 
-### 2. **动态指令调整**
+1. **Actor-Critic 反馈**：Critic 向 Actor 提供质量反馈
+2. **跨阶段反馈**：通过 `GotoStageTool` 跳转到之前阶段
+3. **HITL 反馈**：用户通过 Pipeline 层提供反馈
 
-根据项目历史和Agent表现动态优化指令内容，提升Agent在特定场景下的表现。
+## 相关文档
 
-### 3. **跨Agent学习机制**
-
-建立Agent间的学习机制，优秀决策和模式可以在不同Agent间共享和传递。
-
-### 4. **性能监控和反馈**
-
-建立Agent性能监控体系，收集执行数据用于持续优化Agent行为和工具设计。
-
-通过精心设计的Agent系统，Cowork Forge 实现了AI驱动的专业软件开发流程，使中小型项目也能享受到高效、专业的开发体验。
+- [架构概览](./overview.md)
+- [迭代架构](./iteration-architecture.md)
+- [Pipeline 流程](./pipeline.md)
+- [工具系统](../development/tools.md)

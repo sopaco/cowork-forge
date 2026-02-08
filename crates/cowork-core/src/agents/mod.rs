@@ -43,7 +43,6 @@ pub fn create_idea_agent_with_id(model: Arc<dyn Llm>, iteration_id: String) -> R
         .instruction(&instruction)
         .model(model)
         .tool(Arc::new(SaveIdeaTool))
-        .tool(Arc::new(ReviewAndEditContentTool))
         .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
         .tool(Arc::new(SaveInsightTool::new(iteration_id.clone())))
         .include_contents(IncludeContents::None)
@@ -99,13 +98,13 @@ pub fn create_prd_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Res
         .model(model.clone())
         .tool(Arc::new(LoadFeedbackHistoryTool))  // For incremental update support
         .tool(Arc::new(LoadIdeaTool))  // Load idea document
-        .tool(Arc::new(ReviewWithFeedbackContentTool))  // HITL tool (content-based)
         .tool(Arc::new(CreateRequirementTool))
         .tool(Arc::new(AddFeatureTool))
         .tool(Arc::new(UpdateRequirementTool))  // For incremental updates
         .tool(Arc::new(UpdateFeatureTool))  // For incremental updates
         .tool(Arc::new(DeleteRequirementTool))  // For incremental updates
         .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(SavePrdDocTool))  // Save final PRD document
         .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
         .tool(Arc::new(SaveInsightTool::new(iteration_id.clone())))
         .include_contents(IncludeContents::None)
@@ -179,7 +178,6 @@ pub fn create_design_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> 
         .tool(Arc::new(GetRequirementsTool))
         .tool(Arc::new(GetDesignTool))
         .tool(Arc::new(LoadPrdDocTool))  // Load PRD document
-        .tool(Arc::new(ReviewWithFeedbackContentTool))  // HITL tool (content-based)
         .tool(Arc::new(CreateDesignComponentTool))
         .tool(Arc::new(SaveDesignDocTool))  // Save final design document
         .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
@@ -258,7 +256,6 @@ pub fn create_plan_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Re
         .tool(Arc::new(GetPlanTool))
         .tool(Arc::new(LoadPrdDocTool))  // Load PRD document
         .tool(Arc::new(LoadDesignDocTool))  // Load design document
-        .tool(Arc::new(ReviewWithFeedbackContentTool))  // HITL tool (content-based)
         .tool(Arc::new(CreateTaskTool))
         .tool(Arc::new(SavePlanDocTool))  // Save final plan document
         .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))

@@ -139,6 +139,65 @@ impl IterationExecutor {
         }
     }
 
+    /// Check if expected artifacts exist for a stage
+    async fn check_artifact_exists(&self, stage_name: &str, workspace: &std::path::Path) -> bool {
+        let iteration_dir = workspace.parent().unwrap_or(workspace);
+        let artifacts_dir = iteration_dir.join("artifacts");
+
+        match stage_name {
+            "idea" => {
+                // Check idea.md
+                artifacts_dir.join("idea.md").exists()
+            }
+            "prd" => {
+                // Check prd.md or requirements.json
+                artifacts_dir.join("prd.md").exists() || 
+                iteration_dir.join("data/requirements.json").exists()
+            }
+            "design" => {
+                // Check design.md or design_spec.json
+                artifacts_dir.join("design.md").exists() || 
+                iteration_dir.join("data/design_spec.json").exists()
+            }
+            "plan" => {
+                // Check plan.md or implementation_plan.json
+                artifacts_dir.join("plan.md").exists() || 
+                iteration_dir.join("data/implementation_plan.json").exists()
+            }
+            "coding" => {
+                // Check workspace has code files
+                if !workspace.exists() {
+                    return false;
+                }
+                // Check for any source code files
+                let code_extensions = ["rs", "js", "jsx", "ts", "tsx", "py", "java", "go", "cpp", "c", "h"];
+                let mut entries = std::fs::read_dir(workspace).ok();
+                if let Some(ref mut e) = entries {
+                    while let Some(entry) = e.next() {
+                        if let Ok(entry) = entry {
+                            if let Some(ext) = entry.path().extension() {
+                                if let Some(ext_str) = ext.to_str() {
+                                    if code_extensions.contains(&ext_str) {
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                false
+            }
+            "delivery" => {
+                // Check delivery_report.md
+                artifacts_dir.join("delivery_report.md").exists()
+            }
+            _ => {
+                // Default: assume artifacts exist
+                true
+            }
+        }
+    }
+
     /// Copy only non-code files (config, assets, docs)
     async fn copy_non_code_files(
         &self,
@@ -297,6 +356,30 @@ impl IterationExecutor {
 
                     match result {
                         StageResult::Success(artifact_path) => {
+                            // Artifacts validation check
+                            let artifact_exists = if let Some(ref path) = artifact_path {
+                                // Check if artifact file exists
+                                std::path::Path::new(path).exists()
+                            } else {
+                                // No artifact path provided, check expected artifacts
+                                self.check_artifact_exists(&stage_name, &workspace).await
+                            };
+
+                            if !artifact_exists {
+                                last_error = Some(format!("Artifacts not generated for stage '{}'", stage_name));
+                                
+                                // Show error message
+                                self.interaction
+                                    .show_message(
+                                        crate::interaction::MessageLevel::Error,
+                                        format!("❌ Stage '{}' completed but artifacts not found. Will retry...", stage_name),
+                                    )
+                                    .await;
+                                
+                                // Continue to next retry
+                                break; // Exit feedback loop to retry
+                            }
+
                             // Complete stage
                             iteration.complete_stage(&stage_name, artifact_path.clone());
                             self.iteration_store.save(&iteration)?;

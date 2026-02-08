@@ -1,317 +1,514 @@
-# 迭代架构 - Cowork Forge 的核心设计理念
+# 迭代架构
 
-## 什么是迭代架构
+## 概述
 
-迭代架构是 Cowork Forge 的核心设计理念，它将软件开发过程抽象为一系列可管理、可继承、可演进的迭代单元。每个迭代都代表一个完整的开发周期，从需求分析到最终交付，形成闭环。
+Iteration（迭代）是 Cowork Forge 的核心概念，代表一个完整的软件开发周期。每个迭代都是独立的、可管理的单元，包含完整的开发生命周期和独立的制品。通过迭代机制，Cowork Forge 将复杂的软件开发任务分解为可追踪、可管理、可演进的单元。
 
-## 迭代的两种类型
+### 迭代的价值
 
-### 起始迭代 (Genesis)
+1. **可管理性**：将大型开发任务分解为小的、可管理的单元
+2. **可继承性**：新迭代可以继承现有迭代的制品和代码
+3. **可演进性**：支持功能增强、Bug 修复和架构重构
+4. **可追溯性**：完整的版本历史和制品管理
+5. **可回滚性**：可以回退到任意历史迭代
 
-起始迭代代表一个全新项目的开始，它从零开始构建整个系统。
+### 迭代的核心组件
 
-```rust
-pub struct Iteration {
-    // ...
-    pub base_iteration_id: Option<String>,  // None for Genesis
-    pub inheritance: InheritanceMode,       // InheritanceMode::None
-    // ...
-}
+每个迭代包含以下核心组件：
 
-impl Iteration {
-    pub fn create_genesis(project: &Project, title: String, description: String) -> Self {
-        // 从零创建新迭代
-    }
-}
-```
+- **迭代元数据**：迭代的基本信息和状态
+- **制品**：各阶段生成的文档和交付物
+- **结构化数据**：需求、设计、计划等结构化信息
+- **工作空间**：代码生成的临时目录
+- **会话数据**：元数据和反馈历史
+- **记忆系统**：迭代级的学习和决策
 
-**使用场景**:
-- 全新的项目开发
-- 完全重写现有系统
-- 原型到产品的转化
-- 技术栈完全更换的项目
+## 迭代类型
 
-**优势**:
-- 全面的系统审视
-- 无历史包袱
-- 架构和技术的最佳实践应用
-- 完整的文档生成
+Cowork Forge 支持两种迭代类型：
 
-### 演化迭代 (Evolution)
+### Genesis（起源迭代）
 
-演化迭代基于现有迭代进行扩展和优化，通过继承机制减少重复工作。
+**定义**：从零开始的全新迭代
 
-```rust
-pub struct Iteration {
-    // ...
-    pub base_iteration_id: Option<String>,  // Some(ID) for Evolution
-    pub inheritance: InheritanceMode,       // Full, Partial, or Custom
-    // ...
-}
+**特点**：
+- 不继承任何现有迭代
+- 创建全新的制品和代码
+- 从 Idea 阶段开始
+- 适用于新项目创建
 
-impl Iteration {
-    pub fn create_evolution(
-        project: &Project,
-        title: String,
-        description: String,
-        base_iteration_id: String,
-        inheritance: InheritanceMode,
-    ) -> Self {
-        // 基于基础迭代创建演化迭代
-    }
-}
-```
+**使用场景**：
+- 创建新项目
+- 重新开始项目开发
+- 完全重构项目
 
-**三种继承模式**:
+### Evolution（演化迭代）
 
-1. **完全继承 (Full)**
-   - 继承所有代码文件
-   - 继承所有文档和制品
-   - 从计划阶段开始开发
-   - 适用于功能扩展和小幅修改
+**定义**：基于现有迭代创建的迭代
 
-2. **部分继承 (Partial)**
-   - 仅继承制品定义和设计文档
-   - 不继承源代码
-   - 从设计或需求阶段开始
-   - 适用于架构调整和重大变更
+**特点**：
+- 继承基础迭代的制品和代码
+- 可以从任意阶段开始
+- 支持增量更新
+- 保留历史上下文
 
-3. **自定义继承 (Custom)**
-   - 根据变更描述自动判断起始阶段
-   - 智能分析变更影响范围
-   - 动态确定需要继承的内容
-   - 适用于各类复杂场景
-
-## 智能起始阶段判断
-
-系统通过分析变更描述的语义，自动确定合适的起始阶段：
-
-```rust
-fn analyze_change_scope(description: &str) -> String {
-    let desc_lower = description.to_lowercase();
-
-    // 架构变更 -> 从idea开始
-    let arch_keywords = ["架构", "architecture", "重构", "rewrite", "重新设计", "redesign"];
-    for kw in &arch_keywords {
-        if desc_lower.contains(kw) {
-            return "idea".to_string();
-        }
-    }
-
-    // 需求变更 -> 从prd开始
-    let req_keywords = ["需求", "requirement", "功能", "feature", "添加", "add"];
-    for kw in &req_keywords {
-        if desc_lower.contains(kw) {
-            return "prd".to_string();
-        }
-    }
-
-    // 设计变更 -> 从design开始
-    let design_keywords = ["设计", "design", "数据库", "database", "接口", "api"];
-    for kw in &design_keywords {
-        if desc_lower.contains(kw) {
-            return "design".to_string();
-        }
-    }
-
-    // 默认：代码变更 -> 从plan开始
-    "plan".to_string()
-}
-```
+**使用场景**：
+- 功能增强
+- Bug 修复
+- 架构调整
+- 代码优化
 
 ## 迭代生命周期
 
-```mermaid
-stateDiagram-v2
-    [*] --> Draft: 创建新迭代
-    Draft --> Running: 开始执行
-    Running --> Paused: 需人工确认
-    Paused --> Running: 确认继续
-    Paused --> Failed: 取消执行
-    Running --> Completed: 所有阶段完成
-    Running --> Failed: 执行失败
-    Completed --> [*]
-    Failed --> [*]
+### 状态机
+
+```
+┌─────────┐
+│  Draft  │  草稿状态
+└────┬────┘
+     │ start()
+     ↓
+┌─────────┐
+│ Running │  运行中
+└────┬────┘
+     │ pause()
+     ↓
+┌─────────┐
+│ Paused  │  已暂停
+└────┬────┘
+     │ resume()
+     ↓
+┌─────────┐
+│ Running │  运行中
+└────┬────┘
+     │
+     ├─→ complete() ─→ ┌────────────┐
+     │                  │ Completed  │  已完成
+     │                  └────────────┘
+     │
+     └─→ fail() ──────→ ┌────────────┐
+                        │   Failed    │  失败
+                        └────────────┘
 ```
 
-1. **Draft (草稿)**
-   - 迭代已创建但未开始
-   - 可以修改标题和描述
-   - 可以调整继承设置
+### 状态说明
 
-2. **Running (运行中)**
-   - 正在执行开发流程
-   - 当前阶段实时更新
-   - 可以暂停等待人工确认
+| 状态 | 说明 | 可执行操作 |
+|------|------|-----------|
+| **Draft** | 草稿状态，尚未开始执行 | `start()` |
+| **Running** | 运行中，正在执行阶段 | `pause()`、`fail()`、`complete()` |
+| **Paused** | 已暂停，等待继续 | `resume()` |
+| **Completed** | 已完成，所有阶段执行成功 | 无（终端状态） |
+| **Failed** | 失败，执行过程中出现错误 | 无（终端状态） |
 
-3. **Paused (已暂停)**
-   - 等待人工确认或反馈
-   - 当前阶段保持不变
-   - 可以继续或取消
+### 状态转换规则
 
-4. **Completed (已完成)**
-   - 所有阶段成功完成
-   - 生成完整制品和文档
-   - 可以作为新迭代的基础
+1. **Draft → Running**：调用 `start()` 开始执行
+2. **Running → Paused**：调用 `pause()` 暂停执行
+3. **Paused → Running**：调用 `resume()` 继续执行
+4. **Running → Completed**：所有阶段成功完成
+5. **Running → Failed**：执行过程中出现致命错误
 
-5. **Failed (失败)**
-   - 执行过程中出现错误
-   - 需要手动干预修复
-   - 可以重新启动或放弃
+## 迭代数据结构
 
-## 迭代制品管理
-
-每个迭代产生一组结构化的制品，它们是开发过程的核心产出：
+### Iteration 实体
 
 ```rust
-pub struct Artifacts {
-    pub idea: Option<String>,      // 创意文档
-    pub prd: Option<String>,       // 产品需求文档
-    pub design: Option<String>,    // 设计文档
-    pub plan: Option<String>,      // 开发计划
-    pub delivery: Option<String>,  // 交付报告
+pub struct Iteration {
+    pub id: String,                    // 迭代唯一标识
+    pub project_id: String,            // 所属项目 ID
+    pub name: String,                  // 迭代名称
+    pub description: String,           // 迭代描述
+    pub iteration_type: IterationType, // 迭代类型（Genesis/Evolution）
+    pub base_iteration_id: Option<String>, // 基础迭代 ID（Evolution 类型）
+    pub inheritance_mode: InheritanceMode, // 继承模式
+    pub current_stage: Stage,          // 当前阶段
+    pub status: IterationStatus,       // 迭代状态
+    pub created_at: DateTime<Utc>,     // 创建时间
+    pub updated_at: DateTime<Utc>,     // 更新时间
+    pub started_at: Option<DateTime<Utc>>,   // 开始时间
+    pub completed_at: Option<DateTime<Utc>>, // 完成时间
+    pub change_description: String,    // 变更描述
 }
 ```
 
-**制品特点**:
-
-- **版本化**: 每个制品都关联特定迭代版本
-- **可追溯**: 可以追踪制品的变更历史
-- **可复用**: 演化迭代可以引用和修改历史制品
-- **结构化**: 标准化的格式和内容要求
-
-## 迭代上下文继承
-
-迭代间的上下文传递是系统智能化的关键：
-
-```mermaid
-graph TB
-    subgraph "迭代 N-1"
-        Memory_N1[迭代记忆]
-        Artifacts_N1[迭代制品]
-        Decisions_N1[关键决策]
-    end
-    
-    subgraph "迭代 N"
-        Context_N[新上下文]
-        Memory_N[新记忆]
-        Artifacts_N[新制品]
-        Decisions_N[新决策]
-    end
-    
-    subgraph "记忆系统"
-        ProjectMemory[项目记忆]
-        Patterns[模式库]
-        Decisions[决策库]
-    end
-    
-    Memory_N1 --> Context_N
-    Artifacts_N1 --> Context_N
-    Decisions_N1 --> Context_N
-    
-    Context_N --> Memory_N
-    Memory_N1 --> ProjectMemory
-    Artifacts_N1 --> Patterns
-    Decisions_N1 --> Decisions
-    
-    ProjectMemory --> Context_N
-    Patterns --> Context_N
-    Decisions --> Context_N
-```
-
-## 迭代执行引擎
-
-迭代执行器负责协调整个迭代流程：
+### IterationType
 
 ```rust
-pub struct IterationExecutor {
-    project_store: Arc<dyn ProjectStore>,
-    iteration_store: Arc<dyn IterationStore>,
-    interaction: Arc<dyn InteractiveBackend>,
+pub enum IterationType {
+    Genesis,   // 起源迭代
+    Evolution, // 演化迭代
 }
+```
 
-impl IterationExecutor {
-    pub async fn execute(&self, project: &mut Project, iteration_id: &str) -> anyhow::Result<()> {
-        // 1. 加载迭代
-        let mut iteration = self.iteration_store.load(iteration_id)?;
-        
-        // 2. 准备工作空间
-        let workspace = self.prepare_workspace(&iteration).await?;
-        
-        // 3. 创建执行上下文
-        let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace);
-        
-        // 4. 确定起始阶段
-        let start_stage = iteration.determine_start_stage();
-        
-        // 5. 获取阶段序列
-        let stages = get_stages_from(&start_stage);
-        
-        // 6. 执行阶段序列
-        for stage in stages {
-            // 执行阶段并处理结果
-            // ...
+### InheritanceMode
+
+```rust
+pub enum InheritanceMode {
+    None,     // 不继承，全新开始
+    Full,     // 完全继承，复制所有 workspace 文件
+    Partial,  // 部分继承，只复制 artifacts 和配置
+}
+```
+
+### Stage
+
+```rust
+pub enum Stage {
+    Idea,     // 创意阶段
+    Prd,      // 需求阶段
+    Design,   // 设计阶段
+    Plan,     // 计划阶段
+    Coding,   // 编码阶段
+    Check,    // 检查阶段
+    Delivery, // 交付阶段
+}
+```
+
+### IterationStatus
+
+```rust
+pub enum IterationStatus {
+    Draft,     // 草稿
+    Running,   // 运行中
+    Paused,    // 已暂停
+    Completed, // 已完成
+    Failed,    // 失败
+}
+```
+
+## 迭代目录结构
+
+### 完整目录结构
+
+```
+.cowork-v2/
+└── iterations/
+    └── {iteration_id}/           # 迭代 ID，如 "iter-2-1770536303"
+        ├── iteration.json        # 迭代元数据
+        ├── artifacts/            # 迭代制品（文档）
+        │   ├── idea.md          # 创意文档
+        │   ├── prd.md           # 产品需求文档
+        │   ├── design.md        # 设计文档
+        │   ├── plan.md          # 实施计划
+        │   └── delivery.md      # 交付报告
+        ├── data/                # 结构化数据
+        │   ├── requirements.json      # 需求列表
+        │   ├── feature_list.json      # 功能列表
+        │   ├── design_spec.json       # 设计规范
+        │   ├── implementation_plan.json # 实施计划
+        │   └── code_metadata.json     # 代码元数据
+        ├── session/              # 会话数据
+        │   ├── meta.json        # 会话元数据
+        │   └── feedback.json    # 反馈历史
+        ├── workspace/           # 代码工作空间
+        │   ├── src/            # 源代码
+        │   ├── components/     # 组件
+        │   ├── tests/          # 测试
+        │   ├── docs/           # 文档
+        │   └── config/         # 配置
+        └── logs/               # 日志文件
+            ├── idea.log
+            ├── prd.log
+            ├── design.log
+            ├── plan.log
+            ├── coding.log
+            ├── check.log
+            └── delivery.log
+```
+
+### 目录说明
+
+| 目录 | 内容 | 用途 |
+|------|------|------|
+| **iteration.json** | 迭代元数据 | 存储迭代的基本信息、状态、配置 |
+| **artifacts/** | 迭代制品 | 存储各阶段生成的文档 |
+| **data/** | 结构化数据 | 存储需求、设计、计划等结构化信息 |
+| **session/** | 会话数据 | 存储会话元数据和反馈历史 |
+| **workspace/** | 工作空间 | 代码生成的临时目录 |
+| **logs/** | 日志文件 | 存储各阶段的执行日志 |
+
+## 继承机制
+
+### 继承流程
+
+```
+┌─────────────────┐
+│ 基础迭代 N-1    │
+│  (已完成)       │
+└────────┬────────┘
+         │
+         ↓
+┌─────────────────┐
+│ 选择继承模式    │
+└────────┬────────┘
+         │
+         ├─→ None ──────────────┐
+         │                      │ 创建新目录
+         ├─→ Full ──────────────┤
+         │                      │ 复制 workspace/
+         └─→ Partial ───────────┤
+                                │ 复制 artifacts/ 和 data/
+                                ↓
+                        ┌─────────────────┐
+                        │  新迭代 N       │
+                        │  (从指定阶段开始)│
+                        └─────────────────┘
+```
+
+### 继承模式详解
+
+#### None 模式（不继承）
+
+**适用场景**：
+- 完全重新开始
+- 需要彻底重构
+- 清理历史代码
+
+**继承内容**：
+- 无任何继承
+- 创建全新的迭代目录
+- 从 Idea 阶段开始
+
+**示例**：
+```rust
+let iteration = IterationBuilder::new("New Project")
+    .iteration_type(IterationType::Genesis)
+    .inheritance_mode(InheritanceMode::None)
+    .build()?;
+```
+
+#### Full 模式（完全继承）
+
+**适用场景**：
+- 小幅功能增强
+- Bug 修复
+- 代码优化
+
+**继承内容**：
+- 复制 `workspace/` 目录下的所有文件
+- 复制 `artifacts/` 目录下的所有文档
+- 复制 `data/` 目录下的所有结构化数据
+- 可以从任意阶段开始
+
+**示例**：
+```rust
+let iteration = IterationBuilder::new("Fix Login Bug")
+    .iteration_type(IterationType::Evolution)
+    .base_iteration_id("iter-1-1234567890")
+    .inheritance_mode(InheritanceMode::Full)
+    .start_stage(Stage::Coding)
+    .build()?;
+```
+
+#### Partial 模式（部分继承）
+
+**适用场景**：
+- 大幅功能增强
+- 架构调整
+- 需要重新生成代码
+
+**继承内容**：
+- 复制 `artifacts/` 目录下的所有文档
+- 复制 `data/` 目录下的所有结构化数据
+- **不复制** `workspace/` 目录
+- 通常从 Coding 或后续阶段开始
+
+**示例**：
+```rust
+let iteration = IterationBuilder::new("Add User Authentication")
+    .iteration_type(IterationType::Evolution)
+    .base_iteration_id("iter-1-1234567890")
+    .inheritance_mode(InheritanceMode::Partial)
+    .start_stage(Stage::Design)
+    .build()?;
+```
+
+### 继承实现
+
+```rust
+impl IterationStore {
+    pub fn create_evolution_iteration(
+        &self,
+        base_iteration_id: &str,
+        inheritance_mode: InheritanceMode,
+        change_description: &str,
+    ) -> Result<Iteration, CoworkError> {
+        // 1. 创建新迭代目录
+        let new_iteration_id = self.generate_iteration_id()?;
+        let new_iteration_dir = self.iterations_dir.join(&new_iteration_id);
+        fs::create_dir_all(&new_iteration_dir)?;
+
+        // 2. 根据继承模式复制内容
+        match inheritance_mode {
+            InheritanceMode::None => {
+                // 不继承任何内容
+            }
+            InheritanceMode::Full => {
+                // 复制 workspace
+                self.copy_workspace(&base_iteration_id, &new_iteration_id)?;
+                // 复制 artifacts 和 data
+                self.copy_artifacts_and_data(&base_iteration_id, &new_iteration_id)?;
+            }
+            InheritanceMode::Partial => {
+                // 只复制 artifacts 和 data
+                self.copy_artifacts_and_data(&base_iteration_id, &new_iteration_id)?;
+            }
         }
-        
-        Ok(())
+
+        // 3. 创建新迭代记录
+        let iteration = Iteration {
+            id: new_iteration_id.clone(),
+            iteration_type: IterationType::Evolution,
+            base_iteration_id: Some(base_iteration_id.to_string()),
+            inheritance_mode,
+            change_description: change_description.to_string(),
+            // ... 其他字段
+        };
+
+        Ok(iteration)
     }
 }
 ```
 
-## 迭代架构的优势
+## 迭代间协作
 
-### 1. **可预测的开发流程**
+### 制品传递
 
-每个迭代都遵循标准化的阶段序列，开发过程变得可预测、可管理、可优化。项目管理者可以清楚了解每个迭代的进度和状态。
+迭代之间通过制品实现协作和上下文传递：
 
-### 2. **知识的沉淀和复用**
+```
+迭代 N-1 制品
+    ↓
+    ├─→ idea.md ─────────────────────┐
+    ├─→ prd.md ──────────────────────┤
+    ├─→ design.md ───────────────────┤
+    ├─→ plan.md ─────────────────────┤
+    ├─→ requirements.json ───────────┤
+    ├─→ design_spec.json ────────────┤
+    └─→ implementation_plan.json ────┤
+                                   ↓
+                            ┌──────────────┐
+                            │  迭代 N      │
+                            │  (继承制品)  │
+                            └──────────────┘
+```
 
-通过迭代制品和记忆系统，项目中的决策和模式得以保存和复用，减少重复劳动，提升长期效率。
+### 增量更新
 
-### 3. **渐进式系统演进**
+演化迭代支持增量更新，只修改受影响的部分：
 
-演化迭代机制支持系统的渐进式演进，避免了大型重构的风险，让系统能够持续适应变化的需求。
+1. **增量需求更新**：只修改需要变更的需求
+2. **增量设计更新**：只调整受影响的组件
+3. **增量计划更新**：只更新相关的任务
+4. **增量代码生成**：只生成和修改必要的代码
 
-### 4. **风险控制和回滚**
+### 反馈循环
 
-每个迭代都是相对独立的边界，如果出现问题可以轻松回滚到上一个稳定的迭代状态。
+迭代之间通过反馈机制实现协作：
 
-### 5. **灵活的团队协作**
+1. **Check Agent 反馈**：发现问题后通过 `goto_stage()` 返回 Coding 阶段
+2. **HITL 反馈**：用户通过 Pipeline 层提供反馈
+3. **迭代间反馈**：从历史迭代中学习，避免重复错误
 
-不同团队成员可以专注不同迭代的开发，通过标准化的制品和上下文实现高效协作。
+## 迭代管理
 
-## 迭代架构最佳实践
+### 创建迭代
 
-### 1. **合理的迭代粒度**
+```rust
+// 创建 Genesis 迭代
+let iteration = iteration_store.create_genesis_iteration(
+    "My First Project",
+    "A web application for task management"
+)?;
 
-- 迭代应该足够小以保持专注，但又足够大以交付价值
-- 一般建议1-4周的迭代周期
-- 每个迭代应该有明确的业务目标
+// 创建 Evolution 迭代
+let iteration = iteration_store.create_evolution_iteration(
+    "iter-1-1234567890",
+    InheritanceMode::Partial,
+    "Add user authentication feature"
+)?;
+```
 
-### 2. **高质量的制品产出**
+### 启动迭代
 
-- 每个阶段的制品都应该结构清晰、内容完整
-- 制品不仅服务当前迭代，还要为未来迭代提供价值
-- 定期评审和改进制品模板
+```rust
+// 从指定阶段启动
+iteration_executor.start_iteration(
+    &iteration_id,
+    Some(Stage::Design)  // 从 Design 阶段开始
+).await?;
+```
 
-### 3. **有效的上下文管理**
+### 暂停迭代
 
-- 及时记录关键决策和理由
-- 维护清晰的技术模式库
-- 定期整理和优化项目记忆
+```rust
+iteration_executor.pause_iteration(&iteration_id).await?;
+```
 
-### 4. **合理的人机协作**
+### 继续迭代
 
-- 在关键决策点保留人工确认
-- 利用人类的创意解决复杂问题
-- 让AI处理重复性和模式化工作
+```rust
+iteration_executor.resume_iteration(&iteration_id).await?;
+```
 
-### 5. **持续的反馈和改进**
+### 查询迭代状态
 
-- 收集每个迭代的反馈数据
-- 定期回顾和优化流程
-- 调整Agent指令和工具以提升效率
+```rust
+let iteration = iteration_store.load(&iteration_id)?;
+println!("Current stage: {:?}", iteration.current_stage);
+println!("Status: {:?}", iteration.status);
+```
 
-## 总结
+### 列出项目迭代
 
-迭代架构是 Cowork Forge 的核心创新，它通过将软件开发抽象为可管理的迭代单元，实现了AI驱动开发的流程化和工程化。这种架构不仅提升了开发效率，更重要的是保证了开发过程的可预测性和质量，使其成为中小型项目全链路开发的理想解决方案。
+```rust
+let iterations = iteration_store.list_by_project(&project_id)?;
+for iteration in iterations {
+    println!("{}: {} ({})", iteration.id, iteration.name, iteration.status);
+}
+```
+
+## 迭代最佳实践
+
+### 命名规范
+
+- 使用清晰、描述性的名称
+- 包含迭代的主要目标
+- 示例："Add User Authentication"、"Fix Login Bug"、"Optimize Database Queries"
+
+### 描述规范
+
+- 详细描述变更内容
+- 说明变更原因和目标
+- 列出预期的影响
+
+### 继承模式选择
+
+| 场景 | 推荐模式 | 原因 |
+|------|---------|------|
+| 全新项目 | None | 从零开始 |
+| Bug 修复 | Full | 保留现有代码 |
+| 小功能增强 | Full | 继承现有代码 |
+| 大功能增强 | Partial | 重新生成代码 |
+| 架构调整 | Partial | 需要重新设计 |
+| 性能优化 | Full | 基于现有代码优化 |
+
+### 迭代粒度
+
+- 保持迭代粒度适中
+- 每个迭代专注于一个主要目标
+- 避免在一个迭代中完成过多任务
+
+### 版本管理
+
+- 定期创建里程碑迭代
+- 为重要版本打标签
+- 保留关键迭代的完整备份
+
+## 相关文档
+
+- [架构概览](./overview.md)
+- [Agent 系统](./agent-system.md)
+- [Pipeline 流程](./pipeline.md)
+- [领域模型](../development/domain.md)

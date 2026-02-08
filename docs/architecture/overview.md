@@ -1,305 +1,336 @@
-# Cowork Forge 整体架构设计
+# Cowork Forge 架构概览
 
-## 设计理念
+## 项目简介
 
-Cowork Forge 基于"迭代驱动"的核心理念，构建了一个AI与人类协作的软件开发系统。系统通过模拟真实开发团队的角色分工和协作流程，将大型语言模型(LLM)的能力结构化、流程化，实现从创意到交付的全链路智能化开发。
+Cowork Forge 是一个完整的 AI 驱动软件开发团队系统，通过模拟真实开发团队的角色分工，实现从创意到交付的全链路智能化开发。
 
-## 核心设计原则
+### 核心功能
 
-### 1. 迭代驱动
-- **迭代是核心概念**：所有开发活动都在迭代单元内进行
-- **支持渐进演进**：通过继承机制实现功能的增量开发
-- **完整的生命周期**：每个迭代包含从需求到交付的完整流程
+- **7 阶段开发工作流**：Idea → PRD → Design → Plan → Coding → Check → Delivery
+- **专业化 AI Agents**：8 个专业智能体，每个阶段都有专门的角色处理
+- **迭代驱动架构**：支持 Genesis（起源）和 Evolution（演化）两种迭代类型
+- **人机协作验证**：关键决策点保留人工确认机制（HITL）
+- **增量代码更新**：智能增量分析，只更新受影响文件
+- **文件安全机制**：所有文件操作限制在 iteration workspace 内
 
-### 2. 角色化Agent
-- **专业分工**：不同Agent负责不同阶段的专业工作
-- **协作机制**：Agent间通过共享上下文和结构化数据协作
-- **人机协作**：关键节点保留人类参与和决策权
+### 设计理念
 
-### 3. 记忆系统
-- **知识沉淀**：将开发过程中的决策和模式固化为可复用的知识
-- **上下文感知**：基于历史记忆为当前开发提供上下文
-- **持续学习**：迭代过程中不断积累和优化知识
+Cowork Forge 的核心理念是"**迭代驱动 + 人机协作**"。系统通过模拟真实开发团队的角色分工和协作流程，将大型语言模型的能力结构化、流程化，使其能够像人类开发团队一样完成完整的软件开发任务。
 
-### 4. 可扩展性
-- **模块化设计**：各组件职责单一，接口清晰
-- **插件机制**：支持自定义Agent、阶段和工具
-- **多端支持**：统一的后端，支持多种前端交互
+**关键设计原则**：
 
-## 分层架构
+1. **迭代驱动**：将软件开发抽象为可管理、可继承、可演进的迭代单元
+2. **角色分工**：每个阶段都有专门的角色处理，职责清晰
+3. **质量保证**：Actor-Critic 模式确保产出质量
+4. **人机协作**：关键决策点保留人工参与
+5. **安全隔离**：所有文件操作限制在 workspace 内
+6. **版本化管理**：提供版本化的制品管理和上下文传递
 
-```mermaid
-graph TB
-    subgraph "用户接口层 (Presentation)"
-        CLI[CLI命令行]
-        GUI[GUI桌面应用]
-    end
-    
-    subgraph "交互抽象层 (Interaction)"
-        Backend[InteractiveBackend]
-        Event[事件总线]
-    end
-    
-    subgraph "核心服务层 (Core)"
-        Executor[迭代执行器]
-        Pipeline[开发管道]
-        StageEngine[阶段引擎]
-        AgentRuntime[Agent运行时]
-    end
-    
-    subgraph "领域模型层 (Domain)"
-        Project[项目管理]
-        Iteration[迭代控制]
-        Memory[记忆管理]
-        Artifact[制品管理]
-    end
-    
-    subgraph "基础设施层 (Infrastructure)"
-        LLMService[LLM服务]
-        FileStore[文件存储]
-        Config[配置管理]
-    end
-    
-    CLI --> Backend
-    GUI --> Backend
-    Backend --> Executor
-    Backend --> Event
-    Event --> Executor
-    Event --> AgentRuntime
-    Executor --> Pipeline
-    Pipeline --> StageEngine
-    StageEngine --> AgentRuntime
-    AgentRuntime --> Project
-    AgentRuntime --> Iteration
-    AgentRuntime --> Memory
-    AgentRuntime --> Artifact
-    Project --> FileStore
-    Iteration --> FileStore
-    Memory --> FileStore
-    Artifact --> FileStore
-    AgentRuntime --> LLMService
-    Executor --> Config
+## 架构分层
+
+### 系统架构图
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    用户接口层                            │
+│   ┌──────────────┐         ┌──────────────┐            │
+│   │   CLI 界面   │         │   GUI 界面   │            │
+│   └──────────────┘         └──────────────┘            │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│                  交互抽象层                             │
+│              (InteractiveBackend)                       │
+│   ┌──────────────┐         ┌──────────────┐            │
+│   │  CLI Backend │         │  GUI Backend │            │
+│   └──────────────┘         └──────────────┘            │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│                   核心服务层                            │
+│   ┌─────────────────────────────────────────────────┐   │
+│   │          IterationExecutor                      │   │
+│   │    (迭代执行器 - 管理完整生命周期)              │   │
+│   └─────────────────────────────────────────────────┘   │
+│                          ↓                               │
+│   ┌─────────────────────────────────────────────────┐   │
+│   │            Pipeline                             │   │
+│   │       (工作流编排 - 阶段序列管理)                │   │
+│   └─────────────────────────────────────────────────┘   │
+│                          ↓                               │
+│   ┌─────────────────────────────────────────────────┐   │
+│   │          StageExecutor                          │   │
+│   │       (阶段引擎 - 单阶段执行逻辑)                │   │
+│   └─────────────────────────────────────────────────┘   │
+│                          ↓                               │
+│   ┌─────────────────────────────────────────────────┐   │
+│   │         Agent Runtime                           │   │
+│   │       (Agent 运行时 - 基于 adk-rust)             │   │
+│   └─────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│                   领域模型层                            │
+│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│   │   Project    │  │  Iteration   │  │   Memory     │ │
+│   │  项目管理    │  │  迭代控制    │  │  记忆管理    │ │
+│   └──────────────┘  └──────────────┘  └──────────────┘ │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│                   基础设施层                            │
+│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│   │  LLM 服务    │  │  文件存储    │  │  配置管理    │ │
+│   └──────────────┘  └──────────────┘  └──────────────┘ │
+└─────────────────────────────────────────────────────────┘
 ```
 
-## 核心组件说明
+### 层级职责
 
-### 1. 用户接口层
+| 层级 | 职责 | 关键组件 |
+|------|------|----------|
+| **用户接口层** | 提供用户交互界面 | CLI、GUI (Tauri) |
+| **交互抽象层** | 统一交互接口，支持多种前端 | InteractiveBackend |
+| **核心服务层** | 核心业务逻辑和流程编排 | IterationExecutor、Pipeline、StageExecutor |
+| **领域模型层** | 业务领域实体和规则 | Project、Iteration、Memory |
+| **基础设施层** | 技术支撑服务 | LLM、文件存储、配置管理 |
 
-**CLI (cowork-cli)**
-```rust
-// 基于clap的命令行接口
-#[derive(Subcommand)]
-enum Commands {
-    Iter { /* 创建迭代 */ },
-    List { /* 查看迭代列表 */ },
-    Continue { /* 继续暂停的迭代 */ },
-    Init { /* 初始化项目 */ },
-    // ...
-}
+## 技术栈
+
+### 后端技术栈
+
+| 技术领域 | 技术选型 | 版本要求 |
+|---------|---------|---------|
+| **语言** | Rust | 1.70+ |
+| **AI 框架** | adk-rust | 最新版 |
+| **异步运行时** | tokio | 1.0+ |
+| **序列化** | serde | 1.0+ |
+| **CLI** | clap | 4.0+ |
+
+### 前端技术栈
+
+| 技术领域 | 技术选型 | 版本要求 |
+|---------|---------|---------|
+| **桌面框架** | Tauri | 2.0+ |
+| **构建工具** | Vite | 5.0+ |
+| **运行时** | bun | 1.0+ |
+
+### LLM 服务
+
+- 支持多种 LLM 提供商（OpenAI、Anthropic、本地模型等）
+- 速率限制和错误重试机制
+- 上下文管理优化
+
+## 目录结构
+
+### 项目根目录
+
+```
+cowork-forge/
+├── crates/                  # Cargo 工作空间
+│   ├── cowork-cli/         # CLI 命令行接口
+│   ├── cowork-core/        # 核心业务逻辑
+│   └── cowork-gui/         # GUI 桌面应用
+├── docs/                   # 项目文档
+├── assets/                 # 静态资源
+├── Cargo.toml             # 工作空间配置
+└── README.md              # 项目说明
 ```
 
-**GUI (cowork-gui)**
-- 基于Tauri的桌面应用
-- 提供可视化的开发流程展示
-- 支持更友好的交互方式
+### cowork-core 目录结构
 
-### 2. 交互抽象层
-
-**InteractiveBackend 特征**
-```rust
-#[async_trait]
-pub trait InteractiveBackend: Send + Sync {
-    async fn show_message(&self, level: MessageLevel, content: String);
-    async fn request_input(&self, prompt: &str, options: Vec<InputOption>, initial_content: Option<String>) -> Result<InputResponse>;
-    async fn show_progress(&self, task_id: String, progress: ProgressInfo);
-    async fn submit_response(&self, request_id: String, response: String) -> Result<()>;
-    fn event_bus(&self) -> Arc<EventBus>;
-}
+```
+cowork-core/
+├── src/
+│   ├── domain/            # 领域模型
+│   │   ├── iteration.rs   # 迭代实体
+│   │   ├── memory.rs      # 记忆系统
+│   │   └── project.rs     # 项目实体
+│   ├── pipeline/          # 工作流编排
+│   │   ├── executor.rs    # 迭代执行器
+│   │   ├── stage_executor.rs  # 阶段执行器
+│   │   └── stages/        # 各阶段实现
+│   ├── agents/            # Agent 构建器
+│   │   └── mod.rs         # Agent 配置
+│   ├── instructions/      # Agent 指令模板
+│   │   ├── idea.rs        # Idea Agent 指令
+│   │   ├── prd.rs         # PRD Agent 指令
+│   │   ├── design.rs      # Design Agent 指令
+│   │   ├── plan.rs        # Plan Agent 指令
+│   │   ├── coding.rs      # Coding Agent 指令
+│   │   ├── check.rs       # Check Agent 指令
+│   │   └── delivery.rs    # Delivery Agent 指令
+│   ├── tools/             # 工具实现
+│   │   ├── file_tools.rs      # 文件操作工具
+│   │   ├── deployment_tools.rs # 部署工具
+│   │   ├── data_tools.rs      # 数据管理工具
+│   │   ├── validation_tools.rs # 验证工具
+│   │   └── mod.rs              # 工具模块
+│   ├── llm/               # LLM 集成
+│   │   ├── config.rs      # LLM 配置
+│   │   └── rate_limiter.rs    # 速率限制
+│   ├── data/              # 数据模型
+│   │   ├── models.rs      # 数据结构
+│   │   └── schemas/       # 数据模式
+│   ├── persistence/       # 持久化
+│   │   ├── iteration_store.rs
+│   │   ├── memory_store.rs
+│   │   └── project_store.rs
+│   ├── interaction/       # 交互抽象
+│   │   ├── cli.rs         # CLI 实现
+│   │   └── tauri.rs       # Tauri 实现
+│   └── storage/           # 文件存储
+└── Cargo.toml
 ```
 
-- 解耦核心逻辑与具体UI实现
-- 支持异步交互和进度展示
-- 提供统一的人机协作接口
+### .cowork-v2 数据目录
 
-### 3. 核心服务层
-
-**迭代执行器 (IterationExecutor)**
-- 管理迭代的完整生命周期
-- 控制阶段执行顺序和状态转换
-- 处理异常和重试逻辑
-- 协调人机交互流程
-
-**开发管道 (Pipeline)**
-- 定义标准的开发阶段序列
-- 支持从任意阶段开始执行
-- 提供阶段执行上下文
-- 处理阶段间的数据流转
-
-**Agent运行时**
-- 基于adk-rust框架构建
-- 管理Agent的创建和执行
-- 提供工具调用和LLM交互
-- 控制Agent间的协作流程
-
-### 4. 领域模型层
-
-**项目管理 (Project)**
-```rust
-pub struct Project {
-    pub id: String,
-    pub name: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub metadata: ProjectMetadata,
-    pub current_iteration_id: Option<String>,
-    pub iterations: Vec<IterationSummary>,
-}
+```
+.cowork-v2/
+├── iterations/              # 迭代数据
+│   └── {iteration_id}/      # 每个迭代一个目录
+│       ├── iteration.json   # 迭代元数据
+│       ├── artifacts/       # 迭代制品
+│       │   ├── idea.md
+│       │   ├── prd.md
+│       │   ├── design.md
+│       │   ├── plan.md
+│       │   └── delivery.md
+│       ├── data/            # 结构化数据
+│       │   ├── requirements.json
+│       │   ├── feature_list.json
+│       │   ├── design_spec.json
+│       │   └── implementation_plan.json
+│       ├── session/         # 会话数据
+│       │   ├── meta.json
+│       │   └── feedback.json
+│       ├── workspace/       # 代码工作空间
+│       │   ├── src/
+│       │   ├── components/
+│       │   └── ...
+│       └── logs/            # 日志文件
+└── memory/                  # 记忆系统
+    ├── project/             # 项目级记忆
+    └── iterations/          # 迭代级记忆
 ```
 
-**迭代控制 (Iteration)**
-```rust
-pub struct Iteration {
-    pub id: String,
-    pub number: u32,
-    pub title: String,
-    pub description: String,
-    pub base_iteration_id: Option<String>,
-    pub inheritance: InheritanceMode,
-    pub status: IterationStatus,
-    // ...
-}
+## 核心概念
+
+### Iteration（迭代）
+
+Iteration 是 Cowork Forge 的核心概念，代表一个完整的开发周期。每个 Iteration 包含：
+
+- **独立的制品**：idea.md、prd.md、design.md、plan.md、delivery.md
+- **结构化数据**：requirements.json、design_spec.json、implementation_plan.json
+- **代码工作空间**：workspace 目录，存放生成的代码
+- **会话数据**：meta.json、feedback.json
+- **记忆系统**：迭代级记忆，记录关键决策和学习内容
+
+### Iteration 类型
+
+| 类型 | 说明 | 适用场景 |
+|------|------|---------|
+| **Genesis** | 起源迭代，从零开始 | 新项目创建 |
+| **Evolution** | 演化迭代，基于现有迭代 | 功能增强、Bug 修复 |
+
+### Inheritance Mode（继承模式）
+
+演化迭代支持三种继承模式：
+
+| 模式 | 说明 | 使用场景 |
+|------|------|---------|
+| **None** | 不继承，全新开始 | 需要完全重写的场景 |
+| **Full** | 完全继承，复制所有 workspace 文件 | 小幅修改、Bug 修复 |
+| **Partial** | 部分继承，只复制 artifacts 和配置 | 大幅修改、架构调整 |
+
+### Agent 角色
+
+Cowork Forge 有 8 个专业智能体，每个负责不同的阶段：
+
+| Agent | 类型 | 职责 |
+|-------|------|------|
+| **Idea Agent** | 单一 Agent | 理解用户创意，生成 idea.md |
+| **PRD Loop** | LoopAgent (Actor + Critic) | 生成产品需求文档，创建结构化需求 |
+| **Design Loop** | LoopAgent (Actor + Critic) | 设计系统架构，创建设计规范 |
+| **Plan Loop** | LoopAgent (Actor + Critic) | 制定实施计划，分解任务 |
+| **Coding Loop** | LoopAgent (Actor + Critic) | 生成代码，实现功能 |
+| **Check Agent** | 单一 Agent | 质量检查，验证功能完整性 |
+| **Delivery Agent** | 单一 Agent | 生成交付报告，部署代码 |
+
+### 工具体系
+
+Cowork Forge 使用专用工具体系，遵循权限最小化原则：
+
+| 工具类型 | 工具示例 | 使用场景 |
+|---------|---------|---------|
+| **Artifact 工具** | SaveIdeaTool、SavePrdDocTool | 保存文档 |
+| **文件工具** | ReadFileTool、WriteFileTool | 操作代码文件 |
+| **命令工具** | RunCommandTool | 执行构建和测试 |
+| **数据工具** | CreateRequirementTool | 管理结构化数据 |
+| **验证工具** | CheckTestsTool、CheckLintTool | 质量验证 |
+| **部署工具** | CopyWorkspaceToProjectTool | 部署代码 |
+
+## 安全机制
+
+### 文件安全
+
+- **Workspace 隔离**：所有文件操作限制在 iteration workspace 内
+- **相对路径验证**：只接受相对路径，拒绝绝对路径和 `..` 访问
+- **路径安全检查**：验证路径是否在 workspace 目录内
+- **Delivery 同步**：只在 Delivery 阶段将代码复制到项目根目录
+
+### 权限控制
+
+- **权限最小化**：非编码阶段不提供通用的文件读写权限
+- **工具专用化**：每个工具只完成特定功能
+- **参数验证**：所有工具使用安全的参数提取函数
+- **错误处理**：缺失参数时返回清晰的错误信息
+
+### 命令安全
+
+- **命令白名单**：阻止危险命令（rm -rf、sudo 等）
+- **超时控制**：命令执行 30 秒超时
+- **阻塞检测**：自动拒绝长时间运行的命令
+
+## 快速开始
+
+### 安装
+
+```bash
+# 克隆仓库
+git clone https://github.com/sopaco/cowork-forge.git
+cd cowork-forge
+
+# 构建项目
+cargo build --release
 ```
 
-**记忆管理 (Memory)**
-- 项目级记忆：跨迭代的知识沉淀
-- 迭代级记忆：当前迭代的上下文和洞察
-- 智能查询：基于关键词的上下文检索
+### 运行 CLI
 
-### 5. 基础设施层
+```bash
+# 创建新项目
+cargo run --release -- new my-project
 
-**LLM服务**
-- 抽象LLM调用和响应处理
-- 支持多种LLM提供商
-- 流式响应和错误处理
-- 提示词管理和优化
+# 启动迭代
+cargo run --release -- start
 
-**文件存储**
-- 基于文件系统的简单持久化
-- 结构化的目录和文件组织
-- 原子性写入和备份机制
-
-**配置管理**
-- 支持文件和环境变量配置
-- 灵活的LLM和服务配置
-- 运行时参数调整
-
-## 数据流和控制流
-
-### 开发流程数据流
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant CLI
-    participant Executor
-    participant Pipeline
-    participant Agent
-    participant LLM
-    participant Storage
-    
-    User->>CLI: 创建迭代
-    CLI->>Executor: 初始化并执行迭代
-    
-    loop 每个阶段
-        Executor->>Pipeline: 执行阶段
-        Pipeline->>Agent: 创建角色Agent
-        Agent->>LLM: 执行任务
-        LLM->>Agent: 返回结果
-        Agent->>Storage: 保存制品
-        
-        alt 关键阶段
-            Agent->>CLI: 请求人工确认
-            CLI->>User: 展示结果
-            User->>CLI: 确认或反馈
-            CLI->>Agent: 传递反馈
-            Agent->>LLM: 根据反馈修改
-        end
-    end
-    
-    Executor->>Storage: 更新迭代状态
-    Executor->>CLI: 完成通知
+# 查看迭代状态
+cargo run --release -- status
 ```
 
-### 事件驱动机制
+### 运行 GUI
 
-```mermaid
-graph LR
-    subgraph "事件发布者"
-        Stage[阶段执行器]
-        Agent[Agent系统]
-        User[用户操作]
-    end
-    
-    subgraph "事件总线"
-        EventBus[EventBus]
-        Subscription[订阅管理]
-    end
-    
-    subgraph "事件订阅者"
-        UI[UI更新]
-        Storage[存储更新]
-        Monitor[监控日志]
-    end
-    
-    Stage --> EventBus
-    Agent --> EventBus
-    User --> EventBus
-    EventBus --> Subscription
-    Subscription --> UI
-    Subscription --> Storage
-    Subscription --> Monitor
+```bash
+# 启动 GUI 应用
+cargo run --release --manifest-path=crates/cowork-gui/Cargo.toml
 ```
 
-## 架构优势
+## 相关文档
 
-### 1. **清晰的职责分离**
-- 每一层的职责明确，依赖关系清晰
-- 专注于单一职责，降低系统复杂度
-- 便于独立测试和维护
-
-### 2. **良好的可扩展性**
-- 新增前端无需修改后端逻辑
-- 新增阶段或Agent不影响现有流程
-- 支持插件式功能扩展
-
-### 3. **灵活的人机协作**
-- 可配置的人机交互点
-- 支持多种交互模式
-- 适应不同开发场景
-
-### 4. **强大的上下文管理**
-- 记忆系统提供持久的上下文
-- 迭代间上下文继承和传递
-- 智能的历史信息查询
-
-## 架构演变路径
-
-1. **当前版本 (2.0)**
-   - 基于迭代架构的完整实现
-   - 标准化的Agent协作机制
-   - 基础的人机交互支持
-
-2. **短期演进**
-   - 增强GUI界面的可视化能力
-   - 完善错误处理和恢复机制
-   - 优化记忆系统的查询和索引
-
-3. **中期目标**
-   - 支持多项目和团队协作
-   - 集成版本控制和CI/CD
-   - 开发自定义插件机制
-
-4. **长期愿景**
-   - 分布式Agent协作
-   - 实时多用户协作
-   - 智能化的开发决策支持
+- [Agent 系统](./agent-system.md)
+- [迭代架构](./iteration-architecture.md)
+- [Pipeline 流程](./pipeline.md)
+- [文件安全机制](./file-security.md)
+- [Artifacts 验证](./artifacts-validation.md)
+- [领域模型](../development/domain.md)
+- [工具系统](../development/tools.md)
