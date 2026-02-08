@@ -614,11 +614,11 @@ pub async fn query_memory_index(
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    println!("[GUI] Querying memory index: query_type={}, stage={:?}, limit={}, iteration_id={:?}", 
+    println!("[GUI] Querying memory index: query_type={}, stage={:?}, limit={}, iteration_id={:?}",
              query_type, stage, limit, iteration_id);
 
     let store = cowork_core::persistence::MemoryStore::new();
-    
+
     // Convert parameters to new MemoryQuery format
     let scope = cowork_core::domain::MemoryScope::Smart; // Default to smart query
     let query_type_enum = match query_type.as_str() {
@@ -627,30 +627,95 @@ pub async fn query_memory_index(
         "insights" => cowork_core::domain::MemoryQueryType::Insights,
         _ => cowork_core::domain::MemoryQueryType::All,
     };
-    
+
     let keywords = if let Some(s) = stage {
         vec![s]
     } else {
         vec![]
     };
-    
+
     let query = cowork_core::domain::MemoryQuery {
         scope,
         query_type: query_type_enum,
         keywords,
         limit: Some(limit as usize),
     };
-    
+
     let result = store.query(&query, iteration_id.as_deref())
         .map_err(|e| format!("Failed to query memory: {}", e))?;
-    
+
+    // Convert to format expected by frontend: { results: [], total: N }
+    let mut results: Vec<serde_json::Value> = Vec::new();
+
+    // Add decisions
+    for decision in &result.decisions {
+        let decision_data = serde_json::json!({
+            "id": decision.id,
+            "title": decision.title.chars().take(50).collect::<String>(),
+            "summary": decision.context.clone(),
+            "category": "decision",
+            "stage": "",
+            "created_at": decision.created_at.to_rfc3339(),
+            "impact": "medium",
+            "tags": vec![] as Vec<String>,
+            "file": format!("memory/decisions.json")
+        });
+        results.push(decision_data);
+    }
+
+    // Add patterns
+    for pattern in &result.patterns {
+        let pattern_data = serde_json::json!({
+            "id": pattern.id,
+            "title": pattern.name.chars().take(50).collect::<String>(),
+            "summary": pattern.usage.join("; "),
+            "category": "pattern",
+            "stage": "",
+            "created_at": pattern.created_at.to_rfc3339(),
+            "impact": "high",
+            "tags": pattern.tags.clone(),
+            "file": format!("memory/patterns.json")
+        });
+        results.push(pattern_data);
+    }
+
+    // Add insights
+    for insight in &result.insights {
+        let impact = match insight.importance {
+            cowork_core::domain::Importance::Critical => "high",
+            cowork_core::domain::Importance::Important => "medium",
+            cowork_core::domain::Importance::Normal => "low",
+        };
+
+        let insight_data = serde_json::json!({
+            "id": format!("insight-{}", insight.created_at.timestamp()),
+            "title": format!("Insight: {}", insight.content.chars().take(40).collect::<String>()),
+            "summary": insight.content.clone(),
+            "category": "experience",
+            "stage": insight.stage.clone(),
+            "created_at": insight.created_at.to_rfc3339(),
+            "impact": impact,
+            "tags": vec![] as Vec<String>,
+            "file": format!("memory/insights.json")
+        });
+        results.push(insight_data);
+    }
+
+    // Sort by created_at (newest first)
+    results.sort_by(|a, b| {
+        let a_time = a.get("created_at").and_then(|v| v.as_str()).unwrap_or("");
+        let b_time = b.get("created_at").and_then(|v| v.as_str()).unwrap_or("");
+        b_time.cmp(a_time)
+    });
+
+    // Apply limit
+    results.truncate(limit as usize);
+
+    let total = results.len();
+
     Ok(serde_json::json!({
-        "decisions": result.decisions,
-        "patterns": result.patterns,
-        "insights": result.insights,
-        "total_decisions": result.decisions.len(),
-        "total_patterns": result.patterns.len(),
-        "total_insights": result.insights.len()
+        "results": results,
+        "total": total
     }))
 }
 

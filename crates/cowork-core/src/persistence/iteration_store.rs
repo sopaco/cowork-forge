@@ -83,6 +83,11 @@ impl IterationStore {
     pub fn ensure_workspace(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
         let workspace = self.workspace_path(iteration_id)?;
         std::fs::create_dir_all(&workspace)?;
+
+        // Also ensure memory directory exists for this iteration
+        let memory_dir = get_cowork_dir()?.join("memory/iterations");
+        std::fs::create_dir_all(&memory_dir)?;
+
         Ok(workspace)
     }
 

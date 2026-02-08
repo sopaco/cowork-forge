@@ -18,6 +18,14 @@ impl MemoryStore {
     pub fn load_project_memory(&self) -> anyhow::Result<ProjectMemory> {
         let path = self.project_memory_path()?;
         if !path.exists() {
+            // 如果目录不存在，创建一个默认的空memory
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+                let default_memory = ProjectMemory::new();
+                let content = serde_json::to_string_pretty(&default_memory)?;
+                std::fs::write(&path, content)?;
+                return Ok(default_memory);
+            }
             return Ok(ProjectMemory::new());
         }
         let content = std::fs::read_to_string(&path)?;
@@ -28,6 +36,9 @@ impl MemoryStore {
     /// Save project memory
     pub fn save_project_memory(&self, memory: &ProjectMemory) -> anyhow::Result<()> {
         let path = self.project_memory_path()?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         let content = serde_json::to_string_pretty(memory)?;
         std::fs::write(&path, content)?;
         Ok(())
@@ -53,6 +64,14 @@ impl MemoryStore {
     pub fn load_iteration_memory(&self, iteration_id: &str) -> anyhow::Result<IterationMemory> {
         let path = self.iteration_memory_path(iteration_id)?;
         if !path.exists() {
+            // 如果目录不存在，创建一个默认的空memory
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+                let default_memory = IterationMemory::new(iteration_id);
+                let content = serde_json::to_string_pretty(&default_memory)?;
+                std::fs::write(&path, content)?;
+                return Ok(default_memory);
+            }
             return Ok(IterationMemory::new(iteration_id));
         }
         let content = std::fs::read_to_string(&path)?;
@@ -63,6 +82,9 @@ impl MemoryStore {
     /// Save iteration memory
     pub fn save_iteration_memory(&self, memory: &IterationMemory) -> anyhow::Result<()> {
         let path = self.iteration_memory_path(&memory.iteration_id)?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         let content = serde_json::to_string_pretty(memory)?;
         std::fs::write(&path, content)?;
         Ok(())
@@ -79,9 +101,9 @@ impl MemoryStore {
     pub fn promote_insights_to_decisions(&self, iteration_id: &str) -> anyhow::Result<usize> {
         let iteration_memory = self.load_iteration_memory(iteration_id)?;
         let mut project_memory = self.load_project_memory()?;
-        
+
         let mut promoted_count = 0;
-        
+
         // Promote critical insights to decisions
         for insight in &iteration_memory.insights {
             if insight.importance == crate::domain::Importance::Critical {
@@ -91,12 +113,12 @@ impl MemoryStore {
                     format!("Critical insight: {}", insight.content),
                     iteration_id
                 );
-                
+
                 project_memory.add_decision(decision);
                 promoted_count += 1;
             }
         }
-        
+
         self.save_project_memory(&project_memory)?;
         Ok(promoted_count)
     }
