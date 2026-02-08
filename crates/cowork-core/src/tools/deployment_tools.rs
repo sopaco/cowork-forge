@@ -53,7 +53,7 @@ impl Tool for CopyWorkspaceToProjectTool {
         // Get iteration workspace path
         let iteration_id = get_iteration_id()
             .ok_or_else(|| adk_core::AdkError::Tool("Iteration ID not set. Cannot deploy without an active iteration.".to_string()))?;
-        
+
         let iteration_store = IterationStore::new();
         let workspace_dir = iteration_store.workspace_path(&iteration_id)
             .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e)))?;
@@ -80,17 +80,131 @@ impl Tool for CopyWorkspaceToProjectTool {
             ".json", ".md", ".txt", ".svg", ".png", ".jpg", ".jpeg"
         ];
 
+        // Protected files and directories that should NEVER be deleted
+        let protected_paths = vec![
+            ".cowork-v2",
+            ".git",
+            ".litho",
+            "litho.docs",
+            ".gitignore",
+            ".gitattributes",
+            ".zed",
+            "AGENT.md",
+            ".vscode",
+            ".idea",
+            "config.toml",
+            "Cargo.toml",
+            "Cargo.lock",
+            "README.md",
+            "LICENSE",
+            ".gitignore",
+            ".DS_Store",
+        ];
+
+        // Step 1: Clean up obsolete files in project root
+        println!("[Delivery] Step 1: Cleaning up obsolete files in project root...");
+        let mut deleted_files = Vec::new();
+        let mut protected_skipped = Vec::new();
+
+        for entry in walkdir::WalkDir::new(&project_root)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            let dest_path = entry.path();
+
+            // Skip directories (we'll delete them when they become empty)
+            if dest_path.is_dir() {
+                continue;
+            }
+
+            // Get relative path from project root
+            let rel_path = dest_path.strip_prefix(&project_root)
+                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get relative path: {}", e)))?;
+
+            // Check if this is a protected file/directory
+            let path_str = rel_path.to_string_lossy().to_string();
+            let is_protected = protected_paths.iter().any(|protected| {
+                // Exact match for files
+                if path_str == *protected {
+                    return true;
+                }
+                // Check if it's inside a protected directory
+                path_str.starts_with(&format!("{}/", protected))
+            });
+
+            if is_protected {
+                protected_skipped.push(path_str.clone());
+                println!("[Delivery] Skipped protected: {}", path_str);
+                continue;
+            }
+
+            // Check if file exists in workspace
+            let src_path = workspace_dir.join(&rel_path);
+            if !src_path.exists() {
+                // File doesn't exist in workspace, delete it
+                match fs::remove_file(&dest_path) {
+                    Ok(_) => {
+                        deleted_files.push(path_str.clone());
+                        println!("[Delivery] Deleted obsolete file: {}", path_str);
+                    }
+                    Err(e) => {
+                        println!("[Delivery] Warning: Failed to delete {}: {}", path_str, e);
+                    }
+                }
+            }
+        }
+
+        // Clean up empty directories
+        for entry in walkdir::WalkDir::new(&project_root)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+        {
+            let dir_path = entry.path();
+
+            // Skip protected directories
+            let rel_path = dir_path.strip_prefix(&project_root)
+                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get relative path: {}", e)))?;
+
+            let path_str = rel_path.to_string_lossy().to_string();
+            let is_protected = protected_paths.iter().any(|protected| {
+                path_str == *protected || path_str.starts_with(&format!("{}/", protected))
+            });
+
+            if is_protected {
+                continue;
+            }
+
+            // Check if directory is empty
+            if dir_path.read_dir().ok().map(|mut it| it.next().is_none()).unwrap_or(false) {
+                match fs::remove_dir(&dir_path) {
+                    Ok(_) => {
+                        println!("[Delivery] Deleted empty directory: {}", path_str);
+                    }
+                    Err(e) => {
+                        println!("[Delivery] Warning: Failed to delete directory {}: {}", path_str, e);
+                    }
+                }
+            }
+        }
+
+        // Step 2: Copy files from workspace to project root
+        println!("[Delivery] Step 2: Copying files from workspace...");
         let mut copied_files = Vec::new();
         let mut skipped_files = Vec::new();
 
-        // Walk through workspace directory
         for entry in walkdir::WalkDir::new(&workspace_dir)
             .follow_links(false)
             .into_iter()
             .filter_map(|e| e.ok())
         {
             let src_path = entry.path();
-            
+
             // Skip directories
             if src_path.is_dir() {
                 continue;
@@ -128,14 +242,21 @@ impl Tool for CopyWorkspaceToProjectTool {
             println!("[Delivery] Copied: {}", rel_path.display());
         }
 
-        println!("[Delivery] Deployment complete: {} files copied, {} files skipped", 
-                 copied_files.len(), skipped_files.len());
+        println!("[Delivery] Deployment complete: {} files deleted, {} files copied, {} files skipped, {} protected files skipped",
+                 deleted_files.len(), copied_files.len(), skipped_files.len(), protected_skipped.len());
 
         Ok(json!({
             "status": "success",
-            "message": format!("Deployed {} files from workspace to project root", copied_files.len()),
+            "message": format!(
+                "Deployed {} files from workspace to project root ({} deleted, {} protected)",
+                copied_files.len(),
+                deleted_files.len(),
+                protected_skipped.len()
+            ),
+            "deleted_files": deleted_files,
             "copied_files": copied_files,
             "skipped_files": skipped_files,
+            "protected_files": protected_skipped,
             "workspace": workspace_dir.to_string_lossy().to_string(),
             "project_root": project_root.to_string_lossy().to_string()
         }))
