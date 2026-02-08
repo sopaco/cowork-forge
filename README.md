@@ -156,7 +156,7 @@ Multi-layer security checks prevent:
 
 # 🏗️ Architecture
 
-Cowork Forge is built with a modular, domain-driven architecture:
+Cowork Forge is built as a Rust workspace with modular, domain-driven architecture based on the adk-rust framework:
 
 ```mermaid
 graph TB
@@ -164,85 +164,91 @@ graph TB
         CLI[cowork-cli]
     end
     
-    subgraph "Core Layer"
-        Orch[Orchestrator]
-        Exec[StageExecutor]
+    subgraph "Core Library"
+        CORE[cowork-core]
     end
     
-    subgraph "Agent Layer"
-        IDEA[Idea Agent]
-        PRD[PRD Loop Agent]
-        DESIGN[Design Loop Agent]
-        PLAN[Plan Loop Agent]
-        CODING[Coding Loop Agent]
-        CHECK[Check Agent]
-        DELIVERY[Delivery Agent]
-    end
-    
-    subgraph "Infrastructure Layer"
+    subgraph "Core Modules"
+        AGENTS[Agents]
+        PIPELINE[Pipeline]
         TOOLS[Tools]
-        VERIFY[Verification]
-        MEMORY[Memory]
-        HITL[HITL]
+        PERSISTENCE[Persistence]
+        DOMAIN[Domain]
+    end
+    
+    subgraph "ADK Framework"
+        ADK[adk-rust 0.2.1]
+        LLM[adk-model]
+    end
+    
+    subgraph "Infrastructure"
+        FS[File System]
         CONFIG[Config]
+        HITL[HITL]
     end
     
     subgraph "External"
-        LLM[OpenAI LLM]
-        FS[File System]
-        CMD[Command Line]
+        OPENAI[OpenAI LLM]
+        EMBEDDING[Embedding API]
     end
     
-    CLI --> Orch
-    Orch --> Exec
-    Exec --> IDEA
-    Exec --> PRD
-    Exec --> DESIGN
-    Exec --> PLAN
-    Exec --> CODING
-    Exec --> CHECK
-    Exec --> DELIVERY
+    CLI --> CORE
+    CORE --> AGENTS
+    CORE --> PIPELINE
+    CORE --> TOOLS
     
-    IDEA --> TOOLS
-    CODING --> TOOLS
-    CHECK --> TOOLS
+    AGENTS --> ADK
+    PIPELINE --> DOMAIN
+    TOOLS --> PERSISTENCE
     
-    CHECK --> VERIFY
-    CODING --> VERIFY
+    ADK --> LLM
+    LLM --> OPENAI
+    LLM --> EMBEDDING
     
-    Exec --> HITL
-    
+    PIPELINE --> HITL
     TOOLS --> FS
-    TOOLS --> CMD
-    
-    IDEA -.-> LLM
-    PRD -.-> LLM
-    DESIGN -.-> LLM
-    CODING -.-> LLM
+    CORE --> CONFIG
 ```
 
 ## Key Components
 
-### Pipeline Orchestrator
-Manages session lifecycle, stage dependencies, and workflow execution with support for full and partial pipeline assembly.
+### Rust Workspace Structure
+The project is organized as a Rust workspace with multiple crates:
+- `cowork-core`: Core library with domain logic, agents, and tools
+- `cowork-cli`: Command-line interface for interacting with the system
+- `cowork-gui`: Optional graphical user interface (Tauri-based)
+
+### Iteration Architecture
+Core concept that manages complete development cycles as independent, inheritable units:
+- **Genesis Iterations**: Start new projects from scratch
+- **Evolution Iterations**: Build upon existing iterations with inheritance modes
+- **Inheritance Modes**: None (fresh start), Full (complete code copy), Partial (documents only)
+
+### ADK Framework Integration
+Built on the adk-rust framework (v0.2.1) providing:
+- Agent orchestration and management
+- LLM integration with OpenAI and custom providers
+- Tool system for safe code operations
+- Built-in iteration support
 
 ### AI Agents
-Specialized agents work collaboratively, each responsible for a specific stage of the development lifecycle. Four agents (PRD, Design, Plan, Coding) use actor-critic loop patterns for iterative refinement with human feedback. Includes: Idea, PRD, Design, Plan, Coding, Check, Delivery, Change Triage, Code Patch, Modify Delivery.
-
-### Instruction Templates
-Provides specialized prompt templates for each agent, defining their behavior and output format.
+Specialized agents using the adk-rust agent framework:
+- Idea Agent: Structures initial concepts
+- Loop Agents (PRD, Design, Plan, Coding): Actor-critic pattern for refinement
+- Check Agent: Validates implementation
+- Delivery Agent: Finalizes deliverables
 
 ### Tools Module
-Safe file operations and command execution with security checks and resource limits.
+Secure tool execution with workspace validation:
+- File operations within project boundaries
+- Command execution with safety checks
+- Interactive tools for human-in-the-loop validation
 
-### LLM Integration Layer
-Manages interactions with large language models, including rate limiting, API clients, and request optimization.
-
-### Data Module
-Defines system data models and session management mechanisms.
-
-### Storage Module
-Provides persistent data management and retrieval capabilities.
+### Persistence Layer
+Data management and storage:
+- Iteration storage and retrieval
+- Artifact management
+- Configuration persistence
 
 # 🧠 How It Works
 
@@ -295,8 +301,8 @@ sequenceDiagram
 # 🖥 Getting Started
 
 ### Prerequisites
-- [**Rust**](https://www.rust-lang.org) (version 1.70 or later)
-- [**OpenAI API Key**](https://platform.openai.com/) for LLM access
+- [**Rust**](https://www.rust-lang.org) (edition 2024)
+- [**LLM API Access**](https://platform.openai.com/) (OpenAI or compatible provider)
 - Git and language-specific build tools (cargo, npm, pip, etc.)
 
 ### Installation
@@ -308,7 +314,7 @@ Build from source:
 git clone https://github.com/sopaco/cowork-forge.git
 cd cowork-forge
 
-# Build the project
+# Build the entire workspace
 cargo build --release
 
 # The CLI binary will be available at:
@@ -324,30 +330,48 @@ Cowork Forge uses a `config.toml` file for configuration. Create one in your pro
 [llm]
 api_base_url = "https://api.openai.com/v1"
 api_key = "sk-your-openai-api-key"
-model_name = "gpt-5-codex"
+model_name = "gpt-4"
+
+# Optional: Embedding Configuration
+[embedding]
+api_base_url = "https://your-embedding-api.com/v1"
+api_key = "your-embedding-api-key"
+model_name = "text-embedding-ada-002"
 ```
 
 # 🚀 Usage
 
-### Starting a New Development Session
+### Iteration Management
 
 ```sh
-# Start a new project with an idea
-cowork new "Build a REST API for a task management application"
+# Initialize a new project
+cowork init --name "My Project"
 
-# Start with a configuration file
-cowork new "Create a web dashboard" --config ./config.toml
+# Create a new iteration (Genesis)
+cowork iter --title "Build a REST API" --description "Task management API with authentication"
 
-# Resume an existing project
-cowork resume
+# Create an evolution iteration
+cowork iter --title "Add user profiles" --base iter-1-1234567890 --inherit partial
+
+# List all iterations
+cowork list
+
+# Show iteration details
+cowork show iter-1-1234567890
+
+# Continue a paused iteration
+cowork continue iter-1-1234567890
+
+# Check status
+cowork status
 ```
 
-### Session Workflow
+### Iteration Workflow
 
-When you start a session, Cowork Forge will guide you through the 7-stage workflow:
+When you start an iteration, Cowork Forge guides you through the 7-stage workflow:
 
-1. **Idea Intake**: Your idea is structured into a formal specification (idea.md)
-2. **PRD Generation**: A comprehensive Product Requirements Document with actor-critic refinement
+1. **Idea**: Your concept is structured into a formal specification
+2. **PRD**: Product Requirements Document with actor-critic refinement
 3. **Technical Design**: Architecture design with component specifications and actor-critic refinement
 4. **Implementation Plan**: Task breakdown with dependencies and actor-critic refinement
 5. **Coding**: Code implementation with actor-critic refinement and human validation
@@ -359,44 +383,42 @@ At each critical stage, you'll be prompted to review and confirm the output befo
 ### Example Session Flow
 
 ```sh
-$ cowork new "Build a CLI tool for file conversion"
+# Initialize a new project
+$ cowork init --name "My File Converter"
 
-[Stage 1/7] Idea Agent
-Analyzing your requirement...
-Generated IdeaSpec: "A command-line tool for converting files between formats"
+# Create a new iteration
+$ cowork iter --title "Build a CLI tool" --description "A command-line tool for converting files between formats"
 
-Do you want to:
-  [1] Accept and continue
-  [2] Edit the specification
-  [3] Regenerate
-> 1
+[Pipeline] Starting Genesis iteration: iter-1-1770536303
+[Iteration] Stage 1/7: Idea Agent
+[Idea Agent] Processing requirement...
+[Idea Agent] Generated IdeaSpec at: .cowork-v2/iterations/iter-1-1770536303/artifacts/idea.md
 
-[Stage 2/7] PRD Generation Agent
-Generating Product Requirements Document...
-Created PRD with 12 requirements and 5 user stories
+Review the specification and provide feedback (or 'continue' to proceed):
 
-Review the PRD at: .cowork/artifacts/session-001/prd.md
-Do you want to:
-  [1] Accept and continue
-  [2] Edit the PRD
-  [3] Regenerate
-> 1
+> continue
 
-[Stage 3/7] Design Agent
-Creating technical architecture...
-Generated C4 system context and container diagrams
+[Iteration] Stage 2/7: PRD Loop Agent
+[PRD Agent] Generating Product Requirements Document...
+[PRD Agent] Generated PRD with 12 requirements at: .cowork-v2/iterations/iter-1-1770536303/artifacts/prd.md
 
-Review the design at: .cowork/artifacts/session-001/design.md
-Do you want to:
-  [1] Accept and continue
-  [2] Edit the design
-  [3] Regenerate
-> 1
+Review the PRD and provide feedback (or 'continue' to proceed):
+
+> continue
+
+[Iteration] Stage 3/7: Design Loop Agent
+[Design Agent] Creating technical architecture...
+[Design Agent] Generated design at: .cowork-v2/iterations/iter-1-1770536303/artifacts/design.md
+
+Review the design and provide feedback (or 'continue' to proceed):
+
+> continue
 
 ... (continues through all 7 stages)
 
-[Delivery] Project Complete!
-Delivery report: .cowork/artifacts/session-001/delivery.md
+[Iteration] Stage 7/7: Delivery Agent
+[Delivery Agent] Generating delivery report...
+[Delivery Agent] Iteration completed successfully at: .cowork-v2/iterations/iter-1-1770536303/artifacts/delivery.md
 
 Summary:
 - 12 requirements implemented
@@ -404,76 +426,107 @@ Summary:
 - 15 test cases added
 - Build: PASSED
 - Tests: 15/15 PASSED
+
+[Pipeline] Iteration iter-1-1770536303 completed successfully
 ```
 
-### Managing Projects
+### Managing Iterations
 
 ```sh
-# View project status
-cowork status
+# List all iterations
+$ cowork list
+ID                     Title                    Status    Created At
+iter-1-1770536303      Build a CLI tool         Completed 2023-12-01 10:30
+iter-2-1770537500      Add batch processing      Paused    2023-12-01 14:45
 
-# Modify from a specific stage
-cowork modify --from prd
-cowork modify --from design
-cowork modify --from plan
-cowork modify --from coding
+# View iteration details
+$ cowork show iter-1-1770536303
+
+# Continue a paused iteration
+$ cowork continue iter-2-1770537500
+
+# Delete an iteration
+$ cowork delete iter-2-1770537500
+
+# Create an evolution iteration (based on existing)
+$ cowork iter --title "Add batch processing" --base iter-1-1770536303 --inherit partial
 ```
+
+### Inheritance Modes
+
+When creating evolution iterations, you can choose from three inheritance modes:
+
+| Mode        | Description                           | Use Case                          |
+|-------------|---------------------------------------|-----------------------------------|
+| `none`      | Fresh start, no inheritance           | Complete rewrites, new projects   |
+| `full`      | Copy workspace code + artifacts       | Bug fixes, small enhancements     |
+| `partial`   | Copy artifacts only, regenerate code  | Large features, architecture change|
 
 ### Configuration Management
 
 ```sh
 # Initialize configuration file
-cowork init
+cowork init --name "My Project"
 
-# Use verbose logging
-cowork new "your idea" --verbose
+# Use custom configuration
+cowork iter --title "Your idea" --config ./custom-config.toml
 
-# Enable LLM streaming output
-cowork new "your idea" --stream
+# List iterations with detailed status
+cowork list --all
+
+# Check current project status
+cowork status
 ```
 
 # 🌐 The Cowork Forge Ecosystem
 
-Cowork Forge is organized as a modular Rust workspace with clear separation of concerns:
+Cowork Forge is organized as a modular Rust workspace based on the adk-rust framework:
 
 ```mermaid
 graph TD
-    subgraph "User Interface"
+    subgraph "Workspace"
         CLI["cowork-cli"]
+        CORE["cowork-core"]
+        GUI["cowork-gui (optional)"]
     end
 
-    subgraph "Core System"
-        Core["cowork-core"]
+    subgraph "Dependencies"
+        ADK["adk-rust 0.2.1"]
+        ADK_MODEL["adk-model 0.2.1"]
     end
     
     subgraph "External Services"
-        LLM[("OpenAI LLM")]
+        LLM[("LLM API")]
+        EMBEDDING[("Embedding API")]
         FS[("File System")]
-        CMD[("Command Line")]
     end
 
     %% Define Dependencies
-    CLI --> Core
+    CLI --> CORE
+    CORE --> ADK
+    CORE --> ADK_MODEL
     
-    Core --> LLM
-    Core --> FS
-    Core --> CMD
+    ADK_MODEL --> LLM
+    ADK_MODEL --> EMBEDDING
+    CORE --> FS
 ```
 
-- <strong>`cowork-core`</strong>: The heart of the system containing all business logic, agents, orchestrator, and supporting modules.
-- <strong>`cowork-cli`</strong>: Command-line interface for interacting with the Cowork system.
+- <strong>`cowork-core`</strong>: Core library containing domain logic, agent implementations, and iteration management.
+- <strong>`cowork-cli`</strong>: Command-line interface for iteration management and project interaction.
+- <strong>`cowork-gui`</strong>: Optional graphical user interface based on Tauri framework.
 
 ### Core Modules
 
 <strong>cowork-core</strong> is organized into the following domain modules:
 
-- <strong>`pipeline`</strong>: Workflow pipeline orchestration managing session lifecycle and stage execution.
-- <strong>`agents`</strong>: Specialized AI agents (Idea, PRD, Design, Plan, Coding, Check, Delivery, Modify, CodePatch, ModifyDelivery).
-- <strong>`instructions`</strong>: Prompt templates for each agent.
-- <strong>`tools`</strong>: File operations and command execution with safety checks.
-- <strong>`llm`</strong>: LLM integration layer including rate limiting and API clients.
-- <strong>`data`</strong>: Data models and session management.
-- <strong>`storage`</strong>: Data persistence and retrieval.
+- <strong>`pipeline`</strong>: Iteration pipeline orchestration managing iteration lifecycle and stage execution.
+- <strong>`agents`</strong>: Specialized AI agents built with adk-rust framework (Idea, PRD Loop, Design Loop, Plan Loop, Coding Loop, Check, Delivery).
+- <strong>`instructions`</strong>: Prompt templates for each agent using adk-rust instruction system.
+- <strong>`tools`</strong>: File operations and command execution with workspace validation and security checks.
+- <strong>`llm`</strong>: LLM integration layer using adk-model for OpenAI and custom providers.
+- <strong>`domain`</strong>: Core domain entities including Iteration, Project, and Stage definitions.
+- <strong>`persistence`</strong>: Iteration storage and retrieval system with inheritance support.
+- <strong>`tech_stack`</strong>: Technology stack detection and configuration management.
 
 
 # 🔒 Security
@@ -512,12 +565,13 @@ cargo test -p cowork-core
 
 # 📚 Documentation
 
-Comprehensive documentation is available in the [litho.docs](./litho.docs/) directory:
+Comprehensive documentation is available in the [docs](./docs/) directory:
 
-- [Project Overview](./litho.docs/1、项目概述.md) - System context and architecture
-- [Architecture Overview](./litho.docs/2、架构概览.md) - Detailed architecture documentation
-- [Core Workflows](./litho.docs/3、工作流程.md) - Workflow and process documentation
-- [Domain Modules](./litho.docs/4、深入探索/) - In-depth domain analysis
+- [Architecture Overview](./docs/architecture/overview.md) - System architecture and design principles
+- [Iteration Architecture](./docs/architecture/iteration-architecture.md) - The core iteration system
+- [Agent System](./docs/architecture/agent-system.md) - AI agent implementation details
+- [Pipeline Workflow](./docs/architecture/pipeline.md) - Stage execution and management
+- [Development Guide](./docs/development/) - Contributor resources and patterns
 
 # 🪪 License
 
