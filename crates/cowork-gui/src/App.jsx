@@ -54,6 +54,7 @@ function App() {
   const [activeArtifactTab, setActiveArtifactTab] = useState(null);
   const [currentAgent, setCurrentAgent] = useState(null);
   const [artifactsRefreshTrigger, setArtifactsRefreshTrigger] = useState(0);
+  const [codeRefreshTrigger, setCodeRefreshTrigger] = useState(0);
 
   const listenersRegistered = useRef(false);
   const messagesContainerRef = useRef(null);
@@ -320,6 +321,15 @@ function App() {
     }
   };
 
+  const handleOpenProjectFolder = async () => {
+    try {
+      await invoke('open_in_file_manager', { path: '.' });
+    } catch (error) {
+      console.error('Failed to open project folder:', error);
+      message.error('Failed to open project folder');
+    }
+  };
+
   const handleExecuteIteration = async () => {
     if (!currentIteration) return;
 
@@ -368,14 +378,22 @@ function App() {
         'code': 'code',
       };
       const targetTab = artifactTypeToTab[inputRequest.artifactType] || 'idea';
-      
+
       // Set the active tab before switching view
       setActiveArtifactTab(targetTab);
-      // Switch to artifacts tab
-      setActiveView('artifacts');
-      // Trigger refresh to load latest artifacts
-      setArtifactsRefreshTrigger(prev => prev + 1);
-      message.info(`Switched to Artifacts tab to review ${inputRequest.artifactType}`);
+
+      // For code artifact, switch to code view and trigger refresh
+      if (inputRequest.artifactType === 'code') {
+        setActiveView('code');
+        setCodeRefreshTrigger(prev => prev + 1);
+        message.info('Switched to Code tab to review code files');
+      } else {
+        // For other artifacts, switch to artifacts tab and trigger refresh
+        setActiveView('artifacts');
+        setArtifactsRefreshTrigger(prev => prev + 1);
+        message.info(`Switched to Artifacts tab to review ${inputRequest.artifactType}`);
+      }
+
       // Keep the input request active so user can confirm after viewing
       return;
     }
@@ -504,7 +522,11 @@ function App() {
 
       <div style={{ height: '100%', display: activeView === 'code' ? 'block' : 'none' }}>
         {currentIteration ? (
-          <CodeEditor key={`code-${currentIteration.id}`} iterationId={currentIteration.id} />
+          <CodeEditor 
+            key={`code-${currentIteration.id}`} 
+            iterationId={currentIteration.id}
+            refreshTrigger={codeRefreshTrigger}
+          />
         ) : (
           <Empty description="Select an iteration" style={{ marginTop: '40px' }} />
         )}
@@ -688,7 +710,13 @@ function App() {
             Cowork Forge
           </h1>
           {project && (
-            <Tag color="blue">{project.name}</Tag>
+            <Tag 
+              color="blue" 
+              style={{ cursor: 'pointer' }}
+              onClick={handleOpenProjectFolder}
+            >
+              {project.name}
+            </Tag>
           )}
         </div>
 
@@ -740,7 +768,7 @@ function App() {
         <div style={{ fontSize: '12px', color: '#888' }}>
           {project ? (
             <>
-              <span style={{ marginRight: '16px' }}>
+              <span style={{ marginRight: '16px', cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
                 Project: <strong>{project.name}</strong>
               </span>
               <span>

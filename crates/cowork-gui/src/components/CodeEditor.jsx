@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import Editor from '@monaco-editor/react';
 import { Tabs, Spin, Alert, Empty, Dropdown, Button, Space } from 'antd';
@@ -13,7 +13,7 @@ try {
   console.warn('react-window not installed. Install it with: npm install react-window');
 }
 
-const CodeEditor = ({ iterationId }) => {
+const CodeEditor = ({ iterationId, refreshTrigger }) => {
   const [fileTree, setFileTree] = useState(null);
   const [openFiles, setOpenFiles] = useState([]);
   const [activeFile, setActiveFile] = useState(null);
@@ -21,12 +21,24 @@ const CodeEditor = ({ iterationId }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [formatting, setFormatting] = useState(false);
+  const prevRefreshTriggerRef = useRef(0);
 
   useEffect(() => {
     if (iterationId) {
       loadFileTree();
     }
   }, [iterationId]);
+
+  // Listen for refresh trigger changes
+  useEffect(() => {
+    if (refreshTrigger !== undefined && refreshTrigger !== prevRefreshTriggerRef.current) {
+      prevRefreshTriggerRef.current = refreshTrigger;
+      console.log('[CodeEditor] Refresh trigger changed, reloading file tree...');
+      loadFileTree();
+      // Also reload all open files
+      openFiles.forEach(filePath => loadFileContent(filePath));
+    }
+  }, [refreshTrigger, openFiles]);
 
   // Flatten file tree for virtual scrolling
   const flatFileTree = useMemo(() => {

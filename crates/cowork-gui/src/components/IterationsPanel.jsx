@@ -76,7 +76,11 @@ const IterationsPanel = ({ onSelectIteration, selectedIterationId, onExecuteStat
 
       // Load iterations
       const iterationsData = await invoke('gui_get_iterations');
-      setIterations(iterationsData || []);
+      // Sort by created_at descending (newest first)
+      const sortedIterations = (iterationsData || []).sort((a, b) => {
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
+      setIterations(sortedIterations);
     } catch (error) {
       console.error('[IterationsPanel] Failed to load data:', error);
       message.error('Failed to load data: ' + error);
