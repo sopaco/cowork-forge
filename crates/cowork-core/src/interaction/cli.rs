@@ -4,7 +4,6 @@
 use super::{InteractiveBackend, InputOption, InputResponse, MessageLevel, ProgressInfo};
 use anyhow::Result;
 use async_trait::async_trait;
-use std::sync::Arc;
 use std::io::{self, Write};
 
 pub struct CliBackend {
@@ -105,7 +104,8 @@ impl InteractiveBackend for CliBackend {
                     }
                 }
             } else if input.to_lowercase() == "pass" || input.is_empty() {
-                Ok(InputResponse::Selection("pass".to_string()))
+                // Map "pass" to "yes" for convenience
+                Ok(InputResponse::Selection("yes".to_string()))
             } else {
                 // User provided feedback text
                 Ok(InputResponse::Text(input.to_string()))

@@ -19,7 +19,7 @@ impl Tool for SaveIdeaTool {
     }
 
     fn description(&self) -> &str {
-        "Save the Idea markdown document."
+        "MUST USE THIS TOOL to save the Idea markdown document. Call save_idea(content=<markdown>) to save your generated idea content to artifacts/idea.md. This is REQUIRED to complete the idea stage."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
@@ -234,21 +234,45 @@ impl Tool for LoadFeedbackHistoryTool {
     }
 
     fn description(&self) -> &str {
-        "Load the feedback history from all development stages."
+        "Load the feedback history from a specific stage. Only returns the most recent feedback entry for that stage."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
         Some(json!({
             "type": "object",
-            "properties": {}
+            "properties": {
+                "stage": {
+                    "type": "string",
+                    "description": "The stage to load feedback for (e.g., 'idea', 'prd', 'design', 'plan', 'coding', 'check', 'delivery')",
+                    "enum": ["idea", "prd", "design", "plan", "coding", "check", "delivery"]
+                }
+            },
+            "required": ["stage"]
         }))
     }
 
-    async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let stage = args["stage"].as_str()
+            .ok_or_else(|| adk_core::AdkError::Tool("Missing required parameter: stage".to_string()))?;
+
         let history = load_feedback_history()
             .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
 
-        Ok(serde_json::to_value(history)
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?)
+        // Filter feedbacks by stage and get the most recent one
+        let most_recent_feedback = history.feedbacks
+            .into_iter()
+            .filter(|f| f.stage == stage)
+            .max_by_key(|f| f.timestamp);
+
+        match most_recent_feedback {
+            Some(feedback) => Ok(json!({
+                "has_feedback": true,
+                "feedback": feedback
+            })),
+            None => Ok(json!({
+                "has_feedback": false,
+                "message": format!("No feedback found for stage '{}'", stage)
+            }))
+        }
     }
 }

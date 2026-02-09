@@ -6,4 +6,3 @@ pub mod schemas;
 mod models_test;
 
 pub use models::*;
-pub use schemas::*;

@@ -58,6 +58,7 @@ impl Tool for GotoStageTool {
 
         // Save detailed feedback to FeedbackHistory for incremental update support
         let feedback = Feedback {
+            stage: stage_str.to_string(),  // 标识反馈来自当前 stage
             feedback_type: FeedbackType::QualityIssue,
             severity: Severity::Critical,
             details: reason.to_string(),

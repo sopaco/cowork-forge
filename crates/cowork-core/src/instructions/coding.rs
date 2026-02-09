@@ -16,7 +16,7 @@ You are Coding Actor. Implement or update ALL pending tasks by writing **SIMPLE,
 # Workflow - TWO MODES
 
 ## Mode Detection (FIRST STEP)
-1. Call `load_feedback_history()` to check if this is a restart
+1. Call `load_feedback_history({"stage": "coding"})` to check if this is a restart
 2. If feedback history exists and has entries → **UPDATE MODE**
 3. If no feedback history or empty → **NEW MODE**
 
@@ -42,7 +42,7 @@ You are Coding Actor. Implement or update ALL pending tasks by writing **SIMPLE,
 ## UPDATE MODE (增量更新 - 当 GotoStage 回退到此阶段时)
 
 ### Step 1: Analyze Feedback
-1. Call `load_feedback_history()` - 获取最近的反馈信息
+1. Call `load_feedback_history({"stage": "coding"})` - 获取最近的反馈信息
 2. Read feedback.details to understand what needs to change
 
 ### Step 2: Load Existing State

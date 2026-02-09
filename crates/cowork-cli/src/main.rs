@@ -1,9 +1,11 @@
 // Cowork Forge - CLI Entry Point (Iteration Architecture)
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use cowork_core::domain::IterationStatus;
 use cowork_core::interaction::CliBackend;
+use cowork_core::llm::create_llm_client;
+use cowork_core::llm::config::ModelConfig;
 use cowork_core::persistence::{IterationStore, ProjectStore};
 use cowork_core::pipeline::IterationExecutor;
 use std::sync::Arc;
@@ -79,6 +81,12 @@ enum Commands {
         /// Iteration ID to delete
         iteration_id: String,
     },
+
+    /// Regenerate knowledge for a completed iteration
+    RegenerateKnowledge {
+        /// Iteration ID
+        iteration_id: String,
+    },
 }
 
 #[tokio::main]
@@ -100,7 +108,7 @@ async fn main() -> Result<()> {
     // Execute command
     match cli.command {
         Commands::Iter { title, description, base, inherit } => {
-            cmd_iter(title, description, base, inherit).await?
+            cmd_iter(title, description, base, inherit, cli.config.clone()).await?
         }
         Commands::List { all } => cmd_list(all).await?,
         Commands::Show { iteration_id } => cmd_show(iteration_id).await?,
@@ -108,6 +116,9 @@ async fn main() -> Result<()> {
         Commands::Init { name } => cmd_init(name).await?,
         Commands::Status => cmd_status().await?,
         Commands::Delete { iteration_id } => cmd_delete(iteration_id).await?,
+        Commands::RegenerateKnowledge { iteration_id } => {
+            cmd_regenerate_knowledge(iteration_id, cli.config.clone()).await?
+        }
     }
 
     Ok(())
@@ -119,6 +130,7 @@ async fn cmd_iter(
     description: Option<String>,
     base: Option<String>,
     inherit: String,
+    config: Option<String>,
 ) -> Result<()> {
     let project_store = ProjectStore::new();
     let iteration_store = IterationStore::new();
@@ -154,8 +166,8 @@ async fn cmd_iter(
         // Parse inheritance mode
         let inheritance = match inherit.as_str() {
             "none" => cowork_core::domain::InheritanceMode::None,
-            "partial" => cowork_core::domain::InheritanceMode::Partial,
-            _ => cowork_core::domain::InheritanceMode::Full,
+            "full" => cowork_core::domain::InheritanceMode::Full,
+            _ => cowork_core::domain::InheritanceMode::Partial, // Default to Partial for incremental development
         };
 
         // Create evolution iteration
@@ -194,7 +206,16 @@ async fn cmd_iter(
     println!("🚀 Starting iteration execution...");
     println!();
 
-    match executor.execute(&mut project, &iteration.id, None).await {
+    // Create LLM client
+    let config_path = config.as_deref().unwrap_or("config.toml");
+    let model_config = ModelConfig::from_file(config_path)
+        .or_else(|_| ModelConfig::from_env())
+        .context("Failed to load LLM configuration")?;
+
+    let model = create_llm_client(&model_config.llm)
+        .context("Failed to create LLM client")?;
+
+    match executor.execute(&mut project, &iteration.id, None, Some(model)).await {
         Ok(_) => {
             println!("\n✅ Iteration '{}' completed successfully!", iteration.title);
             println!("   Iteration ID: {}", iteration.id);
@@ -408,7 +429,15 @@ async fn cmd_continue(iteration_id: Option<String>) -> Result<()> {
     let interaction = Arc::new(CliBackend::new());
     let executor = IterationExecutor::new(interaction);
 
-    match executor.continue_iteration(&mut project, &iteration_id).await {
+    // Create LLM client
+    let model_config = ModelConfig::from_file("config.toml")
+        .or_else(|_| ModelConfig::from_env())
+        .context("Failed to load LLM configuration")?;
+
+    let model = create_llm_client(&model_config.llm)
+        .context("Failed to create LLM client")?;
+
+    match executor.continue_iteration(&mut project, &iteration_id, Some(model)).await {
         Ok(_) => {
             println!("\n✅ Iteration completed!");
             Ok(())
@@ -565,5 +594,49 @@ fn truncate(s: &str, max_len: usize) -> String {
         s.to_string()
     } else {
         format!("{}...", &s[..max_len - 3])
+    }
+}
+
+/// Regenerate knowledge for a completed iteration
+async fn cmd_regenerate_knowledge(iteration_id: String, config: Option<String>) -> Result<()> {
+    println!("🔄 Regenerating knowledge for iteration: {}", iteration_id);
+    println!();
+
+    let iteration_store = IterationStore::new();
+
+    // Load iteration
+    let iteration = iteration_store.load(&iteration_id)
+        .context("Failed to load iteration")?;
+
+    // Check if iteration is completed
+    if iteration.status != IterationStatus::Completed {
+        println!("❌ Iteration is not completed (status: {:?})", iteration.status);
+        println!("   Knowledge can only be regenerated for completed iterations.");
+        return Ok(());
+    }
+
+    // Create executor
+    let interaction = Arc::new(CliBackend::new());
+    let executor = IterationExecutor::new(interaction);
+
+    // Create LLM client
+    let config_path = config.as_deref().unwrap_or("config.toml");
+    let model_config = ModelConfig::from_file(config_path)
+        .or_else(|_| ModelConfig::from_env())
+        .context("Failed to load LLM configuration")?;
+
+    let model = create_llm_client(&model_config.llm)
+        .context("Failed to create LLM client")?;
+
+    // Regenerate knowledge
+    match executor.regenerate_iteration_knowledge(&iteration_id, model).await {
+        Ok(_) => {
+            println!("\n✅ Knowledge regenerated successfully for iteration {}", iteration_id);
+            Ok(())
+        }
+        Err(e) => {
+            println!("\n❌ Failed to regenerate knowledge: {}", e);
+            Err(e)
+        }
     }
 }

@@ -7,7 +7,7 @@ You are PRD Actor. Create or update requirements and features.
 # Workflow - TWO MODES
 
 ## Mode Detection (FIRST STEP)
-1. Call `load_feedback_history()` to check if this is a restart
+1. Call `load_feedback_history({"stage": "prd"})` to check if this is a restart
 2. If feedback history exists and has entries → **UPDATE MODE**
 3. If no feedback history or empty → **NEW MODE**
 
@@ -30,7 +30,7 @@ You are PRD Actor. Create or update requirements and features.
 ## UPDATE MODE (增量更新 - 当 GotoStage 回退到此阶段时)
 
 ### Step 1: Analyze Feedback
-1. Call `load_feedback_history()` - 获取最近的反馈信息
+1. Call `load_feedback_history({"stage": "prd"})` - 获取最近的反馈信息
 2. Read feedback.details to understand what needs to change
 
 ### Step 2: Load Existing Content
@@ -183,7 +183,7 @@ Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt
 # Tools
 - get_requirements() ← **START HERE - This is all you need**
 - load_idea() ← Load idea document if you need additional context
-- provide_feedback(feedback_type, severity, details, suggested_fix) ← Only if serious issues
+- provide_feedback(stage="prd", feedback_type, severity, details, suggested_fix) ← Only if serious issues
 
 # Example - Normal Case
 ```

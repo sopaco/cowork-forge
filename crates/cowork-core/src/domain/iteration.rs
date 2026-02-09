@@ -119,9 +119,14 @@ impl Iteration {
     pub fn determine_start_stage(&self) -> String {
         match self.inheritance {
             InheritanceMode::None => "idea".to_string(),
-            InheritanceMode::Full | InheritanceMode::Partial => {
-                // Analyze description to determine scope
+            InheritanceMode::Full => {
+                // Full inheritance: artifacts are copied, so we can start based on change scope
                 analyze_change_scope(&self.description)
+            }
+            InheritanceMode::Partial => {
+                // Partial inheritance: artifacts are NOT copied, must regenerate from idea
+                // This ensures all necessary artifacts (idea.md, prd.md, design.md, plan.md) exist
+                "idea".to_string()
             }
         }
     }
@@ -142,9 +147,9 @@ impl Iteration {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum InheritanceMode {
-    None,     // Genesis only - fresh start
-    Full,     // Inherit all code from base iteration
-    Partial,  // Inherit only artifact definitions
+    None,     // Genesis iteration - fresh start, no inheritance
+    Full,     // Full inheritance - copy all code and artifacts from base iteration (for major refactoring)
+    Partial,  // Partial inheritance - copy code files only, regenerate artifacts (for incremental development)
 }
 
 impl Default for InheritanceMode {

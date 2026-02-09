@@ -7,6 +7,8 @@ pub struct ProjectMemory {
     pub decisions: Vec<Decision>,
     pub patterns: Vec<Pattern>,
     pub context: ProjectContext,
+    /// Iteration knowledge cache - stores knowledge snapshots for each iteration
+    pub iteration_knowledge: std::collections::HashMap<String, IterationKnowledge>,
 }
 
 impl ProjectMemory {
@@ -41,6 +43,91 @@ impl ProjectMemory {
             .iter()
             .filter(|p| p.tags.iter().any(|t| t.to_lowercase() == tag_lower))
             .collect()
+    }
+
+    /// Save iteration knowledge to project memory
+    pub fn save_iteration_knowledge(&mut self, knowledge: IterationKnowledge) {
+        self.iteration_knowledge.insert(knowledge.iteration_id.clone(), knowledge);
+    }
+
+    /// Get iteration knowledge by iteration ID
+    pub fn get_iteration_knowledge(&self, iteration_id: &str) -> Option<&IterationKnowledge> {
+        self.iteration_knowledge.get(iteration_id)
+    }
+
+    /// Remove iteration knowledge
+    pub fn remove_iteration_knowledge(&mut self, iteration_id: &str) {
+        self.iteration_knowledge.remove(iteration_id);
+    }
+
+    /// Cleanup old knowledge, keeping only the most recent N iterations
+    pub fn cleanup_old_knowledge(&mut self, keep_count: usize) {
+        let mut knowledge_vec: Vec<_> = self.iteration_knowledge.values().collect();
+        
+        // Sort by iteration number
+        knowledge_vec.sort_by_key(|k| k.iteration_number);
+        
+        // Keep only the most recent N
+        if knowledge_vec.len() > keep_count {
+            let to_remove = knowledge_vec.len() - keep_count;
+            let iteration_ids: Vec<String> = knowledge_vec[..to_remove].iter().map(|k| k.iteration_id.clone()).collect();
+            for id in iteration_ids {
+                self.iteration_knowledge.remove(&id);
+            }
+        }
+    }
+}
+
+/// Iteration knowledge snapshot - represents the knowledge learned from an iteration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IterationKnowledge {
+    /// Iteration identifier
+    pub iteration_id: String,
+    /// Iteration number
+    pub iteration_number: u32,
+    
+    /// Summarized content (not full documents to avoid excessive size)
+    pub idea_summary: String,
+    pub prd_summary: String,
+    pub design_summary: String,
+    pub plan_summary: String,
+    
+    /// Tech stack information
+    pub tech_stack: Vec<String>,
+    
+    /// Key decisions extracted from this iteration
+    pub key_decisions: Vec<String>,
+    
+    /// Key patterns identified in this iteration
+    pub key_patterns: Vec<String>,
+    
+    /// Code structure summary (important files and their purposes)
+    pub code_structure: String,
+    
+    /// Known issues or limitations
+    pub known_issues: Vec<String>,
+    
+    /// Timestamp when knowledge was generated
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl IterationKnowledge {
+    pub fn new(iteration_id: String, iteration_number: u32) -> Self {
+        let now = chrono::Utc::now();
+        Self {
+            iteration_id,
+            iteration_number,
+            idea_summary: String::new(),
+            prd_summary: String::new(),
+            design_summary: String::new(),
+            plan_summary: String::new(),
+            tech_stack: Vec::new(),
+            key_decisions: Vec::new(),
+            key_patterns: Vec::new(),
+            code_structure: String::new(),
+            known_issues: Vec::new(),
+            created_at: now,
+        }
     }
 }
 
@@ -275,3 +362,4 @@ impl MemoryQueryResult {
         parts.join("\n")
     }
 }
+

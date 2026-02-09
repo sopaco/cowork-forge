@@ -95,13 +95,16 @@ pub async fn execute_stage_with_instruction(
         Ok((agent, artifact_path))
     }.await;
 
-    let (agent, artifact_path) = match result {
+    let (agent, _artifact_path) = match result {
         Ok(v) => v,
         Err(e) => return StageResult::Failed(e),
     };
 
     // Build prompt with context
     let prompt = build_prompt(ctx, stage_name, feedback);
+    
+    // DEBUG: Print the prompt
+    eprintln!("[DEBUG] Full prompt:\n{}", prompt);
 
     // Execute agent
     let status_msg = if feedback.is_some() {
@@ -154,6 +157,17 @@ pub async fn execute_stage_with_instruction(
         return StageResult::Failed("Agent produced no output".to_string());
     }
 
+    // DEBUG: Print agent output
+    let debug_text = if generated_text.len() > 200 {
+        generated_text.chars().take(200).collect::<String>()
+    } else {
+        generated_text.clone()
+    };
+    interaction.show_message(
+        crate::interaction::MessageLevel::Info,
+        format!("[DEBUG] Agent generated text ({} chars): {}", generated_text.len(), debug_text),
+    ).await;
+
     // NEW BEHAVIOR: All stages (including document stages) should use tools to save their artifacts
     // The agent is responsible for calling:
     // - save_idea(content) for idea stage
@@ -162,20 +176,20 @@ pub async fn execute_stage_with_instruction(
     // - save_plan_doc(content) for plan stage
     // - save_delivery_report(content) for delivery stage
     // We do NOT automatically save markdown documents anymore
-    
+
     let success_msg = if feedback.is_some() {
         format!("{} stage completed successfully", capitalize(stage_name))
     } else {
         format!("{} stage completed successfully", capitalize(stage_name))
     };
-    
+
     interaction
         .show_message(
             crate::interaction::MessageLevel::Success,
             success_msg,
         )
         .await;
-    
+
     StageResult::Success(None)
 }
 
@@ -188,7 +202,81 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
     );
 
     prompt.push_str(&format!("Iteration ID: {}\n\n", ctx.iteration.id));
-    prompt.push_str(&format!("Original request: {}\n\n", ctx.iteration.description));
+    
+    // Provide stage-specific guidance
+    match stage_name {
+        "idea" => {
+            prompt.push_str("========================================\n");
+            prompt.push_str("USER'S PROJECT IDEA (ALREADY PROVIDED):\n");
+            prompt.push_str("========================================\n");
+            prompt.push_str(&ctx.iteration.description);
+            prompt.push_str("\n========================================\n\n");
+            prompt.push_str("YOUR TASK:\n");
+            prompt.push_str("1. Read and understand the project idea above\n");
+            prompt.push_str("2. Generate a structured idea document\n");
+            prompt.push_str("3. SAVE IT using the save_idea() tool (MANDATORY)\n\n");
+        }
+        "prd" => {
+            prompt.push_str("========================================\n");
+            prompt.push_str("STAGE: PRD (Product Requirements Document)\n");
+            prompt.push_str("========================================\n");
+            prompt.push_str("YOUR TASK:\n");
+            prompt.push_str("1. Load idea using load_idea() tool\n");
+            prompt.push_str("2. Analyze the idea and create requirements\n");
+            prompt.push_str("3. SAVE PRD using save_prd_doc() tool (MANDATORY)\n\n");
+            prompt.push_str(&format!("Original request: {}\n\n", ctx.iteration.description));
+        }
+        "design" => {
+            prompt.push_str("========================================\n");
+            prompt.push_str("STAGE: Design (System Architecture)\n");
+            prompt.push_str("========================================\n");
+            prompt.push_str("YOUR TASK:\n");
+            prompt.push_str("1. Load requirements using get_requirements() tool\n");
+            prompt.push_str("2. Design system architecture (2-4 components max)\n");
+            prompt.push_str("3. SAVE DESIGN using save_design_doc() tool (MANDATORY)\n\n");
+        }
+        "plan" => {
+            prompt.push_str("========================================\n");
+            prompt.push_str("STAGE: Plan (Implementation Tasks)\n");
+            prompt.push_str("========================================\n");
+            prompt.push_str("YOUR TASK:\n");
+            prompt.push_str("1. Load design using get_design() tool\n");
+            prompt.push_str("2. Create 5-12 simple implementation tasks\n");
+            prompt.push_str("3. SAVE PLAN using save_plan_doc() tool (MANDATORY)\n\n");
+        }
+        "coding" => {
+            prompt.push_str("========================================\n");
+            prompt.push_str("STAGE: Coding (Implementation)\n");
+            prompt.push_str("========================================\n");
+            prompt.push_str("YOUR TASK:\n");
+            prompt.push_str("1. Load plan using get_plan() tool\n");
+            prompt.push_str("2. Implement tasks one by one\n");
+            prompt.push_str("3. Update task status using update_task_status() tool\n\n");
+        }
+        "check" => {
+            prompt.push_str("========================================\n");
+            prompt.push_str("STAGE: Check (Quality Assurance)\n");
+            prompt.push_str("========================================\n");
+            prompt.push_str("YOUR TASK:\n");
+            prompt.push_str("1. Load all artifacts (requirements, design, plan)\n");
+            prompt.push_str("2. Run quality checks\n");
+            prompt.push_str("3. Use goto_stage() if issues found\n\n");
+        }
+        "delivery" => {
+            prompt.push_str("========================================\n");
+            prompt.push_str("STAGE: Delivery (Final Report)\n");
+            prompt.push_str("========================================\n");
+            prompt.push_str("YOUR TASK:\n");
+            prompt.push_str("1. Load all artifacts\n");
+            prompt.push_str("2. Generate delivery report\n");
+            prompt.push_str("3. SAVE using save_delivery_report() tool\n");
+            prompt.push_str("4. Copy files using copy_workspace_to_project() tool\n\n");
+        }
+        _ => {
+            prompt.push_str(&format!("Original request: {}\n\n", ctx.iteration.description));
+        }
+    }
+    
     prompt.push_str(&format!("Workspace: {}\n\n", ctx.workspace_path.display()));
 
     // Add artifact path information
@@ -196,6 +284,12 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
         "Artifacts directory: .cowork-v2/iterations/{}/artifacts/\n\n",
         ctx.iteration.id
     ));
+
+    // Add explicit instruction to use tools
+    prompt.push_str("IMPORTANT: You have access to tools and MUST use them to save your work.\n");
+    prompt.push_str("For the ");
+    prompt.push_str(stage_name);
+    prompt.push_str(" stage, you MUST use the appropriate save tool (e.g., save_idea for idea stage).\n\n");
 
     if let Some(feedback_text) = feedback {
         prompt.push_str(&format!("USER FEEDBACK: {}\n\n", feedback_text));
@@ -239,7 +333,7 @@ fn load_config() -> Result<ModelConfig, String> {
 }
 
 /// Simple InvocationContext implementation
-struct SimpleInvocationContext {
+pub struct SimpleInvocationContext {
     invocation_id: String,
     agent_name: String,
     user_id: String,
@@ -256,7 +350,7 @@ struct SimpleInvocationContext {
 }
 
 impl SimpleInvocationContext {
-    fn new(ctx: &PipelineContext, content: &Content, agent: Arc<dyn adk_core::Agent>) -> Self {
+    pub fn new(ctx: &PipelineContext, content: &Content, agent: Arc<dyn adk_core::Agent>) -> Self {
         Self {
             invocation_id: uuid::Uuid::new_v4().to_string(),
             agent_name: agent.name().to_string(),
@@ -267,7 +361,7 @@ impl SimpleInvocationContext {
             user_content: content.clone(),
             agent,
             memory: None, // TODO: implement memory
-            session: Box::new(SimpleSession::new(&ctx.iteration.id)),
+            session: Box::new(SimpleSession::new(&ctx.iteration.id, content.clone())),
             run_config: adk_core::RunConfig {
                 streaming_mode: adk_core::StreamingMode::None,
             },
@@ -291,7 +385,7 @@ impl Clone for SimpleInvocationContext {
             agent: self.agent.clone(),
             memory: self.memory.clone(),
             // session can't be cloned, create a new one
-            session: Box::new(SimpleSession::new(&self.session_id)),
+            session: Box::new(SimpleSession::new(&self.session_id, self.user_content.clone())),
             run_config: self.run_config.clone(),
             ended: std::sync::atomic::AtomicBool::new(self.ended.load(std::sync::atomic::Ordering::SeqCst)),
             artifacts: self.artifacts.clone(),
@@ -373,15 +467,17 @@ struct SimpleSession {
     app_name: String,
     user_id: String,
     simple_state: SimpleState,
+    messages: Vec<Content>,
 }
 
 impl SimpleSession {
-    fn new(session_id: &str) -> Self {
+    fn new(session_id: &str, initial_message: Content) -> Self {
         Self {
             session_id: session_id.to_string(),
             app_name: "cowork_forge".to_string(),
             user_id: "default_user".to_string(),
             simple_state: SimpleState::new(),
+            messages: vec![initial_message],
         }
     }
 }
@@ -404,7 +500,7 @@ impl adk_core::Session for SimpleSession {
     }
 
     fn conversation_history(&self) -> Vec<Content> {
-        Vec::new()
+        self.messages.clone()
     }
 
     fn append_to_history(&self, _content: Content) {
@@ -440,7 +536,7 @@ impl adk_core::State for SimpleState {
 }
 
 /// Helper to extract text from Event
-fn extract_text_from_event(event: &Event) -> Option<String> {
+pub fn extract_text_from_event(event: &Event) -> Option<String> {
     // Event has methods to extract different types of content
     // Only extract text content, ignore tool calls/results/errors
     if let Some(content) = event.content() {

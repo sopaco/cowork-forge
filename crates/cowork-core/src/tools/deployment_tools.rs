@@ -1,4 +1,4 @@
-// Deployment tools for copying code from workspace to project path
+// Deployment tools for copying code from workspace to project path - Fixed with UNC path handling
 
 use adk_core::{Tool, ToolContext};
 use async_trait::async_trait;
@@ -8,6 +8,16 @@ use std::fs;
 
 use crate::persistence::IterationStore;
 use crate::storage::get_iteration_id;
+
+/// Helper function to strip UNC path prefix on Windows
+fn strip_unc_prefix(path: &std::path::Path) -> std::path::PathBuf {
+    let path_str = path.display().to_string();
+    if path_str.starts_with(r"\\?\\") {
+        std::path::PathBuf::from(&path_str[4..])
+    } else {
+        path.to_path_buf()
+    }
+}
 
 /// CopyWorkspaceToProjectTool - Copy code from iteration workspace to project path
 /// This should be used in Delivery stage to finalize the project
@@ -70,9 +80,27 @@ impl Tool for CopyWorkspaceToProjectTool {
             }));
         }
 
+        // Check if workspace is empty (safety check)
+        let workspace_has_files = workspace_dir.read_dir()
+            .ok()
+            .map(|mut entries| entries.next().is_some())
+            .unwrap_or(false);
+
+        if !workspace_has_files {
+            return Ok(json!({
+                "status": "warning",
+                "message": "Workspace is empty. No files to deploy. To prevent accidental file deletion, deployment was skipped.",
+                "workspace": workspace_dir.to_string_lossy().to_string(),
+                "note": "This usually indicates that the Coding stage did not generate any code files. Please check the Plan stage for tasks."
+            }));
+        }
+
         println!("[Delivery] Copying files from workspace to project root...");
         println!("[Delivery] Workspace: {}", workspace_dir.display());
+        println!("[Delivery] Workspace absolute: {}", workspace_dir.canonicalize().unwrap_or_else(|_| workspace_dir.clone()).display());
         println!("[Delivery] Project root: {}", project_root.display());
+        println!("[Delivery] Project root absolute: {}", project_root.canonicalize().unwrap_or_else(|_| project_root.clone()).display());
+        println!("[Delivery] Iteration ID: {}", iteration_id);
 
         // File extensions to copy (source code files)
         let extensions_to_copy = vec![
@@ -119,8 +147,12 @@ impl Tool for CopyWorkspaceToProjectTool {
             }
 
             // Get relative path from project root
-            let rel_path = dest_path.strip_prefix(&project_root)
-                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get relative path: {}", e)))?;
+            // Handle UNC path prefixes on Windows
+            let dest_path_stripped = strip_unc_prefix(&dest_path);
+            let project_root_stripped = strip_unc_prefix(&project_root);
+            
+            let rel_path = dest_path_stripped.strip_prefix(&project_root_stripped)
+                .unwrap_or(&dest_path_stripped);
 
             // Check if this is a protected file/directory
             let path_str = rel_path.to_string_lossy().to_string();
@@ -139,10 +171,25 @@ impl Tool for CopyWorkspaceToProjectTool {
                 continue;
             }
 
+            // IMPORTANT: Skip files that are inside .cowork-v2 directory
+            // These are workspace files and should NOT be deleted
+            // Check for both forward and backward slashes
+            if path_str.starts_with(".cowork-v2/") || path_str.starts_with(".cowork-v2\\") {
+                protected_skipped.push(path_str.clone());
+                println!("[Delivery] Skipped workspace file: {}", path_str);
+                continue;
+            }
+
             // Check if file exists in workspace
             let src_path = workspace_dir.join(&rel_path);
-            if !src_path.exists() {
+            let src_path_exists = src_path.exists();
+
+            println!("[Delivery] Checking file: {} -> Workspace path: {} (exists: {})",
+                     path_str, src_path.display(), src_path_exists);
+
+            if !src_path_exists {
                 // File doesn't exist in workspace, delete it
+                println!("[Delivery] File {} not found in workspace, marking for deletion", path_str);
                 match fs::remove_file(&dest_path) {
                     Ok(_) => {
                         deleted_files.push(path_str.clone());
@@ -168,8 +215,11 @@ impl Tool for CopyWorkspaceToProjectTool {
             let dir_path = entry.path();
 
             // Skip protected directories
-            let rel_path = dir_path.strip_prefix(&project_root)
-                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get relative path: {}", e)))?;
+            let dir_path_stripped = strip_unc_prefix(&dir_path);
+            let project_root_stripped = strip_unc_prefix(&project_root);
+            
+            let rel_path = dir_path_stripped.strip_prefix(&project_root_stripped)
+                .unwrap_or(&dir_path_stripped);
 
             let path_str = rel_path.to_string_lossy().to_string();
             let is_protected = protected_paths.iter().any(|protected| {
@@ -177,6 +227,11 @@ impl Tool for CopyWorkspaceToProjectTool {
             });
 
             if is_protected {
+                continue;
+            }
+
+            // IMPORTANT: Skip directories inside .cowork-v2
+            if path_str.starts_with(".cowork-v2/") {
                 continue;
             }
 
@@ -211,8 +266,12 @@ impl Tool for CopyWorkspaceToProjectTool {
             }
 
             // Get relative path from workspace
-            let rel_path = src_path.strip_prefix(&workspace_dir)
-                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get relative path: {}", e)))?;
+            // Handle UNC path prefixes on Windows
+            let src_path_stripped = strip_unc_prefix(&src_path);
+            let workspace_dir_stripped = strip_unc_prefix(&workspace_dir);
+            
+            let rel_path = src_path_stripped.strip_prefix(&workspace_dir_stripped)
+                .unwrap_or(&src_path_stripped);
 
             // Check if file should be copied
             let should_copy = rel_path.extension()

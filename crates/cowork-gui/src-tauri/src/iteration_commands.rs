@@ -2,7 +2,9 @@
 
 use crate::AppState;
 use crate::TauriBackend;
-use cowork_core::domain::{Iteration, InheritanceMode, Project};
+use cowork_core::domain::{Iteration, InheritanceMode, Project, IterationStatus};
+use cowork_core::llm::create_llm_client;
+use cowork_core::llm::config::{LlmConfig, ModelConfig};
 use cowork_core::persistence::{IterationStore, ProjectStore};
 use cowork_core::pipeline::IterationExecutor;
 use tauri::{Emitter, Manager, State, Window};
@@ -118,8 +120,8 @@ pub async fn gui_create_iteration(
     // Determine inheritance mode
     let inheritance = match request.inheritance.as_str() {
         "none" => InheritanceMode::None,
-        "partial" => InheritanceMode::Partial,
-        _ => InheritanceMode::Full,
+        "full" => InheritanceMode::Full,
+        _ => InheritanceMode::Partial, // Default to Partial for incremental development
     };
 
     // Create iteration
@@ -186,6 +188,14 @@ pub async fn gui_execute_iteration(
 
     let executor = IterationExecutor::new(interaction);
 
+    // Create LLM client
+    let model_config = ModelConfig::from_file("config.toml")
+        .or_else(|_| ModelConfig::from_env())
+        .map_err(|e| format!("Failed to load LLM configuration: {}", e))?;
+
+    let model = create_llm_client(&model_config.llm)
+        .map_err(|e| format!("Failed to create LLM client: {}", e))?;
+
     // Emit started event
     let _ = window.emit("iteration_started", iteration_id.clone());
 
@@ -194,7 +204,7 @@ pub async fn gui_execute_iteration(
     let iteration_id_clone = iteration_id.clone();
 
     tokio::spawn(async move {
-        match executor.execute(&mut project, &iteration_id_clone, None).await {
+        match executor.execute(&mut project, &iteration_id_clone, None, Some(model)).await {
             Ok(_) => {
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);
             }
@@ -226,6 +236,14 @@ pub async fn gui_continue_iteration(
 
     let executor = IterationExecutor::new(interaction);
 
+    // Create LLM client
+    let model_config = ModelConfig::from_file("config.toml")
+        .or_else(|_| ModelConfig::from_env())
+        .map_err(|e| format!("Failed to load LLM configuration: {}", e))?;
+
+    let model = create_llm_client(&model_config.llm)
+        .map_err(|e| format!("Failed to create LLM client: {}", e))?;
+
     // Emit started event
     let _ = window.emit("iteration_continued", iteration_id.clone());
 
@@ -235,7 +253,7 @@ pub async fn gui_continue_iteration(
 
     tokio::spawn(async move {
         println!("[GUI] Starting continue_iteration for iteration: {}", iteration_id_clone);
-        match executor.continue_iteration(&mut project, &iteration_id_clone).await {
+        match executor.continue_iteration(&mut project, &iteration_id_clone, Some(model)).await {
             Ok(_) => {
                 println!("[GUI] continue_iteration completed successfully");
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);
@@ -268,6 +286,14 @@ pub async fn gui_retry_iteration(
     ));
 
     let executor = IterationExecutor::new(interaction);
+
+    // Create LLM client
+    let model_config = ModelConfig::from_file("config.toml")
+        .or_else(|_| ModelConfig::from_env())
+        .map_err(|e| format!("Failed to load LLM configuration: {}", e))?;
+
+    let model = create_llm_client(&model_config.llm)
+        .map_err(|e| format!("Failed to create LLM client: {}", e))?;
 
     // Emit started event
     let _ = window.emit("iteration_retrying", iteration_id.clone());
@@ -312,6 +338,66 @@ pub async fn gui_delete_iteration(
 
     // Emit event
     let _ = window.emit("iteration_deleted", iteration_id);
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn gui_regenerate_knowledge(
+    iteration_id: String,
+    window: Window,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let iteration_store = IterationStore::new();
+
+    // Load iteration
+    let iteration = iteration_store.load(&iteration_id)
+        .map_err(|e| e.to_string())?;
+
+    // Check if iteration is completed
+    if iteration.status != IterationStatus::Completed {
+        return Err(format!(
+            "Iteration is not completed (status: {:?})",
+            iteration.status
+        ));
+    }
+
+    // Create LLM client
+    let model_config = ModelConfig::from_file("config.toml")
+        .or_else(|_| ModelConfig::from_env())
+        .map_err(|e| format!("Failed to load LLM configuration: {}", e))?;
+
+    let model = create_llm_client(&model_config.llm)
+        .map_err(|e| format!("Failed to create LLM client: {}", e))?;
+
+    // Create executor
+    let interaction = Arc::new(TauriBackend::new(
+        window.app_handle().clone(),
+        state.pending_requests.clone(),
+    ));
+
+    let executor = IterationExecutor::new(interaction);
+
+    // Emit started event
+    let _ = window.emit("knowledge_regeneration_started", iteration_id.clone());
+
+    // Execute in background
+    let window_clone = window.app_handle().clone();
+    let iteration_id_clone = iteration_id.clone();
+
+    tokio::spawn(async move {
+        println!("[GUI] Starting knowledge regeneration for iteration: {}", iteration_id_clone);
+        match executor.regenerate_iteration_knowledge(&iteration_id_clone, model).await {
+            Ok(_) => {
+                println!("[GUI] Knowledge regeneration completed successfully");
+                let _ = window_clone.emit("knowledge_regeneration_completed", iteration_id_clone);
+            }
+            Err(e) => {
+                println!("[GUI] Knowledge regeneration failed: {}", e);
+                let _ = window_clone.emit("knowledge_regeneration_failed", (iteration_id_clone, e.to_string()));
+            }
+        }
+    });
 
     Ok(())
 }

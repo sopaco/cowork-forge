@@ -29,6 +29,11 @@ impl Tool for ProvideFeedbackTool {
         Some(json!({
             "type": "object",
             "properties": {
+                "stage": {
+                    "type": "string",
+                    "description": "The stage providing this feedback (e.g., 'idea', 'prd', 'design', 'plan', 'coding', 'check', 'delivery')",
+                    "enum": ["idea", "prd", "design", "plan", "coding", "check", "delivery"]
+                },
                 "feedback_type": {
                     "type": "string",
                     "enum": ["build_error", "quality_issue", "missing_requirement", "suggestion"],
@@ -40,11 +45,13 @@ impl Tool for ProvideFeedbackTool {
                 "details": {"type": "string"},
                 "suggested_fix": {"type": "string"}
             },
-            "required": ["feedback_type", "severity", "details"]
+            "required": ["stage", "feedback_type", "severity", "details"]
         }))
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let stage = get_required_string_param(&args, "stage")?;
+
         let feedback_type = match get_required_string_param(&args, "feedback_type")? {
             "build_error" => FeedbackType::BuildError,
             "quality_issue" => FeedbackType::QualityIssue,
@@ -59,6 +66,7 @@ impl Tool for ProvideFeedbackTool {
         };
 
         let feedback = Feedback {
+            stage: stage.to_string(),  // 设置 stage 字段
             feedback_type,
             severity,
             details: get_required_string_param(&args, "details")?.to_string(),

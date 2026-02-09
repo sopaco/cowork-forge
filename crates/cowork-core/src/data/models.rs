@@ -292,6 +292,7 @@ pub struct FeedbackHistory {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Feedback {
+    pub stage: String,  // 标识反馈来自哪个阶段 (idea, prd, design, plan, coding, check, delivery)
     pub feedback_type: FeedbackType,
     pub severity: Severity,
     pub details: String,

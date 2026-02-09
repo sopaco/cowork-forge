@@ -1,7 +1,7 @@
 // Agents module - Agent builders using adk-rust
-// 
+//
 // IMPORTANT: This file solves a CRITICAL bug where SequentialAgent stops after
-// the first LoopAgent completes. 
+// the first LoopAgent completes.
 //
 // PROBLEM: When a sub-agent in LoopAgent calls exit_loop(), it terminates the
 // ENTIRE SequentialAgent, not just the LoopAgent. This is adk-rust's design.
@@ -17,7 +17,6 @@ use anyhow::Result;
 use std::sync::Arc;
 
 mod hitl;
-use hitl::ResilientAgent;
 
 // ============================================================================
 // IdeaAgent - Simple agent to capture initial idea
@@ -39,15 +38,19 @@ pub fn create_idea_agent_with_id(model: Arc<dyn Llm>, iteration_id: String) -> R
     // Replace {ITERATION_ID} placeholder in instruction
     let instruction = IDEA_AGENT_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
 
+    let save_idea_tool = Arc::new(SaveIdeaTool);
+    eprintln!("[DEBUG] Created SaveIdeaTool");
+
     let agent = LlmAgentBuilder::new("idea_agent")
         .instruction(&instruction)
         .model(model)
-        .tool(Arc::new(SaveIdeaTool))
+        .tool(save_idea_tool)
         .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
         .tool(Arc::new(SaveInsightTool::new(iteration_id.clone())))
         .include_contents(IncludeContents::None)
         .build()?;
 
+    eprintln!("[DEBUG] Created idea_agent successfully");
     Ok(Arc::new(agent))
 }
 
@@ -92,7 +95,7 @@ pub fn create_prd_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Res
     // Replace {ITERATION_ID} placeholder in instructions
     let actor_instruction = PRD_ACTOR_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
     let critic_instruction = PRD_CRITIC_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
-    
+
     let prd_actor = LlmAgentBuilder::new("prd_actor")
         .instruction(&actor_instruction)
         .model(model.clone())
@@ -170,7 +173,7 @@ pub fn create_design_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> 
     // Replace {ITERATION_ID} placeholder in instructions
     let actor_instruction = DESIGN_ACTOR_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
     let critic_instruction = DESIGN_CRITIC_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
-    
+
     let design_actor = LlmAgentBuilder::new("design_actor")
         .instruction(&actor_instruction)
         .model(model.clone())
@@ -246,7 +249,7 @@ pub fn create_plan_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Re
     // Replace {ITERATION_ID} placeholder in instructions
     let actor_instruction = PLAN_ACTOR_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
     let critic_instruction = PLAN_CRITIC_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
-    
+
     let plan_actor = LlmAgentBuilder::new("plan_actor")
         .instruction(&actor_instruction)
         .model(model.clone())
@@ -326,7 +329,7 @@ pub fn create_coding_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> 
     // Replace {ITERATION_ID} placeholder in instructions
     let actor_instruction = CODING_ACTOR_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
     let critic_instruction = CODING_CRITIC_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
-    
+
     let coding_actor = LlmAgentBuilder::new("coding_actor")
         .instruction(&actor_instruction)
         .model(model.clone())
@@ -397,7 +400,7 @@ pub fn create_check_agent(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent
 pub fn create_check_agent_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Result<Arc<dyn adk_core::Agent>> {
     // Replace {ITERATION_ID} placeholder in instruction
     let instruction = CHECK_AGENT_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
-    
+
     let agent = LlmAgentBuilder::new("check_agent")
         .instruction(&instruction)
         .model(model)
@@ -452,7 +455,7 @@ pub fn create_delivery_agent(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Ag
 pub fn create_delivery_agent_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Result<Arc<dyn adk_core::Agent>> {
     // Replace {ITERATION_ID} placeholder in instruction
     let instruction = DELIVERY_AGENT_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
-    
+
     let agent = LlmAgentBuilder::new("delivery_agent")
         .instruction(&instruction)
         .model(model)
@@ -472,6 +475,59 @@ pub fn create_delivery_agent_with_id(model: Arc<dyn Llm>, iteration_id: String) 
         .tool(Arc::new(PromoteToPatternTool::new(iteration_id.clone())))
         .include_contents(IncludeContents::None)
         .build()?;
+
+    Ok(Arc::new(agent))
+}
+
+// ============================================================================
+// Summary Agent - Generates summaries of iteration documents
+// ============================================================================
+
+pub fn create_summary_agent(model: Arc<dyn Llm>, iteration_id: String, iteration_number: u32) -> Result<Arc<dyn adk_core::Agent>> {
+    let instruction = SUMMARY_AGENT_INSTRUCTION
+        .replace("{iteration_id}", &iteration_id)
+        .replace("{iteration_number}", &iteration_number.to_string());
+
+    let agent = LlmAgentBuilder::new(SUMMARY_AGENT_NAME)
+        .instruction(&instruction)
+        .model(model)
+        .include_contents(IncludeContents::None)
+        .build()?;
+
+    Ok(Arc::new(agent))
+}
+
+// ============================================================================
+// Knowledge Generation Agent - Extracts project-level knowledge from iterations
+// ============================================================================
+
+pub fn create_knowledge_generation_agent(
+    model: Arc<dyn Llm>,
+    iteration_id: String,
+    iteration_number: u32,
+    base_iteration_id: Option<String>
+) -> Result<Arc<dyn adk_core::Agent>> {
+    let instruction = KNOWLEDGE_GEN_AGENT_INSTRUCTION
+        .replace("{iteration_id}", &iteration_id)
+        .replace("{iteration_number}", &iteration_number.to_string());
+
+    let read_file_with_limit = Arc::new(ReadFileWithLimitTool::new(10)); // Limit to 10 calls
+
+    let mut builder = LlmAgentBuilder::new(KNOWLEDGE_GEN_AGENT_NAME)
+        .instruction(&instruction)
+        .model(model)
+        .tool(Arc::new(LoadDocumentSummaryTool::new(iteration_id.clone())))
+        .tool(read_file_with_limit.clone())
+        .tool(Arc::new(ListFilesWorkspaceTool))
+        .tool(Arc::new(SaveKnowledgeSnapshotTool::new(iteration_id.clone(), iteration_number)))
+        .include_contents(IncludeContents::None);
+
+    // Add base knowledge tool if this is an evolution iteration
+    if let Some(base_id) = base_iteration_id {
+        builder = builder.tool(Arc::new(LoadBaseKnowledgeTool::new(base_id)));
+    }
+
+    let agent = builder.build()?;
 
     Ok(Arc::new(agent))
 }

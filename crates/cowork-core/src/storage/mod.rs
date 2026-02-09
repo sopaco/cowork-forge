@@ -268,6 +268,23 @@ pub fn append_feedback(feedback: &Feedback) -> Result<()> {
     Ok(())
 }
 
+/// Clear all feedback for a specific stage
+pub fn clear_stage_feedback(stage: &str) -> Result<()> {
+    let mut history = load_feedback_history()?;
+    history.feedbacks.retain(|f| f.stage != stage);
+    save_feedback_history(&history)?;
+    Ok(())
+}
+
+/// Clear all feedback (used when starting a fresh iteration)
+pub fn clear_all_feedback() -> Result<()> {
+    let path = session_path("feedback.json")?;
+    if path.exists() {
+        fs::remove_file(&path)?;
+    }
+    Ok(())
+}
+
 // ============================================================================
 // Artifacts (Markdown files)
 // ============================================================================
