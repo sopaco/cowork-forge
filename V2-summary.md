@@ -57,7 +57,9 @@ Draft (草稿) → Running (运行中) → Paused (已暂停) → Completed (已
 1. 加载迭代和项目数据
 2. 准备工作空间（根据继承模式复制或初始化）
 3. 创建执行上下文
-4. 确定起始阶段（智能分析变更描述）
+4. 确定起始阶段：
+   - Genesis/Partial：从 `idea` 开始
+   - Full：根据变更描述智能分析（架构→idea，需求→prd，设计→design，默认→plan）
 5. Evolution 迭代：注入 base iteration 的项目知识到迭代记忆
 6. 按顺序执行阶段序列
 7. 每个阶段完成后更新迭代状态
@@ -232,8 +234,9 @@ impl adk_core::Session for SimpleSession {
    - LoadProjectKnowledgeTool：加载项目级知识
    - SaveProjectKnowledgeTool：保存项目级知识（Knowledge Generation Agent 使用）
 
-### 文件工具安全实现
-所有文件操作工具都遵循以下安全规则：
+#### 路径安全检查实现
+所有文件操作工具都使用统一的路径安全检查机制：
+
 ```rust
 // 1. 获取 iteration workspace 路径
 let iteration_id = get_iteration_id()?;
@@ -249,11 +252,25 @@ let full_path = workspace_dir.join(&safe_path);
 fs::write(&full_path, content)?;
 ```
 
+**路径安全检查逻辑**：
+1. 拒绝空路径或只有空格的路径（`trim().is_empty()`）
+2. 拒绝绝对路径（`is_absolute()`）
+3. 拒绝父目录访问（`contains("..")`）
+4. 拒绝包含 workspace 目录结构的路径（`contains(".cowork-v2")` 或 `contains("iterations")`）
+5. 将 workspace_dir 转换为绝对路径（`canonicalize()`）
+6. 构造 full_path 的绝对路径（`workspace_dir_absolute.join(path)`）
+7. 使用 `strip_unc_prefix()` 去除 Windows UNC 前缀
+8. 验证 full_path 是否在 workspace_dir_absolute 内（`starts_with()`）
+
 **安全规则**：
 - ✅ 接受相对路径：`src/index.html`
-- ❌ 拒绝绝对路径：`/tmp/file.txt`
+- ❌ 拒绝绝对路径：`/tmp/file.txt`、`D:\Workspace\file.txt`
 - ❌ 拒绝父目录访问：`../config.toml`
+- ❌ 拒绝空路径：`` 或 `   `
+- ❌ 拒绝包含 workspace 的路径：`.cowork-v2/iterations/iter-X/workspace/file.txt`
 - ✅ 自动拼接到 workspace
+- ✅ 兼容 Windows UNC 路径和路径分隔符
+- ✅ 支持超长路径（通过 UNC 前缀）
 
 ### Artifacts 验证机制
 在 executor.rs 中实现了 `check_artifact_exists` 方法，用于验证各阶段的 Artifacts 是否生成：
@@ -273,7 +290,7 @@ async fn check_artifact_exists(&self, stage_name: &str, workspace: &Path) -> boo
                  iteration_dir.join("data/implementation_plan.json").exists(),
         "coding" => {
             // 检查 workspace 中是否有代码文件
-            let code_extensions = ["rs", "js", "jsx", "ts", "tsx", "py", "java", "go", "cpp", "c", "h"];
+            let code_extensions = ["rs", "js", "jsx", "ts", "tsx", "py", "java", "go", "cpp", "c", "h", "html", "htm", "css", "scss", "json"];
             // 遍历 workspace 检查代码文件
         }
         "delivery" => artifacts_dir.join("delivery_report.md").exists(),
@@ -281,6 +298,8 @@ async fn check_artifact_exists(&self, stage_name: &str, workspace: &Path) -> boo
     }
 }
 ```
+
+**代码文件扩展名**：支持传统编程语言（rs, js, py 等）和 Web 文件（html, css, json）。
 
 ---
 
@@ -324,11 +343,24 @@ async fn check_artifact_exists(&self, stage_name: &str, workspace: &Path) -> boo
 ### InheritanceMode 实现
 ```rust
 pub enum InheritanceMode {
-    None,     // Genesis only - fresh start
-    Full,     // Copy all workspace files from base
-    Partial,  // Copy only artifacts and config, regenerate code
+    None,     // Genesis iteration - fresh start, no inheritance
+    Full,     // Full inheritance - copy all code and artifacts from base iteration (for major refactoring)
+    Partial,  // Partial inheritance - copy code files only, regenerate artifacts (for incremental development)
 }
 ```
+
+#### 继承模式使用场景
+| 模式 | 复制内容 | 起始阶段 | 适用场景 |
+|------|---------|---------|---------|
+| **None** | 无 | `idea` | 创建新项目 |
+| **Partial** | 代码文件（不含 artifacts） | `idea` | 增量开发、修改现有代码（最常用） |
+| **Full** | 代码 + artifacts | 根据描述分析 | 大规模重构、保留完整上下文 |
+
+#### Partial 模式工作流程
+1. 继承代码：复制 base iteration 的所有代码文件
+2. 注入知识：将 base iteration 的项目知识注入到 memory
+3. 从 idea 开始：重新生成所有 artifacts（idea.md, prd.md, design.md, plan.md）
+4. 增量修改：Coding Agent 基于现有代码和新的 plan 进行修改
 
 ---
 
@@ -447,7 +479,10 @@ Plan Agent 可以访问完整的上下文
 ### 相比 V1 的改进
 1. 统一的迭代架构：所有开发活动都在迭代单元内进行
 2. 灵活的继承机制：支持三种继承模式，适应不同场景
-3. 智能起始阶段判断：自动分析变更描述确定起始阶段
+   - **None**：Genesis 迭代，全新开始
+   - **Partial**：增量开发，只复制代码，重新生成 artifacts（默认模式）
+   - **Full**：大规模重构，复制代码和 artifacts
+3. 智能起始阶段判断：Genesis/Partial 从 idea 开始，Full 根据变更描述智能分析
 4. 完善的错误处理：重试机制、反馈循环、自愈机制
 5. 结构化的存储：清晰的目录组织和制品管理
 6. 人机协作优化：HITL 改在 Pipeline 层处理，避免与 Critic 冲突
@@ -520,9 +555,17 @@ fn strip_unc_prefix(path: &Path) -> PathBuf {
 ```
 
 #### 应用的工具
-1. **file_tools.rs**：`list_files` 工具，确保返回正确的相对路径
-2. **deployment_tools.rs**：`copy_workspace_to_project` 工具，在删除和复制文件前规范化路径
-3. **knowledge_tools.rs**：知识生成工具的路径处理
+1. **file_tools.rs**：
+   - `validate_path_security_within_workspace()`：路径安全检查
+   - `list_files`：确保返回正确的相对路径
+   - `write_file`、`read_file`：文件读写操作
+
+2. **deployment_tools.rs**：
+   - `copy_workspace_to_project`：在删除和复制文件前规范化路径
+   - 兼容路径分隔符检查（同时支持 `/` 和 `\`）
+
+3. **knowledge_tools.rs**：
+   - 知识生成工具的路径处理
 
 #### 路径分隔符兼容
 Windows 使用反斜杠（`\`）而 Unix 使用正斜杠（`/`），系统在路径检查时同时支持两种分隔符：
@@ -557,7 +600,7 @@ Cowork Forge 是一个设计精良的 AI 驱动开发系统，核心优势在于
 3. 灵活的迭代机制：支持增量开发和渐进式演进
 4. 完善的人机协作：关键决策点保留人工参与（HITL 在 Pipeline 层）
 5. 结构化的数据管理：版本化的制品和记忆系统
-6. 文件安全机制：所有文件操作限制在 workspace 内，路径验证相对于 workspace
+6. 文件安全机制：所有文件操作限制在 workspace 内，路径验证相对于 workspace，增强安全检查（空路径、workspace 结构检查）
 7. Artifacts 验证：自动检查文件生成，未生成则自动重试
 8. Delivery 同步：代码最终才部署到项目根目录
 9. HITL 外层处理：用户审查在 Pipeline 层进行，避免与 Critic 冲突

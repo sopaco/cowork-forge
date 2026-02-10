@@ -40,6 +40,15 @@ pub fn strip_unc_prefix(path: &Path) -> PathBuf {
 fn validate_path_security_within_workspace(path: &str, workspace_dir: &Path) -> Result<PathBuf, String> {
     let path_obj = Path::new(path);
     
+    // Rule 0: Reject empty or whitespace-only paths
+    let trimmed_path = path.trim();
+    if trimmed_path.is_empty() {
+        return Err(format!(
+            "Security: Empty path is not allowed. Path '{}' must be a valid relative path.",
+            path
+        ));
+    }
+    
     // Rule 1: Reject absolute paths
     if path_obj.is_absolute() {
         return Err(format!(
@@ -56,54 +65,45 @@ fn validate_path_security_within_workspace(path: &str, workspace_dir: &Path) -> 
         ));
     }
     
-    // Rule 3: Construct full path and verify it's within workspace
-    let full_path = workspace_dir.join(path);
-    
-    // Canonicalize both paths for reliable comparison
-    // On Windows, canonicalize() returns \\?\ prefix paths
-    let normalized_workspace_dir = workspace_dir.canonicalize()
-        .map_err(|e| format!("Failed to canonicalize workspace directory: {}", e))?;
-    
-    let canonical_path = if full_path.exists() {
-        full_path.canonicalize()
-            .map_err(|e| format!("Failed to resolve path: {}", e))?
-    } else {
-        // For non-existent paths (e.g., files to be created), we need to:
-        // 1. Try to canonicalize the parent directory
-        // 2. Append the filename to get the full path
-        // 3. Use starts_with() check on the path components, not the full string
-        if let Some(parent) = full_path.parent() {
-            let canonical_parent = match parent.canonicalize() {
-                Ok(p) => p,
-                Err(_) => parent.to_path_buf(), // Fallback if parent doesn't exist
-            };
-            if let Some(filename) = full_path.file_name() {
-                canonical_parent.join(filename)
-            } else {
-                full_path
-            }
-        } else {
-            full_path
-        }
-    };
-    
-    // Verify the path is within workspace directory
-    // For Windows, we need to handle UNC path prefixes (\\?\)
-    // Strip the UNC prefix if present for comparison
-    let canonical_path_stripped = strip_unc_prefix(&canonical_path);
-    let workspace_dir_stripped = strip_unc_prefix(&normalized_workspace_dir);
-    
-    if !canonical_path_stripped.starts_with(&workspace_dir_stripped) {
+    // Rule 2.5: Warn about paths that might contain workspace directory
+    if path.contains(".cowork-v2") || path.contains("iterations") {
         return Err(format!(
-            "Security: Path escapes workspace directory. Path '{}' resolves to '{}', expected to be within workspace: '{}'",
-            path,
-            canonical_path_stripped.display(),
-            workspace_dir_stripped.display()
+            "Security: Path '{}' appears to contain workspace directory structure. Use relative paths within workspace only (e.g., 'src/index.html' instead of '.cowork-v2/iterations/iter-X/workspace/src/index.html').",
+            path
         ));
     }
     
-    Ok(canonical_path)
-}
+    // Rule 3: Construct full path and verify it's within workspace
+    let full_path = workspace_dir.join(path);
+    
+    // CRITICAL: workspace_dir might be relative (e.g., ".cowork-v2/...")
+    // We need to canonicalize it to get the absolute path for comparison
+    let workspace_dir_absolute = workspace_dir.canonicalize()
+        .map_err(|e| format!("Failed to canonicalize workspace directory: {}", e))?;
+    
+    // Construct the absolute path of full_path
+    // Since full_path might not exist, we construct it by joining workspace_dir_absolute with the relative path
+    let full_path_absolute = workspace_dir_absolute.join(path);
+    
+    // Verify the full_path is within workspace_dir_absolute
+    // Strip UNC prefixes for comparison
+    let full_path_stripped = strip_unc_prefix(&full_path_absolute);
+    let workspace_stripped = strip_unc_prefix(&workspace_dir_absolute);
+    
+    if !full_path_stripped.starts_with(&workspace_stripped) {
+        return Err(format!(
+            "Security: Path escapes workspace directory. Path '{}' resolves to '{}', expected to be within workspace: '{}'",
+            path,
+            full_path_stripped.display(),
+            workspace_stripped.display()
+        ));
+    }
+    
+    // Return the original path (relative to workspace)
+    
+    // The caller will join it with workspace_dir to get the full path
+    
+    Ok(PathBuf::from(path))}
 
 // ============================================================================
 // ListFilesTool
@@ -663,15 +663,16 @@ impl Tool for ReadFileTruncatedTool {
         let workspace_dir = iteration_store.workspace_path(&iteration_id)
             .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get workspace: {}", e)))?;
 
-        // Validate path security
-        let full_path = validate_path_security_within_workspace(&path, &workspace_dir)
+// Validate path security
+        let safe_path = validate_path_security_within_workspace(&path, &workspace_dir)
             .map_err(|e| adk_core::AdkError::Tool(e))?;
+
+        // Construct full path in workspace
+        let full_path = workspace_dir.join(&safe_path);
 
         // Read file content
         let content = fs::read_to_string(&full_path)
             .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read file: {}", e)))?;
-
-        // Check file extension for code files
         let file_ext = full_path.extension()
             .and_then(|e| e.to_str())
             .unwrap_or("");
@@ -798,8 +799,11 @@ impl Tool for ReadFileWithLimitTool {
             .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get workspace: {}", e)))?;
 
         // Validate path security
-        let full_path = validate_path_security_within_workspace(&path, &workspace_dir)
+        let safe_path = validate_path_security_within_workspace(&path, &workspace_dir)
             .map_err(|e| adk_core::AdkError::Tool(e))?;
+
+        // Construct full path in workspace
+        let full_path = workspace_dir.join(&safe_path);
 
         // Read file content
         let content = fs::read_to_string(&full_path)
