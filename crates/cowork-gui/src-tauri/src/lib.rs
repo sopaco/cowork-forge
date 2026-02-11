@@ -47,7 +47,7 @@ impl InteractiveBackend for TauriBackend {
     async fn show_message(&self, level: cowork_core::interaction::MessageLevel, content: String) {
         // Determine agent name from message content
         let agent_name = determine_agent_name(&content);
-        
+
         // Emit agent_event for frontend processing display
         let _ = self.app_handle.emit("agent_event", serde_json::json!({
             "content": content,
@@ -55,7 +55,7 @@ impl InteractiveBackend for TauriBackend {
             "is_thinking": false,
             "level": format!("{:?}", level)
         }));
-        
+
         // Also emit legacy message event for backward compatibility
         let _ = self.app_handle.emit("message", (level, content));
     }
@@ -96,8 +96,8 @@ impl InteractiveBackend for TauriBackend {
                     },
                 }
             }
-            _ = tokio::time::sleep(Duration::from_secs(300)) => { // 5 minute timeout
-                println!("[HITL] Request timeout after 300 seconds");
+            _ = tokio::time::sleep(Duration::from_secs(3000)) => { // 5 minute timeout
+                println!("[HITL] Request timeout after 3000 seconds");
                 anyhow::bail!("Request timeout")
             }
         }
@@ -112,7 +112,7 @@ impl InteractiveBackend for TauriBackend {
         Ok(())
     }
 
-    
+
 }
 
 /// Determine agent name from message content based on stage keywords
@@ -157,7 +157,7 @@ impl AppState {
     pub fn new() -> Result<Self, anyhow::Error> {
         let project_registry_manager = ProjectRegistryManager::new()
             .context("Failed to initialize project registry manager")?;
-        
+
         Ok(Self {
             pending_requests: Arc::new(Mutex::new(HashMap::new())),
             project_registry_manager: Arc::new(Mutex::new(project_registry_manager)),
@@ -183,7 +183,7 @@ async fn register_project(
 ) -> Result<ProjectRecord, String> {
     let mut registry = state.project_registry_manager.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
-    
+
     registry.register_project(workspace_path, name, description)
         .map_err(|e| format!("Failed to register project: {}", e))
 }
@@ -197,13 +197,13 @@ async fn get_all_projects(
 ) -> Result<Vec<ProjectRecord>, String> {
     let registry = state.project_registry_manager.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
-    
+
     let options = ProjectQueryOptions {
         status: status.and_then(|s| serde_json::from_str(&s).ok()),
         search,
         limit,
     };
-    
+
     Ok(registry.get_all_projects(Some(options)))
 }
 
@@ -215,7 +215,7 @@ async fn delete_project(
 ) -> Result<(), String> {
     let mut registry = state.project_registry_manager.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
-    
+
     registry.delete_project(&project_id, delete_files)
         .map_err(|e| format!("Failed to delete project: {}", e))
 }
@@ -230,9 +230,9 @@ async fn update_project(
 ) -> Result<ProjectRecord, String> {
     let mut registry = state.project_registry_manager.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
-    
+
     let status = status.and_then(|s| serde_json::from_str(&s).ok());
-    
+
     registry.update_project(&project_id, name, description, status)
         .map_err(|e| format!("Failed to update project: {}", e))
 }
@@ -244,29 +244,29 @@ async fn open_project(
 ) -> Result<(), String> {
     let mut registry = state.project_registry_manager.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
-    
+
     // Get project
     let project = registry.get_project(&project_id)
         .ok_or_else(|| "Project not found".to_string())?;
-    
+
     // Update last opened time
     registry.update_last_opened(&project_id)
         .map_err(|e| format!("Failed to update last opened time: {}", e))?;
-    
+
     // Drop the lock before spawning new process
     drop(registry);
-    
+
     // Get current executable path
     let exe_path = std::env::current_exe()
         .map_err(|e| format!("Failed to get executable path: {}", e))?;
-    
+
     // Spawn new process with --workspace parameter
     std::process::Command::new(&exe_path)
         .arg("--workspace")
         .arg(&project.workspace_path)
         .spawn()
         .map_err(|e| format!("Failed to open project: {}", e))?;
-    
+
     Ok(())
 }
 
@@ -276,7 +276,7 @@ async fn auto_register_current_project(
 ) -> Result<Option<ProjectRecord>, String> {
     let mut registry = state.project_registry_manager.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
-    
+
     registry.auto_register_current_project()
         .map_err(|e| format!("Failed to auto-register project: {}", e))
 }
@@ -288,20 +288,20 @@ async fn set_workspace(
     window: Window,
 ) -> Result<(), String> {
     use std::path::Path;
-    
+
     println!("[GUI] Setting workspace to: {}", workspace_path);
-    
+
     let path = Path::new(&workspace_path);
     if !path.exists() {
         // Create the directory if it doesn't exist
         fs::create_dir_all(path)
             .map_err(|e| format!("Failed to create workspace directory: {}", e))?;
     }
-    
+
     if !path.is_dir() {
         return Err(format!("Path is not a directory: {}", workspace_path));
     }
-    
+
     // Check if workspace is already set
     let workspace = state.workspace_path.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
@@ -310,47 +310,47 @@ async fn set_workspace(
         return Err("This window already has a project opened. Please open a new window to work on another project.".to_string());
     }
     drop(workspace);
-    
+
     // Change current directory
     std::env::set_current_dir(path)
         .map_err(|e| format!("Failed to set current directory: {}", e))?;
-    
+
     // Initialize project using new V2 API
     let project_name = path.file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("cowork_project")
         .to_string();
-    
+
     // Use new persistence API to check if initialized
     let cowork_v2_path = path.join(".cowork-v2");
     if !cowork_v2_path.exists() {
         println!("[GUI] Project not initialized, initializing with V2 API...");
-        
+
         // Create .cowork-v2 directory structure
         std::fs::create_dir_all(&cowork_v2_path)
             .map_err(|e| format!("Failed to create .cowork-v2 directory: {}", e))?;
-        
+
         let project_file = cowork_v2_path.join("project.json");
         let iterations_dir = cowork_v2_path.join("iterations");
         std::fs::create_dir_all(&iterations_dir)
             .map_err(|e| format!("Failed to create iterations directory: {}", e))?;
-        
+
         // Create initial project file
         let project = cowork_core::domain::Project::new(&project_name);
         let project_json = serde_json::to_string_pretty(&project)
             .map_err(|e| format!("Failed to serialize project: {}", e))?;
         std::fs::write(&project_file, project_json)
             .map_err(|e| format!("Failed to write project.json: {}", e))?;
-        
+
         println!("[GUI] Project initialized successfully with V2 API");
     } else {
         println!("[GUI] Project already initialized with V2");
     }
-    
+
     // Auto-register project to registry
     let mut registry = state.project_registry_manager.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
-    
+
     // Check if already registered
     let workspace_path_str = workspace_path.clone();
     if !registry.get_all_projects(None).iter().any(|p| p.workspace_path == workspace_path_str) {
@@ -369,18 +369,18 @@ async fn set_workspace(
         println!("[GUI] Project already registered");
     }
     drop(registry);
-    
+
     // Reset any "running" iterations to "paused" since there's no actual execution after reopening
     reset_running_iterations();
-    
+
     // Store in app state
     let mut workspace = state.workspace_path.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
     *workspace = Some(workspace_path.clone());
-    
+
     // Emit event to trigger reload
     let _ = window.emit("project_loaded", ());
-    
+
     println!("[GUI] Workspace set successfully");
     Ok(())
 }
@@ -390,9 +390,9 @@ async fn set_workspace(
 fn reset_running_iterations() {
     use cowork_core::persistence::IterationStore;
     use cowork_core::domain::IterationStatus;
-    
+
     let iteration_store = IterationStore::new();
-    
+
     match iteration_store.load_all() {
         Ok(iterations) => {
             let mut reset_count = 0;
@@ -434,7 +434,7 @@ async fn open_project_in_current_window(
     window: Window,
 ) -> Result<(), String> {
     use std::path::Path;
-    
+
     // Check if window already has a project
     let workspace = state.workspace_path.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
@@ -443,43 +443,43 @@ async fn open_project_in_current_window(
         return Err("This window already has a project opened. Please open a new window to work on another project.".to_string());
     }
     drop(workspace);
-    
+
     // Get project from registry
     let mut registry = state.project_registry_manager.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
-    
+
     let project = registry.get_project(&project_id)
         .ok_or_else(|| "Project not found".to_string())?;
-    
+
     // Update last opened time
     registry.update_last_opened(&project_id)
         .map_err(|e| format!("Failed to update last opened time: {}", e))?;
-    
+
     let workspace_path = project.workspace_path.clone();
     drop(registry);
-    
+
     // Log for debugging
     println!("[GUI] Project opened in current window: {}", workspace_path);
-    
+
     // Set workspace in current window
     let path = Path::new(&workspace_path);
     if !path.exists() {
         return Err(format!("Project path does not exist: {}", workspace_path));
     }
-    
+
     std::env::set_current_dir(path)
         .map_err(|e| format!("Failed to set current directory: {}", e))?;
-    
+
     // Reset any "running" iterations to "paused" since there's no actual execution after reopening
     reset_running_iterations();
-    
+
     let mut workspace = state.workspace_path.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
     *workspace = Some(workspace_path);
-    
+
     // Emit event to trigger reload
     let _ = window.emit("project_loaded", ());
-    
+
     Ok(())
 }
 
@@ -532,16 +532,16 @@ async fn submit_input_response(
 pub fn run() {
     let app_state = AppState::new()
         .expect("Failed to initialize application state");
-    
+
     // Check for --workspace argument
     let args: Vec<String> = std::env::args().collect();
     let workspace_path = args.iter()
         .position(|arg| arg == "--workspace")
         .and_then(|pos| args.get(pos + 1))
         .cloned();
-    
+
     let workspace_path_clone = workspace_path.clone();
-    
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -603,7 +603,7 @@ pub fn run() {
         .setup(move |app| {
             // Initialize app handle for project runner
             gui_commands::init_app_handle(app.handle().clone());
-            
+
             // Set workspace if provided via command line
             if let Some(workspace) = workspace_path_clone {
                 println!("[GUI] Workspace path from command line: {}", workspace);
@@ -625,7 +625,7 @@ pub fn run() {
                     eprintln!("[GUI] Invalid workspace path: {}", workspace);
                 }
             }
-            
+
             Ok(())
         })
         .run(tauri::generate_context!())

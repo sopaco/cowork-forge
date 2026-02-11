@@ -531,7 +531,7 @@ impl Default for HitlConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            timeout_seconds: 300,    // 5 分钟
+            timeout_seconds: 3000,    // 50 分钟
             max_feedback_length: 10000,
             required_stages: vec![
                 Stage::Idea,
