@@ -760,8 +760,8 @@ function App() {
               { key: 'code', icon: <CodeOutlined />, label: 'Code' },
               { key: 'preview', icon: <EyeOutlined />, label: 'Preview' },
               { key: 'run', icon: <PlayCircleOutlined />, label: 'Run' },
-              { key: 'execution-memory', icon: <DatabaseOutlined />, label: '执行记忆' },
-              { key: 'project-knowledge', icon: <BookOutlined />, label: '项目知识' },
+              { key: 'execution-memory', icon: <DatabaseOutlined />, label: 'Memory' },
+              { key: 'project-knowledge', icon: <BookOutlined />, label: 'Knowledge' },
             ]}
           />
         </Sider>

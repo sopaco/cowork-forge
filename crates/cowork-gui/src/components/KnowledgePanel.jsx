@@ -60,7 +60,7 @@ function KnowledgePanel({ currentSession }) {
         "[KnowledgePanel] Failed to load project knowledge:",
         error,
       );
-      message.error("Failed to load project knowledge: " + error);
+      message.error("Failed to load knowledge: " + error);
       setKnowledgeList([]);
     } finally {
       setLoading(false);
@@ -71,11 +71,11 @@ function KnowledgePanel({ currentSession }) {
     setRegenerating(iterationId);
     try {
       await invoke("gui_regenerate_knowledge", { iterationId });
-      message.success("Knowledge regenerated successfully");
+      message.success("Knowledge regenerated");
       loadProjectKnowledge();
     } catch (error) {
       console.error("[KnowledgePanel] Failed to regenerate knowledge:", error);
-      message.error("Failed to regenerate knowledge: " + error);
+      message.error("Failed to regenerate: " + error);
     } finally {
       setRegenerating(null);
     }
@@ -132,8 +132,8 @@ function KnowledgePanel({ currentSession }) {
           >
             <Space>
               <BookOutlined style={{ fontSize: "16px", color: "#1890ff" }} />
-              <Text strong>项目知识</Text>
-              <Tag color="blue">{filteredKnowledge.length} 个迭代</Tag>
+              <Text strong>Knowledge</Text>
+              <Tag color="blue">{filteredKnowledge.length} iterations</Tag>
             </Space>
             <Button
               icon={<ReloadOutlined />}
@@ -141,11 +141,11 @@ function KnowledgePanel({ currentSession }) {
               onClick={loadProjectKnowledge}
               loading={loading}
             >
-              刷新
+              Refresh
             </Button>
           </div>
           <Input
-            placeholder="搜索知识..."
+            placeholder="Search knowledge..."
             prefix={<SearchOutlined />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
@@ -167,9 +167,9 @@ function KnowledgePanel({ currentSession }) {
             <Spin size="large" />
           </div>
         ) : !currentSession ? (
-          <Empty description="请先选择一个项目" style={{ marginTop: "50px" }} />
+          <Empty description="Please select a project" style={{ marginTop: "50px" }} />
         ) : filteredKnowledge.length === 0 ? (
-          <Empty description="暂无项目知识" style={{ marginTop: "50px" }} />
+          <Empty description="No knowledge found" style={{ marginTop: "50px" }} />
         ) : (
           <div
             style={{ display: "flex", flexDirection: "column", gap: "12px" }}
@@ -294,7 +294,7 @@ function KnowledgePanel({ currentSession }) {
                   key: "summary",
                   label: (
                     <span>
-                      <FileTextOutlined /> 总结
+                      <FileTextOutlined /> Summary
                     </span>
                   ),
                   children: (
@@ -328,7 +328,7 @@ function KnowledgePanel({ currentSession }) {
                                 level={5}
                                 style={{ margin: 0, color: "#52c41a" }}
                               >
-                                Idea 总结
+                                Idea Summary
                               </Title>
                             </div>
                             <Paragraph
@@ -366,7 +366,7 @@ function KnowledgePanel({ currentSession }) {
                                 level={5}
                                 style={{ margin: 0, color: "#722ed1" }}
                               >
-                                Design 总结
+                                Design Summary
                               </Title>
                             </div>
                             <Paragraph
@@ -404,7 +404,7 @@ function KnowledgePanel({ currentSession }) {
                                 level={5}
                                 style={{ margin: 0, color: "#fa8c16" }}
                               >
-                                Plan 总结
+                                Plan Summary
                               </Title>
                             </div>
                             <Paragraph
@@ -442,7 +442,7 @@ function KnowledgePanel({ currentSession }) {
                                 level={5}
                                 style={{ margin: 0, color: "#1890ff" }}
                               >
-                                代码结构
+                                Code Structure
                               </Title>
                             </div>
                             <Paragraph
@@ -465,7 +465,7 @@ function KnowledgePanel({ currentSession }) {
                   key: "tech-stack",
                   label: (
                     <span>
-                      <CodeOutlined /> 技术栈
+                      <CodeOutlined /> Tech Stack
                     </span>
                   ),
                   children: (
@@ -491,7 +491,7 @@ function KnowledgePanel({ currentSession }) {
                                 fontSize: "14px",
                               }}
                             >
-                              技术栈
+                              Tech Stack
                             </Text>
                             <div
                               style={{
@@ -515,7 +515,7 @@ function KnowledgePanel({ currentSession }) {
                             </div>
                           </div>
                         ) : (
-                          <Empty description="暂无技术栈信息" />
+                          <Empty description="No tech stack information" />
                         )}
                       </Space>
                     </div>
@@ -525,7 +525,7 @@ function KnowledgePanel({ currentSession }) {
                   key: "decisions",
                   label: (
                     <span>
-                      <CheckCircleOutlined /> 关键决策
+                      <CheckCircleOutlined /> Key Decisions
                     </span>
                   ),
                   children: (
@@ -559,7 +559,7 @@ function KnowledgePanel({ currentSession }) {
                           )}
                         />
                       ) : (
-                        <Empty description="无关键决策记录" />
+                        <Empty description="No key decisions recorded" />
                       )}
                     </div>
                   ),
@@ -568,7 +568,7 @@ function KnowledgePanel({ currentSession }) {
                   key: "patterns",
                   label: (
                     <span>
-                      <BookOutlined /> 设计模式
+                      <BookOutlined /> Design Patterns
                     </span>
                   ),
                   children: (
@@ -604,7 +604,7 @@ function KnowledgePanel({ currentSession }) {
                           )}
                         </Space>
                       ) : (
-                        <Empty description="无设计模式记录" />
+                        <Empty description="No design patterns recorded" />
                       )}
                     </div>
                   ),
@@ -613,7 +613,7 @@ function KnowledgePanel({ currentSession }) {
                   key: "issues",
                   label: (
                     <span>
-                      <CloseCircleOutlined /> 已知问题
+                      <CloseCircleOutlined /> Known Issues
                     </span>
                   ),
                   children: (
@@ -659,7 +659,7 @@ function KnowledgePanel({ currentSession }) {
                           ))}
                         </Space>
                       ) : (
-                        <Empty description="无已知问题记录" />
+                        <Empty description="No known issues recorded" />
                       )}
                     </div>
                   ),

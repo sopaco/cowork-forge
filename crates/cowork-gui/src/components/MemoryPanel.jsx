@@ -63,7 +63,7 @@ function MemoryPanel({ currentSession }) {
       setTotal(result.total || 0);
     } catch (error) {
       console.error("[MemoryPanel] Failed to load memories:", error);
-      message.error("加载记忆失败: " + error);
+      message.error("Failed to load memories: " + error);
       setMemories([]);
       setTotal(0);
     } finally {
@@ -87,7 +87,7 @@ function MemoryPanel({ currentSession }) {
       setMemoryDetail(detail);
     } catch (error) {
       console.error("[MemoryPanel] Failed to load memory detail:", error);
-      message.error("加载记忆详情失败: " + error);
+      message.error("Failed to load memory detail: " + error);
       setMemoryDetail(null);
     } finally {
       setDetailLoading(false);
