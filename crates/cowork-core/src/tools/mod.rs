@@ -61,6 +61,7 @@ pub use file_tools::*;
 pub use hitl_tools::*;
 pub use hitl_content_tools::*;
 pub use test_lint_tools::*;
+pub use test_lint_tools::ExecuteShellCommandTool;
 pub use data_tools::*;
 pub use validation_tools::*;
 pub use control_tools::*;

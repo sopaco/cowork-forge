@@ -5,6 +5,8 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use std::path::Path;
 
+use crate::tools::{get_required_string_param, get_optional_string_param};
+
 // ============================================================================
 // CheckTestsTool
 // ============================================================================
@@ -277,4 +279,103 @@ fn parse_lint_output(stdout: &str, stderr: &str) -> (u32, u32) {
     let errors = combined.matches("error").count() as u32;
     
     (warnings, errors)
+}
+
+// ============================================================================
+// ExecuteShellCommandTool
+// ============================================================================
+
+pub struct ExecuteShellCommandTool;
+
+#[async_trait]
+impl Tool for ExecuteShellCommandTool {
+    fn name(&self) -> &str {
+        "execute_shell_command"
+    }
+
+    fn description(&self) -> &str {
+        "Execute a shell command and return the result. Use this to run \
+         installation, build, or test commands extracted from README.md. \
+         Supports both Windows (PowerShell) and Unix (bash) commands."
+    }
+
+    fn parameters_schema(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The shell command to execute"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Description of what this command does (e.g., 'Install dependencies')"
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": "Timeout in seconds (default: 120)"
+                }
+            },
+            "required": ["command", "description"]
+        }))
+    }
+
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let command = get_required_string_param(&args, "command")?;
+        let description = get_optional_string_param(&args, "description").unwrap_or_default();
+        let timeout = args.get("timeout")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(120);
+
+        // Determine OS and choose appropriate shell
+        let (shell, shell_arg) = if cfg!(target_os = "windows") {
+            ("powershell.exe", vec!["-NoProfile", "-Command", command])
+        } else {
+            ("sh", vec!["-c", command])
+        };
+
+        // Execute command with timeout
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout),
+            tokio::process::Command::new(shell)
+                .args(&shell_arg)
+                .output()
+        ).await;
+
+        match result {
+            Ok(Ok(output)) => {
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                let success = output.status.success();
+
+                Ok(json!({
+                    "status": if success { "success" } else { "failed" },
+                    "description": description,
+                    "command": command,
+                    "exit_code": output.status.code(),
+                    "stdout": stdout,
+                    "stderr": stderr,
+                    "timeout": false
+                }))
+            }
+            Ok(Err(e)) => {
+                Ok(json!({
+                    "status": "error",
+                    "description": description,
+                    "command": command,
+                    "error": e.to_string(),
+                    "timeout": false
+                }))
+            }
+            Err(_) => {
+                Ok(json!({
+                    "status": "timeout",
+                    "description": description,
+                    "command": command,
+                    "error": format!("Command timed out after {} seconds", timeout),
+                    "timeout": true
+                }))
+            }
+        }
+    }
 }

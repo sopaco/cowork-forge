@@ -1,12 +1,31 @@
-import { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { Card, Input, Select, Button, Tag, Empty, Spin, Modal, Tabs, Typography, Space, Divider, message } from 'antd';
-import { SearchOutlined, EyeOutlined, DatabaseOutlined, ClockCircleOutlined } from '@ant-design/icons';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
-import rehypeRaw from 'rehype-raw';
-import 'highlight.js/styles/github.css';
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import {
+  Card,
+  Input,
+  Select,
+  Button,
+  Tag,
+  Empty,
+  Spin,
+  Modal,
+  Tabs,
+  Typography,
+  Space,
+  Divider,
+  message,
+} from "antd";
+import {
+  SearchOutlined,
+  EyeOutlined,
+  DatabaseOutlined,
+  ClockCircleOutlined,
+} from "@ant-design/icons";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
+import rehypeRaw from "rehype-raw";
+import "highlight.js/styles/github.css";
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -15,9 +34,9 @@ const { Text, Paragraph } = Typography;
 function MemoryPanel({ currentSession }) {
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [queryType, setQueryType] = useState('all');
-  const [category, setCategory] = useState('all');
-  const [stage, setStage] = useState('');
+  const [queryType, setQueryType] = useState("all");
+  const [category, setCategory] = useState("all");
+  const [stage, setStage] = useState("");
   const [limit, setLimit] = useState(20);
   const [selectedMemory, setSelectedMemory] = useState(null);
   const [memoryDetail, setMemoryDetail] = useState(null);
@@ -36,15 +55,15 @@ function MemoryPanel({ currentSession }) {
         category: category,
         stage: stage || null,
         limit: limit,
-        iterationId: currentSession || null
+        iterationId: currentSession || null,
       };
 
-      const result = await invoke('query_memory_index', params);
+      const result = await invoke("query_memory_index", params);
       setMemories(result.results || []);
       setTotal(result.total || 0);
     } catch (error) {
-      console.error('[MemoryPanel] Failed to load memories:', error);
-      message.error('加载记忆失败: ' + error);
+      console.error("[MemoryPanel] Failed to load memories:", error);
+      message.error("加载记忆失败: " + error);
       setMemories([]);
       setTotal(0);
     } finally {
@@ -60,15 +79,15 @@ function MemoryPanel({ currentSession }) {
     setSelectedMemory(memory);
     setDetailLoading(true);
     try {
-      const detail = await invoke('load_memory_detail', {
+      const detail = await invoke("load_memory_detail", {
         memoryId: memory.id,
         file: memory.file,
-        iterationId: currentSession || null
+        iterationId: currentSession || null,
       });
       setMemoryDetail(detail);
     } catch (error) {
-      console.error('[MemoryPanel] Failed to load memory detail:', error);
-      message.error('加载记忆详情失败: ' + error);
+      console.error("[MemoryPanel] Failed to load memory detail:", error);
+      message.error("加载记忆详情失败: " + error);
       setMemoryDetail(null);
     } finally {
       setDetailLoading(false);
@@ -77,25 +96,34 @@ function MemoryPanel({ currentSession }) {
 
   const getCategoryColor = (cat) => {
     switch (cat) {
-      case 'decision': return 'blue';
-      case 'experience': return 'green';
-      case 'pattern': return 'purple';
-      case 'record': return 'orange';
-      default: return 'default';
+      case "decision":
+        return "blue";
+      case "experience":
+        return "green";
+      case "pattern":
+        return "purple";
+      case "record":
+        return "orange";
+      default:
+        return "default";
     }
   };
 
   const getImpactColor = (impact) => {
     switch (impact) {
-      case 'high': return 'red';
-      case 'medium': return 'orange';
-      case 'low': return 'green';
-      default: return 'default';
+      case "high":
+        return "red";
+      case "medium":
+        return "orange";
+      case "low":
+        return "green";
+      default:
+        return "default";
     }
   };
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return 'N/A';
+    if (!dateStr) return "N/A";
     try {
       const date = new Date(dateStr);
       return date.toLocaleString();
@@ -105,29 +133,70 @@ function MemoryPanel({ currentSession }) {
   };
 
   return (
-    <div style={{ padding: '20px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexShrink: 0 }}>
-        <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+    <div
+      style={{
+        padding: "20px",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "20px",
+          flexShrink: 0,
+        }}
+      >
+        <h2
+          style={{
+            margin: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+          }}
+        >
           <DatabaseOutlined />
           Memory Browser
         </h2>
         <Space>
           <Text type="secondary">Total: {total}</Text>
-          <Button icon={<SearchOutlined />} onClick={handleSearch} loading={loading}>
+          <Button
+            icon={<SearchOutlined />}
+            onClick={handleSearch}
+            loading={loading}
+          >
             Refresh
           </Button>
         </Space>
       </div>
 
-      <Card size="small" style={{ marginBottom: '20px', flexShrink: 0 }}>
-        <Space direction="vertical" style={{ width: '100%' }} size="small">
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '150px' }}>
+      <Card size="small" style={{ marginBottom: "20px", flexShrink: 0 }}>
+        <Space direction="vertical" style={{ width: "100%" }} size="small">
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                minWidth: "150px",
+              }}
+            >
               <Text strong>Query Type:</Text>
               <Select
                 value={queryType}
                 onChange={setQueryType}
-                style={{ flex: 1, minWidth: '120px' }}
+                style={{ flex: 1, minWidth: "120px" }}
                 size="small"
               >
                 <Option value="all">All</Option>
@@ -136,12 +205,19 @@ function MemoryPanel({ currentSession }) {
               </Select>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '150px' }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                minWidth: "150px",
+              }}
+            >
               <Text strong>Category:</Text>
               <Select
                 value={category}
                 onChange={setCategory}
-                style={{ flex: 1, minWidth: '120px' }}
+                style={{ flex: 1, minWidth: "120px" }}
                 size="small"
               >
                 <Option value="all">All</Option>
@@ -152,12 +228,19 @@ function MemoryPanel({ currentSession }) {
               </Select>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '150px' }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                minWidth: "150px",
+              }}
+            >
               <Text strong>Stage:</Text>
               <Select
                 value={stage}
                 onChange={setStage}
-                style={{ flex: 1, minWidth: '120px' }}
+                style={{ flex: 1, minWidth: "120px" }}
                 size="small"
                 allowClear
                 placeholder="All"
@@ -171,12 +254,19 @@ function MemoryPanel({ currentSession }) {
               </Select>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '100px' }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                minWidth: "100px",
+              }}
+            >
               <Text strong>Limit:</Text>
               <Select
                 value={limit}
                 onChange={setLimit}
-                style={{ flex: 1, minWidth: '80px' }}
+                style={{ flex: 1, minWidth: "80px" }}
                 size="small"
               >
                 <Option value={10}>10</Option>
@@ -189,36 +279,68 @@ function MemoryPanel({ currentSession }) {
         </Space>
       </Card>
 
-      <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{
+          flex: 1,
+          overflow: "auto",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         {loading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+            }}
+          >
             <Spin size="large" />
           </div>
         ) : memories.length === 0 ? (
-          <Empty 
-            description="No memories found" 
-            style={{ marginTop: '50px' }}
+          <Empty
+            description="No memories found"
+            style={{ marginTop: "50px" }}
           />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+          >
             {memories.map((memory) => (
               <Card
                 key={memory.id}
                 size="small"
                 hoverable
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: "pointer" }}
                 onClick={() => handleViewDetail(memory)}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    marginBottom: "8px",
+                  }}
+                >
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        marginBottom: "4px",
+                      }}
+                    >
                       <Text strong>{memory.title}</Text>
-                      <Tag color={getCategoryColor(memory.category)}>{memory.category}</Tag>
+                      <Tag color={getCategoryColor(memory.category)}>
+                        {memory.category}
+                      </Tag>
                       {memory.stage && <Tag>{memory.stage}</Tag>}
                     </div>
-                    <Paragraph 
-                      ellipsis={{ rows: 2 }} 
-                      style={{ margin: 0, fontSize: '13px', color: '#888' }}
+                    <Paragraph
+                      ellipsis={{ rows: 2 }}
+                      style={{ margin: 0, fontSize: "13px", color: "#888" }}
                     >
                       {memory.summary}
                     </Paragraph>
@@ -233,15 +355,32 @@ function MemoryPanel({ currentSession }) {
                     }}
                   />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#666' }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontSize: "12px",
+                    color: "#666",
+                  }}
+                >
                   <Space size="small">
-                    <span><ClockCircleOutlined /> {formatDate(memory.created_at)}</span>
-                    {memory.impact && <Tag color={getImpactColor(memory.impact)} size="small">{memory.impact}</Tag>}
+                    <span>
+                      <ClockCircleOutlined /> {formatDate(memory.created_at)}
+                    </span>
+                    {memory.impact && (
+                      <Tag color={getImpactColor(memory.impact)} size="small">
+                        {memory.impact}
+                      </Tag>
+                    )}
                   </Space>
                   <Space size="small">
-                    {memory.tags && memory.tags.slice(0, 2).map((tag, idx) => (
-                      <Tag key={idx} style={{ fontSize: '11px' }}>{tag}</Tag>
-                    ))}
+                    {memory.tags &&
+                      memory.tags.slice(0, 2).map((tag, idx) => (
+                        <Tag key={idx} style={{ fontSize: "11px" }}>
+                          {tag}
+                        </Tag>
+                      ))}
                   </Space>
                 </div>
               </Card>
@@ -258,18 +397,28 @@ function MemoryPanel({ currentSession }) {
           setMemoryDetail(null);
         }}
         footer={[
-          <Button key="close" onClick={() => {
-            setSelectedMemory(null);
-            setMemoryDetail(null);
-          }}>
+          <Button
+            key="close"
+            onClick={() => {
+              setSelectedMemory(null);
+              setMemoryDetail(null);
+            }}
+          >
             Close
-          </Button>
+          </Button>,
         ]}
         width={800}
         style={{ top: 20 }}
       >
         {detailLoading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "200px",
+            }}
+          >
             <Spin size="large" />
           </div>
         ) : (
@@ -277,15 +426,28 @@ function MemoryPanel({ currentSession }) {
             <Tabs.TabPane tab="Content" key="content">
               {memoryDetail ? (
                 <div>
-                  <div style={{ marginBottom: '16px', padding: '12px', background: '#f5f5f5', borderRadius: '4px' }}>
-                    <Space direction="vertical" style={{ width: '100%' }} size="small">
+                  <div
+                    style={{
+                      marginBottom: "16px",
+                      padding: "25px",
+                      background: "#f5f5f5",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    <Space
+                      direction="vertical"
+                      style={{ width: "100%" }}
+                      size="small"
+                    >
                       <div>
                         <Text strong>ID: </Text>
                         <Text code>{selectedMemory.id}</Text>
                       </div>
                       <div>
                         <Text strong>Category: </Text>
-                        <Tag color={getCategoryColor(selectedMemory.category)}>{selectedMemory.category}</Tag>
+                        <Tag color={getCategoryColor(selectedMemory.category)}>
+                          {selectedMemory.category}
+                        </Tag>
                       </div>
                       {selectedMemory.stage && (
                         <div>
@@ -300,27 +462,37 @@ function MemoryPanel({ currentSession }) {
                       {selectedMemory.impact && (
                         <div>
                           <Text strong>Impact: </Text>
-                          <Tag color={getImpactColor(selectedMemory.impact)}>{selectedMemory.impact}</Tag>
+                          <Tag color={getImpactColor(selectedMemory.impact)}>
+                            {selectedMemory.impact}
+                          </Tag>
                         </div>
                       )}
-                      {selectedMemory.tags && selectedMemory.tags.length > 0 && (
-                        <div>
-                          <Text strong>Tags: </Text>
-                          <Space size="small">
-                            {selectedMemory.tags.map((tag, idx) => (
-                              <Tag key={idx}>{tag}</Tag>
-                            ))}
-                          </Space>
-                        </div>
-                      )}
+                      {selectedMemory.tags &&
+                        selectedMemory.tags.length > 0 && (
+                          <div>
+                            <Text strong>Tags: </Text>
+                            <Space size="small">
+                              {selectedMemory.tags.map((tag, idx) => (
+                                <Tag key={idx}>{tag}</Tag>
+                              ))}
+                            </Space>
+                          </div>
+                        )}
                     </Space>
                   </div>
-                  <Divider />
-                  <div style={{ maxHeight: '400px', overflow: 'auto', padding: '12px', backgroundColor: '#fafafa', borderRadius: '4px' }}>
+                  <div
+                    style={{
+                      maxHeight: "400px",
+                      overflow: "auto",
+                      padding: "25px",
+                      backgroundColor: "#fafafa",
+                      borderRadius: "4px",
+                    }}
+                  >
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       rehypePlugins={[rehypeHighlight, rehypeRaw]}
-                      style={{ lineHeight: '1.8', fontSize: '14px' }}
+                      style={{ lineHeight: "1.8", fontSize: "14px" }}
                     >
                       {memoryDetail.content}
                     </ReactMarkdown>
@@ -333,14 +505,20 @@ function MemoryPanel({ currentSession }) {
             <Tabs.TabPane tab="Summary" key="summary">
               {selectedMemory && (
                 <div>
-                  <div style={{ marginBottom: '16px' }}>
+                  <div style={{ marginBottom: "16px" }}>
                     <Text strong>Summary</Text>
-                    <Divider style={{ margin: '8px 0' }} />
-                    <div style={{ padding: '12px', backgroundColor: '#fafafa', borderRadius: '4px' }}>
+                    <Divider style={{ margin: "8px 0" }} />
+                    <div
+                      style={{
+                        padding: "25px",
+                        backgroundColor: "#fafafa",
+                        borderRadius: "4px",
+                      }}
+                    >
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeHighlight, rehypeRaw]}
-                        style={{ lineHeight: '1.8', fontSize: '14px' }}
+                        style={{ lineHeight: "1.8", fontSize: "14px" }}
                       >
                         {selectedMemory.summary}
                       </ReactMarkdown>
@@ -349,7 +527,7 @@ function MemoryPanel({ currentSession }) {
                   {selectedMemory.file && (
                     <div>
                       <Text strong>File</Text>
-                      <Divider style={{ margin: '8px 0' }} />
+                      <Divider style={{ margin: "8px 0" }} />
                       <Text code>{selectedMemory.file}</Text>
                     </div>
                   )}

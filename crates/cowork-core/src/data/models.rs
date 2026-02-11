@@ -216,6 +216,8 @@ pub struct CodeMetadata {
     pub files: Vec<FileMetadata>,
     pub build_status: BuildStatus,
     pub test_status: TestStatus,
+    pub readme_path: Option<String>,
+    pub project_type: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -390,6 +392,8 @@ impl CodeMetadata {
                 failed: 0,
                 details: Vec::new(),
             },
+            readme_path: None,
+            project_type: "Unknown".to_string(),
         }
     }
 }
