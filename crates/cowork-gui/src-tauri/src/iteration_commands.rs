@@ -4,7 +4,7 @@ use crate::AppState;
 use crate::TauriBackend;
 use cowork_core::domain::{Iteration, InheritanceMode, Project, IterationStatus};
 use cowork_core::llm::create_llm_client;
-use cowork_core::llm::config::{LlmConfig, ModelConfig};
+use cowork_core::llm::config::ModelConfig;
 use cowork_core::persistence::{IterationStore, ProjectStore, MemoryStore};
 use cowork_core::pipeline::IterationExecutor;
 use tauri::{Emitter, Manager, State, Window};
@@ -292,7 +292,7 @@ pub async fn gui_retry_iteration(
         .or_else(|_| ModelConfig::from_env())
         .map_err(|e| format!("Failed to load LLM configuration: {}", e))?;
 
-    let model = create_llm_client(&model_config.llm)
+    let _model = create_llm_client(&model_config.llm)
         .map_err(|e| format!("Failed to create LLM client: {}", e))?;
 
     // Emit started event

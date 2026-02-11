@@ -317,9 +317,40 @@ function App() {
         if (agent_name) {
           setCurrentAgent(agent_name);
         }
-        if (!is_thinking && content) {
-          setMessages((prev) => {
-            const lastMsg = prev[prev.length - 1];
+
+        if (!content) return;
+
+        setMessages((prev) => {
+          const lastMsg = prev[prev.length - 1];
+
+          if (is_thinking) {
+            // Handle thinking messages
+            if (lastMsg && lastMsg.type === 'thinking' && lastMsg.isStreaming) {
+              // Append to existing thinking message
+              return [
+                ...prev.slice(0, -1),
+                {
+                  ...lastMsg,
+                  content: lastMsg.content + content,
+                  agentName: agent_name || lastMsg.agentName,
+                },
+              ];
+            } else {
+              // Create new thinking message
+              return [
+                ...prev,
+                {
+                  type: 'thinking',
+                  content,
+                  agentName: agent_name || 'AI Agent',
+                  isStreaming: true,
+                  isExpanded: true,
+                  timestamp: new Date().toISOString(),
+                },
+              ];
+            }
+          } else {
+            // Handle regular agent messages
             if (lastMsg && lastMsg.type === 'agent' && lastMsg.isStreaming) {
               return [
                 ...prev.slice(0, -1),
@@ -341,8 +372,8 @@ function App() {
                 },
               ];
             }
-          });
-        }
+          }
+        });
       });
 
       await listen('input_request', (event) => {
@@ -707,6 +738,30 @@ function App() {
                 {currentIteration.description}
               </p>
             </div>
+
+            {/* Status Indicator */}
+            {isProcessing && currentAgent && (
+              <div style={{
+                padding: '12px 16px',
+                backgroundColor: '#e6f7ff',
+                border: '1px solid #91d5ff',
+                borderRadius: '6px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}>
+                <Spin size="small" />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '14px', fontWeight: 500, color: '#1890ff', marginBottom: '4px' }}>
+                    {currentAgent} is working...
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>
+                    {currentIteration.current_stage ? `Stage: ${currentIteration.current_stage}` : 'Processing...'}
+                  </div>
+                </div>
+              </div>
+            )}
             
             <div 
               ref={messagesContainerRef}
@@ -740,6 +795,47 @@ function App() {
                         }}>
                           {msg.content}
                         </div>
+                      </div>
+                    ) : msg.type === 'thinking' ? (
+                      <div>
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            color: '#888',
+                            marginBottom: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            cursor: 'pointer',
+                          }}
+                          onClick={() => {
+                            setMessages((prev) =>
+                              prev.map((m, i) =>
+                                i === index ? { ...m, isExpanded: !m.isExpanded } : m
+                              )
+                            );
+                          }}
+                        >
+                          <span>🤔</span>
+                          <span style={{ fontStyle: 'italic' }}>{msg.agentName || 'AI Agent'} thinking...</span>
+                          <span style={{ fontSize: '10px' }}>{msg.isExpanded ? '▼' : '▶'}</span>
+                        </div>
+                        {msg.isExpanded && (
+                          <div style={{
+                            backgroundColor: '#f6f8fa',
+                            padding: '10px 14px',
+                            borderRadius: '4px',
+                            border: '1px solid #e1e4e8',
+                            maxWidth: '70%',
+                            wordBreak: 'break-word',
+                            fontSize: '13px',
+                            fontStyle: 'italic',
+                            color: '#555',
+                            lineHeight: '1.6',
+                          }}>
+                            {msg.content}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div>

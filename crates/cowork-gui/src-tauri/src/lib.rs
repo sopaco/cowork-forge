@@ -48,11 +48,14 @@ impl InteractiveBackend for TauriBackend {
         // Determine agent name from message content
         let agent_name = determine_agent_name(&content);
 
+        // Determine if this is a thinking message (Debug level only)
+        let is_thinking = matches!(level, cowork_core::interaction::MessageLevel::Debug);
+
         // Emit agent_event for frontend processing display
         let _ = self.app_handle.emit("agent_event", serde_json::json!({
             "content": content,
             "agent_name": agent_name,
-            "is_thinking": false,
+            "is_thinking": is_thinking,
             "level": format!("{:?}", level)
         }));
 
