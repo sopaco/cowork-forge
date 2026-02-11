@@ -560,6 +560,8 @@ pub fn run() {
             iteration_commands::gui_continue_iteration,
             iteration_commands::gui_retry_iteration,
             iteration_commands::gui_delete_iteration,
+            iteration_commands::gui_get_project_knowledge,
+            iteration_commands::gui_regenerate_knowledge,
             // GUI-specific commands (V2 API - Iteration based)
             gui_commands::open_in_file_manager,
             gui_commands::get_iteration_artifacts,

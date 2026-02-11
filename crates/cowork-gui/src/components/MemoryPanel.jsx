@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Card, Input, Select, Button, Tag, Empty, Spin, Modal, Tabs, Typography, Space, Divider } from 'antd';
+import { Card, Input, Select, Button, Tag, Empty, Spin, Modal, Tabs, Typography, Space, Divider, message } from 'antd';
 import { SearchOutlined, EyeOutlined, DatabaseOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import rehypeRaw from 'rehype-raw';
+import 'highlight.js/styles/github.css';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -30,14 +35,16 @@ function MemoryPanel({ currentSession }) {
         queryType: queryType,
         category: category,
         stage: stage || null,
-        limit: limit
+        limit: limit,
+        iterationId: currentSession || null
       };
-      
+
       const result = await invoke('query_memory_index', params);
       setMemories(result.results || []);
       setTotal(result.total || 0);
     } catch (error) {
       console.error('[MemoryPanel] Failed to load memories:', error);
+      message.error('加载记忆失败: ' + error);
       setMemories([]);
       setTotal(0);
     } finally {
@@ -55,11 +62,13 @@ function MemoryPanel({ currentSession }) {
     try {
       const detail = await invoke('load_memory_detail', {
         memoryId: memory.id,
-        file: memory.file
+        file: memory.file,
+        iterationId: currentSession || null
       });
       setMemoryDetail(detail);
     } catch (error) {
       console.error('[MemoryPanel] Failed to load memory detail:', error);
+      message.error('加载记忆详情失败: ' + error);
       setMemoryDetail(null);
     } finally {
       setDetailLoading(false);
@@ -307,10 +316,14 @@ function MemoryPanel({ currentSession }) {
                     </Space>
                   </div>
                   <Divider />
-                  <div style={{ maxHeight: '400px', overflow: 'auto' }}>
-                    <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '14px' }}>
+                  <div style={{ maxHeight: '400px', overflow: 'auto', padding: '12px', backgroundColor: '#fafafa', borderRadius: '4px' }}>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                      style={{ lineHeight: '1.8', fontSize: '14px' }}
+                    >
                       {memoryDetail.content}
-                    </pre>
+                    </ReactMarkdown>
                   </div>
                 </div>
               ) : (
@@ -320,15 +333,25 @@ function MemoryPanel({ currentSession }) {
             <Tabs.TabPane tab="Summary" key="summary">
               {selectedMemory && (
                 <div>
-                  <Paragraph>
-                    <Text strong>Summary: </Text>
-                    {selectedMemory.summary}
-                  </Paragraph>
+                  <div style={{ marginBottom: '16px' }}>
+                    <Text strong>Summary</Text>
+                    <Divider style={{ margin: '8px 0' }} />
+                    <div style={{ padding: '12px', backgroundColor: '#fafafa', borderRadius: '4px' }}>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                        style={{ lineHeight: '1.8', fontSize: '14px' }}
+                      >
+                        {selectedMemory.summary}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
                   {selectedMemory.file && (
-                    <Paragraph>
-                      <Text strong>File: </Text>
+                    <div>
+                      <Text strong>File</Text>
+                      <Divider style={{ margin: '8px 0' }} />
                       <Text code>{selectedMemory.file}</Text>
-                    </Paragraph>
+                    </div>
                   )}
                 </div>
               )}

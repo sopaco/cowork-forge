@@ -16,6 +16,7 @@ import {
   CheckCircleOutlined,
   RocketOutlined,
   CloseCircleOutlined,
+  BookOutlined,
 } from '@ant-design/icons';
 import ArtifactsViewer from './components/ArtifactsViewer';
 import CodeEditor from './components/CodeEditor';
@@ -23,6 +24,7 @@ import PreviewPanel from './components/PreviewPanel';
 import RunnerPanel from './components/RunnerPanel';
 import ProjectsPanel from './components/ProjectsPanel';
 import MemoryPanel from './components/MemoryPanel';
+import KnowledgePanel from './components/KnowledgePanel';
 import CommandPalette from './components/CommandPalette';
 import IterationsPanel from './components/IterationsPanel';
 
@@ -548,8 +550,12 @@ function App() {
         )}
       </div>
 
-      <div style={{ height: '100%', display: activeView === 'memory' ? 'block' : 'none' }}>
-        <MemoryPanel key="memory" currentSession={currentIteration?.id} />
+      <div style={{ height: '100%', display: activeView === 'execution-memory' ? 'block' : 'none' }}>
+        <MemoryPanel key="execution-memory" currentSession={currentIteration?.id} />
+      </div>
+
+      <div style={{ height: '100%', display: activeView === 'project-knowledge' ? 'block' : 'none' }}>
+        <KnowledgePanel key="project-knowledge" currentSession={project?.id} />
       </div>
 
       <div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
@@ -754,7 +760,8 @@ function App() {
               { key: 'code', icon: <CodeOutlined />, label: 'Code' },
               { key: 'preview', icon: <EyeOutlined />, label: 'Preview' },
               { key: 'run', icon: <PlayCircleOutlined />, label: 'Run' },
-              { key: 'memory', icon: <DatabaseOutlined />, label: 'Memory' },
+              { key: 'execution-memory', icon: <DatabaseOutlined />, label: '执行记忆' },
+              { key: 'project-knowledge', icon: <BookOutlined />, label: '项目知识' },
             ]}
           />
         </Sider>
@@ -818,7 +825,7 @@ function App() {
               setActiveView('run');
               break;
             case 'view-memory':
-              setActiveView('memory');
+              setActiveView('execution-memory');
               break;
             case 'view-projects':
               setActiveView('projects');

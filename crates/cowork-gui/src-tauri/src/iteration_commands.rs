@@ -5,7 +5,7 @@ use crate::TauriBackend;
 use cowork_core::domain::{Iteration, InheritanceMode, Project, IterationStatus};
 use cowork_core::llm::create_llm_client;
 use cowork_core::llm::config::{LlmConfig, ModelConfig};
-use cowork_core::persistence::{IterationStore, ProjectStore};
+use cowork_core::persistence::{IterationStore, ProjectStore, MemoryStore};
 use cowork_core::pipeline::IterationExecutor;
 use tauri::{Emitter, Manager, State, Window};
 use std::sync::Arc;
@@ -340,6 +340,50 @@ pub async fn gui_delete_iteration(
     let _ = window.emit("iteration_deleted", iteration_id);
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn gui_get_project_knowledge(
+    _project_id: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let memory_store = MemoryStore::new();
+    let project_memory = memory_store.load_project_memory()
+        .map_err(|e| format!("Failed to load project memory: {}", e))?;
+
+    // Load project to get project name
+    let project_store = ProjectStore::new();
+    let project = project_store.load()
+        .map_err(|e| format!("Failed to load project: {}", e))?
+        .ok_or_else(|| "No project found".to_string())?;
+
+    // Convert to frontend-friendly format
+    let knowledge_list: Vec<serde_json::Value> = project_memory
+        .iteration_knowledge
+        .into_iter()
+        .map(|(iteration_id, knowledge)| {
+            serde_json::json!({
+                "iteration_id": iteration_id,
+                "title": format!("Iteration #{}", knowledge.iteration_number),
+                "idea_summary": knowledge.idea_summary,
+                "design_summary": knowledge.design_summary,
+                "plan_summary": knowledge.plan_summary,
+                "tech_stack": knowledge.tech_stack,
+                "key_decisions": knowledge.key_decisions,
+                "key_patterns": knowledge.key_patterns,
+                "code_structure": knowledge.code_structure,
+                "known_issues": knowledge.known_issues,
+                "created_at": knowledge.created_at.to_rfc3339(),
+            })
+        })
+        .collect();
+
+    Ok(serde_json::json!({
+        "project_id": project.id,
+        "project_name": project.name,
+        "knowledge_list": knowledge_list,
+    }))
 }
 
 #[tauri::command]

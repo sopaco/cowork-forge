@@ -65,7 +65,7 @@ const IterationsPanel = ({ onSelectIteration, selectedIterationId, onExecuteStat
   const [newIterationTitle, setNewIterationTitle] = useState('');
   const [newIterationDescription, setNewIterationDescription] = useState('');
   const [newIterationBase, setNewIterationBase] = useState(null);
-  const [newIterationInheritance, setNewIterationInheritance] = useState('full');
+  const [newIterationInheritance, setNewIterationInheritance] = useState('partial');
 
   const loadData = async () => {
     setLoading(true);
@@ -230,7 +230,7 @@ const IterationsPanel = ({ onSelectIteration, selectedIterationId, onExecuteStat
     setNewIterationTitle('');
     setNewIterationDescription('');
     setNewIterationBase(null);
-    setNewIterationInheritance('full');
+    setNewIterationInheritance('partial');
   };
 
   const handleInitProject = async () => {
