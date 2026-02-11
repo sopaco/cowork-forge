@@ -188,46 +188,106 @@ impl IterationExecutor {
                 let mut has_issues = false;
                 let mut issue_messages = Vec::new();
 
-                if let Some(entries) = std::fs::read_dir(workspace).ok() {
+                // Recursively walk through workspace directory to find code files
+                if let Ok(entries) = std::fs::read_dir(workspace) {
                     for entry in entries.flatten() {
                         let path = entry.path();
 
-                        // Check if it's a code file
-                        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                            if code_extensions.contains(&ext) {
-                                has_code_files = true;
+                        // Check if it's a directory, recursively process
+                        if path.is_dir() {
+                            // Skip hidden directories (except .well-known)
+                            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                                if name.starts_with('.') && name != ".well-known" {
+                                    continue;
+                                }
+                            }
 
-                                // Read file content and check for issues
-                                if let Ok(content) = std::fs::read_to_string(&path) {
-                                    // Check for empty files
-                                    if content.trim().is_empty() {
-                                        has_issues = true;
-                                        issue_messages.push(format!("Empty file: {}", path.display()));
+                            // Recursively check subdirectory
+                            if let Ok(sub_entries) = std::fs::read_dir(&path) {
+                                for sub_entry in sub_entries.flatten() {
+                                    let sub_path = sub_entry.path();
+
+                                    // Check if it's a code file
+                                    if let Some(ext) = sub_path.extension().and_then(|e| e.to_str()) {
+                                        if code_extensions.contains(&ext) {
+                                            has_code_files = true;
+
+                                            // Read file content and check for issues
+                                            if let Ok(content) = std::fs::read_to_string(&sub_path) {
+                                                // Check for empty files
+                                                if content.trim().is_empty() {
+                                                    has_issues = true;
+                                                    issue_messages.push(format!("Empty file: {}", sub_path.display()));
+                                                }
+
+                                                // Check for TODO/FIXME comments
+                                                let content_lower = content.to_lowercase();
+                                                if content_lower.contains("todo:") || content_lower.contains("fixme:") {
+                                                    has_issues = true;
+                                                    issue_messages.push(format!("TODO/FIXME found in: {}", sub_path.display()));
+                                                }
+
+                                                // Check for placeholder code patterns
+                                                let placeholder_patterns = [
+                                                    "todo: implement",
+                                                    "fixme: implement",
+                                                    "// implement",
+                                                    "/* implement */",
+                                                    "// placeholder",
+                                                    "<!-- implement -->",
+                                                    "// todo",
+                                                    "// fixme",
+                                                ];
+                                                for pattern in &placeholder_patterns {
+                                                    if content_lower.contains(&pattern.to_lowercase()) {
+                                                        has_issues = true;
+                                                        issue_messages.push(format!("Placeholder pattern '{}' found in: {}", pattern, sub_path.display()));
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
+                                }
+                            }
+                        } else {
+                            // Check if it's a code file in the root directory
+                            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                                if code_extensions.contains(&ext) {
+                                    has_code_files = true;
 
-                                    // Check for TODO/FIXME comments
-                                    let content_lower = content.to_lowercase();
-                                    if content_lower.contains("todo:") || content_lower.contains("fixme:") {
-                                        has_issues = true;
-                                        issue_messages.push(format!("TODO/FIXME found in: {}", path.display()));
-                                    }
-
-                                    // Check for placeholder code patterns
-                                    let placeholder_patterns = [
-                                        "todo: implement",
-                                        "fixme: implement",
-                                        "// implement",
-                                        "/* implement */",
-                                        "// placeholder",
-                                        "<!-- implement -->",
-                                        "// todo",
-                                        "// fixme",
-                                    ];
-                                    for pattern in &placeholder_patterns {
-                                        if content_lower.contains(&pattern.to_lowercase()) {
+                                    // Read file content and check for issues
+                                    if let Ok(content) = std::fs::read_to_string(&path) {
+                                        // Check for empty files
+                                        if content.trim().is_empty() {
                                             has_issues = true;
-                                            issue_messages.push(format!("Placeholder pattern '{}' found in: {}", pattern, path.display()));
-                                            break;
+                                            issue_messages.push(format!("Empty file: {}", path.display()));
+                                        }
+
+                                        // Check for TODO/FIXME comments
+                                        let content_lower = content.to_lowercase();
+                                        if content_lower.contains("todo:") || content_lower.contains("fixme:") {
+                                            has_issues = true;
+                                            issue_messages.push(format!("TODO/FIXME found in: {}", path.display()));
+                                        }
+
+                                        // Check for placeholder code patterns
+                                        let placeholder_patterns = [
+                                            "todo: implement",
+                                            "fixme: implement",
+                                            "// implement",
+                                            "/* implement */",
+                                            "// placeholder",
+                                            "<!-- implement -->",
+                                            "// todo",
+                                            "// fixme",
+                                        ];
+                                        for pattern in &placeholder_patterns {
+                                            if content_lower.contains(&pattern.to_lowercase()) {
+                                                has_issues = true;
+                                                issue_messages.push(format!("Placeholder pattern '{}' found in: {}", pattern, path.display()));
+                                                break;
+                                            }
                                         }
                                     }
                                 }
@@ -237,6 +297,7 @@ impl IterationExecutor {
                 }
 
                 if !has_code_files {
+                    eprintln!("[Coding Quality Check] No code files found in workspace: {}", workspace.display());
                     return false;
                 }
 
