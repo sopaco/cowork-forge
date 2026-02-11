@@ -32,7 +32,7 @@ const { TextArea } = Input;
 const { Option } = Input;
 const { Text, Paragraph, Title } = Typography;
 
-function KnowledgePanel({ currentSession }) {
+function KnowledgePanel({ currentSession, refreshTrigger }) {
   const [knowledgeList, setKnowledgeList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [regenerating, setRegenerating] = useState(null);
@@ -41,7 +41,7 @@ function KnowledgePanel({ currentSession }) {
 
   useEffect(() => {
     loadProjectKnowledge();
-  }, [currentSession]);
+  }, [currentSession, refreshTrigger]);
 
   const loadProjectKnowledge = async () => {
     if (!currentSession) {
@@ -167,9 +167,15 @@ function KnowledgePanel({ currentSession }) {
             <Spin size="large" />
           </div>
         ) : !currentSession ? (
-          <Empty description="Please select a project" style={{ marginTop: "50px" }} />
+          <Empty
+            description="Please select a project"
+            style={{ marginTop: "50px" }}
+          />
         ) : filteredKnowledge.length === 0 ? (
-          <Empty description="No knowledge found" style={{ marginTop: "50px" }} />
+          <Empty
+            description="No knowledge found"
+            style={{ marginTop: "50px" }}
+          />
         ) : (
           <div
             style={{ display: "flex", flexDirection: "column", gap: "12px" }}
@@ -281,12 +287,13 @@ function KnowledgePanel({ currentSession }) {
         onCancel={() => setSelectedKnowledge(null)}
         footer={null}
         width={900}
+        style={{ top: "5vh" }}
         styles={{
-          body: { padding: "24px" },
+          body: { padding: "24px", maxHeight: "75vh", overflow: "auto" },
         }}
       >
         {selectedKnowledge && (
-          <div style={{ maxHeight: "75vh", overflow: "auto" }}>
+          <div>
             <Tabs
               defaultActiveKey="summary"
               items={[

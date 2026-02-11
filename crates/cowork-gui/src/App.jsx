@@ -57,6 +57,8 @@ function App() {
   const [currentAgent, setCurrentAgent] = useState(null);
   const [artifactsRefreshTrigger, setArtifactsRefreshTrigger] = useState(0);
   const [codeRefreshTrigger, setCodeRefreshTrigger] = useState(0);
+  const [memoryRefreshTrigger, setMemoryRefreshTrigger] = useState(0);
+  const [knowledgeRefreshTrigger, setKnowledgeRefreshTrigger] = useState(0);
 
   const listenersRegistered = useRef(false);
   const messagesContainerRef = useRef(null);
@@ -160,6 +162,9 @@ function App() {
         });
         // Refresh all data to sync project state
         loadData();
+        // Trigger refresh for Memory and Knowledge panels
+        setMemoryRefreshTrigger(prev => prev + 1);
+        setKnowledgeRefreshTrigger(prev => prev + 1);
         message.success('Iteration completed');
       });
 
@@ -258,6 +263,17 @@ function App() {
         setActiveView('iterations'); // Switch to iterations view
         loadData();
         message.success('Project initialized');
+      });
+
+      // Listen for knowledge regeneration events
+      await listen('knowledge_regeneration_completed', () => {
+        setKnowledgeRefreshTrigger(prev => prev + 1);
+        message.success('Knowledge updated');
+      });
+
+      await listen('knowledge_regeneration_failed', (event) => {
+        const [, error] = event.payload;
+        message.error('Knowledge update failed: ' + error);
       });
     };
 
@@ -551,11 +567,11 @@ function App() {
       </div>
 
       <div style={{ height: '100%', display: activeView === 'execution-memory' ? 'block' : 'none' }}>
-        <MemoryPanel key="execution-memory" currentSession={currentIteration?.id} />
+        <MemoryPanel key={`memory-${memoryRefreshTrigger}`} currentSession={currentIteration?.id} refreshTrigger={memoryRefreshTrigger} />
       </div>
 
       <div style={{ height: '100%', display: activeView === 'project-knowledge' ? 'block' : 'none' }}>
-        <KnowledgePanel key="project-knowledge" currentSession={project?.id} />
+        <KnowledgePanel key={`knowledge-${knowledgeRefreshTrigger}`} currentSession={project?.id} refreshTrigger={knowledgeRefreshTrigger} />
       </div>
 
       <div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>

@@ -31,7 +31,7 @@ const { TextArea } = Input;
 const { Option } = Select;
 const { Text, Paragraph } = Typography;
 
-function MemoryPanel({ currentSession }) {
+function MemoryPanel({ currentSession, refreshTrigger }) {
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [queryType, setQueryType] = useState("all");
@@ -45,7 +45,7 @@ function MemoryPanel({ currentSession }) {
 
   useEffect(() => {
     loadMemories();
-  }, [queryType, category, stage, limit, currentSession]);
+  }, [queryType, category, stage, limit, currentSession, refreshTrigger]);
 
   const loadMemories = async () => {
     setLoading(true);
@@ -408,7 +408,10 @@ function MemoryPanel({ currentSession }) {
           </Button>,
         ]}
         width={800}
-        style={{ top: 20 }}
+        style={{ top: "5vh" }}
+        styles={{
+          body: { maxHeight: "75vh", overflow: "auto" },
+        }}
       >
         {detailLoading ? (
           <div
@@ -429,7 +432,7 @@ function MemoryPanel({ currentSession }) {
                   <div
                     style={{
                       marginBottom: "16px",
-                      padding: "25px",
+                      padding: "20px",
                       background: "#f5f5f5",
                       borderRadius: "4px",
                     }}
@@ -482,9 +485,9 @@ function MemoryPanel({ currentSession }) {
                   </div>
                   <div
                     style={{
-                      maxHeight: "400px",
+                      maxHeight: "50vh",
                       overflow: "auto",
-                      padding: "25px",
+                      padding: "20px",
                       backgroundColor: "#fafafa",
                       borderRadius: "4px",
                     }}
@@ -510,9 +513,11 @@ function MemoryPanel({ currentSession }) {
                     <Divider style={{ margin: "8px 0" }} />
                     <div
                       style={{
-                        padding: "25px",
+                        padding: "20px",
                         backgroundColor: "#fafafa",
                         borderRadius: "4px",
+                        maxHeight: "60vh",
+                        overflow: "auto",
                       }}
                     >
                       <ReactMarkdown
