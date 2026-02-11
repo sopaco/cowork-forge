@@ -18,6 +18,11 @@ import {
   CloseCircleOutlined,
   BookOutlined,
 } from '@ant-design/icons';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import rehypeRaw from 'rehype-raw';
+import 'highlight.js/styles/github.css';
 import ArtifactsViewer from './components/ArtifactsViewer';
 import CodeEditor from './components/CodeEditor';
 import PreviewPanel from './components/PreviewPanel';
@@ -40,6 +45,125 @@ const STAGES = [
   { key: 'check', label: 'Check', color: '#eb2f96' },
   { key: 'delivery', label: 'Delivery', color: '#52c41a' },
 ];
+
+// Markdown message component for rendering AI agent responses
+function MarkdownMessage({ content }) {
+  return (
+    <div style={{
+      lineHeight: '1.6',
+      fontSize: '14px',
+    }}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight, rehypeRaw]}
+        components={{
+          // Style for code blocks
+          code({ node, inline, className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || '');
+            return !inline ? (
+              <div style={{
+                backgroundColor: '#f6f8fa',
+                borderRadius: '6px',
+                padding: '12px',
+                margin: '8px 0',
+                overflowX: 'auto',
+                border: '1px solid #e1e4e8',
+              }}>
+                <code className={className} {...props} style={{ fontSize: '13px' }}>
+                  {children}
+                </code>
+              </div>
+            ) : (
+              <code style={{
+                backgroundColor: '#f6f8fa',
+                padding: '2px 6px',
+                borderRadius: '3px',
+                fontSize: '0.9em',
+                fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+              }} {...props}>
+                {children}
+              </code>
+            );
+          },
+          // Style for blockquotes
+          blockquote({ children }) {
+            return (
+              <blockquote style={{
+                borderLeft: '4px solid #dfe2e5',
+                margin: '8px 0',
+                padding: '8px 16px',
+                backgroundColor: '#f6f8fa',
+                color: '#6a737d',
+              }}>
+                {children}
+              </blockquote>
+            );
+          },
+          // Style for headings
+          h1({ children }) {
+            return <h1 style={{ fontSize: '1.5em', fontWeight: 600, marginBottom: '0.5em', marginTop: '1em' }}>{children}</h1>;
+          },
+          h2({ children }) {
+            return <h2 style={{ fontSize: '1.3em', fontWeight: 600, marginBottom: '0.5em', marginTop: '0.8em' }}>{children}</h2>;
+          },
+          h3({ children }) {
+            return <h3 style={{ fontSize: '1.1em', fontWeight: 600, marginBottom: '0.5em', marginTop: '0.6em' }}>{children}</h3>;
+          },
+          // Style for lists
+          ul({ children }) {
+            return <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>{children}</ul>;
+          },
+          ol({ children }) {
+            return <ol style={{ paddingLeft: '20px', margin: '8px 0' }}>{children}</ol>;
+          },
+          li({ children }) {
+            return <li style={{ marginBottom: '4px' }}>{children}</li>;
+          },
+          // Style for links
+          a({ children, href }) {
+            return (
+              <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: '#1890ff', textDecoration: 'underline' }}>
+                {children}
+              </a>
+            );
+          },
+          // Style for tables
+          table({ children }) {
+            return (
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                margin: '12px 0',
+                fontSize: '13px',
+              }}>
+                {children}
+              </table>
+            );
+          },
+          thead({ children }) {
+            return <thead style={{ backgroundColor: '#f6f8fa' }}>{children}</thead>;
+          },
+          th({ children }) {
+            return <th style={{
+              padding: '8px 12px',
+              textAlign: 'left',
+              borderBottom: '2px solid #e1e4e8',
+              fontWeight: 600,
+            }}>{children}</th>;
+          },
+          td({ children }) {
+            return <td style={{
+              padding: '8px 12px',
+              borderBottom: '1px solid #e1e4e8',
+            }}>{children}</td>;
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
 
 function App() {
   const [project, setProject] = useState(null);
@@ -605,11 +729,11 @@ function App() {
                   <div key={index} style={{ marginBottom: '16px' }}>
                     {msg.type === 'user' ? (
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ 
-                          display: 'inline-block', 
-                          backgroundColor: '#1890ff', 
-                          color: '#fff', 
-                          padding: '8px 12px', 
+                        <div style={{
+                          display: 'inline-block',
+                          backgroundColor: '#1890ff',
+                          color: '#fff',
+                          padding: '8px 12px',
                           borderRadius: '4px',
                           maxWidth: '70%',
                           wordBreak: 'break-word'
@@ -622,16 +746,15 @@ function App() {
                         <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>
                           {msg.agentName || 'AI Agent'}
                         </div>
-                        <div style={{ 
-                          backgroundColor: '#fff', 
-                          padding: '8px 12px', 
+                        <div style={{
+                          backgroundColor: '#fff',
+                          padding: '12px 16px',
                           borderRadius: '4px',
                           border: '1px solid #e8e8e8',
                           maxWidth: '70%',
                           wordBreak: 'break-word',
-                          whiteSpace: 'pre-wrap'
                         }}>
-                          {msg.content}
+                          <MarkdownMessage content={msg.content} />
                         </div>
                       </div>
                     )}
