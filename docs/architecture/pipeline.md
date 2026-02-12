@@ -1,674 +1,696 @@
-# Pipeline 流程
+# Pipeline 流程设计与实现
 
-## 概述
+你有没有想过，为什么很多 AI 编程工具只能生成零散的代码片段，而无法完成一个完整的项目？问题的关键在于缺乏结构化的流程。Cowork Forge 的 Pipeline 正是为了解决这个痛点而设计的——它将软件开发过程建模为七个明确的阶段，每个阶段有清晰的输入输出，形成一个完整的价值流。
 
-Pipeline 是 Cowork Forge 的核心执行引擎，负责协调整个开发流程的执行。它管理迭代的完整生命周期，编排各阶段的执行顺序，处理错误和重试，集成人机协作机制（HITL），并确保开发流程的顺利进行。
+## Pipeline 概览
 
-### Pipeline 的职责
+Cowork Forge 采用经典的瀑布模型作为基础框架，但加入了 AI 驱动的自动化和人工确认的灵活性：
 
-1. **生命周期管理**：管理迭代的完整生命周期（启动、暂停、继续、完成）
-2. **阶段编排**：按预定顺序执行各个阶段
-3. **错误处理**：捕获和处理执行过程中的错误
-4. **重试机制**：自动重试失败的操作
-5. **反馈循环**：处理 Agent 和用户的反馈
-6. **Artifacts 验证**：验证各阶段生成的制品
-7. **HITL 集成**：集成人机协作机制
+```mermaid
+graph LR
+    IDEA["1. Idea<br/>需求构思"] --> PRD["2. PRD<br/>需求文档"]
+    PRD --> DESIGN["3. Design<br/>架构设计"]
+    DESIGN --> PLAN["4. Plan<br/>任务规划"]
+    PLAN --> CODING["5. Coding<br/>代码实现"]
+    CODING --> CHECK["6. Check<br/>质量检查"]
+    CHECK --> DELIVERY["7. Delivery<br/>交付报告"]
 
-### Pipeline 组件
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                  IterationExecutor                      │
-│              (迭代执行器 - 顶层协调器)                   │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ↓
-┌─────────────────────────────────────────────────────────┐
-│                    Pipeline                              │
-│           (工作流编排 - 阶段序列管理)                    │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ↓
-┌─────────────────────────────────────────────────────────┐
-│                StageExecutor                            │
-│           (阶段执行器 - 单阶段执行逻辑)                  │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ↓
-┌─────────────────────────────────────────────────────────┐
-│                Agent Runtime                            │
-│           (Agent 运行时 - 基于 adk-rust)                 │
-└─────────────────────────────────────────────────────────┘
+    style IDEA fill:#e3f2fd
+    style PRD fill:#e8f5e9
+    style DESIGN fill:#fff3e0
+    style PLAN fill:#fce4ec
+    style CODING fill:#f3e5f5
+    style CHECK fill:#e0f2f1
+    style DELIVERY fill:#fff8e1
 ```
 
-## 执行流程
+这七个阶段覆盖了软件开发的完整生命周期。让我们深入看看每个阶段的具体职责：
 
-### 完整执行流程
+| 阶段 | 职责 | 关键输出 | 确认方式 |
+|------|------|----------|----------|
+| **Idea** | 理解用户需求，生成初步想法文档 | `idea.md` | HITL 确认 |
+| **PRD** | 细化需求，创建完整的产品需求文档 | `prd.md`, `requirements.json` | HITL 确认 |
+| **Design** | 设计系统架构和技术方案 | `design.md`, `design_spec.json` | HITL 确认 |
+| **Plan** | 制定实现计划，分解任务 | `plan.md`, `implementation_plan.json` | HITL 确认 |
+| **Coding** | 编写代码实现 | 代码文件 | HITL 确认 |
+| **Check** | 质量检查和测试 | `check_report.md` | 自动执行 |
+| **Delivery** | 生成交付报告 | `delivery_report.md` | 自动执行 |
 
-```
-1. 加载迭代和项目数据
-   │
-   ↓
-2. 准备工作空间
-   │
-   ├─→ Genesis: 创建新目录
-   └─→ Evolution: 根据继承模式复制内容
-   │
-   ↓
-3. 创建执行上下文
-   │
-   ↓
-4. 确定起始阶段
-   │
-   ├─→ Genesis: 从 Idea 开始
-   └─→ Evolution: 从指定阶段开始
-   │
-   ↓
-5. 按顺序执行阶段序列
-   │
-   ├─→ Idea
-   ├─→ PRD
-   ├─→ Design
-   ├─→ Plan
-   ├─→ Coding
-   ├─→ Check
-   └─→ Delivery
-   │
-   ↓
-6. 每个阶段完成后更新迭代状态
-   │
-   ↓
-7. 验证 Artifacts 是否生成
-   │
-   ├─→ 存在 → 继续
-   └─→ 不存在 → 自动重试（最多 3 次）
-   │
-   ↓
-8. 如果是关键阶段，触发 HITL 用户审查
-   │
-   ├─→ Idea
-   ├─→ PRD
-   ├─→ Design
-   └─→ Plan
-   │
-   ↓
-9. 处理用户反馈
-   │
-   ├─→ 通过 → 继续下一阶段
-   └─→ 反馈 → goto_stage 当前阶段（带反馈）
-   │
-   ↓
-10. 生成并保存制品
-   │
-   ↓
-11. 最终完成迭代
+## 阶段设计哲学
+
+### 为什么需要七个阶段？
+
+你可能会问，为什么不能简化流程，让 AI 一口气完成所有工作？这里有几个关键考量：
+
+**分而治之降低复杂度**：每个阶段只关注一个核心问题。PRD 阶段只关注"做什么"，Design 阶段只关注"怎么做"，Coding 阶段只关注"具体实现"。这种分离让 AI 能够更专注，也更容易产生高质量的输出。
+
+**人工介入的关键节点**：前五个阶段都需要人工确认，这是为了确保方向正确。想象一下，如果 AI 在误解需求的情况下直接写了几千行代码，那将是灾难性的。通过在关键节点暂停，用户可以及时纠正偏差。
+
+**可追溯的工件链**：每个阶段产生明确的文档和结构化数据，形成完整的追溯链。当出现问题时，可以回溯到具体阶段查看当时的决策依据。
+
+### HITL（Human-in-the-Loop）设计
+
+人机协作是 Pipeline 的核心设计理念。在关键阶段完成后，系统会暂停并等待用户决策：
+
+```mermaid
+graph TB
+    subgraph "HITL 决策流程"
+        COMPLETE["阶段执行完成"] --> DISPLAY["展示阶段产物"]
+        DISPLAY --> CHOICE{用户选择}
+
+        CHOICE -->|Continue| NEXT["进入下一阶段"]
+        CHOICE -->|View Artifact| VIEW["查看详细工件"]
+        CHOICE -->|Provide Feedback| FEEDBACK["提供反馈"]
+
+        VIEW --> CHOICE
+        FEEDBACK --> REVISE["AI 根据反馈修订"]
+        REVISE --> COMPLETE
+    end
+
+    style COMPLETE fill:#e3f2fd
+    style CHOICE fill:#fff3e0
+    style NEXT fill:#e8f5e9
 ```
 
-### 阶段序列
+用户有三个选择：
+- **Continue**：满意当前结果，进入下一阶段
+- **View Artifact**：查看生成的详细文档，了解更多细节
+- **Provide Feedback**：对当前结果提出修改意见，AI 会根据反馈重新生成
 
-| 序号 | 阶段 | Agent 类型 | 说明 |
-|------|------|-----------|------|
-| 1 | Idea | 单一 Agent | 理解创意，生成 idea.md |
-| 2 | PRD | LoopAgent | 生成需求文档，创建结构化需求 |
-| 3 | Design | LoopAgent | 设计系统架构，创建设计规范 |
-| 4 | Plan | LoopAgent | 制定实施计划，分解任务 |
-| 5 | Coding | LoopAgent | 生成代码，实现功能 |
-| 6 | Check | 单一 Agent | 质量检查，验证功能完整性 |
-| 7 | Delivery | 单一 Agent | 生成交付报告，部署代码 |
+这种设计让用户始终掌控全局，同时充分利用 AI 的自动化能力。
 
-## IterationExecutor
+## Pipeline 核心组件
 
-### 职责
+### Stage Trait：阶段的抽象
 
-IterationExecutor 是 Pipeline 的顶层协调器，负责：
-
-1. **迭代生命周期管理**：启动、暂停、继续、完成迭代
-2. **工作空间准备**：根据继承模式准备工作空间
-3. **上下文创建**：创建执行上下文
-4. **阶段调度**：调度和执行各个阶段
-5. **状态更新**：更新迭代状态
-6. **错误恢复**：处理错误和恢复
-
-### 核心方法
+所有阶段都实现了统一的 `Stage` trait，这是 Pipeline 可扩展的基础：
 
 ```rust
-impl IterationExecutor {
-    /// 启动迭代
-    pub async fn start_iteration(
+#[async_trait::async_trait]
+pub trait Stage: Send + Sync {
+    /// 阶段名称
+    fn name(&self) -> &str;
+
+    /// 阶段描述
+    fn description(&self) -> &str;
+
+    /// 是否需要人工确认
+    fn needs_confirmation(&self) -> bool { false }
+
+    /// 执行阶段逻辑
+    async fn execute(
         &self,
-        iteration_id: &str,
-        start_stage: Option<Stage>,
-    ) -> Result<(), CoworkError> {
-        // 1. 加载迭代
-        let iteration = self.iteration_store.load(iteration_id)?;
+        ctx: &PipelineContext,
+        interaction: Arc<dyn InteractiveBackend>,
+    ) -> StageResult;
 
-        // 2. 准备工作空间
-        self.prepare_workspace(&iteration)?;
+    /// 带反馈执行（用于修订场景）
+    async fn execute_with_feedback(
+        &self,
+        ctx: &PipelineContext,
+        interaction: Arc<dyn InteractiveBackend>,
+        feedback: &str,
+    ) -> StageResult;
+}
+```
 
-        // 3. 创建执行上下文
-        let context = self.create_context(&iteration)?;
+这个设计的精妙之处在于**统一抽象**：无论是简单的 Check 阶段还是复杂的 Coding 阶段，都遵循相同的接口。这让我们可以：
+- 轻松添加新阶段
+- 统一处理阶段执行和错误恢复
+- 支持条件执行（比如跳过某些阶段）
 
-        // 4. 确定起始阶段
-        let start_stage = start_stage.unwrap_or(Stage::Idea);
+### PipelineContext：执行上下文
 
-        // 5. 执行 Pipeline
-        self.pipeline.execute(&context, start_stage).await?;
+`PipelineContext` 贯穿整个 Pipeline 执行过程，携带所有必要的信息：
 
-        // 6. 标记迭代为完成
-        self.mark_iteration_completed(iteration_id)?;
+```rust
+pub struct PipelineContext {
+    pub project: Project,
+    pub iteration: Iteration,
+    pub workspace_dir: PathBuf,
+    pub artifacts_dir: PathBuf,
+    pub data_dir: PathBuf,
+    pub llm_config: LlmConfig,
+}
+```
 
-        Ok(())
-    }
+上下文对象确保了：
+- **状态一致性**：所有阶段访问的是同一套项目、迭代数据
+- **路径管理**：统一管理工作空间、工件、数据目录
+- **配置传递**：LLM 配置等参数一次性传递
 
-    /// 暂停迭代
-    pub async fn pause_iteration(&self, iteration_id: &str) -> Result<(), CoworkError> {
-        self.iteration_store.update_status(iteration_id, IterationStatus::Paused)?;
-        Ok(())
-    }
+### IterationExecutor：迭代执行器
 
-    /// 继续迭代
-    pub async fn resume_iteration(&self, iteration_id: &str) -> Result<(), CoworkError> {
-        let iteration = self.iteration_store.load(iteration_id)?;
-        let context = self.create_context(&iteration)?;
-        self.pipeline.execute(&context, iteration.current_stage).await?;
-        Ok(())
+`IterationExecutor` 是 Pipeline 的"导演"，负责编排整个执行流程：
+
+```mermaid
+graph TB
+    subgraph "IterationExecutor 执行流程"
+        START["开始执行"] --> PREPARE["准备工作空间"]
+        PREPARE --> DETERMINE["确定起始阶段"]
+        DETERMINE --> LOOP["阶段执行循环"]
+
+        LOOP --> EXECUTE["执行当前阶段"]
+        EXECUTE --> VALIDATE["验证工件"]
+        VALIDATE --> CHECK_CONFIRM{"需要确认?"}
+
+        CHECK_CONFIRM -->|是| HITL["HITL 确认"]
+        CHECK_CONFIRM -->|否| NEXT_STAGE["进入下一阶段"]
+
+        HITL --> CONTINUE{"继续?"}
+        CONTINUE -->|是| NEXT_STAGE
+        CONTINUE -->|反馈| REVISE["根据反馈修订"]
+        REVISE --> EXECUTE
+
+        NEXT_STAGE --> MORE{"还有更多阶段?"}
+        MORE -->|是| LOOP
+        MORE -->|否| COMPLETE["迭代完成"]
+    end
+
+    style START fill:#e3f2fd
+    style COMPLETE fill:#e8f5e9
+    style HITL fill:#fff3e0
+```
+
+执行器处理的关键逻辑包括：
+- **断点续传**：支持从任意阶段继续执行
+- **工件验证**：确保每个阶段都产生了预期的输出
+- **重试机制**：阶段执行失败时自动重试（最多3次）
+- **反馈循环**：支持用户反馈和 AI 修订的循环（最多5次）
+
+## 阶段执行细节
+
+### 阶段执行流程
+
+每个阶段的执行遵循固定的模式：
+
+```rust
+pub async fn execute_stage_with_instruction(
+    ctx: &PipelineContext,
+    interaction: Arc<dyn InteractiveBackend>,
+    stage_name: &str,
+    instruction: &str,
+    feedback: Option<&str>,
+) -> StageResult {
+    // 1. 构建 Agent
+    let agent = create_agent_for_stage(stage_name, ctx)?;
+
+    // 2. 准备会话状态
+    let session_state = prepare_session_state(ctx, feedback)?;
+
+    // 3. 执行 Agent（支持流式输出）
+    let result = agent.execute(&instruction, session_state, ...).await?;
+
+    // 4. 验证执行结果
+    validate_stage_output(ctx, stage_name)?;
+
+    // 5. 返回阶段结果
+    Ok(StageOutput { ... })
+}
+```
+
+这个流程确保了：
+- **一致性**：所有阶段使用相同的执行框架
+- **可观测性**：可以追踪每个阶段的执行状态
+- **可恢复性**：失败时可以从中断点恢复
+
+### 流式输出与节流控制
+
+系统支持 LLM 输出的实时流式展示，提供更好的用户体验：
+
+```rust
+// 流式输出节流配置
+const STREAM_CHUNK_SIZE: usize = 30;    // 每块 30 字符
+const MIN_STREAM_INTERVAL_MS: u64 = 50;  // 最小间隔 50ms
+
+async fn handle_stream_event(event: Event, interaction: &dyn InteractiveBackend) {
+    match event {
+        Event::Content(content) => {
+            // 通过 Stream 消息级别输出
+            interaction.show_message(
+                MessageLevel::Stream,
+                content.text,
+                Some(agent_name)
+            ).await;
+        }
+        // ...
     }
 }
 ```
 
-## Pipeline
+流式输出的特点：
+- **实时反馈**：用户可以看到 AI 的"思考过程"
+- **节流控制**：避免 UI 刷新过于频繁
+- **消息级别区分**：`MessageLevel::Stream` 专门用于流式内容
 
-### 职责
+### 智能起始阶段判定
 
-Pipeline 是工作流编排器，负责：
-
-1. **阶段序列管理**：管理阶段的执行顺序
-2. **阶段执行**：调用 StageExecutor 执行各个阶段
-3. **反馈处理**：处理 Agent 和用户的反馈
-4. **Artifacts 验证**：验证各阶段生成的制品
-5. **HITL 集成**：集成人机协作机制
-6. **错误处理**：处理阶段执行错误
-
-### 核心方法
+对于演进迭代（Evolution Iteration），系统会智能判定从哪个阶段开始执行：
 
 ```rust
-impl Pipeline {
-    /// 执行 Pipeline
-    pub async fn execute(
-        &self,
-        context: &ExecutionContext,
-        start_stage: Stage,
-    ) -> Result<(), CoworkError> {
-        // 获取阶段序列
-        let stages = self.get_stage_sequence(start_stage);
-
-        // 依次执行各个阶段
-        for stage in stages {
-            // 执行阶段
-            let result = self.stage_executor.execute(context, stage).await?;
-
-            // 验证 Artifacts
-            if !self.verify_artifacts(context, &stage).await? {
-                return Err(CoworkError::ArtifactsNotFound(stage));
-            }
-
-            // 处理反馈
-            if let Some(feedback) = self.check_feedback(context, &stage).await? {
-                // 用户提供了反馈，重新执行当前阶段
-                self.stage_executor.execute_with_feedback(context, stage, feedback).await?;
-            }
-
-            // 触发 HITL（如果是关键阶段）
-            if self.is_critical_stage(&stage) {
-                self.trigger_hitl(context, &stage).await?;
+impl Iteration {
+    pub fn determine_start_stage(&self) -> String {
+        match self.inheritance {
+            InheritanceMode::None => "idea".to_string(),
+            InheritanceMode::Full | InheritanceMode::Partial => {
+                // 分析变更描述，智能决定起始阶段
+                analyze_change_scope(&self.description)
             }
         }
-
-        Ok(())
     }
+}
 
-    /// 获取阶段序列
-    fn get_stage_sequence(&self, start_stage: Stage) -> Vec<Stage> {
-        match start_stage {
-            Stage::Idea => vec![
-                Stage::Idea, Stage::Prd, Stage::Design,
-                Stage::Plan, Stage::Coding, Stage::Check, Stage::Delivery,
-            ],
-            Stage::Prd => vec![
-                Stage::Prd, Stage::Design, Stage::Plan,
-                Stage::Coding, Stage::Check, Stage::Delivery,
-            ],
-            // ... 其他阶段
-        }
-    }
+fn analyze_change_scope(description: &str) -> String {
+    let desc_lower = description.to_lowercase();
 
-    /// 判断是否为关键阶段
-    fn is_critical_stage(&self, stage: &Stage) -> bool {
-        matches!(stage, Stage::Idea | Stage::Prd | Stage::Design | Stage::Plan)
+    if desc_lower.contains("fix") || desc_lower.contains("bug") {
+        "coding".to_string()      // Bug 修复：从 Coding 开始
+    } else if desc_lower.contains("refactor") || desc_lower.contains("重构") {
+        "design".to_string()       // 重构：从 Design 开始
+    } else if desc_lower.contains("feature") || desc_lower.contains("功能") {
+        "prd".to_string()          // 新功能：从 PRD 开始
+    } else if desc_lower.contains("architecture") || desc_lower.contains("架构") {
+        "design".to_string()       // 架构调整：从 Design 开始
+    } else {
+        "idea".to_string()         // 默认：从 Idea 开始
     }
 }
 ```
 
-## StageExecutor
+这种智能判定避免了不必要的重复工作。如果只是修复一个小 Bug，不需要重新走完整的需求分析和架构设计流程。
 
-### 职责
+## 工作空间管理
 
-StageExecutor 是单阶段执行器，负责：
+### 工作空间准备
 
-1. **Agent 执行**：调用相应的 Agent 执行任务
-2. **结果收集**：收集 Agent 的执行结果
-3. **反馈处理**：处理反馈和重试
-4. **错误处理**：处理执行错误
+在执行 Pipeline 之前，系统需要准备工作空间：
 
-### 核心方法
+```mermaid
+graph LR
+    subgraph "工作空间准备流程"
+        A["创建迭代目录"] --> B{"继承模式?"}
+        B -->|Full| C["复制基础迭代工作空间<br/>+ artifacts"]
+        B -->|Partial| D["复制基础迭代工作空间<br/>仅代码文件"]
+        B -->|None| E["创建空工作空间"]
+        C --> F["创建必要子目录"]
+        D --> F
+        E --> F
+    end
+```
+
+三种继承模式的区别：
+
+| 模式 | 工作空间 | 工件 | 起始阶段 | 适用场景 |
+|------|----------|------|----------|----------|
+| None | 空 | 无 | Idea | 全新项目 |
+| Full | 复制 | 复制 | 智能判定 | 功能增强 |
+| Partial | 复制代码 | 不复制 | Idea | 架构重构 |
+
+### 工件验证机制
+
+每个阶段完成后，系统会验证是否产生了预期的工件：
 
 ```rust
-impl StageExecutor {
-    /// 执行阶段
-    pub async fn execute(
-        &self,
-        context: &ExecutionContext,
-        stage: Stage,
-    ) -> Result<StageResult, CoworkError> {
-        // 1. 获取 Agent
-        let agent = self.get_agent(context, stage)?;
+async fn check_artifact_exists(&self, stage_name: &str, workspace: &Path) -> bool {
+    match stage_name {
+        "idea" => artifacts_dir.join("idea.md").exists(),
+        "prd" => artifacts_dir.join("prd.md").exists() ||
+                 iteration_dir.join("data/requirements.json").exists(),
+        "design" => artifacts_dir.join("design.md").exists() ||
+                    iteration_dir.join("data/design_spec.json").exists(),
+        "plan" => artifacts_dir.join("plan.md").exists() ||
+                  iteration_dir.join("data/implementation_plan.json").exists(),
+        "coding" => {
+            // 检查代码文件是否存在
+            // 并检查是否有 TODO/FIXME/占位符等问题
+            self.check_code_quality(workspace).await
+        },
+        "delivery" => artifacts_dir.join("delivery_report.md").exists(),
+        _ => true,
+    }
+}
+```
 
-        // 2. 执行 Agent
-        let result = agent.run(context).await?;
+### 代码质量检查
 
-        // 3. 处理结果
-        match result {
-            AgentResult::Success(output) => {
-                // 阶段成功
-                Ok(StageResult::Success(Some(output)))
-            }
-            AgentResult::NeedsFeedback(feedback_request) => {
-                // 需要反馈
-                let feedback = self.request_feedback(context, feedback_request).await?;
-                self.execute_with_feedback(context, stage, feedback).await
-            }
-            AgentResult::Error(error) => {
-                // 执行错误
-                Err(CoworkError::AgentExecution(error))
+对于 Coding 阶段，系统会执行更严格的质量检查：
+
+```rust
+fn check_code_quality(&self, workspace: &Path) -> bool {
+    let code_extensions = ["rs", "js", "jsx", "ts", "tsx", "py", "java", "go", ...];
+    let mut has_code_files = false;
+    let mut issues = Vec::new();
+
+    // 遍历代码文件
+    for file in find_code_files(workspace, &code_extensions) {
+        let content = fs::read_to_string(&file)?;
+
+        // 检查空文件
+        if content.trim().is_empty() {
+            issues.push(format!("Empty file: {}", file.display()));
+        }
+
+        // 检查 TODO/FIXME
+        if content.to_lowercase().contains("todo:") {
+            issues.push(format!("TODO found in: {}", file.display()));
+        }
+
+        // 检查占位符代码
+        let placeholder_patterns = ["todo: implement", "// placeholder", ...];
+        for pattern in &placeholder_patterns {
+            if content.to_lowercase().contains(pattern) {
+                issues.push(format!("Placeholder in: {}", file.display()));
             }
         }
     }
 
-    /// 带反馈执行
-    pub async fn execute_with_feedback(
-        &self,
-        context: &ExecutionContext,
-        stage: Stage,
-        feedback: String,
-    ) -> Result<StageResult, CoworkError> {
-        // 1. 保存反馈到迭代
-        self.save_feedback(context, &feedback)?;
+    has_code_files && issues.is_empty()
+}
+```
 
-        // 2. 获取 Agent
-        let agent = self.get_agent(context, stage)?;
+## 错误处理与恢复
 
-        // 3. 带反馈执行 Agent
-        let result = agent.run_with_feedback(context, &feedback).await?;
+### ResilientAgent 包装器
 
-        // 4. 处理结果
-        match result {
-            AgentResult::Success(output) => {
-                Ok(StageResult::Success(Some(output)))
-            }
-            AgentResult::Error(error) => {
-                Err(CoworkError::AgentExecution(error))
-            }
-            _ => Err(CoworkError::InvalidFeedback),
+系统引入了 `ResilientAgent` 为 Agent 执行提供自动错误恢复能力：
+
+```mermaid
+sequenceDiagram
+    participant Executor as IterationExecutor
+    participant Resilient as ResilientAgent
+    participant Inner as Inner Agent
+    participant User as 用户
+
+    Executor->>Resilient: run()
+    Resilient->>Inner: run()
+
+    alt 执行成功
+        Inner-->>Resilient: Ok(stream)
+        Resilient-->>Executor: Ok(stream)
+    else 执行失败
+        Inner-->>Resilient: Err(e)
+        Resilient->>User: 请求用户选择
+        User-->>Resilient: Retry/Guidance/Abort
+
+        alt 重试
+            Resilient->>Inner: run()
+        else 中止
+            Resilient-->>Executor: Err(e)
+        end
+    end
+```
+
+ResilientAgent 的核心特性：
+
+```rust
+pub struct ResilientAgent {
+    inner: Arc<dyn Agent>,
+    retry_count: Arc<AtomicU32>,
+    interaction: Arc<dyn InteractiveBackend>,
+}
+
+impl ResilientAgent {
+    const MAX_RETRY_ATTEMPTS: u32 = 3;
+
+    async fn handle_error(&self, context: Arc<dyn InvocationContext>, e: AdkError) 
+        -> Result<AgentOutput, AdkError> 
+    {
+        let current_retry = self.retry_count.fetch_add(1, Ordering::SeqCst);
+
+        if current_retry >= Self::MAX_RETRY_ATTEMPTS {
+            return Err(AdkError::Tool(format!(
+                "Agent failed after {} retry attempts", 
+                Self::MAX_RETRY_ATTEMPTS
+            )));
+        }
+
+        // 提供用户选择
+        let options = vec![
+            InputOption { id: "retry", label: "Retry (reset counter)", ... },
+            InputOption { id: "guidance", label: "Provide Guidance & Retry", ... },
+            InputOption { id: "abort", label: "Abort", ... },
+        ];
+
+        match self.interaction.request_input("How would you like to proceed?", options, None).await? {
+            InputResponse::Selection(id) => match id.as_str() {
+                "retry" | "guidance" => self.run(context).await,
+                "abort" => Err(e),
+                _ => Err(e),
+            },
+            _ => Err(e),
         }
     }
 }
 ```
 
-## 错误处理
+### 阶段重试机制
 
-### 错误类型
+除了 Agent 级别的重试，Pipeline 还提供阶段级别的重试：
 
 ```rust
-pub enum CoworkError {
-    // 迭代错误
-    IterationNotFound(String),
-    InvalidIterationState(String),
+const MAX_STAGE_RETRIES: u32 = 3;
+const RETRY_DELAY_MS: u64 = 2000;
 
-    // Agent 错误
-    AgentExecution(String),
-    AgentTimeout,
+for attempt in 0..MAX_STAGE_RETRIES {
+    if attempt > 0 {
+        interaction.show_message(
+            MessageLevel::Warning,
+            format!("Stage '{}' retry {}/{}...", stage_name, attempt, MAX_STAGE_RETRIES - 1),
+            None,
+        ).await;
+        tokio::time::sleep(Duration::from_millis(RETRY_DELAY_MS)).await;
+    }
 
-    // 制品错误
-    ArtifactsNotFound(Stage),
-    InvalidArtifactFormat,
-
-    // 反馈错误
-    InvalidFeedback,
-    FeedbackTimeout,
-
-    // IO 错误
-    IoError(std::io::Error),
-
-    // 其他错误
-    LlmError(String),
-    ValidationError(String),
+    match stage.execute(&ctx, interaction.clone()).await {
+        StageResult::Success(path) => return Ok(path),
+        StageResult::Failed(e) => {
+            last_error = Some(e);
+            continue;
+        }
+    }
 }
 ```
 
-### 错误处理策略
+### 断点续传机制
 
-| 错误类型 | 处理策略 | 说明 |
-|---------|---------|------|
-| **AgentExecution** | 重试 3 次 | Agent 执行失败，自动重试 |
-| **AgentTimeout** | 增加超时时间，重试 1 次 | Agent 超时，增加超时时间后重试 |
-| **ArtifactsNotFound** | 重试 3 次 | 制品未生成，自动重试 |
-| **InvalidArtifactFormat** | 标记阶段失败 | 制品格式错误，标记阶段失败 |
-| **InvalidFeedback** | 请求新的反馈 | 反馈无效，请求新的反馈 |
-| **FeedbackTimeout** | 使用默认行为 | 反馈超时，使用默认行为 |
-| **IoError** | 标记迭代失败 | IO 错误，标记迭代失败 |
-| **LlmError** | 重试 3 次 | LLM 错误，自动重试 |
-
-## 重试机制
-
-### 重试策略
+Pipeline 支持从任意阶段继续执行：
 
 ```rust
-impl Pipeline {
-    /// 带重试执行阶段
-    async fn execute_with_retry(
-        &self,
-        context: &ExecutionContext,
-        stage: Stage,
-    ) -> Result<StageResult, CoworkError> {
-        let max_retries = 3;
-        let mut retry_count = 0;
+pub async fn continue_iteration(&self, iteration_id: &str) -> Result<()> {
+    let iteration = self.iteration_store.load(iteration_id)?;
 
-        loop {
-            match self.stage_executor.execute(context, stage).await {
-                Ok(result) => return Ok(result),
-                Err(error) => {
-                    retry_count += 1;
+    // 验证状态
+    if iteration.status != IterationStatus::Paused {
+        return Err(Error::InvalidState("Iteration is not paused"));
+    }
 
-                    if retry_count >= max_retries {
-                        return Err(error);
-                    }
+    // 从当前阶段继续
+    let current_stage = iteration.current_stage
+        .ok_or_else(|| Error::InvalidState("No current stage"))?;
 
-                    // 等待后重试
-                    tokio::time::sleep(Duration::from_secs(2 * retry_count as u64)).await;
+    // 恢复执行
+    self.execute_pipeline(&iteration, Some(&current_stage)).await
+}
+```
 
-                    // 记录重试
-                    self.log_retry(context, &stage, retry_count, &error).await;
+断点续传的价值：
+- **应对中断**：用户可以暂停执行，稍后继续
+- **增量修正**：发现某个阶段有问题时，可以回到该阶段重新执行
+- **灵活调度**：长时间运行的 Pipeline 可以分多次完成
+
+## GotoStage 流程控制
+
+### 动态阶段跳转
+
+`GotoStageTool` 允许 Agent 在检测到质量问题时跳转到之前的阶段重新执行：
+
+```rust
+pub struct GotoStageTool;
+
+impl Tool for GotoStageTool {
+    fn name(&self) -> &str { "goto_stage" }
+
+    fn description(&self) -> &str {
+        "Jump to a specific stage in the pipeline when quality issues are detected"
+    }
+
+    fn parameters(&self) -> Value {
+        json!({
+            "type": "object",
+            "required": ["stage_name"],
+            "properties": {
+                "stage_name": {
+                    "type": "string",
+                    "enum": ["prd", "design", "plan", "coding"],
+                    "description": "Target stage name"
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for jumping to this stage"
                 }
             }
-        }
+        })
+    }
+
+    async fn execute(&self, args: Value) -> Result<Value, ToolError> {
+        let stage_name = args["stage_name"].as_str().unwrap();
+        let reason = args["reason"].as_str().unwrap_or("No reason provided");
+
+        // 设置恢复阶段
+        set_resume_stage(stage_name).await?;
+
+        Ok(json!({
+            "success": true,
+            "message": format!("Will resume from {} stage", stage_name)
+        }))
     }
 }
 ```
 
-### 重试配置
+### 使用场景
 
-| 操作 | 最大重试次数 | 重试间隔 | 说明 |
-|------|-----------|---------|------|
-| **Agent 执行** | 3 次 | 2s, 4s, 6s | 指数退避 |
-| **Artifacts 验证** | 3 次 | 2s, 4s, 6s | 指数退避 |
-| **LLM 调用** | 3 次 | 1s, 2s, 3s | 指数退避 |
-| **文件操作** | 1 次 | - | 不重试 |
-| **反馈请求** | 1 次 | - | 不重试 |
+GotoStage 在以下场景特别有用：
 
-## 反馈循环
+1. **Check 阶段发现问题**：质量检查发现架构问题，跳回 Design 阶段
+2. **需求变更**：发现需求理解有误，跳回 PRD 阶段
+3. **实现偏差**：代码实现偏离设计，跳回 Plan 或 Coding 阶段
 
-### 反馈来源
+```mermaid
+graph TB
+    subgraph "GotoStage 使用场景"
+        CHECK["Check 阶段"] -->|发现架构问题| DESIGN["Design 阶段"]
+        CHECK -->|发现需求问题| PRD["PRD 阶段"]
+        CHECK -->|发现实现问题| CODING["Coding 阶段"]
 
-1. **Agent 反馈**：Agent 通过工具提供反馈
-2. **Critic 反馈**：Critic 提供质量反馈
-3. **HITL 反馈**：用户通过界面提供反馈
-4. **系统反馈**：系统自动生成的反馈
+        DESIGN --> PLAN["Plan 阶段"]
+        PRD --> DESIGN
+        CODING --> CHECK
+    end
+```
+
+## 反馈循环机制
 
 ### 反馈处理流程
 
-```
-Agent 执行
-    ↓
-生成结果
-    ↓
-Pipeline 验证 Artifacts
-    ↓
-    ├─→ 验证通过 → 继续
-    └─→ 验证失败 → 自动重试
-    ↓
-触发 HITL（关键阶段）
-    ↓
-用户审查
-    ↓
-    ├─→ 通过 → 继续下一阶段
-    └─→ 反馈 → goto_stage 当前阶段
-    ↓
-保存反馈
-    ↓
-重新执行阶段（带反馈）
-    ↓
-完成
+当用户对阶段结果不满意时，可以发起反馈修订：
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant Pipeline as Pipeline
+    participant Agent as Stage Agent
+    participant Output as 阶段输出
+
+    User->>Pipeline: 提供反馈
+    Pipeline->>Pipeline: 保存反馈历史
+    Pipeline->>Agent: 执行（携带反馈）
+
+    Note over Agent: Agent 检测到反馈历史<br/>自动进入 UPDATE MODE
+
+    Agent->>Output: 根据反馈修订
+    Output->>Pipeline: 返回结果
+    Pipeline->>User: 展示修订结果
+
+    alt 满意
+        User->>Pipeline: Continue
+    else 仍不满意
+        User->>Pipeline: 再次反馈
+        Pipeline->>Agent: 再次修订（最多5次）
+    end
 ```
 
-### 反馈存储
+### UPDATE MODE 设计
+
+Agent 通过检测反馈历史自动进入 UPDATE MODE：
 
 ```rust
-pub struct Feedback {
-    pub id: String,
-    pub iteration_id: String,
-    pub stage: Stage,
-    pub content: String,
-    pub timestamp: DateTime<Utc>,
-    pub source: FeedbackSource,
-}
-
-pub enum FeedbackSource {
-    Agent,
-    Critic,
-    User,
-    System,
+// 在提示词中动态添加模式指示
+if !feedback_history.is_empty() {
+    instruction.push_str("\n\n## UPDATE MODE\n你正在根据用户反馈修订已有内容...");
+    instruction.push_str("\n\n历史反馈:\n");
+    for feedback in feedback_history {
+        instruction.push_str(&format!("- {}\n", feedback));
+    }
+} else {
+    instruction.push_str("\n\n## NEW MODE\n你正在从零开始创建内容...");
 }
 ```
 
-## HITL 集成
+### 反馈历史持久化
 
-### HITL 触发时机
+反馈历史会被保存，支持跨阶段查看：
 
-HITL 在以下阶段触发：
+```
+.cowork-v2/iterations/{id}/session/feedback.json
+```
 
-1. **Idea** 阶段完成后
-2. **PRD** 阶段完成后
-3. **Design** 阶段完成后
-4. **Plan** 阶段完成后
+```json
+{
+    "feedbacks": [
+        {
+            "stage": "prd",
+            "timestamp": "2024-01-15T10:30:00Z",
+            "content": "需要增加用户认证功能的需求",
+            "iteration": 1
+        }
+    ]
+}
+```
 
-**不触发 HITL 的阶段**：
-- Coding：由 Critic 处理质量验证
-- Check：自动执行，无需人工干预
-- Delivery：自动执行，无需人工干预
+## Pipeline 的扩展性
 
-### HITL 流程
+### 添加新阶段
+
+添加新阶段只需要实现 `Stage` trait：
 
 ```rust
-impl Pipeline {
-    /// 触发 HITL
-    async fn trigger_hitl(
+pub struct NewStage;
+
+#[async_trait::async_trait]
+impl Stage for NewStage {
+    fn name(&self) -> &str { "new_stage" }
+
+    fn description(&self) -> &str { "新阶段描述" }
+
+    fn needs_confirmation(&self) -> bool { true }
+
+    async fn execute(
         &self,
-        context: &ExecutionContext,
-        stage: &Stage,
-    ) -> Result<Option<String>, CoworkError> {
-        // 1. 加载 Artifacts
-        let artifacts = self.load_artifacts(context, stage)?;
-
-        // 2. 显示给用户
-        self.interaction.show_artifacts(&artifacts).await;
-
-        // 3. 请求用户反馈
-        let feedback = self.interaction.request_feedback(
-            &format!("Please review the {} stage output", stage)
-        ).await?;
-
-        // 4. 保存反馈
-        if let Some(fb) = &feedback {
-            self.save_feedback(context, fb).await?;
-        }
-
-        Ok(feedback)
-    }
-}
-```
-
-### HITL 配置
-
-```rust
-pub struct HitlConfig {
-    pub enabled: bool,              // 是否启用 HITL
-    pub timeout_seconds: u64,       // 反馈超时时间
-    pub max_feedback_length: usize, // 最大反馈长度
-    pub required_stages: Vec<Stage>, // 需要 HITL 的阶段
-}
-
-impl Default for HitlConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            timeout_seconds: 3000,    // 50 分钟
-            max_feedback_length: 10000,
-            required_stages: vec![
-                Stage::Idea,
-                Stage::Prd,
-                Stage::Design,
-                Stage::Plan,
-            ],
-        }
-    }
-}
-```
-
-## 自愈机制
-
-### Check 阶段的自愈
-
-Check Agent 发现问题时，可以通过 `goto_stage()` 返回 Coding 阶段修复：
-
-```rust
-impl CheckAgent {
-    async fn execute(&self, context: &ExecutionContext) -> Result<AgentResult, CoworkError> {
-        // 1. 检查功能覆盖度
-        let coverage = self.check_feature_coverage(context).await?;
-        if coverage < 0.8 {
-            // 覆盖度不足，返回 Coding 阶段
-            self.goto_stage(context, Stage::Coding, "Insufficient feature coverage").await?;
-        }
-
-        // 2. 检查测试通过率
-        let test_result = self.check_tests(context).await?;
-        if !test_result.passed {
-            // 测试失败，返回 Coding 阶段
-            self.goto_stage(context, Stage::Coding, "Tests failed").await?;
-        }
-
-        // 3. 其他检查...
-
-        Ok(AgentResult::Success("All checks passed".to_string()))
-    }
-}
-```
-
-## 性能优化
-
-### 并行执行
-
-某些阶段可以并行执行：
-
-```rust
-impl Pipeline {
-    /// 并行执行多个阶段
-    async fn execute_parallel(
-        &self,
-        context: &ExecutionContext,
-        stages: Vec<Stage>,
-    ) -> Result<Vec<StageResult>, CoworkError> {
-        let futures: Vec<_> = stages
-            .into_iter()
-            .map(|stage| self.stage_executor.execute(context, stage))
-            .collect();
-
-        let results = futures::future::try_join_all(futures).await?;
-        Ok(results)
-    }
-}
-```
-
-### 缓存机制
-
-缓存阶段结果，避免重复执行：
-
-```rust
-impl StageExecutor {
-    /// 带缓存执行
-    async fn execute_with_cache(
-        &self,
-        context: &ExecutionContext,
-        stage: Stage,
-    ) -> Result<StageResult, CoworkError> {
-        // 1. 检查缓存
-        if let Some(cached) = self.cache.get(&context.iteration_id, &stage) {
-            return Ok(cached);
-        }
-
-        // 2. 执行阶段
-        let result = self.execute(context, stage).await?;
-
-        // 3. 缓存结果
-        self.cache.set(&context.iteration_id, &stage, result.clone());
-
+        ctx: &PipelineContext,
+        interaction: Arc<dyn InteractiveBackend>,
+    ) -> StageResult {
+        // 阶段逻辑
+        let agent = create_new_stage_agent(&ctx.llm_config)?;
+        let result = agent.execute(...).await?;
         Ok(result)
     }
-}
-```
 
-## 监控和日志
-
-### 执行日志
-
-```rust
-impl Pipeline {
-    /// 记录阶段开始
-    async fn log_stage_start(&self, context: &ExecutionContext, stage: &Stage) {
-        log::info!(
-            "Starting stage: {} for iteration: {}",
-            stage,
-            context.iteration_id
-        );
-    }
-
-    /// 记录阶段完成
-    async fn log_stage_complete(&self, context: &ExecutionContext, stage: &Stage, duration: Duration) {
-        log::info!(
-            "Completed stage: {} for iteration: {} in {:.2}s",
-            stage,
-            context.iteration_id,
-            duration.as_secs_f64()
-        );
-    }
-
-    /// 记录错误
-    async fn log_error(&self, context: &ExecutionContext, stage: &Stage, error: &CoworkError) {
-        log::error!(
-            "Error in stage: {} for iteration: {}: {:?}",
-            stage,
-            context.iteration_id,
-            error
-        );
+    async fn execute_with_feedback(
+        &self,
+        ctx: &PipelineContext,
+        interaction: Arc<dyn InteractiveBackend>,
+        feedback: &str,
+    ) -> StageResult {
+        // 带反馈的执行逻辑
+        ...
     }
 }
 ```
 
-## 相关文档
+然后在 Pipeline 配置中注册新阶段即可。
 
-- [架构概览](./overview.md)
-- [Agent 系统](./agent-system.md)
-- [迭代架构](./iteration-architecture.md)
-- [文件安全机制](./file-security.md)
-- [Artifacts 验证](./artifacts-validation.md)
-- [HITL 工作流](../features/hitl-workflow.md)
+## 总结
+
+Cowork Forge 的 Pipeline 设计体现了**结构化流程**与**灵活执行**的平衡。七个阶段覆盖完整的软件开发生命周期，HITL 机制确保人工可控，智能起始阶段判定提高效率，反馈循环支持增量修正。
+
+关键特性：
+
+1. **ResilientAgent**：Agent 级别的错误恢复，提供重试、指导、中止选项
+2. **GotoStage**：动态阶段跳转，避免从头开始
+3. **流式输出**：实时展示 AI 思考过程，带节流控制
+4. **智能起始**：根据变更描述自动判定起始阶段
+5. **反馈循环**：最多 5 次反馈修订，支持增量更新
+
+这个设计的核心思想是：**AI 负责执行，人类负责决策**。Pipeline 提供了清晰的执行框架，但关键决策点始终由人类掌控。这种人机协作模式既发挥了 AI 的自动化能力，又保留了人类的判断力和创造力。
+
+在下一章中，我们将深入探讨 Agent 系统的设计——Pipeline 的执行者，以及它们如何实现各个阶段的具体任务。
