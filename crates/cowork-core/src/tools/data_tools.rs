@@ -157,6 +157,9 @@ impl Tool for AddFeatureTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let name = get_required_string_param(&args, "name")?;
+        super::notify_tool_call("add_feature", &json!({"name": name}));
+
         let mut features = load_feature_list().map_err(|e| AdkError::Tool(e.to_string()))?;
 
         let feat_id = generate_id("FEAT", features.features.len());
@@ -242,6 +245,9 @@ impl Tool for CreateDesignComponentTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+        super::notify_tool_call("create_design_component", &json!({"name": name}));
+
         let mut design = load_design_spec().map_err(|e| AdkError::Tool(e.to_string()))?;
 
         let comp_id = generate_id("COMP", design.architecture.components.len());
@@ -356,6 +362,9 @@ impl Tool for CreateTaskTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let title = get_required_string_param(&args, "title")?;
+        super::notify_tool_call("create_task", &json!({"title": title}));
+
         let mut plan = load_implementation_plan().map_err(|e| AdkError::Tool(e.to_string()))?;
 
         let task_id = generate_id("TASK", plan.tasks.len());
@@ -428,10 +437,11 @@ impl Tool for UpdateFeatureStatusTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let mut features = load_feature_list().map_err(|e| AdkError::Tool(e.to_string()))?;
-
         let feature_id = get_required_string_param(&args, "feature_id")?;
         let new_status_str = get_required_string_param(&args, "new_status")?;
+        super::notify_tool_call("update_feature_status", &json!({"feature_id": feature_id, "status": new_status_str}));
+
+        let mut features = load_feature_list().map_err(|e| AdkError::Tool(e.to_string()))?;
 
         let new_status = match new_status_str {
             "pending" => FeatureStatus::Pending,
@@ -490,16 +500,16 @@ impl Tool for UpdateTaskStatusTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let mut plan = load_implementation_plan().map_err(|e| AdkError::Tool(e.to_string()))?;
-
         // Parse parameters with error handling
         let task_id = args.get("task_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| AdkError::Tool("Missing or invalid 'task_id' parameter".to_string()))?;
-        
         let new_status_str = args.get("new_status")
             .and_then(|v| v.as_str())
             .ok_or_else(|| AdkError::Tool("Missing or invalid 'new_status' parameter".to_string()))?;
+        super::notify_tool_call("update_task_status", &json!({"task_id": task_id, "status": new_status_str}));
+
+        let mut plan = load_implementation_plan().map_err(|e| AdkError::Tool(e.to_string()))?;
 
         let new_status = match new_status_str {
             "pending" => TaskStatus::Pending,

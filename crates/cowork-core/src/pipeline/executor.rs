@@ -457,7 +457,7 @@ impl IterationExecutor {
                             .show_message_with_context(
                                 crate::interaction::MessageLevel::Info,
                                 format!("Starting iteration '{}' from stage '{}'", iteration.title, start_stage),
-                                MessageContext::new("Pipeline"),
+                                MessageContext::new("Pipeline Controller"),
                             )
                             .await;        // Evolution iteration: Inject project knowledge from base iteration
         if iteration.base_iteration_id.is_some() {

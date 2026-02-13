@@ -88,6 +88,8 @@ impl Tool for SaveDeliveryReportTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        super::notify_tool_call("save_delivery_report", &json!({"file": "delivery_report.md"}));
+
         let content = get_required_string_param(&args, "content")?;
 
         save_delivery_report(content)
@@ -131,6 +133,8 @@ impl Tool for SavePlanDocTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        super::notify_tool_call("save_plan_doc", &json!({"file": "plan.md"}));
+
         let content = get_required_string_param(&args, "content")?;
 
         save_plan_doc(content)
@@ -226,6 +230,8 @@ impl Tool for SaveDesignDocTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        super::notify_tool_call("save_design_doc", &json!({"file": "design.md"}));
+
         let content = get_required_string_param(&args, "content")?;
 
         save_design_doc(content)
