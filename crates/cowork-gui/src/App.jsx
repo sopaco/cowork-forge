@@ -311,9 +311,10 @@ function App() {
         message.error('Iteration failed: ' + error);
       });
 
+      // Main agent event handler - updated to use actual agent_name from backend
       await listen('agent_event', (event) => {
-        const { content, is_thinking, agent_name } = event.payload;
-        // Track current agent for processing display
+        const { content, agent_name, message_type, stage_name, level } = event.payload;
+        // Track current agent for processing display (now using real agent name)
         if (agent_name) {
           setCurrentAgent(agent_name);
         }
@@ -322,17 +323,17 @@ function App() {
 
         setMessages((prev) => {
           const lastMsg = prev[prev.length - 1];
+          const isThinking = message_type === 'thinking';
 
-          if (is_thinking) {
+          if (isThinking) {
             // Handle thinking messages
-            if (lastMsg && lastMsg.type === 'thinking' && lastMsg.isStreaming) {
+            if (lastMsg && lastMsg.type === 'thinking' && lastMsg.isStreaming && lastMsg.agentName === agent_name) {
               // Append to existing thinking message
               return [
                 ...prev.slice(0, -1),
                 {
                   ...lastMsg,
                   content: lastMsg.content + content,
-                  agentName: agent_name || lastMsg.agentName,
                 },
               ];
             } else {
@@ -343,21 +344,21 @@ function App() {
                   type: 'thinking',
                   content,
                   agentName: agent_name || 'AI Agent',
+                  stageName: stage_name,
                   isStreaming: true,
-                  isExpanded: true,
+                  isExpanded: false,
                   timestamp: new Date().toISOString(),
                 },
               ];
             }
           } else {
             // Handle regular agent messages
-            if (lastMsg && lastMsg.type === 'agent' && lastMsg.isStreaming) {
+            if (lastMsg && lastMsg.type === 'agent' && lastMsg.isStreaming && lastMsg.agentName === agent_name) {
               return [
                 ...prev.slice(0, -1),
                 {
                   ...lastMsg,
                   content: lastMsg.content + content,
-                  agentName: agent_name || lastMsg.agentName,
                 },
               ];
             } else {
@@ -367,6 +368,8 @@ function App() {
                   type: 'agent',
                   content,
                   agentName: agent_name || 'AI Agent',
+                  stageName: stage_name,
+                  level: level,
                   isStreaming: true,
                   timestamp: new Date().toISOString(),
                 },
@@ -374,6 +377,75 @@ function App() {
             }
           }
         });
+      });
+
+      // Streaming content handler - for real-time token output
+      await listen('agent_streaming', (event) => {
+        const { content, agent_name, is_thinking } = event.payload;
+
+        if (!content) return;
+
+        setMessages((prev) => {
+          const lastMsg = prev[prev.length - 1];
+          const msgType = is_thinking ? 'thinking' : 'agent';
+
+          if (lastMsg && lastMsg.type === msgType && lastMsg.isStreaming && lastMsg.agentName === agent_name) {
+            // Append to existing streaming message
+            return [
+              ...prev.slice(0, -1),
+              {
+                ...lastMsg,
+                content: lastMsg.content + content,
+              },
+            ];
+          } else {
+            // Create new streaming message
+            return [
+              ...prev,
+              {
+                type: msgType,
+                content,
+                agentName: agent_name || 'AI Agent',
+                isStreaming: true,
+                isExpanded: false,
+                timestamp: new Date().toISOString(),
+              },
+            ];
+          }
+        });
+      });
+
+      // Tool call handler - shows when agent calls a tool
+      await listen('tool_call', (event) => {
+        const { tool_name, arguments: toolArguments, agent_name } = event.payload;
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            type: 'tool_call',
+            toolName: tool_name,
+            arguments: toolArguments,
+            agentName: agent_name || 'AI Agent',
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      });
+
+      // Tool result handler - shows tool execution result
+      await listen('tool_result', (event) => {
+        const { tool_name, result, success, agent_name } = event.payload;
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            type: 'tool_result',
+            toolName: tool_name,
+            result: result,
+            success: success,
+            agentName: agent_name || 'AI Agent',
+            timestamp: new Date().toISOString(),
+          },
+        ]);
       });
 
       await listen('input_request', (event) => {
@@ -836,6 +908,56 @@ function App() {
                             {msg.content}
                           </div>
                         )}
+                      </div>
+                    ) : msg.type === 'tool_call' ? (
+                      <div style={{
+                        backgroundColor: '#fff3e0',
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        maxWidth: '70%',
+                        fontSize: '13px',
+                        borderLeft: '3px solid #ff9800',
+                      }}>
+                        <div style={{ fontWeight: 500, color: '#e65100', marginBottom: '4px' }}>
+                          🔧 {msg.agentName} 调用工具: <code style={{ 
+                            backgroundColor: 'rgba(0,0,0,0.05)',
+                            padding: '1px 4px',
+                            borderRadius: '2px',
+                            fontSize: '12px'
+                          }}>{msg.toolName}</code>
+                        </div>
+                        {msg.arguments && Object.keys(msg.arguments).length > 0 && (
+                          <pre style={{ 
+                            margin: '4px 0 0', 
+                            fontSize: '11px', 
+                            color: '#666',
+                            backgroundColor: 'rgba(0,0,0,0.02)',
+                            padding: '6px',
+                            borderRadius: '3px',
+                            overflow: 'auto',
+                            maxHeight: '100px',
+                          }}>
+                            {JSON.stringify(msg.arguments, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    ) : msg.type === 'tool_result' ? (
+                      <div style={{
+                        backgroundColor: msg.success ? '#e8f5e9' : '#ffebee',
+                        padding: '6px 12px',
+                        borderRadius: '4px',
+                        maxWidth: '70%',
+                        fontSize: '12px',
+                        borderLeft: msg.success ? '3px solid #4caf50' : '3px solid #f44336',
+                      }}>
+                        <span>
+                          {msg.success ? '✓' : '✗'} 工具 <code style={{
+                            backgroundColor: 'rgba(0,0,0,0.05)',
+                            padding: '1px 4px',
+                            borderRadius: '2px',
+                            fontSize: '11px'
+                          }}>{msg.toolName}</code> 执行{msg.success ? '成功' : '失败'}
+                        </span>
                       </div>
                     ) : (
                       <div>

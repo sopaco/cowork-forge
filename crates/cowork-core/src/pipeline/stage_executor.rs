@@ -5,15 +5,50 @@
 // - Invokes agent functions from agents/mod.rs
 // - Handles feedback and iteration
 // - Saves artifacts
+// - Sends real-time streaming output
 
 use std::sync::Arc;
 use futures::StreamExt;
-use crate::interaction::InteractiveBackend;
+use crate::interaction::{InteractiveBackend, MessageContext};
 use crate::pipeline::{PipelineContext, StageResult};
 use crate::agents::*;
 use crate::llm::{create_llm_client, ModelConfig};
 use crate::storage::set_iteration_id;
 use adk_core::{Content, Event};
+
+/// Map internal agent names to user-friendly display names
+fn get_display_name(agent_name: &str) -> &'static str {
+    match agent_name {
+        // Individual agent names
+        "idea_agent" => "Idea Agent",
+        "prd_actor" => "PRD Agent",
+        "prd_critic" => "PRD Reviewer",
+        "design_actor" => "Design Agent",
+        "design_critic" => "Design Reviewer",
+        "plan_actor" => "Plan Agent",
+        "plan_critic" => "Plan Reviewer",
+        "coding_actor" => "Coding Agent",
+        "coding_critic" => "Code Reviewer",
+        "check_agent" => "Validation Agent",
+        "delivery_agent" => "Delivery Agent",
+        "summary_agent" => "Summary Agent",
+        "knowledge_gen_agent" => "Knowledge Agent",
+
+        // Loop agent names (composite)
+        "prd_loop" => "PRD Agent",
+        "design_loop" => "Design Agent",
+        "plan_loop" => "Plan Agent",
+        "coding_loop" => "Coding Agent",
+
+        // System agents
+        "Pipeline Controller" => "Pipeline",
+        "Memory System" => "Memory",
+        "Knowledge System" => "Knowledge",
+
+        // Fallback
+        _ => "AI Agent",
+    }
+}
 
 /// Execute a stage using real adk-rust Agent
 pub async fn execute_stage_with_instruction(
@@ -100,23 +135,25 @@ pub async fn execute_stage_with_instruction(
         Err(e) => return StageResult::Failed(e),
     };
 
+    // Get the actual agent name and map to user-friendly display name
+    let internal_name = agent.name();
+    let display_name = get_display_name(internal_name).to_string();
+
     // Build prompt with context
     let prompt = build_prompt(ctx, stage_name, feedback);
-    
-    // DEBUG: Print the prompt
-    eprintln!("[DEBUG] Full prompt:\n{}", prompt);
 
-    // Execute agent
+    // Execute agent - send start notification with user-friendly name
     let status_msg = if feedback.is_some() {
-        format!("Regenerating {} document using Agent...", stage_name)
+        format!("Regenerating {}...", stage_name.to_uppercase())
     } else {
-        format!("Generating {} document using Agent...", stage_name)
+        format!("Generating {}...", stage_name.to_uppercase())
     };
 
     interaction
-        .show_message(
+        .show_message_with_context(
             crate::interaction::MessageLevel::Info,
             status_msg,
+            MessageContext::new(&display_name).with_stage(stage_name),
         )
         .await;
 
@@ -131,62 +168,51 @@ pub async fn execute_stage_with_instruction(
     };
 
     let mut generated_text = String::new();
+
     let mut stream = std::pin::pin!(stream);
     while let Some(result) = stream.next().await {
         match result {
             Ok(event) => {
-                // Only keep text from the LAST Content event
-                // This filters out intermediate reasoning/thinking content
-                if let Some(text) = extract_text_from_event(&event) {
-                    // Replace with new text (keep only the latest)
+                // Extract content from the event using the event's content() method
+                if let Some(content) = event.content() {
+                    if let Some(text) = extract_text_from_content(content) {
+                        if !text.trim().is_empty() {
+                            generated_text.push_str(&text);
+                            // Send content in real-time with display name
+                            interaction.send_streaming(text.clone(), &display_name, false).await;
+                        }
+                    }
+                } else if let Some(text) = extract_text_from_event(&event) {
+                    // Fallback: use helper function
                     if !text.trim().is_empty() {
-                        generated_text = text;
+                        generated_text.push_str(&text);
+                        interaction.send_streaming(text, &display_name, false).await;
                     }
                 }
             }
             Err(e) => {
-                interaction.show_message(
+                interaction.show_message_with_context(
                     crate::interaction::MessageLevel::Error,
                     format!("Stream error: {}", e),
+                    MessageContext::new(&display_name).with_stage(stage_name),
                 ).await;
             }
         }
     }
 
+    // Send completion notification
     if generated_text.is_empty() {
         return StageResult::Failed("Agent produced no output".to_string());
     }
 
-    // DEBUG: Print agent output
-    let debug_text = if generated_text.len() > 200 {
-        generated_text.chars().take(200).collect::<String>()
-    } else {
-        generated_text.clone()
-    };
-    interaction.show_message(
-        crate::interaction::MessageLevel::Info,
-        format!("[DEBUG] Agent generated text ({} chars): {}", generated_text.len(), debug_text),
-    ).await;
-
-    // NEW BEHAVIOR: All stages (including document stages) should use tools to save their artifacts
-    // The agent is responsible for calling:
-    // - save_idea(content) for idea stage
-    // - save_prd_doc(content) for prd stage
-    // - save_design_doc(content) for design stage
-    // - save_plan_doc(content) for plan stage
-    // - save_delivery_report(content) for delivery stage
-    // We do NOT automatically save markdown documents anymore
-
-    let success_msg = if feedback.is_some() {
-        format!("{} stage completed successfully", capitalize(stage_name))
-    } else {
-        format!("{} stage completed successfully", capitalize(stage_name))
-    };
+    // Show summary of what was generated
+    let summary_msg = format!("✓ Completed ({} chars generated)", generated_text.len());
 
     interaction
-        .show_message(
+        .show_message_with_context(
             crate::interaction::MessageLevel::Success,
-            success_msg,
+            summary_msg,
+            MessageContext::new(&display_name).with_stage(stage_name),
         )
         .await;
 
@@ -532,6 +558,21 @@ impl adk_core::State for SimpleState {
 
     fn all(&self) -> std::collections::HashMap<String, serde_json::Value> {
         self.data.clone()
+    }
+}
+
+/// Helper to extract text from Content object
+pub fn extract_text_from_content(content: &Content) -> Option<String> {
+    let mut text = String::new();
+    for part in &content.parts {
+        if let Some(part_text) = part.text() {
+            text.push_str(part_text);
+        }
+    }
+    if text.is_empty() {
+        None
+    } else {
+        Some(text)
     }
 }
 

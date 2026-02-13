@@ -36,16 +36,25 @@ impl Tool for SaveIdeaTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        // Notify tool call
+        super::notify_tool_call("save_idea", &json!({"file": "idea.md"}));
+
         let content = get_required_string_param(&args, "content")?;
 
-        save_idea(content)
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
-
-        Ok(json!({
-            "status": "success",
-            "message": "Idea document saved successfully",
-            "file_path": "artifacts/idea.md"
-        }))
+        match save_idea(content) {
+            Ok(_) => {
+                super::notify_tool_result("save_idea", &Ok(json!({"status": "success"})));
+                Ok(json!({
+                    "status": "success",
+                    "message": "Idea document saved successfully",
+                    "file_path": "artifacts/idea.md"
+                }))
+            }
+            Err(e) => {
+                super::notify_tool_result("save_idea", &Err(adk_core::AdkError::Tool(e.to_string())));
+                Err(adk_core::AdkError::Tool(e.to_string()))
+            }
+        }
     }
 }
 
@@ -165,16 +174,25 @@ impl Tool for SavePrdDocTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        // Notify tool call
+        super::notify_tool_call("save_prd_doc", &json!({"file": "prd.md"}));
+
         let content = get_required_string_param(&args, "content")?;
 
-        save_prd_doc(content)
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
-
-        Ok(json!({
-            "status": "success",
-            "message": "PRD document saved successfully",
-            "file_path": "artifacts/prd.md"
-        }))
+        match save_prd_doc(content) {
+            Ok(_) => {
+                super::notify_tool_result("save_prd_doc", &Ok(json!({"status": "success"})));
+                Ok(json!({
+                    "status": "success",
+                    "message": "PRD document saved successfully",
+                    "file_path": "artifacts/prd.md"
+                }))
+            }
+            Err(e) => {
+                super::notify_tool_result("save_prd_doc", &Err(adk_core::AdkError::Tool(e.to_string())));
+                Err(adk_core::AdkError::Tool(e.to_string()))
+            }
+        }
     }
 }
 

@@ -432,14 +432,17 @@ impl Tool for WriteFileTool {
         let path = get_required_string_param(&args, "path")?;
         let content = get_required_string_param(&args, "content")?;
 
+        // Notify tool call
+        super::notify_tool_call("write_file", &json!({"path": path}));
+
         // Get iteration workspace path
         let iteration_id = get_iteration_id()
             .ok_or_else(|| adk_core::AdkError::Tool("Iteration ID not set. Cannot write files without an active iteration.".to_string()))?;
-        
+
         let iteration_store = IterationStore::new();
         let workspace_dir = iteration_store.workspace_path(&iteration_id)
             .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e)))?;
-        
+
         // Ensure workspace exists
         fs::create_dir_all(&workspace_dir)
             .map_err(|e| adk_core::AdkError::Tool(format!("Failed to create workspace: {}", e)))?;
@@ -448,6 +451,7 @@ impl Tool for WriteFileTool {
         let safe_path = match validate_path_security_within_workspace(path, &workspace_dir) {
             Ok(p) => p,
             Err(e) => {
+                super::notify_tool_result("write_file", &Err(adk_core::AdkError::Tool("security error".to_string())));
                 return Ok(json!({
                     "status": "security_error",
                     "message": e
@@ -463,7 +467,7 @@ impl Tool for WriteFileTool {
             fs::create_dir_all(parent).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
         }
 
-        match fs::write(&full_path, content) {
+        let result = match fs::write(&full_path, content) {
             Ok(_) => {
                 // Log file creation for user visibility
                 println!("📝 Writing file: {} ({} lines) [iteration: {}]", path, content.lines().count(), iteration_id);
@@ -479,7 +483,16 @@ impl Tool for WriteFileTool {
                 "status": "error",
                 "message": format!("Failed to write file: {}", e)
             })),
+        };
+
+        // Notify tool result
+        if result.is_ok() {
+            super::notify_tool_result("write_file", &Ok(json!({"status": "success"})));
+        } else {
+            super::notify_tool_result("write_file", &Err(adk_core::AdkError::Tool("error".to_string())));
         }
+
+        result
     }
 }
 

@@ -59,6 +59,10 @@ impl Tool for CreateRequirementTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        // Notify tool call
+        let title = args.get("title").and_then(|v| v.as_str()).unwrap_or("");
+        super::notify_tool_call("create_requirement", &json!({"title": title}));
+
         let mut reqs = load_requirements().map_err(|e| AdkError::Tool(e.to_string()))?;
 
         let req_id = generate_id("REQ", reqs.requirements.len());
@@ -95,6 +99,9 @@ impl Tool for CreateRequirementTool {
 
         // Log for user visibility
         println!("✅ Created: {} - {}", req_id, requirement.title);
+
+        // Notify tool result
+        super::notify_tool_result("create_requirement", &Ok(json!({"status": "success", "requirement_id": req_id})));
 
         Ok(json!({
             "status": "success",

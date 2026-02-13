@@ -1,9 +1,10 @@
 // CLI implementation of InteractiveBackend
 // Uses console and stdin for terminal-based interaction with UTF-8 support
 
-use super::{InteractiveBackend, InputOption, InputResponse, MessageLevel, ProgressInfo};
+use super::{InteractiveBackend, InputOption, InputResponse, MessageLevel, MessageContext, MessageType, ProgressInfo};
 use anyhow::Result;
 use async_trait::async_trait;
+use serde_json::Value;
 use std::io::{self, Write};
 
 pub struct CliBackend {
@@ -20,6 +21,47 @@ impl CliBackend {
 impl InteractiveBackend for CliBackend {
     async fn show_message(&self, level: MessageLevel, content: String) {
         println!("{} {}", level.emoji(), content);
+    }
+
+    async fn show_message_with_context(&self, level: MessageLevel, content: String, context: MessageContext) {
+        // Display agent name prefix for better clarity
+        let prefix = match &context.stage_name {
+            Some(stage) => format!("[{}:{}]", context.agent_name, stage),
+            None => format!("[{}]", context.agent_name),
+        };
+
+        // Add emoji based on message type
+        let type_emoji = match &context.message_type {
+            MessageType::Thinking => "💭",
+            MessageType::ToolCall { .. } => "🔧",
+            MessageType::ToolResult { success: true, .. } => "✓",
+            MessageType::ToolResult { success: false, .. } => "✗",
+            MessageType::Streaming { .. } => "📝",
+            MessageType::Normal => "",
+        };
+
+        println!("{} {}{} {}", level.emoji(), prefix, type_emoji, content);
+    }
+
+    async fn send_streaming(&self, content: String, agent_name: &str, is_thinking: bool) {
+        // For CLI, print streaming content directly
+        let prefix = if is_thinking { "💭" } else { "📝" };
+        print!("\r{} [{}] {}", prefix, agent_name, content);
+        io::stdout().flush().ok();
+    }
+
+    async fn send_tool_call(&self, tool_name: &str, arguments: &Value, agent_name: &str) {
+        println!("\n🔧 [{}] Calling tool: {}", agent_name, tool_name);
+        // Optionally print arguments for debugging
+        if !arguments.is_null() {
+            println!("   Arguments: {}", serde_json::to_string_pretty(arguments).unwrap_or_default());
+        }
+    }
+
+    async fn send_tool_result(&self, tool_name: &str, result: &str, success: bool, agent_name: &str) {
+        let status = if success { "✓" } else { "✗" };
+        println!("{} [{}] Tool {} completed: {}", status, agent_name, tool_name, 
+            if result.len() > 100 { &result[..100] } else { result });
     }
 
     async fn request_input(&self, prompt: &str, options: Vec<InputOption>, initial_content: Option<String>) -> Result<InputResponse> {

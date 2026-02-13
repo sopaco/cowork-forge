@@ -4,11 +4,11 @@
 use std::sync::{Arc, Mutex};
 use std::fs;
 use tauri::{Emitter, Manager, State, Window};
-use cowork_core::interaction::{InteractiveBackend, InputResponse};
+use cowork_core::interaction::{InteractiveBackend, InputResponse, MessageContext, MessageType};
 use std::collections::HashMap;
 use tokio::sync::oneshot;
 use anyhow::Context;
-use serde::{Serialize, Deserialize};
+use serde_json::Value;
 
 // GUI-specific modules
 mod gui_types;
@@ -45,22 +45,65 @@ impl TauriBackend {
 #[async_trait::async_trait]
 impl InteractiveBackend for TauriBackend {
     async fn show_message(&self, level: cowork_core::interaction::MessageLevel, content: String) {
-        // Determine agent name from message content
-        let agent_name = determine_agent_name(&content);
-
-        // Determine if this is a thinking message (Debug level only)
-        let is_thinking = matches!(level, cowork_core::interaction::MessageLevel::Debug);
-
-        // Emit agent_event for frontend processing display
+        // Legacy method - emit without agent context
         let _ = self.app_handle.emit("agent_event", serde_json::json!({
             "content": content,
-            "agent_name": agent_name,
-            "is_thinking": is_thinking,
+            "agent_name": "System",
+            "message_type": "normal",
             "level": format!("{:?}", level)
         }));
 
         // Also emit legacy message event for backward compatibility
-        let _ = self.app_handle.emit("message", (level, content));
+        let _ = self.app_handle.emit("message", (format!("{:?}", level), content));
+    }
+
+    async fn show_message_with_context(&self, level: cowork_core::interaction::MessageLevel, content: String, context: MessageContext) {
+        // Use the actual agent name from context (not inferred from keywords)
+        let message_type_str = match &context.message_type {
+            MessageType::Normal => "normal",
+            MessageType::Thinking => "thinking",
+            MessageType::ToolCall { .. } => "tool_call",
+            MessageType::ToolResult { .. } => "tool_result",
+            MessageType::Streaming { .. } => "streaming",
+        };
+
+        // Emit agent_event for frontend processing display
+        let _ = self.app_handle.emit("agent_event", serde_json::json!({
+            "content": content,
+            "agent_name": context.agent_name,
+            "message_type": message_type_str,
+            "stage_name": context.stage_name,
+            "level": format!("{:?}", level),
+            "details": &context.message_type
+        }));
+    }
+
+    async fn send_streaming(&self, content: String, agent_name: &str, is_thinking: bool) {
+        // Emit streaming event for real-time display
+        let _ = self.app_handle.emit("agent_streaming", serde_json::json!({
+            "content": content,
+            "agent_name": agent_name,
+            "is_thinking": is_thinking
+        }));
+    }
+
+    async fn send_tool_call(&self, tool_name: &str, arguments: &Value, agent_name: &str) {
+        // Emit tool call event
+        let _ = self.app_handle.emit("tool_call", serde_json::json!({
+            "tool_name": tool_name,
+            "arguments": arguments,
+            "agent_name": agent_name
+        }));
+    }
+
+    async fn send_tool_result(&self, tool_name: &str, result: &str, success: bool, agent_name: &str) {
+        // Emit tool result event
+        let _ = self.app_handle.emit("tool_result", serde_json::json!({
+            "tool_name": tool_name,
+            "result": result,
+            "success": success,
+            "agent_name": agent_name
+        }));
     }
 
     async fn request_input(&self, prompt: &str, options: Vec<cowork_core::interaction::InputOption>, _initial_content: Option<String>) -> anyhow::Result<InputResponse> {
@@ -117,35 +160,6 @@ impl InteractiveBackend for TauriBackend {
 
 
 }
-
-/// Determine agent name from message content based on stage keywords
-fn determine_agent_name(content: &str) -> String {
-    let content_lower = content.to_lowercase();
-
-    // Check for stage-specific keywords - order matters!
-    // Put more specific keywords first
-    if content_lower.contains("delivery") || content_lower.contains("delivering") {
-        return "Delivery Agent".to_string();
-    } else if content_lower.contains("check") || content_lower.contains("validat") || content_lower.contains("test") {
-        return "Validation Agent".to_string();
-    } else if content_lower.contains("coding") || content_lower.contains("generating code") || (content_lower.contains("file") && content_lower.contains("generat")) {
-        return "Coding Agent".to_string();
-    } else if content_lower.contains("plan") || content_lower.contains("implementation plan") {
-        return "Planning Agent".to_string();
-    } else if content_lower.contains("design") || content_lower.contains("architecture") {
-        return "Design Agent".to_string();
-    } else if content_lower.contains("prd") || content_lower.contains("requirement") {
-        return "Requirements Agent".to_string();
-    } else if content_lower.contains("idea") || content_lower.contains("concept") {
-        return "Ideation Agent".to_string();
-    } else if content_lower.contains("stage") && content_lower.contains("complet") {
-        return "Pipeline Controller".to_string();
-    }
-
-    // Default agent name
-    "Cowork Agent".to_string()
-}
-
 // ============================================================================
 // AppState
 // ============================================================================
@@ -549,6 +563,54 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(app_state)
+        .setup(move |app| {
+            // Initialize app handle for project runner
+            gui_commands::init_app_handle(app.handle().clone());
+
+            // Initialize tool notification callback
+            let app_handle = app.handle().clone();
+            cowork_core::tools::set_tool_notify_callback(move |tool_name: &str, args: &Value, is_call: bool, result: &str| {
+                if is_call {
+                    // Tool call event
+                    let _ = app_handle.emit("tool_call", serde_json::json!({
+                        "tool_name": tool_name,
+                        "arguments": args,
+                        "agent_name": "Agent"
+                    }));
+                } else {
+                    // Tool result event
+                    let _ = app_handle.emit("tool_result", serde_json::json!({
+                        "tool_name": tool_name,
+                        "success": args.is_null() || result.is_empty() || !result.contains("error"),
+                        "result": result,
+                        "agent_name": "Agent"
+                    }));
+                }
+            });
+
+            // Set workspace if provided via command line
+            if let Some(workspace) = workspace_path_clone {
+                use std::path::Path;
+                let path = Path::new(&workspace);
+                if path.exists() && path.is_dir() {
+                    if let Err(e) = std::env::set_current_dir(path) {
+                        eprintln!("[GUI] Failed to set workspace directory: {}", e);
+                    } else {
+                        println!("[GUI] Working directory set to: {}", workspace);
+                        // Store in app state
+                        if let Some(state) = app.try_state::<AppState>() {
+                            if let Ok(mut ws) = state.workspace_path.lock() {
+                                *ws = Some(workspace);
+                            }
+                        }
+                    }
+                } else {
+                    eprintln!("[GUI] Invalid workspace path: {}", workspace);
+                }
+            }
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // Input/Interaction commands
             submit_input_response,
@@ -603,34 +665,6 @@ pub fn run() {
             get_workspace,
             has_open_project,
         ])
-        .setup(move |app| {
-            // Initialize app handle for project runner
-            gui_commands::init_app_handle(app.handle().clone());
-
-            // Set workspace if provided via command line
-            if let Some(workspace) = workspace_path_clone {
-                println!("[GUI] Workspace path from command line: {}", workspace);
-                use std::path::Path;
-                let path = Path::new(&workspace);
-                if path.exists() && path.is_dir() {
-                    if let Err(e) = std::env::set_current_dir(path) {
-                        eprintln!("[GUI] Failed to set workspace directory: {}", e);
-                    } else {
-                        println!("[GUI] Working directory set to: {}", workspace);
-                        // Store in app state
-                        if let Some(state) = app.try_state::<AppState>() {
-                            if let Ok(mut ws) = state.workspace_path.lock() {
-                                *ws = Some(workspace);
-                            }
-                        }
-                    }
-                } else {
-                    eprintln!("[GUI] Invalid workspace path: {}", workspace);
-                }
-            }
-
-            Ok(())
-        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

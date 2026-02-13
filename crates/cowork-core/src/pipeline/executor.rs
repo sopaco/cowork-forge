@@ -4,7 +4,7 @@ use std::sync::Arc;
 use futures::StreamExt;
 
 use crate::domain::{Iteration, IterationStatus, Project};
-use crate::interaction::InteractiveBackend;
+use crate::interaction::{InteractiveBackend, MessageContext};
 use crate::persistence::{IterationStore, ProjectStore};
 use adk_core::Content;
 
@@ -449,18 +449,17 @@ impl IterationExecutor {
             println!("[Executor] Warning: Failed to create iteration memory: {}", e);
         }
 
-        println!("[Executor] Iteration '{}' started, will execute {} stages starting from '{}'",
-            iteration.title, stages.len(), start_stage);
-
-        // Emit event
-        self.interaction
-            .show_message(
-                crate::interaction::MessageLevel::Info,
-                format!("Starting iteration '{}' from stage '{}'", iteration.title, start_stage),
-            )
-            .await;
-
-        // Evolution iteration: Inject project knowledge from base iteration
+                    println!("[Executor] Iteration '{}' started, will execute {} stages starting from '{}'",
+                    iteration.title, stages.len(), start_stage);
+        
+                        // Emit event with Pipeline context
+                        self.interaction
+                            .show_message_with_context(
+                                crate::interaction::MessageLevel::Info,
+                                format!("Starting iteration '{}' from stage '{}'", iteration.title, start_stage),
+                                MessageContext::new("Pipeline"),
+                            )
+                            .await;        // Evolution iteration: Inject project knowledge from base iteration
         if iteration.base_iteration_id.is_some() {
             if let Err(e) = self.inject_project_knowledge(&iteration).await {
                 println!("[Executor] Warning: Failed to inject project knowledge: {}", e);
@@ -485,11 +484,12 @@ impl IterationExecutor {
 
             println!("[Executor] Stage updated: {} (iteration: {})", stage_name, iteration_id);
 
-            // Emit stage started event with progress info
+            // Emit stage started event with progress info and agent context
             self.interaction
-                .show_message(
+                .show_message_with_context(
                     crate::interaction::MessageLevel::Info,
                     format!("🚀 [{}/{}] Starting stage: {}", stage_num, total_stages, stage.description()),
+                    MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                 )
                 .await;
 
@@ -501,9 +501,10 @@ impl IterationExecutor {
                 // Emit retry message if needed
                 if attempt > 0 {
                     self.interaction
-                        .show_message(
+                        .show_message_with_context(
                             crate::interaction::MessageLevel::Warning,
                             format!("🔄 Stage '{}' retry {}/{}...", stage_name, attempt, MAX_STAGE_RETRIES - 1),
+                            MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                         )
                         .await;
                     // Wait before retry
@@ -537,11 +538,12 @@ impl IterationExecutor {
                             if !artifact_exists {
                                 last_error = Some(format!("Artifacts not generated for stage '{}'", stage_name));
 
-                                // Show error message
+                                // Show error message with context
                                 self.interaction
-                                    .show_message(
+                                    .show_message_with_context(
                                         crate::interaction::MessageLevel::Error,
                                         format!("❌ Stage '{}' completed but artifacts not found. Will retry...", stage_name),
+                                        MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                                     )
                                     .await;
 
@@ -558,7 +560,7 @@ impl IterationExecutor {
                             iteration.complete_stage(&stage_name, artifact_path.clone());
                             self.iteration_store.save(&iteration)?;
 
-                            // Show success message with progress info
+                            // Show success message with progress info and agent context
                             let progress_msg = if feedback_loop_count > 0 {
                                 format!("✅ [{}/{}] Stage '{}' completed (revision {})",
                                     stage_num, total_stages, stage_name, feedback_loop_count)
@@ -571,9 +573,10 @@ impl IterationExecutor {
                             };
 
                             self.interaction
-                                .show_message(
+                                .show_message_with_context(
                                     crate::interaction::MessageLevel::Success,
                                     progress_msg,
+                                    MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                                 )
                                 .await;
 
@@ -622,9 +625,10 @@ impl IterationExecutor {
                                     ConfirmationAction::ProvideFeedback(feedback) => {
                                         if feedback_loop_count >= MAX_FEEDBACK_LOOPS {
                                             self.interaction
-                                                .show_message(
+                                                .show_message_with_context(
                                                     crate::interaction::MessageLevel::Warning,
                                                     format!("Maximum revision attempts ({}) reached. Proceeding...", MAX_FEEDBACK_LOOPS),
+                                                    MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                                                 )
                                                 .await;
                                             iteration.resume();
@@ -636,10 +640,11 @@ impl IterationExecutor {
                                         feedback_loop_count += 1;
                                         current_feedback = Some(feedback);
                                         self.interaction
-                                            .show_message(
+                                            .show_message_with_context(
                                                 crate::interaction::MessageLevel::Info,
                                                 format!("Regenerating {} based on your feedback (revision {} of {})...",
                                                     stage_name, feedback_loop_count, MAX_FEEDBACK_LOOPS),
+                                                MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                                             )
                                             .await;
                                         continue; // Re-execute with feedback
@@ -651,10 +656,11 @@ impl IterationExecutor {
                             } else {
                                 // Non-critical stage completed, no confirmation needed
                                 self.interaction
-                                    .show_message(
+                                    .show_message_with_context(
                                         crate::interaction::MessageLevel::Success,
                                         format!("✅ [{}/{}] Stage '{}' completed (auto-continuing)",
                                             stage_num, total_stages, stage_name),
+                                        MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                                     )
                                     .await;
                                 success = true;
@@ -671,9 +677,10 @@ impl IterationExecutor {
                             self.iteration_store.save(&iteration)?;
 
                             self.interaction
-                                .show_message(
+                                .show_message_with_context(
                                     crate::interaction::MessageLevel::Info,
                                     format!("Stage '{}' paused. Use 'continue' to resume.", stage_name),
+                                    MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                                 )
                             .await;
 
@@ -683,9 +690,10 @@ impl IterationExecutor {
                             // Stage itself is requesting revision
                             if feedback_loop_count >= MAX_FEEDBACK_LOOPS {
                                 self.interaction
-                                    .show_message(
+                                    .show_message_with_context(
                                         crate::interaction::MessageLevel::Warning,
                                         format!("Maximum revision attempts reached. Proceeding..."),
+                                        MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                                     )
                                     .await;
                                 iteration.resume();
@@ -697,10 +705,11 @@ impl IterationExecutor {
                             feedback_loop_count += 1;
                             current_feedback = Some(feedback);
                             self.interaction
-                                .show_message(
+                                .show_message_with_context(
                                     crate::interaction::MessageLevel::Info,
                                     format!("Stage '{}' requesting revision ({} of {})...",
                                         stage_name, feedback_loop_count, MAX_FEEDBACK_LOOPS),
+                                    MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                                 )
                                 .await;
                             continue; // Re-execute with feedback
@@ -720,9 +729,10 @@ impl IterationExecutor {
                 // Special handling for Check stage failure - attempt self-healing
                 if stage_name == "check" {
                     self.interaction
-                        .show_message(
+                        .show_message_with_context(
                             crate::interaction::MessageLevel::Warning,
                             "Check stage failed. Attempting self-healing by returning to previous stage...".to_string(),
+                            MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                         )
                         .await;
 
@@ -742,9 +752,10 @@ impl IterationExecutor {
                             }
 
                             self.interaction
-                                .show_message(
+                                .show_message_with_context(
                                     crate::interaction::MessageLevel::Success,
                                     "Self-healing successful! Code has been fixed based on validation feedback.".to_string(),
+                                    MessageContext::new("Pipeline Controller").with_stage("coding"),
                                 )
                                 .await;
 
@@ -754,9 +765,10 @@ impl IterationExecutor {
 
                             // Retry check stage again
                             self.interaction
-                                .show_message(
+                                .show_message_with_context(
                                     crate::interaction::MessageLevel::Info,
                                     "Re-running validation after self-healing...".to_string(),
+                                    MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                                 )
                                 .await;
 
@@ -769,9 +781,10 @@ impl IterationExecutor {
                                     }
 
                                     self.interaction
-                                        .show_message(
+                                        .show_message_with_context(
                                             crate::interaction::MessageLevel::Success,
                                             "✅ Validation passed after self-healing!".to_string(),
+                                            MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                                         )
                                         .await;
                                     iteration.complete_stage(&stage_name, None);
@@ -780,18 +793,20 @@ impl IterationExecutor {
                                 }
                                 StageResult::Failed(e) => {
                                     self.interaction
-                                        .show_message(
+                                        .show_message_with_context(
                                             crate::interaction::MessageLevel::Error,
                                             format!("Self-healing failed: Validation still fails after fix: {}", e),
+                                            MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                                         )
                                         .await;
                                     // Fall through to failure handling
                                 }
                                 _ => {
                                     self.interaction
-                                        .show_message(
+                                        .show_message_with_context(
                                             crate::interaction::MessageLevel::Error,
                                             "Self-healing failed: Unexpected result from validation".to_string(),
+                                            MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                                         )
                                         .await;
                                     // Fall through to failure handling
@@ -800,9 +815,10 @@ impl IterationExecutor {
                         }
                         StageResult::Failed(e) => {
                             self.interaction
-                                .show_message(
+                                .show_message_with_context(
                                     crate::interaction::MessageLevel::Error,
                                     format!("Self-healing failed: Unable to fix code: {}", e),
+                                    MessageContext::new("Pipeline Controller").with_stage("coding"),
                                 )
                                 .await;
                         }
@@ -816,9 +832,10 @@ impl IterationExecutor {
                     self.iteration_store.save(&iteration)?;
 
                     self.interaction
-                        .show_message(
+                        .show_message_with_context(
                             crate::interaction::MessageLevel::Error,
                             format!("Stage '{}' failed after {} attempts: {}", stage_name, MAX_STAGE_RETRIES, error),
+                            MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                         )
                         .await;
 
@@ -838,9 +855,10 @@ impl IterationExecutor {
                 if count > 0 {
                     println!("[Executor] Promoted {} insights to project decisions", count);
                     self.interaction
-                        .show_message(
+                        .show_message_with_context(
                             crate::interaction::MessageLevel::Info,
                             format!("Promoted {} insights to project memory", count),
+                            MessageContext::new("Memory System"),
                         )
                         .await;
                 }
@@ -859,18 +877,20 @@ impl IterationExecutor {
                         Ok(_) => {
                             println!("[Executor] Iteration knowledge generated successfully");
                             self.interaction
-                                .show_message(
+                                .show_message_with_context(
                                     crate::interaction::MessageLevel::Info,
-                                    "Project knowledge has been generated and saved.".to_string()
+                                    "Project knowledge has been generated and saved.".to_string(),
+                                    MessageContext::new("Knowledge System"),
                                 )
                                 .await;
                         }
                         Err(e) => {
                             println!("[Executor] Warning: Failed to generate iteration knowledge: {}", e);
                             self.interaction
-                                .show_message(
+                                .show_message_with_context(
                                     crate::interaction::MessageLevel::Warning,
                                     format!("Knowledge generation completed with warnings: {}", e),
+                                    MessageContext::new("Knowledge System"),
                                 )
                                 .await;
                         }
@@ -887,9 +907,10 @@ impl IterationExecutor {
         self.project_store.save(project)?;
 
         self.interaction
-            .show_message(
+            .show_message_with_context(
                 crate::interaction::MessageLevel::Success,
                 format!("Iteration '{}' completed successfully!", iteration.title),
+                MessageContext::new("Pipeline Controller"),
             )
             .await;
 
@@ -917,9 +938,10 @@ impl IterationExecutor {
 
         // Notify that iteration has been resumed and is ready to continue
         self.interaction
-            .show_message(
+            .show_message_with_context(
                 crate::interaction::MessageLevel::Info,
                 format!("Iteration '{}' resumed from stage: {}", iteration_id, resume_stage.as_ref().unwrap_or(&"unknown".to_string())),
+                MessageContext::new("Pipeline Controller").with_stage(resume_stage.as_deref().unwrap_or("unknown")),
             )
             .await;
 

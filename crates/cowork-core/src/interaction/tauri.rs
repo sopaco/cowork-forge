@@ -1,9 +1,10 @@
 // Tauri implementation of InteractiveBackend (placeholder)
 // Actual implementation will be in cowork-gui crate
 
-use super::{InteractiveBackend, InputOption, InputResponse, MessageLevel, ProgressInfo};
+use super::{InteractiveBackend, InputOption, InputResponse, MessageLevel, MessageContext, ProgressInfo};
 use anyhow::Result;
 use async_trait::async_trait;
+use serde_json::Value;
 
 /// Tauri backend placeholder - will be properly implemented in cowork-gui crate
 pub struct TauriBackend {
@@ -21,6 +22,29 @@ impl InteractiveBackend for TauriBackend {
     async fn show_message(&self, level: MessageLevel, content: String) {
         // Tauri implementation will send events to frontend
         println!("{} [Tauri]: {}", level.emoji(), content);
+    }
+
+    async fn show_message_with_context(&self, level: MessageLevel, content: String, context: MessageContext) {
+        // Display agent name prefix for better clarity
+        let prefix = match &context.stage_name {
+            Some(stage) => format!("[{}:{}]", context.agent_name, stage),
+            None => format!("[{}]", context.agent_name),
+        };
+        println!("{} {} {}", level.emoji(), prefix, content);
+    }
+
+    async fn send_streaming(&self, content: String, agent_name: &str, is_thinking: bool) {
+        let prefix = if is_thinking { "💭" } else { "📝" };
+        println!("{} [{}] {}", prefix, agent_name, content);
+    }
+
+    async fn send_tool_call(&self, tool_name: &str, arguments: &Value, agent_name: &str) {
+        println!("🔧 [{}] Calling tool: {}", agent_name, tool_name);
+    }
+
+    async fn send_tool_result(&self, tool_name: &str, result: &str, success: bool, agent_name: &str) {
+        let status = if success { "✓" } else { "✗" };
+        println!("{} [{}] Tool {} completed", status, agent_name, tool_name);
     }
 
     async fn request_input(&self, _prompt: &str, _options: Vec<InputOption>, _initial_content: Option<String>) -> Result<InputResponse> {
