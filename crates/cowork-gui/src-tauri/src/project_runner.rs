@@ -221,9 +221,7 @@ impl ProjectRunner {
         if let Some(mut process) = process {
             println!("[Runner] Stopping process for iteration: {}", iteration_id);
             
-            process.child.kill()
-                .await
-                .map_err(|e| format!("Failed to stop: {}", e))?;
+            let _ = process.child.kill().await;
             
             // Emit stopped event (use expected event name)
             if let Some(ref handle) = *self.app_handle.lock().unwrap() {
@@ -236,7 +234,9 @@ impl ProjectRunner {
             println!("[Runner] Process stopped");
             Ok(())
         } else {
-            Err(format!("No running process for iteration: {}", iteration_id))
+            // Process already stopped or not found - this is fine, just return success
+            println!("[Runner] No running process found for iteration: {} (may already be stopped)", iteration_id);
+            Ok(())
         }
     }
 

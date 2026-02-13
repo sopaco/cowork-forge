@@ -127,17 +127,17 @@ const RunnerPanel = ({ iterationId }) => {
 
   const startProject = async () => {
     setLoading(true);
-    setLogs(prev => [...prev, { type: 'system', content: '> 正在启动项目...\n', timestamp: new Date() }]);
+    setLogs(prev => [...prev, { type: 'system', content: '> Starting project...\n', timestamp: new Date() }]);
     
     const result = await tryExecute(async () => {
       return await invoke('start_iteration_project', { iterationId });
-    }, '启动项目失败');
+    }, 'Failed to start project');
     
     setLoading(false);
     
     if (result) {
       setIsRunning(true);
-      setLogs(prev => [...prev, { type: 'system', content: `> 项目已启动 (PID: ${result.process_id})\n`, timestamp: new Date() }]);
+      setLogs(prev => [...prev, { type: 'system', content: `> Project started (PID: ${result.process_id})\n`, timestamp: new Date() }]);
       // Refresh runtime info after starting
       loadProjectRuntimeInfo();
     }
@@ -145,18 +145,18 @@ const RunnerPanel = ({ iterationId }) => {
 
   const stopProject = async () => {
     setLoading(true);
-    setLogs(prev => [...prev, { type: 'system', content: '> 正在停止项目...\n', timestamp: new Date() }]);
+    setLogs(prev => [...prev, { type: 'system', content: '> Stopping project...\n', timestamp: new Date() }]);
     
     const success = await tryExecute(async () => {
       await invoke('stop_iteration_project', { iterationId });
       return true;
-    }, '停止项目失败');
+    }, 'Failed to stop project');
     
     setLoading(false);
     
     if (success) {
       setIsRunning(false);
-      setLogs(prev => [...prev, { type: 'system', content: '> 项目已停止\n', timestamp: new Date() }]);
+      setLogs(prev => [...prev, { type: 'system', content: '> Project stopped\n', timestamp: new Date() }]);
     }
   };
 
@@ -204,7 +204,7 @@ const RunnerPanel = ({ iterationId }) => {
         flexShrink: 0
       }}>
         <Input
-          placeholder="搜索日志..."
+          placeholder="Search logs..."
           prefix={<SearchOutlined />}
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
@@ -218,16 +218,16 @@ const RunnerPanel = ({ iterationId }) => {
           style={{ width: '100px' }}
           size="small"
         >
-          <Select.Option value="all">全部</Select.Option>
-          <Select.Option value="stdout">标准输出</Select.Option>
-          <Select.Option value="stderr">错误输出</Select.Option>
-          <Select.Option value="system">系统</Select.Option>
+          <Select.Option value="all">All</Select.Option>
+          <Select.Option value="stdout">Stdout</Select.Option>
+          <Select.Option value="stderr">Stderr</Select.Option>
+          <Select.Option value="system">System</Select.Option>
         </Select>
         <Checkbox checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} size="small">
-          自动滚动
+          Auto-scroll
         </Checkbox>
         <span style={{ color: '#888', fontSize: '12px', marginLeft: 'auto' }}>
-          {filteredLogs.length}/{logs.length} 行
+          {filteredLogs.length}/{logs.length} lines
         </span>
       </div>
 
@@ -251,11 +251,11 @@ const RunnerPanel = ({ iterationId }) => {
       >
         {logs.length === 0 ? (
           <div style={{ color: '#999', textAlign: 'center', marginTop: '50px' }}>
-            点击「启动」按钮运行项目
+            Click "Start" to run your project
           </div>
         ) : filteredLogs.length === 0 ? (
           <div style={{ color: '#999', textAlign: 'center', marginTop: '50px' }}>
-            没有匹配的日志
+            No matching logs
           </div>
         ) : (
           filteredLogs.map((log, index) => (
@@ -294,7 +294,7 @@ const RunnerPanel = ({ iterationId }) => {
               size="small" 
               onClick={refreshPreview}
             >
-              刷新
+              Refresh
             </Button>
           </div>
           
@@ -323,10 +323,10 @@ const RunnerPanel = ({ iterationId }) => {
           <EyeOutlined style={{ fontSize: 64, color: '#d9d9d9' }} />
           <div style={{ textAlign: 'center', color: '#666' }}>
             <div style={{ fontSize: 14, marginBottom: 8 }}>
-              {!hasFrontend ? '未检测到前端项目' : '请先启动项目'}
+              {!hasFrontend ? 'No frontend project detected' : 'Please start the project first'}
             </div>
             <div style={{ fontSize: 12, color: '#999' }}>
-              {!isRunning && hasFrontend && '点击「启动」按钮运行项目后即可预览'}
+              {!isRunning && hasFrontend && 'Click "Start" to run the project for preview'}
             </div>
           </div>
         </div>
@@ -350,7 +350,7 @@ const RunnerPanel = ({ iterationId }) => {
         background: '#ffffff'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '16px', fontWeight: 500 }}>🚀 运行中心</span>
+          <span style={{ fontSize: '16px', fontWeight: 500 }}>🚀 Run Center</span>
         </div>
         
         <Space>
@@ -361,11 +361,11 @@ const RunnerPanel = ({ iterationId }) => {
               onClick={startProject}
               loading={loading}
             >
-              启动
+              Start
             </Button>
           ) : (
             <Button danger icon={<StopOutlined />} onClick={stopProject} loading={loading}>
-              停止
+              Stop
             </Button>
           )}
         </Space>
@@ -395,7 +395,7 @@ const RunnerPanel = ({ iterationId }) => {
             transition: 'all 0.2s'
           }}
         >
-          <AppstoreOutlined /> 运行程序
+          <AppstoreOutlined /> Run Program
         </button>
         <button
           onClick={() => hasFrontend && isRunning && setActiveTab('preview')}
@@ -415,9 +415,9 @@ const RunnerPanel = ({ iterationId }) => {
             transition: 'all 0.2s'
           }}
         >
-          <EyeOutlined /> 页面预览
-          {!hasFrontend && <span style={{ fontSize: '11px', marginLeft: '4px', color: '#ccc' }}>(无可用)</span>}
-          {hasFrontend && !isRunning && <span style={{ fontSize: '11px', marginLeft: '4px', color: '#ccc' }}>(未启动)</span>}
+          <EyeOutlined /> Page Preview
+          {!hasFrontend && <span style={{ fontSize: '11px', marginLeft: '4px', color: '#ccc' }}>(N/A)</span>}
+          {hasFrontend && !isRunning && <span style={{ fontSize: '11px', marginLeft: '4px', color: '#ccc' }}>(Stopped)</span>}
         </button>
       </div>
 
@@ -438,13 +438,13 @@ const RunnerPanel = ({ iterationId }) => {
       }}>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <Tag color={isRunning ? 'success' : 'default'}>
-            {isRunning ? '运行中' : '已停止'}
+            {isRunning ? 'Running' : 'Stopped'}
           </Tag>
           {hasFrontend && (
-            <Tag color="blue">前端</Tag>
+            <Tag color="blue">Frontend</Tag>
           )}
           {projectRuntimeInfo?.has_backend && (
-            <Tag color="purple">后端</Tag>
+            <Tag color="purple">Backend</Tag>
           )}
         </div>
         
@@ -452,10 +452,10 @@ const RunnerPanel = ({ iterationId }) => {
         {activeTab === 'run' && (
           <Space size="small">
             <Button size="small" icon={<ClearOutlined />} onClick={clearLogs} disabled={logs.length === 0}>
-              清空
+              Clear
             </Button>
             <Button size="small" icon={<CopyOutlined />} onClick={copyLogs} disabled={logs.length === 0}>
-              复制
+              Copy
             </Button>
           </Space>
         )}
