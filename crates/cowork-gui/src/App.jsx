@@ -25,7 +25,6 @@ import rehypeRaw from 'rehype-raw';
 import 'highlight.js/styles/github.css';
 import ArtifactsViewer from './components/ArtifactsViewer';
 import CodeEditor from './components/CodeEditor';
-import PreviewPanel from './components/PreviewPanel';
 import RunnerPanel from './components/RunnerPanel';
 import ProjectsPanel from './components/ProjectsPanel';
 import MemoryPanel from './components/MemoryPanel';
@@ -777,14 +776,6 @@ function App() {
         )}
       </div>
 
-      <div style={{ height: '100%', display: activeView === 'preview' ? 'block' : 'none' }}>
-        {currentIteration ? (
-          <PreviewPanel key={`preview-${currentIteration.id}`} iterationId={currentIteration.id} />
-        ) : (
-          <Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-        )}
-      </div>
-
       <div style={{ height: '100%', display: activeView === 'run' ? 'block' : 'none' }}>
         {currentIteration ? (
           <RunnerPanel key={`run-${currentIteration.id}`} iterationId={currentIteration.id} />
@@ -1115,7 +1106,6 @@ function App() {
               { key: 'chat', icon: <MessageOutlined />, label: 'Chat' },
               { key: 'artifacts', icon: <FileTextOutlined />, label: 'Artifacts' },
               { key: 'code', icon: <CodeOutlined />, label: 'Code' },
-              { key: 'preview', icon: <EyeOutlined />, label: 'Preview' },
               { key: 'run', icon: <PlayCircleOutlined />, label: 'Run' },
               { key: 'execution-memory', icon: <DatabaseOutlined />, label: 'Memory' },
               { key: 'project-knowledge', icon: <BookOutlined />, label: 'Knowledge' },
@@ -1174,9 +1164,6 @@ function App() {
               break;
             case 'view-code':
               setActiveView('code');
-              break;
-            case 'view-preview':
-              setActiveView('preview');
               break;
             case 'view-run':
               setActiveView('run');

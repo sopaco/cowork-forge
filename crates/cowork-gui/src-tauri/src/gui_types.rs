@@ -182,3 +182,17 @@ pub struct ProjectInfo {
     pub has_package_json: bool,
     pub has_cargo_toml: bool,
 }
+
+// ============================================================================
+// Project Runtime Info
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectRuntimeInfo {
+    pub has_frontend: bool,
+    pub has_backend: bool,
+    pub preview_url: Option<String>,
+    pub frontend_port: Option<u16>,
+    pub backend_port: Option<u16>,
+    pub start_command: Option<String>,
+}

@@ -33,21 +33,20 @@ impl ProjectRunner {
         processes.contains_key(iteration_id)
     }
 
-    pub async fn start(&self, iteration_id: String, command: String) -> Result<u32, String> {
+    pub async fn start(&self, iteration_id: String, command: String, code_dir: String) -> Result<u32, String> {
         // Stop existing process if any
         if let Ok(()) = self.stop(iteration_id.clone()).await {
             println!("[Runner] Stopped existing process for iteration: {}", iteration_id);
         }
 
-        // Get iteration workspace directory (V2 architecture)
-        let code_dir = format!(".cowork-v2/iterations/{}/workspace", iteration_id);
+        // Use provided code_dir instead of hardcoded workspace path
         let code_path = std::path::Path::new(&code_dir);
 
         if !code_path.exists() {
-            return Err(format!("Workspace directory not found: {}", code_dir));
+            return Err(format!("Code directory not found: {}", code_dir));
         }
 
-        println!("[Runner] Starting command: {}", command);
+        println!("[Runner] Starting command: {} in {}", command, code_dir);
 
         let mut child = Command::new("cmd")
             .args(["/C", &command])
@@ -60,8 +59,11 @@ impl ProjectRunner {
 
         let pid = child.id().unwrap();
 
-        // Get app handle for event emission
+        // Get app handle for event emission - create multiple clones upfront
         let app_handle_opt = self.app_handle.lock().unwrap().clone();
+        let app_handle_stdout = app_handle_opt.clone();
+        let app_handle_stderr = app_handle_opt.clone();
+        let app_handle_exit = app_handle_opt.clone();
         let iteration_id_clone = iteration_id.clone();
 
         // Create channels for output
@@ -76,8 +78,7 @@ impl ProjectRunner {
         let stdout_tx_spawn = stdout_tx.clone();
         let stderr_tx_spawn = stderr_tx.clone();
         
-        // Clone app_handle and iteration_id for stdout task
-        let app_handle_stdout = app_handle_opt.clone();
+        // Clone for stdout task
         let iteration_id_stdout = iteration_id_clone.clone();
 
         // Spawn task to read stdout and emit events
@@ -92,14 +93,15 @@ impl ProjectRunner {
                     Ok(_) => {
                         let _ = stdout_tx_spawn.send(line.clone());
                         
-                        // Emit event to frontend
+                        // Emit event to frontend (use expected event names)
                         if let Some(ref handle) = app_handle_stdout {
-                            if let Err(e) = handle.emit("process_output", serde_json::json!({
+                            if let Err(e) = handle.emit("project_log", serde_json::json!({
                                 "iteration_id": iteration_id_stdout,
-                                "output_type": "stdout",
+                                "session_id": iteration_id_stdout,
+                                "stream": "stdout",
                                 "content": line.clone()
                             })) {
-                                eprintln!("[Runner] Failed to emit process_output event: {}", e);
+                                eprintln!("[Runner] Failed to emit project_log event: {}", e);
                             }
                         }
                         
@@ -108,13 +110,15 @@ impl ProjectRunner {
                     Err(e) => {
                         eprintln!("[Runner] Error reading stdout: {}", e);
                         
-                        // Emit error event
+                        // Emit error event (use expected event name)
                         if let Some(ref handle) = app_handle_stdout {
-                            if let Err(e) = handle.emit("process_error", serde_json::json!({
+                            if let Err(e) = handle.emit("project_log", serde_json::json!({
                                 "iteration_id": iteration_id_stdout,
-                                "error": e.to_string()
+                                "session_id": iteration_id_stdout,
+                                "stream": "stderr",
+                                "content": format!("Error reading output: {}\n", e)
                             })) {
-                                eprintln!("[Runner] Failed to emit process_error event: {}", e);
+                                eprintln!("[Runner] Failed to emit project_log event: {}", e);
                             }
                         }
                         break;
@@ -135,14 +139,15 @@ impl ProjectRunner {
                     Ok(_) => {
                         let _ = stderr_tx_spawn.send(line.clone());
                         
-                        // Emit event to frontend
-                        if let Some(ref handle) = app_handle_opt {
-                            if let Err(e) = handle.emit("process_output", serde_json::json!({
+                        // Emit event to frontend (use expected event names)
+                        if let Some(ref handle) = app_handle_stderr {
+                            if let Err(e) = handle.emit("project_log", serde_json::json!({
                                 "iteration_id": iteration_id_clone,
-                                "output_type": "stderr",
+                                "session_id": iteration_id_clone,
+                                "stream": "stderr",
                                 "content": line.clone()
                             })) {
-                                eprintln!("[Runner] Failed to emit process_output event: {}", e);
+                                eprintln!("[Runner] Failed to emit project_log event: {}", e);
                             }
                         }
                         
@@ -152,7 +157,7 @@ impl ProjectRunner {
                         eprintln!("[Runner] Error reading stderr: {}", e);
                         
                         // Emit error event
-                        if let Some(ref handle) = app_handle_opt {
+                        if let Some(ref handle) = app_handle_stderr {
                             if let Err(e) = handle.emit("process_error", serde_json::json!({
                                 "iteration_id": iteration_id_clone,
                                 "error": e.to_string()
@@ -167,9 +172,39 @@ impl ProjectRunner {
         });
 
         let mut processes = self.processes.lock().unwrap();
-        processes.insert(iteration_id, ProjectProcess {
+        processes.insert(iteration_id.clone(), ProjectProcess {
             child,
             output_tx: stdout_tx,
+        });
+        drop(processes);
+
+        // Spawn task to wait for process exit and emit stopped event
+        let iteration_id_exit = iteration_id.clone();
+        let processes_ref = Arc::clone(&self.processes);
+        
+        tokio::spawn(async move {
+            // First get the child from processes, then release the lock before waiting
+            let child = {
+                let mut procs = processes_ref.lock().unwrap();
+                procs.remove(&iteration_id_exit).map(|p| p.child)
+            };
+            
+            // Wait for process to exit (without holding the lock)
+            let exit_status = if let Some(mut child) = child {
+                child.wait().await.ok()
+            } else {
+                None
+            };
+            
+            println!("[Runner] Process exited with status: {:?}", exit_status);
+            
+            // Emit stopped event
+            if let Some(ref handle) = app_handle_exit {
+                let _ = handle.emit("project_stopped", serde_json::json!({
+                    "iteration_id": iteration_id_exit,
+                    "session_id": iteration_id_exit
+                }));
+            }
         });
 
         println!("[Runner] Process started with PID: {}", pid);
@@ -190,10 +225,11 @@ impl ProjectRunner {
                 .await
                 .map_err(|e| format!("Failed to stop: {}", e))?;
             
-            // Emit stopped event
+            // Emit stopped event (use expected event name)
             if let Some(ref handle) = *self.app_handle.lock().unwrap() {
-                let _ = handle.emit("process_stopped", serde_json::json!({
-                    "iteration_id": iteration_id
+                let _ = handle.emit("project_stopped", serde_json::json!({
+                    "iteration_id": iteration_id,
+                    "session_id": iteration_id
                 }));
             }
             

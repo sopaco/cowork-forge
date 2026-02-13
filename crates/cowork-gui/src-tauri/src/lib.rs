@@ -638,7 +638,8 @@ pub fn run() {
             gui_commands::check_preview_status,
             gui_commands::start_iteration_project,
             gui_commands::stop_iteration_project,
-            gui_commands::check_project_status,            // Memory commands
+            gui_commands::check_project_status,
+            gui_commands::get_project_runtime_info,
             gui_commands::query_memory_index,
             gui_commands::load_memory_detail,
             gui_commands::save_session_memory,

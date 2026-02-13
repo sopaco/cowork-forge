@@ -5,6 +5,8 @@ use crate::AppState;
 use crate::preview_server::PreviewServerManager;
 use crate::project_runner::ProjectRunner;
 use cowork_core::persistence::IterationStore;
+use cowork_core::{RuntimeAnalyzer, ProjectRuntimeConfig};
+use cowork_core::llm::config::LlmConfig;
 use tauri::{State, Window};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -14,6 +16,7 @@ use std::process::Command;
 lazy_static::lazy_static! {
     static ref PREVIEW_SERVER_MANAGER: PreviewServerManager = PreviewServerManager::new();
     static ref PROJECT_RUNNER: ProjectRunner = ProjectRunner::new();
+    static ref RUNTIME_ANALYZER: std::sync::Mutex<Option<RuntimeAnalyzer>> = std::sync::Mutex::new(None);
 }
 
 // ============================================================================
@@ -30,8 +33,6 @@ pub fn init_app_handle(handle: tauri::AppHandle) {
 
 #[tauri::command]
 pub async fn open_in_file_manager(path: String, _window: Window) -> Result<(), String> {
-    use std::env;
-    
     // Resolve the path
     let resolved_path = if path.starts_with("workspace_") {
         // It's a workspace path
@@ -286,19 +287,54 @@ pub async fn start_iteration_preview(
 ) -> Result<PreviewInfo, String> {
     println!("[GUI] Starting preview for iteration: {}", iteration_id);
 
-    // Use workspace directory for preview (working code location)
-    // This ensures consistency with Code editor
-    let iteration_store = IterationStore::new();
-    let workspace = iteration_store.workspace_path(&iteration_id)
-        .map_err(|e| format!("Failed to get workspace: {}", e))?;
+    // Use project root (after delivery) or workspace (before delivery)
+    let code_dir = get_code_directory(&iteration_id)?;
 
-    if !workspace.exists() {
-        return Err(format!("Workspace directory not found: {}", workspace.display()));
+    // Install dependencies if needed
+    install_dependencies_if_needed(&code_dir).await?;
+
+    // Get start command and port from LLM analysis
+    let (command, port, url) = detect_start_command_with_info(&code_dir)?;
+    
+    println!("[GUI] Preview using command: {}, port: {}", command, port);
+
+    // Start the development server using ProjectRunner
+    let _pid = PROJECT_RUNNER.start(iteration_id.clone(), command, code_dir.to_string_lossy().to_string()).await?;
+
+    Ok(PreviewInfo {
+        url,
+        port,
+        status: PreviewStatus::Running,
+        project_type: ProjectType::Unknown,
+    })
+}
+
+/// Detect start command with additional info (port, url)
+fn detect_start_command_with_info(code_dir: &Path) -> Result<(String, u16, String), String> {
+    // Use RuntimeAnalyzer (LLM分析) 获取运行配置
+    let analyzer_result = try_analyze_with_runtime(code_dir);
+    
+    if let Ok(config) = analyzer_result {
+        // Determine port and URL based on project type
+        let (port, url) = if let Some(frontend) = &config.frontend {
+            (frontend.dev_port, format!("http://{}:{}", frontend.dev_host, frontend.dev_port))
+        } else if let Some(backend) = &config.backend {
+            (backend.port, format!("http://{}:{}", backend.host, backend.port))
+        } else if let Some(fullstack) = &config.fullstack {
+            (fullstack.frontend_port, format!("http://localhost:{}", fullstack.frontend_port))
+        } else {
+            (3000, "http://localhost:3000".to_string())
+        };
+        
+        // Generate start command
+        if let Some(cmd) = generate_start_command_from_config(&config) {
+            println!("[GUI] LLM detected runtime type: {:?}, command: {}, port: {}", config.runtime_type, cmd, port);
+            return Ok((cmd, port, url));
+        }
     }
-
-    install_dependencies_if_needed(&workspace).await?;
-
-    PREVIEW_SERVER_MANAGER.start(iteration_id, workspace).await
+    
+    // LLM 分析失败，返回错误
+    Err("无法通过大模型分析获取运行命令，请确保 config.toml 中配置了有效的 LLM".to_string())
 }
 
 #[tauri::command]
@@ -379,6 +415,68 @@ pub async fn stop_iteration_preview(
 }
 
 #[tauri::command]
+pub async fn get_project_runtime_info(
+    iteration_id: String,
+    _window: Window,
+    _state: State<'_, AppState>,
+) -> Result<ProjectRuntimeInfo, String> {
+    println!("[GUI] Getting project runtime info for iteration: {}", iteration_id);
+
+    // Use project root (after delivery) or workspace (before delivery)
+    let code_dir = get_code_directory(&iteration_id)?;
+
+    // Try to get runtime config from LLM analysis
+    let config_result = try_analyze_with_runtime(&code_dir);
+
+    let (has_frontend, has_backend, preview_url, frontend_port, backend_port, start_command) = 
+        if let Ok(config) = config_result {
+            let has_frontend = config.frontend.is_some();
+            let has_backend = config.backend.is_some() || config.fullstack.is_some();
+            
+            let (preview_url, frontend_port) = if let Some(ref frontend) = config.frontend {
+                let url = format!("http://{}:{}", frontend.dev_host, frontend.dev_port);
+                (Some(url), Some(frontend.dev_port))
+            } else if let Some(ref fullstack) = config.fullstack {
+                let url = format!("http://localhost:{}", fullstack.frontend_port);
+                (Some(url), Some(fullstack.frontend_port))
+            } else {
+                (None, None)
+            };
+
+            let backend_port = if let Some(ref backend) = config.backend {
+                Some(backend.port)
+            } else if let Some(ref fullstack) = config.fullstack {
+                Some(fullstack.backend_port)
+            } else {
+                None
+            };
+
+            let start_command = generate_start_command_from_config(&config);
+
+            (has_frontend, has_backend, preview_url, frontend_port, backend_port, start_command)
+        } else {
+            // Fallback: detect based on file existence
+            let has_frontend = code_dir.join("index.html").exists() 
+                || code_dir.join("src").exists() 
+                || code_dir.join("package.json").exists();
+            let has_backend = code_dir.join("Cargo.toml").exists()
+                || code_dir.join("main.py").exists()
+                || code_dir.join("server.js").exists();
+            
+            (has_frontend, has_backend, None, None, None, None)
+        };
+
+    Ok(ProjectRuntimeInfo {
+        has_frontend,
+        has_backend,
+        preview_url,
+        frontend_port,
+        backend_port,
+        start_command,
+    })
+}
+
+#[tauri::command]
 pub async fn start_iteration_project(
     iteration_id: String,
     _window: Window,
@@ -386,21 +484,18 @@ pub async fn start_iteration_project(
 ) -> Result<RunInfo, String> {
     println!("[GUI] Starting project for iteration: {}", iteration_id);
 
-    // Use workspace directory for running (working code location)
-    // This ensures consistency with Code editor and Preview
-    let iteration_store = IterationStore::new();
-    let workspace = iteration_store.workspace_path(&iteration_id)
-        .map_err(|e| format!("Failed to get workspace: {}", e))?;
+    // Use project root (after delivery) or workspace (before delivery)
+    let code_dir = get_code_directory(&iteration_id)?;
 
     // Install dependencies if needed
-    install_dependencies_if_needed(&workspace).await?;
+    install_dependencies_if_needed(&code_dir).await?;
 
-    let command = detect_start_command(&workspace)?;
+    let command = detect_start_command(&code_dir)?;
 
     println!("[GUI] Detected start command: {}", command);
 
     let command_clone = command.clone();
-    let pid = PROJECT_RUNNER.start(iteration_id.clone(), command).await?;
+    let pid = PROJECT_RUNNER.start(iteration_id.clone(), command, code_dir.to_string_lossy().to_string()).await?;
 
     Ok(RunInfo {
         status: RunStatus::Running,
@@ -557,47 +652,181 @@ fn detect_language(filename: &str) -> Option<String> {
 // Project Detection
 // ============================================================================
 
+/// Determine the correct code directory for preview/run.
+/// Priority: workspace (before delivery) > project root (after delivery)
+fn get_code_directory(iteration_id: &str) -> Result<PathBuf, String> {
+    let iteration_store = IterationStore::new();
+    let workspace = iteration_store.workspace_path(iteration_id)
+        .map_err(|e| format!("Failed to get workspace path: {}", e))?;
+
+    // Get project root (current working directory)
+    let project_root = std::env::current_dir()
+        .map_err(|e| format!("Failed to get project root: {}", e))?;
+
+    // Check if a directory has project files
+    let has_frontend_files = |dir: &Path| -> bool {
+        dir.join("index.html").exists() 
+            || dir.join("src").exists()
+            || dir.join("public").exists()
+    };
+    
+    let has_backend_files = |dir: &Path| -> bool {
+        dir.join("Cargo.toml").exists()
+            || dir.join("main.rs").exists()
+            || dir.join("main.py").exists()
+            || dir.join("server.js").exists()
+            || dir.join("app.py").exists()
+    };
+    
+    let has_node_project = |dir: &Path| -> bool {
+        dir.join("package.json").exists()
+    };
+
+    // Check if workspace has actual project files (development phase)
+    let workspace_has_files = workspace.exists() && (
+        has_frontend_files(&workspace) 
+        || has_backend_files(&workspace) 
+        || has_node_project(&workspace)
+    );
+
+    // Check if project root has actual project files (after delivery)
+    let project_root_has_files = has_frontend_files(&project_root) 
+        || has_backend_files(&project_root) 
+        || has_node_project(&project_root);
+
+    // Priority: workspace > project root
+    // Use workspace if it exists and has files (development phase)
+    // Otherwise use project root (after delivery)
+    if workspace_has_files {
+        println!("[GUI] Using workspace for preview/run: {}", workspace.display());
+        Ok(workspace)
+    } else if project_root_has_files {
+        println!("[GUI] Using project root for preview/run: {}", project_root.display());
+        Ok(project_root)
+    } else if workspace.exists() {
+        // Fallback: workspace exists but no project files
+        println!("[GUI] Using workspace (fallback): {}", workspace.display());
+        Ok(workspace)
+    } else {
+        Err(format!("No valid code directory found. Workspace: {}, Project root: {}",
+            workspace.display(), project_root.display()))
+    }
+}
+
+/// 使用大模型分析项目结构并生成运行命令
 fn detect_start_command(code_dir: &Path) -> Result<String, String> {
-    let package_json = code_dir.join("package.json");
-    let cargo_toml = code_dir.join("Cargo.toml");
-    let index_html = code_dir.join("index.html");
+    // 使用 RuntimeAnalyzer (LLM分析) 获取运行配置
+    let analyzer_result = try_analyze_with_runtime(code_dir);
+    
+    if let Ok(config) = analyzer_result {
+        // 从运行时配置生成启动命令
+        if let Some(cmd) = generate_start_command_from_config(&config) {
+            println!("[GUI] LLM detected runtime type: {:?}, command: {}", config.runtime_type, cmd);
+            return Ok(cmd);
+        }
+    }
+    
+    // LLM 分析失败，返回错误
+    Err("无法通过大模型分析获取运行命令，请确保 config.toml 中配置了有效的 LLM".to_string())
+}
 
-    // Check for Node.js/React/Vue projects
-    if package_json.exists() {
-        let pkg = fs::read_to_string(&package_json)
-            .map_err(|e| format!("Failed to read package.json: {}", e))?;
+/// Try to analyze project using RuntimeAnalyzer
+fn try_analyze_with_runtime(code_dir: &Path) -> Result<ProjectRuntimeConfig, String> {
+    // Initialize analyzer with config if not already done
+    init_runtime_analyzer();
+    
+    let guard = RUNTIME_ANALYZER.lock().map_err(|e| e.to_string())?;
+    
+    if let Some(analyzer) = guard.as_ref() {
+        // Clone the necessary data to move into blocking task
+        let code_dir = code_dir.to_path_buf();
+        
+        // Use spawn_blocking to run the async analysis in a blocking context
+        let result = tokio::task::block_in_place(move || {
+            let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+            rt.block_on(async {
+                analyzer.analyze(&code_dir).await
+            })
+        });
+        
+        return result;
+    }
+    
+    Err("RuntimeAnalyzer not initialized".to_string())
+}
 
-        let pkg_json: serde_json::Value = serde_json::from_str(&pkg)
-            .map_err(|e| format!("Failed to parse package.json: {}", e))?;
+/// Initialize RuntimeAnalyzer with LLM config
+fn init_runtime_analyzer() {
+    let mut guard = match RUNTIME_ANALYZER.lock() {
+        Ok(g) => g,
+        Err(e) => {
+            println!("[GUI] Failed to lock RUNTIME_ANALYZER: {}", e);
+            return;
+        }
+    };
+    
+    if guard.is_some() {
+        return; // Already initialized
+    }
+    
+    // Try to load config.toml from project root
+    let config_path = std::env::current_dir()
+        .ok()
+        .and_then(|dir| dir.join("config.toml").exists().then_some(dir.join("config.toml")));
+    
+    if let Some(path) = config_path {
+        if let Ok(config) = cowork_core::llm::config::ModelConfig::from_file(path.to_str().unwrap_or("config.toml")) {
+            let llm_config = LlmConfig {
+                api_base_url: config.llm.api_base_url,
+                api_key: config.llm.api_key,
+                model_name: config.llm.model_name,
+            };
+            let analyzer = RuntimeAnalyzer::new().with_llm_config(llm_config);
+            *guard = Some(analyzer);
+            println!("[GUI] RuntimeAnalyzer initialized with LLM config");
+            return;
+        }
+    }
+    
+    // No config found, use heuristic-only analyzer
+    *guard = Some(RuntimeAnalyzer::new());
+    println!("[GUI] RuntimeAnalyzer initialized (heuristic mode)");
+}
 
-        // Check for scripts
-        if let Some(scripts) = pkg_json.get("scripts").and_then(|s| s.as_object()) {
-            // Priority: dev -> start -> serve -> build
-            for script_name in &["dev", "start", "serve", "build"] {
-                if scripts.contains_key(*script_name) {
-                    return Ok(format!("npm run {}", script_name));
-                }
+/// Generate start command from runtime config
+fn generate_start_command_from_config(config: &ProjectRuntimeConfig) -> Option<String> {
+    // Use dev command if available
+    if let Some(ref frontend) = config.frontend {
+        if !frontend.dev_command.is_empty() {
+            return Some(frontend.dev_command.clone());
+        }
+    }
+    
+    if let Some(ref backend) = config.backend {
+        if !backend.dev_command.is_empty() {
+            return Some(backend.dev_command.clone());
+        }
+        if let Some(ref start_cmd) = backend.start_command {
+            if !start_cmd.is_empty() {
+                return Some(start_cmd.clone());
             }
         }
     }
-
-    // Check for Rust projects
-    if cargo_toml.exists() {
-        // Check if it's a binary project
-        let cargo_content = fs::read_to_string(&cargo_toml)
-            .map_err(|e| format!("Failed to read Cargo.toml: {}", e))?;
-
-        if cargo_content.contains("[[bin]]") || cargo_content.contains("[[lib]]") {
-            return Ok("cargo run".to_string());
-        }
+    
+    // Check runtime type for common patterns
+    match config.runtime_type {
+        cowork_core::RuntimeType::ReactVite => Some("npm run dev".to_string()),
+        cowork_core::RuntimeType::VueVite => Some("npm run dev".to_string()),
+        cowork_core::RuntimeType::RustBackend => Some("cargo run".to_string()),
+        cowork_core::RuntimeType::NodeExpress => Some("node index.js".to_string()),
+        cowork_core::RuntimeType::NodeFastify => Some("node index.js".to_string()),
+        cowork_core::RuntimeType::PythonFastapi => Some("uvicorn main:app --reload".to_string()),
+        cowork_core::RuntimeType::PythonFlask => Some("flask run".to_string()),
+        cowork_core::RuntimeType::VanillaHtml => Some("python -m http.server 8000".to_string()),
+        cowork_core::RuntimeType::NodeTool => Some("node index.js".to_string()),
+        cowork_core::RuntimeType::RustCli => Some("cargo run".to_string()),
+        _ => None,
     }
-
-    // Check for static HTML
-    if index_html.exists() {
-        return Ok("python -m http.server 8000".to_string());
-    }
-
-    Err("Unable to detect project type".to_string())
 }
 
 // ============================================================================
