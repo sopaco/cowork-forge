@@ -50,8 +50,8 @@ graph TB
 | 模式 | 说明 | 适用场景 |
 |------|------|----------|
 | **None** | 创世模式，从零开始 | 全新项目 |
-| **Full** | 完整继承，复制代码和所有工件 | 功能增强、架构升级 |
-| **Partial** | 部分继承，复制代码但重新生成工件 | 重大重构、技术栈变更 |
+| **Full** | 完整继承，复制代码和所有工件 | 功能增强 |
+| **Partial** | 部分继承，复制代码但不复制工件 | 重大重构、技术栈变更 |
 
 ```mermaid
 graph TB
@@ -65,16 +65,15 @@ graph TB
         end
 
         subgraph "Full 模式"
-            F1["复制基础迭代工作空间"]
-            F2["复制所有工件"]
-            F3["智能决定起始阶段"]
-            F1 --> F2 --> F3
+            F1["复制基础迭代工作空间<br/>+ artifacts 目录"]
+            F2["智能决定起始阶段<br/>（根据变更描述分析）"]
+            F1 --> F2
         end
 
         subgraph "Partial 模式"
-            P1["复制基础迭代工作空间"]
-            P2["从 Idea 阶段开始"]
-            P3["重新生成所有工件"]
+            P1["复制基础迭代工作空间<br/>（仅代码文件）"]
+            P2["跳过 artifacts 复制"]
+            P3["从 Idea 阶段开始<br/>重新生成所有工件"]
             P1 --> P2 --> P3
         end
     end
@@ -84,15 +83,35 @@ graph TB
     style P1 fill:#fff3e0
 ```
 
+**关键区别**：
+- **Full 模式**：复制工作空间和 artifacts 目录，Agent 可以基于已有工件继续工作
+- **Partial 模式**：只复制代码文件，跳过 artifacts 目录，Agent 需要重新生成所有文档工件
+
 ### 迭代状态（IterationStatus）
 
 迭代在其生命周期中会经历不同的状态：
 
 ```mermaid
 graph LR
-    CREATED["Created<br/>已创建"] --> PREPARING["Preparing<br/>准备中"]
-    PREPARING --> RUNNING["Running<br/>执行中"]
+    DRAFT["Draft<br/>草稿"] --> RUNNING["Running<br/>执行中"]
     RUNNING --> PAUSED["Paused<br/>已暂停"]
+    PAUSED --> RUNNING
+    RUNNING --> COMPLETED["Completed<br/>已完成"]
+    RUNNING --> FAILED["Failed<br/>已失败"]
+
+    style DRAFT fill:#e3f2fd
+    style RUNNING fill:#e8f5e9
+    style COMPLETED fill:#c8e6c9
+    style PAUSED fill:#fff3e0
+    style FAILED fill:#ffcdd2
+```
+
+状态设计考虑了实际使用场景：
+- **Draft**：迭代已创建，尚未开始执行
+- **Running**：Pipeline 正在执行
+- **Paused**：关键阶段完成，等待用户确认或反馈
+- **Completed**：所有阶段执行完成
+- **Failed**：执行过程中发生错误（可通过 retry 命令重试）
     PAUSED --> RUNNING
     RUNNING --> COMPLETED["Completed<br/>已完成"]
     RUNNING --> FAILED["Failed<br/>已失败"]
@@ -104,14 +123,6 @@ graph LR
     style PAUSED fill:#fff3e0
     style FAILED fill:#ffcdd2
 ```
-
-状态设计考虑了实际使用场景：
-- **Created**：迭代刚创建，尚未开始执行
-- **Preparing**：正在准备工作空间
-- **Running**：Pipeline 正在执行
-- **Paused**：等待用户确认或输入
-- **Completed**：所有阶段执行完成
-- **Failed**：执行过程中发生错误
 
 ## 迭代创建流程
 
@@ -131,7 +142,7 @@ graph LR
         description,
         base_iteration_id: None,        // 无基础迭代
         inheritance: InheritanceMode::None,
-        status: IterationStatus::Created,
+        status: IterationStatus::Draft,
         artifacts: Artifacts::default(),
         current_stage: None,
     };

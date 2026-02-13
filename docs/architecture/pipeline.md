@@ -370,85 +370,109 @@ fn check_code_quality(&self, workspace: &Path) -> bool {
 
 ## 错误处理与恢复
 
-### ResilientAgent 包装器
+### 错误恢复与自愈机制
 
-系统引入了 `ResilientAgent` 为 Agent 执行提供自动错误恢复能力：
+IterationExecutor 内置了多层错误恢复能力，包括阶段重试和自愈机制：
 
-```mermaid
-sequenceDiagram
-    participant Executor as IterationExecutor
-    participant Resilient as ResilientAgent
-    participant Inner as Inner Agent
-    participant User as 用户
+#### 阶段重试机制
 
-    Executor->>Resilient: run()
-    Resilient->>Inner: run()
+每个阶段执行失败时会自动重试（最多 3 次）：
 
-    alt 执行成功
-        Inner-->>Resilient: Ok(stream)
-        Resilient-->>Executor: Ok(stream)
-    else 执行失败
-        Inner-->>Resilient: Err(e)
-        Resilient->>User: 请求用户选择
-        User-->>Resilient: Retry/Guidance/Abort
+```rustnconst MAX_STAGE_RETRIES: u32 = 3;
+const RETRY_DELAY_MS: u64 = 2000;
 
-        alt 重试
-            Resilient->>Inner: run()
-        else 中止
-            Resilient-->>Executor: Err(e)
-        end
-    end
-```
+for attempt in 0..MAX_STAGE_RETRIES {
+    if attempt > 0 {
+        interaction.show_message(
+            MessageLevel::Warning,
+            format!("Stage '{}' retry {}/{}...", stage_name, attempt, MAX_STAGE_RETRIES - 1),
+        ).await;
+        tokio::time::sleep(Duration::from_millis(RETRY_DELAY_MS)).await;
+    }
 
-ResilientAgent 的核心特性：
-
-```rust
-pub struct ResilientAgent {
-    inner: Arc<dyn Agent>,
-    retry_count: Arc<AtomicU32>,
-    interaction: Arc<dyn InteractiveBackend>,
-}
-
-impl ResilientAgent {
-    const MAX_RETRY_ATTEMPTS: u32 = 3;
-
-    async fn handle_error(&self, context: Arc<dyn InvocationContext>, e: AdkError) 
-        -> Result<AgentOutput, AdkError> 
-    {
-        let current_retry = self.retry_count.fetch_add(1, Ordering::SeqCst);
-
-        if current_retry >= Self::MAX_RETRY_ATTEMPTS {
-            return Err(AdkError::Tool(format!(
-                "Agent failed after {} retry attempts", 
-                Self::MAX_RETRY_ATTEMPTS
-            )));
-        }
-
-        // 提供用户选择
-        let options = vec![
-            InputOption { id: "retry", label: "Retry (reset counter)", ... },
-            InputOption { id: "guidance", label: "Provide Guidance & Retry", ... },
-            InputOption { id: "abort", label: "Abort", ... },
-        ];
-
-        match self.interaction.request_input("How would you like to proceed?", options, None).await? {
-            InputResponse::Selection(id) => match id.as_str() {
-                "retry" | "guidance" => self.run(context).await,
-                "abort" => Err(e),
-                _ => Err(e),
-            },
-            _ => Err(e),
+    match stage.execute(&ctx, interaction.clone()).await {
+        StageResult::Success(path) => return Ok(path),
+        StageResult::Failed(e) => {
+            last_error = Some(e);
+            continue;
         }
     }
 }
 ```
 
-### 阶段重试机制
+#### Check 阶段自愈机制
 
-除了 Agent 级别的重试，Pipeline 还提供阶段级别的重试：
+当 Check 阶段失败时，系统会尝试自动修复问题：
 
-```rust
-const MAX_STAGE_RETRIES: u32 = 3;
+```mermaid
+sequenceDiagram
+    participant Executor as IterationExecutor
+    participant Check as Check Stage
+    participant Coding as Coding Stage
+    participant User as 用户
+
+    Executor->>Check: execute()
+    Check-->>Executor: Failed(validation_errors)
+    
+    Note over Executor: 触发自愈机制
+    
+    Executor->>User: 显示验证失败信息
+    Executor->>Coding: execute_with_feedback(errors)
+    Coding->>Coding: 根据错误修复代码
+    Coding-->>Executor: Success
+    
+    Executor->>Check: execute()
+    Check-->>Executor: Success
+    
+    Executor->>User: 自愈成功！
+```
+
+这种自愈机制允许系统在遇到验证错误时自动返回 Coding 阶段进行修复，而不是直接失败：
+
+```rustn// Check 阶段失败后的自愈逻辑
+if stage_name == "check" {
+    let feedback = format!(
+        "Validation failed with the following issues:\n\n{}\n\nPlease fix these issues in the code.", 
+        error
+    );
+    
+    // 返回 Coding 阶段修复问题
+    let coding_stage = CodingStage;
+    match coding_stage.execute_with_feedback(&ctx, interaction.clone(), &feedback).await {
+        StageResult::Success(_) => {
+            // 修复成功，重新运行 Check
+            match stage.execute(&ctx, interaction.clone()).await {
+                StageResult::Success(_) => {
+                    // 自愈成功！
+                }
+                // ...
+            }
+        }
+        // ...
+    }
+}
+```
+
+#### 用户反馈循环
+
+对于关键阶段（Idea、PRD、Design、Plan、Coding），系统支持用户反馈循环：
+
+```rustnconst MAX_FEEDBACK_LOOPS: u32 = 5;
+
+loop {
+    let result = if let Some(ref feedback) = current_feedback {
+        stage.execute_with_feedback(&ctx, interaction.clone(), feedback).await
+    } else {
+        stage.execute(&ctx, interaction.clone()).await
+    };
+    
+    match result {
+        StageResult::Success(_) => break,
+        // 用户可以提供反馈让 Agent 修订
+        // ...
+    }
+}
+```
 const RETRY_DELAY_MS: u64 = 2000;
 
 for attempt in 0..MAX_STAGE_RETRIES {
@@ -685,7 +709,7 @@ Cowork Forge 的 Pipeline 设计体现了**结构化流程**与**灵活执行**�
 
 关键特性：
 
-1. **ResilientAgent**：Agent 级别的错误恢复，提供重试、指导、中止选项
+1. **阶段重试与自愈**：阶段失败自动重试（3次），Check 失败后自动返回 Coding 修复
 2. **GotoStage**：动态阶段跳转，避免从头开始
 3. **流式输出**：实时展示 AI 思考过程，带节流控制
 4. **智能起始**：根据变更描述自动判定起始阶段

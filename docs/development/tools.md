@@ -385,62 +385,90 @@ impl Tool for GotoStageTool {
 
 ### 6. 记忆工具（Memory Tools）
 
-记忆工具用于操作双层记忆系统：
+记忆工具用于操作双层记忆系统，包括查询、保存和提升功能：
 
-```rustn// 查询项目记忆工具
-pub struct QueryProjectMemoryTool {
-    pub memory_store: Arc<MemoryStore>,
+```rustn// 查询记忆工具
+pub struct QueryMemoryTool {
+    iteration_id: String,
 }
 
-#[async_trait::async_trait]
-impl Tool for QueryProjectMemoryTool {
-    fn name(&self) -> &str {
-        "query_project_memory"
-    }
-
+impl Tool for QueryMemoryTool {
+    fn name(&self) -> &str { "query_memory" }
+    
     fn description(&self) -> &str {
-        "Query the project memory for relevant decisions, patterns, or knowledge"
+        "Query memory to retrieve decisions, patterns, and insights"
     }
-
-    async fn execute(&self, args: Value) -> Result<Value, ToolError> {
-        let query = args["query"].as_str().unwrap();
-
-        // 语义搜索记忆
-        let results = self.memory_store.search(query).await?;
-
-        Ok(json!({"results": results}))
-    }
+    
+    // 支持三种 scope: project（项目级）、iteration（迭代级）、smart（智能合并）
 }
 
 // 保存洞察工具
-pub struct SaveIterationInsightTool {
-    pub memory_store: Arc<MemoryStore>,
+pub struct SaveInsightTool {
+    iteration_id: String,
 }
 
-#[async_trait::async_trait]
-impl Tool for SaveIterationInsightTool {
-    fn name(&self) -> &str {
-        "save_iteration_insight"
-    }
+// 保存问题工具
+pub struct SaveIssueTool {
+    iteration_id: String,
+}
 
-    fn description(&self) -> &str {
-        "Save an insight to the iteration memory"
-    }
+// 保存学习工具
+pub struct SaveLearningTool {
+    iteration_id: String,
+}
 
-    async fn execute(&self, args: Value) -> Result<Value, ToolError> {
-        let insight: Insight = serde_json::from_value(args)?;
+// 提升为决策工具（迭代级 → 项目级）
+pub struct PromoteToDecisionTool {
+    iteration_id: String,
+}
 
-        self.memory_store.save_insight(insight).await?;
-
-        Ok(json!({"success": true}))
-    }
+// 提升为模式工具（迭代级 → 项目级）
+pub struct PromoteToPatternTool {
+    iteration_id: String,
 }
 ```
 
-记忆工具让 Agent 具备了"长期记忆"能力，可以：
-- 查询之前的决策，保持一致性
-- 保存新的洞察，积累知识
-- 学习历史经验，避免重复犯错
+记忆工具让 Agent 具备了"长期记忆"能力：
+- **QueryMemoryTool**：查询项目决策、模式和洞察，支持智能合并查询
+- **SaveInsightTool**：保存当前迭代的洞察，记录重要发现
+- **SaveIssueTool**：保存遇到的问题，便于追踪和解决
+- **SaveLearningTool**：保存学习内容，积累经验
+- **PromoteToDecisionTool**：将洞察提升为项目级决策，跨迭代持久化
+- **PromoteToPatternTool**：将学习提升为项目级模式，复用最佳实践
+
+### 7. 智能文件读取工具
+
+为避免上下文溢出，系统提供了智能文件读取工具：
+
+```rustn// 截断式文件读取工具
+pub struct ReadFileTruncatedTool;
+
+impl Tool for ReadFileTruncatedTool {
+    fn name(&self) -> &str { "read_file_truncated" }
+    
+    fn description(&self) -> &str {
+        "Read a file with intelligent truncation to prevent context overflow"
+    }
+    
+    // 参数: path, max_chars (default: 2000), prefer_structure (default: true)
+    // 对代码文件优先提取结构（函数、类等）
+    // 对其他文件进行智能截断
+}
+
+// 带调用限制的文件读取工具
+pub struct ReadFileWithLimitTool {
+    max_calls: usize,
+    call_count: Arc<AtomicUsize>,
+}
+
+impl Tool for ReadFileWithLimitTool {
+    fn name(&self) -> &str { "read_file_with_limit" }
+    
+    // 用于知识生成阶段，防止过度读取文件消耗 Token
+}
+```
+
+这些工具在知识生成阶段特别有用，可以在获取必要信息的同时控制 Token 消耗。
 
 ## 工具注册与权限控制
 

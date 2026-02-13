@@ -119,20 +119,17 @@ pub enum InheritanceMode {
 ```rustn#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum IterationStatus {
-    Created,     // 已创建，尚未开始
-    Preparing,   // 准备工作空间中
+    Draft,       // 草稿状态，已创建但尚未开始
     Running,     // Pipeline 执行中
-    Paused,      // 暂停，等待用户确认
+    Paused,      // 暂停，等待用户确认或反馈
     Completed,   // 已完成
     Failed,      // 执行失败
-    Cancelled,   // 已取消
 }
 ```
 
 状态设计考虑了实际使用场景：
-- **Created → Preparing**：开始执行，准备工作空间
-- **Preparing → Running**：准备完成，开始 Pipeline
-- **Running → Paused**：阶段完成，等待用户确认
+- **Draft → Running**：开始执行迭代
+- **Running → Paused**：关键阶段完成，等待用户确认
 - **Paused → Running**：用户确认，继续执行
 - **Running → Completed**：所有阶段执行完成
 - **Running → Failed**：执行过程中出错
@@ -147,12 +144,12 @@ pub struct IterationSummary {
     pub number: u32,
     pub title: String,
     pub status: IterationStatus,
+    pub completed_stages: Vec<String>,  // 已完成的阶段列表
     pub created_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
 }
 ```
 
-这种设计避免了在列表展示时加载完整的迭代数据，提高性能。
+这种设计避免了在列表展示时加载完整的迭代数据，同时保留已完成阶段信息便于快速了解迭代进度。
 
 ## Artifacts（工件）
 
@@ -160,15 +157,16 @@ Artifacts 记录了迭代生成的所有文档：
 
 ```rustn#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Artifacts {
-    pub idea_doc: Option<String>,           // idea.md 路径
-    pub prd_doc: Option<String>,            // prd.md 路径
-    pub design_doc: Option<String>,         // design.md 路径
-    pub plan_doc: Option<String>,           // plan.md 路径
-    pub delivery_report: Option<String>,    // delivery_report.md 路径
+    pub idea: Option<String>,       // idea.md 路径
+    pub prd: Option<String>,        // prd.md 路径
+    pub design: Option<String>,     // design.md 路径
+    pub plan: Option<String>,       // plan.md 路径
+    pub coding: Option<String>,     // coding workspace 路径
+    pub delivery: Option<String>,   // delivery_report.md 路径
 }
 ```
 
-工件设计遵循**可选性原则**：不是所有迭代都会生成所有工件。例如，一个 Bug 修复迭代可能直接从 Coding 阶段开始，不会生成 PRD 和 Design 文档。
+工件设计遵循**可选性原则**：不是所有迭代都会生成所有工件。例如，一个 Bug 修复迭代可能直接从 Plan 或 Coding 阶段开始，不会生成 Idea、PRD 和 Design 文档。
 
 ## Memory（记忆系统）
 
@@ -201,13 +199,12 @@ graph TB
 
 ### 项目级记忆
 
-```rustn#[derive(Debug, Clone, Serialize, Deserialize)]
+```rustn#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProjectMemory {
-    pub project_id: String,
-    pub decisions: Vec<Decision>,                    // 架构决策
-    pub patterns: Vec<Pattern>,                      // 模式库
-    pub iteration_knowledge: Vec<IterationKnowledge>, // 迭代知识
-    pub updated_at: DateTime<Utc>,
+    pub decisions: Vec<Decision>,                              // 架构决策
+    pub patterns: Vec<Pattern>,                                // 模式库
+    pub context: ProjectContext,                               // 项目上下文
+    pub iteration_knowledge: HashMap<String, IterationKnowledge>, // 迭代知识快照（按迭代ID索引）
 }
 ```
 
@@ -219,10 +216,9 @@ pub struct Decision {
     pub title: String,                        // 决策标题
     pub context: String,                      // 决策背景
     pub decision: String,                     // 决策内容
-    pub rationale: String,                    // 决策理由
     pub consequences: Vec<String>,            // 影响
+    pub iteration_id: String,                 // 关联迭代
     pub created_at: DateTime<Utc>,
-    pub iteration_id: Option<String>,         // 关联迭代
 }
 ```
 
@@ -234,50 +230,46 @@ pub struct Decision {
 pub struct Pattern {
     pub id: String,
     pub name: String,                         // 模式名称
-    pub category: PatternCategory,            // 模式类别
     pub description: String,                  // 描述
-    pub usage: String,                        // 使用场景
-    pub example: Option<String>,              // 示例
+    pub usage: Vec<String>,                   // 使用场景列表
+    pub tags: Vec<String>,                    // 标签
+    pub code_example: Option<String>,         // 代码示例
+    pub iteration_id: String,                 // 关联迭代
     pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum PatternCategory {
-    Architecture,    // 架构模式
-    Design,          // 设计模式
-    Implementation,  // 实现模式
-    Testing,         // 测试模式
-    Deployment,      // 部署模式
 }
 ```
 
-模式库让 AI 能够**复用已验证的解决方案**，提高开发效率和代码质量。
+模式库让 AI 能够**复用已验证的解决方案**，提高开发效率和代码质量。通过标签系统支持灵活的查询和分类。
 
 #### 迭代知识（IterationKnowledge）
 
 ```rustn#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IterationKnowledge {
     pub iteration_id: String,
-    pub title: String,                        // 迭代标题
-    pub summary: String,                      // 摘要
+    pub iteration_number: u32,                // 迭代序号
+    pub idea_summary: String,                 // Idea 文档摘要
+    pub prd_summary: String,                  // PRD 文档摘要
+    pub design_summary: String,               // Design 文档摘要
+    pub plan_summary: String,                 // Plan 文档摘要
+    pub tech_stack: Vec<String>,              // 技术栈
     pub key_decisions: Vec<String>,           // 关键决策
-    pub patterns_used: Vec<String>,           // 使用的模式
-    pub tech_stack: TechStackSnapshot,        // 技术栈快照
+    pub key_patterns: Vec<String>,            // 关键模式
+    pub code_structure: String,               // 代码结构摘要
+    pub known_issues: Vec<String>,            // 已知问题
     pub created_at: DateTime<Utc>,
 }
 ```
 
-迭代知识是迭代完成后的"总结报告"，供后续迭代快速了解历史上下文。
+迭代知识是迭代完成后的"总结报告"，供后续迭代快速了解历史上下文。使用摘要而非完整文档，避免存储空间过大。
 
 ### 迭代级记忆
 
-```rustn#[derive(Debug, Clone, Serialize, Deserialize)]
+```rustn#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct IterationMemory {
     pub iteration_id: String,
     pub insights: Vec<Insight>,               // 洞察
     pub issues: Vec<Issue>,                   // 问题
     pub learnings: Vec<Learning>,             // 学习
-    pub updated_at: DateTime<Utc>,
 }
 ```
 
@@ -285,63 +277,47 @@ pub struct IterationMemory {
 
 ```rustn#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Insight {
-    pub id: String,
+    pub stage: String,                        // 来源阶段
     pub content: String,                      // 洞察内容
-    pub category: InsightCategory,            // 类别
-    pub importance: ImportanceLevel,          // 重要程度
+    pub importance: Importance,               // 重要程度
     pub created_at: DateTime<Utc>,
-    pub source_stage: Option<String>,         // 来源阶段
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum InsightCategory {
-    Architecture,    // 架构洞察
-    Design,          // 设计洞察
-    Implementation,  // 实现洞察
-    Performance,     // 性能洞察
-    Security,        // 安全洞察
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Importance {
+    Critical,    // 关键
+    Important,   // 重要
+    Normal,      // 普通
 }
 ```
 
-洞察是 Agent 在执行过程中的"顿悟"——发现更好的实现方式、识别潜在问题、总结最佳实践。
+洞察是 Agent 在执行过程中的"顿悟"——发现更好的实现方式、识别潜在问题、总结最佳实践。每个洞察都关联到特定的阶段，便于追溯。
 
 #### 问题（Issue）
 
 ```rustn#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Issue {
-    pub id: String,
-    pub description: String,                  // 问题描述
-    pub severity: IssueSeverity,              // 严重程度
-    pub status: IssueStatus,                  // 状态
-    pub solution: Option<String>,             // 解决方案
+    pub stage: String,                        // 发生阶段
+    pub content: String,                      // 问题描述
+    pub resolved: bool,                       // 是否已解决
     pub created_at: DateTime<Utc>,
     pub resolved_at: Option<DateTime<Utc>>,
 }
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum IssueSeverity {
-    Critical,    // 严重
-    High,        // 高
-    Medium,      // 中
-    Low,         // 低
-}
 ```
 
-问题记录让 AI 能够**追踪已知问题**，避免重复踩坑。
+问题记录让 AI 能够**追踪已知问题**，避免重复踩坑。当问题被解决时，会记录解决时间。
 
 #### 学习（Learning）
 
 ```rustn#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Learning {
-    pub id: String,
     pub content: String,                      // 学习内容
-    pub context: String,                      // 上下文
-    pub applicability: String,                // 适用场景
     pub created_at: DateTime<Utc>,
 }
 ```
 
-学习记录是 Agent 的"成长记录"，记录了在实践中获得的经验和教训。
+学习记录是 Agent 的"成长记录"，记录了在实践中获得的经验和教训。通过 `PromoteToPatternTool` 可以将重要的学习提升为项目级模式。
 
 ## 数据模型（结构化数据）
 
