@@ -73,6 +73,29 @@ Each role uses Actor-Critic patterns for self-review and optimization, with huma
 
 <hr />
 
+## ✨ Visual Walkthrough
+> Cowork Forge is an intelligent development engine that can be called by various technology stacks (Python/Java/NodeJS) through FFI as the high-performance cowork-core library; easily integrated into workflows through cowork-cli; also includes a locally deployable GUI project that provides a friendly interactive interface. Using Cowork Forge GUI as an example, we can intuitively experience the complete lifecycle of software development through its interface.
+
+|  |  |
+| :--- | :--- |
+| **📄 Live Artifact Preview**：Watch documents being written in real-time. View formatted **PRDs**, **System Designs**, and **Implementation Plans** as they are generated. Support for Markdown rendering allows for clear, structured documentation reviews. ![Artifact Viewer](./assets/snapshots/artifact_preview.png) | **💬 Interactive Agent Chat**：Collaborate directly with your AI team. Discuss requirements with the Product Manager, review architecture with the Architect, or give feedback to the Engineer. The chat interface keeps the context of your entire project history. ![Agent Chat Interface](./assets/snapshots/chat_preview.png) |
+| **🌐 Built-in App Preview**：See the result instantly. Cowork Forge GUI includes a web view to preview your generated web applications immediately after the build completes, without leaving the tool. ![App Preview](./assets/snapshots/app_preview.png) | **📝 Task & Todo Management**：Keep track of progress. The system automatically generates and maintains a Todo list for the current iteration, checking off items as the agents complete them. ![Todo List](./assets/snapshots/todo_preview.png) |
+| **🚀 Project Dashboard**：The central hub for all your development initiatives. View active projects, check their status (Running, Paused, Completed), and quickly launch new ones from a clean, modern interface.![Project Dashboard](./assets/snapshots/dashboard_preview.png) | **⚡ Real-time Code Execution**：Monitor the **Coding Agent** as it writes files, runs builds, and executes tests. The built-in terminal view shows you exactly what commands are being run and their output, ensuring transparency and control. ![Terminal & Execution](./assets/snapshots/execution_preview.png) |
+
+---
+
+## 🔄 Development Workflow
+
+Cowork Forge GUI guides you through the standard **7-Stage Development Lifecycle**:
+
+1.  **💡 Idea Intake**: Chat with the agent to define your concept.
+2.  **📋 PRD Generation**: Review the generated Product Requirements Document.
+3.  **🏗️ Architecture Design**: Approve the technical design and system boundaries.
+4.  **📅 Implementation Planning**: See the task breakdown and timeline.
+5.  **💻 Coding & Testing**: Watch code being written and tests passing.
+6.  **✅ Quality Check**: Verify the implementation against requirements.
+7.  **📦 Delivery**: Receive the final project report and artifacts.
+
 # 🏆 Cowork Forge vs. Competitors
 
 Cowork Forge stands out in the AI development tools landscape through its unique multi-agent architecture and comprehensive workflow coverage.
