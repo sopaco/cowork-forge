@@ -192,7 +192,7 @@ Cowork Forge 的专业智能体像真实开发团队一样协同工作:
 
 # 🏗️ 架构
 
-Cowork Forge 是基于 adk-rust 框架构建的 Rust 工作空间，采用模块化、领域驱动设计架构：
+Cowork Forge 是基于 adk-rust 框架构建的 Rust 工作空间，采用模块化、六边形架构设计：
 
 ```mermaid
 graph TB
@@ -200,140 +200,144 @@ graph TB
         CLI[cowork-cli]
     end
     
-    subgraph "核心库"
-        CORE[cowork-core]
+    subgraph "GUI 层"
+        GUI[cowork-gui<br/>Tauri + React]
     end
     
-    subgraph "核心模块"
-        AGENTS[智能体]
-        PIPELINE[流水线]
-        TOOLS[工具]
-        PERSISTENCE[持久化]
-        DOMAIN[领域]
+    subgraph "cowork-core"
+        subgraph "应用层"
+            PIPELINE[流程域<br/>7 阶段编排]
+            INTERACTION[交互域<br/>后端抽象]
+        end
+        
+        subgraph "域层"
+            DOMAIN[域逻辑<br/>项目/迭代/内存]
+        end
+        
+        subgraph "基础设施层"
+            PERSISTENCE[持久化<br/>JSON 存储]
+            LLM_INTEGRATION[LLM 集成<br/>限流]
+            TOOLS[工具域<br/>30+ ADK 工具]
+            SECURITY[安全<br/>路径验证]
+        end
     end
     
     subgraph "ADK 框架"
-        ADK[adk-rust 0.2.1]
-        LLM[adk-model]
-    end
-    
-    subgraph "基础设施"
-        FS[文件系统]
-        CONFIG[配置]
-        INTERACTION[交互]
+        ADK[adk-rust]
+        AGENTS[智能体系统]
     end
     
     subgraph "外部"
-        OPENAI[OpenAI LLM]
-        EMBEDDING[嵌入 API]
+        OPENAI[OpenAI 兼容<br/>LLM API]
+        FS[文件系统]
     end
     
-    CLI --> CORE
-    CORE --> AGENTS
-    CORE --> PIPELINE
-    CORE --> TOOLS
-    
-    AGENTS --> ADK
+    CLI --> INTERACTION
+    GUI --> INTERACTION
+    INTERACTION --> PIPELINE
     PIPELINE --> DOMAIN
+    DOMAIN --> PERSISTENCE
     TOOLS --> PERSISTENCE
-    
-    ADK --> LLM
-    LLM --> OPENAI
-    LLM --> EMBEDDING
-    
-    PIPELINE --> INTERACTION
+    AGENTS --> ADK
+    ADK --> LLM_INTEGRATION
+    LLM_INTEGRATION --> OPENAI
     TOOLS --> FS
-    CORE --> CONFIG
 ```
 
 ## 核心组件
 
 ### Rust 工作空间结构
 项目组织为多个 crate 的 Rust 工作空间：
-- `cowork-core`：包含领域逻辑、智能体和工具的核心库
+- `cowork-core`：包含领域逻辑、智能体引擎、工具系统、自迭代Memory等模块的核心库
 - `cowork-cli`：与系统交互的命令行界面
-- `cowork-gui`：可选的图形用户界面（基于 Tauri）
+- `cowork-gui`：基于图形用户界面的Cowork GUI工作台
+
+### 六边形架构
+Cowork Forge 实现六边形（端口和适配器）架构：
+- **域层**：纯业务逻辑（项目、迭代、内存聚合）
+- **应用层**：流程编排、阶段执行
+- **基础设施层**：持久化、LLM 集成、工具
+- **端口**：InteractiveBackend 特性用于 CLI/GUI 抽象
 
 ### 迭代架构
 核心概念，将完整的开发周期管理为独立的、可继承的单元：
 - **起源迭代**：从零开始新项目
 - **演化迭代**：基于现有迭代构建，支持继承模式
-- **继承模式**：无（全新开始）、完全（完整代码复制）、部分（仅文档）
+- **继承模式**：无（全新开始）、完全（完整代码+制品复制）、部分（仅制品，重新生成代码）
 
 ### ADK 框架集成
-基于 adk-rust 框架（v0.2.1）构建：
-- 智能体编排和管理
-- 与 OpenAI 和自定义提供者的 LLM 集成
+基于 adk-rust 框架构建：
+- 智能体编排和生命周期管理
+- 与 OpenAI 和兼容提供者的 LLM 集成
 - 工具系统用于安全代码操作
-- 内置迭代支持
+- 会话管理用于状态交互
 
-### AI 智能体
-使用 adk-rust 智能体框架的专门智能体：
-- 创意智能体：结构化初始概念
-- 循环智能体（PRD、设计、计划、编码）：角色-评论者模式用于优化
-- 检查智能体：验证实现
-- 交付智能体：完成交付物
+### 流程域
+七阶段开发工作流，采用 Actor-Critic 模式：
+- **创意阶段**：捕获和结构化需求
+- **PRD 阶段**：使用 Actor-Critic 优化生成产品需求文档
+- **设计阶段**：使用 Actor-Critic 优化创建技术架构
+- **计划阶段**：使用 Actor-Critic 优化分解任务
+- **编码阶段**：使用 Actor-Critic 优化实现代码
+- **检查阶段**：验证质量和完整性
+- **交付阶段**：生成最终交付报告
 
 ### 工具模块
 通过工作空间验证的安全工具执行：
 - 项目边界内的文件操作
 - 带安全检查的命令执行
 - 人机交互验证的交互工具
+- 30+ ADK 工具用于文件、数据、验证和内存操作
 
 ### 持久化层
 数据管理和存储：
 - 迭代存储和检索
-- 制品管理
-- 配置持久化
+- 带版本控制的制品管理
+- 项目内存系统用于跨迭代知识保留
 
 # 🧠 工作原理
 
-Cowork Forge 使用基于迭代架构的多阶段工作流，由 `Pipeline` 编排系统管理：
+Cowork Forge 使用基于流程域的多阶段工作流，由 `Pipeline Controller` 编排系统管理：
 
 ```mermaid
 sequenceDiagram
     participant User as 用户
     participant CLI as Cowork Forge CLI
-    participant Pipeline as 流水线
-    participant Iteration as 迭代
+    participant Pipeline as 流程控制器
+    participant Stage as 阶段执行器
     participant Agents as AI 智能体
-    participant ADK as ADK 框架
     participant LLM as LLM API
-    participant FS as 文件系统
+    participant Store as 迭代存储
 
-    User->>CLI: 创建迭代或继续现有迭代
-    CLI->>Pipeline: 初始化流水线
-    Pipeline->>Iteration: 创建或加载迭代
-    Iteration->>Agents: 执行当前阶段智能体
+    User->>CLI: 提供想法/需求
+    CLI->>Pipeline: 初始化流程上下文
+    Pipeline->>Store: 创建起源/演进迭代
     
-    loop 每个阶段执行
-        Agents->>ADK: 准备智能体请求
-        ADK->>LLM: 发送请求
-        LLM-->>ADK: 返回响应
-        ADK-->>Agents: 处理响应
+    loop 每个阶段（7 阶段）
+        Pipeline->>Stage: 带上下文执行阶段
+        Stage->>Agents: 创建带指令的智能体
+        Agents->>LLM: 生成内容
+        LLM-->>Agents: 流式响应
         
-        alt 需要人工验证的阶段
+        alt 关键阶段（PRD/设计/计划/编码）
             Agents->>User: HITL 交互验证
-            User-->>Agents: 确认或提供反馈
+            User-->>Agents: 确认/编辑/反馈
         end
         
         alt 编码阶段
-            Agents->>FS: 验证文件路径安全性
-            Agents->>FS: 读取项目文件
-            Agents->>LLM: 请求生成代码
-            LLM-->>Agents: 返回代码变更计划
-            Agents->>User: HITL 验证代码计划
-            User-->>Agents: 确认或编辑
-            Agents->>FS: 应用代码变更
-            Agents->>ADK: 运行构建命令
-            ADK->>FS: 执行命令并返回结果
+            Agents->>Store: 读取项目文件
+            Agents->>LLM: 生成代码变更
+            LLM-->>Agents: 返回代码
+            Agents->>Store: 写入代码文件
+            Agents->>Store: 运行构建/测试命令
         end
         
-        Iteration->>Pipeline: 阶段完成，进入下一阶段
+        Stage->>Store: 持久化阶段工件
+        Pipeline->>Pipeline: 转换到下一阶段
     end
     
-    Iteration->>Agents: 执行最终交付智能体
-    Agents->>User: 展示交付报告
+    Pipeline->>Store: 更新迭代状态（已完成）
+    Pipeline->>Store: 生成知识快照
 ```
 
 ### 迭代生命周期
@@ -410,17 +414,29 @@ Cowork Forge 提供两种交互方式：命令行界面 (CLI) 和图形用户界
 
 ## 🖥️ Cowork CLI
 
-### 启动新的开发会话
+### 迭代管理
 
 ```sh
-# 使用想法启动新项目
-cowork new "构建任务管理应用的 REST API"
+# 初始化新项目
+cowork init --name "我的项目"
 
-# 使用配置文件启动
-cowork new "创建 Web 仪表板" --config ./config.toml
+# 创建新迭代（起源迭代）
+cowork iter --project "my-project" "构建任务管理 REST API"
 
-# 恢复现有项目
-cowork resume
+# 创建演进迭代
+cowork iter --project "my-project" --base iter-1 --inherit partial "添加用户资料"
+
+# 列出所有迭代
+cowork list
+
+# 查看迭代详情
+cowork show iter-1-1234567890
+
+# 继续已暂停的迭代
+cowork continue iter-1-1234567890
+
+# 检查状态
+cowork status
 ```
 
 ### 会话工作流

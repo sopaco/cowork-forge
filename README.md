@@ -179,7 +179,7 @@ Multi-layer security checks prevent:
 
 # 🏗️ Architecture
 
-Cowork Forge is built as a Rust workspace with modular, domain-driven architecture based on the adk-rust framework:
+Cowork Forge is built as a Rust workspace with modular, hexagonal architecture based on the adk-rust framework:
 
 ```mermaid
 graph TB
@@ -187,138 +187,144 @@ graph TB
         CLI[cowork-cli]
     end
     
-    subgraph "Core Library"
-        CORE[cowork-core]
+    subgraph "GUI Layer"
+        GUI[cowork-gui<br/>Tauri + React]
     end
     
-    subgraph "Core Modules"
-        AGENTS[Agents]
-        PIPELINE[Pipeline]
-        TOOLS[Tools]
-        PERSISTENCE[Persistence]
-        DOMAIN[Domain]
+    subgraph "cowork-core"
+        subgraph "Application Layer"
+            PIPELINE[Pipeline Domain<br/>7-Stage Orchestration]
+            INTERACTION[Interaction Domain<br/>Backend Abstraction]
+        end
+        
+        subgraph "Domain Layer"
+            DOMAIN[Domain Logic<br/>Project/Iteration/Memory]
+        end
+        
+        subgraph "Infrastructure Layer"
+            PERSISTENCE[Persistence<br/>JSON Stores]
+            LLM_INTEGRATION[LLM Integration<br/>Rate-Limited]
+            TOOLS[Tools Domain<br/>30+ ADK Tools]
+            SECURITY[Security<br/>Path Validation]
+        end
     end
     
     subgraph "ADK Framework"
-        ADK[adk-rust 0.2.1]
-        LLM[adk-model]
-    end
-    
-    subgraph "Infrastructure"
-        FS[File System]
-        CONFIG[Config]
-        INTERACTION[Interaction]
+        ADK[adk-rust]
+        AGENTS[Agent System]
     end
     
     subgraph "External"
-        OPENAI[OpenAI LLM]
-        EMBEDDING[Embedding API]
+        OPENAI[OpenAI Compatible<br/>LLM API]
+        FS[File System]
     end
     
-    CLI --> CORE
-    CORE --> AGENTS
-    CORE --> PIPELINE
-    CORE --> TOOLS
-    
-    AGENTS --> ADK
+    CLI --> INTERACTION
+    GUI --> INTERACTION
+    INTERACTION --> PIPELINE
     PIPELINE --> DOMAIN
+    DOMAIN --> PERSISTENCE
     TOOLS --> PERSISTENCE
-    
-    ADK --> LLM
-    LLM --> OPENAI
-    LLM --> EMBEDDING
-    
-    PIPELINE --> INTERACTION
+    AGENTS --> ADK
+    ADK --> LLM_INTEGRATION
+    LLM_INTEGRATION --> OPENAI
     TOOLS --> FS
-    CORE --> CONFIG
 ```
 
 ## Key Components
 
 ### Rust Workspace Structure
 The project is organized as a Rust workspace with multiple crates:
-- `cowork-core`: Core library with domain logic, agents, and tools
+- `cowork-core`: Core library with domain logic, pipeline orchestration, and tools
 - `cowork-cli`: Command-line interface for interacting with the system
-- `cowork-gui`: Optional graphical user interface (Tauri-based)
+- `cowork-gui`: Optional graphical user interface (Tauri + React based)
+
+### Hexagonal Architecture
+Cowork Forge implements a hexagonal (ports and adapters) architecture:
+- **Domain Layer**: Pure business logic (Project, Iteration, Memory aggregates)
+- **Application Layer**: Pipeline orchestration, stage execution
+- **Infrastructure Layer**: Persistence, LLM integration, tools
+- **Ports**: InteractiveBackend trait for CLI/GUI abstraction
 
 ### Iteration Architecture
 Core concept that manages complete development cycles as independent, inheritable units:
 - **Genesis Iterations**: Start new projects from scratch
 - **Evolution Iterations**: Build upon existing iterations with inheritance modes
-- **Inheritance Modes**: None (fresh start), Full (complete code copy), Partial (documents only)
+- **Inheritance Modes**: None (fresh start), Full (complete code + artifacts copy), Partial (artifacts only, regenerate code)
 
 ### ADK Framework Integration
-Built on the adk-rust framework (v0.2.1) providing:
-- Agent orchestration and management
-- LLM integration with OpenAI and custom providers
+Built on the adk-rust framework providing:
+- Agent orchestration and lifecycle management
+- LLM integration with OpenAI and compatible providers
 - Tool system for safe code operations
-- Built-in iteration support
+- Session management for stateful interactions
 
-### AI Agents
-Specialized agents using the adk-rust agent framework:
-- Idea Agent: Structures initial concepts
-- Loop Agents (PRD, Design, Plan, Coding): Actor-critic pattern for refinement
-- Check Agent: Validates implementation
-- Delivery Agent: Finalizes deliverables
+### Pipeline Domain
+Seven-stage development workflow with Actor-Critic pattern:
+- **Idea Stage**: Capture and structure requirements
+- **PRD Stage**: Generate product requirements with Actor-Critic refinement
+- **Design Stage**: Create technical architecture with Actor-Critic refinement
+- **Plan Stage**: Break down tasks with Actor-Critic refinement
+- **Coding Stage**: Implement code with Actor-Critic refinement
+- **Check Stage**: Verify quality and completeness
+- **Delivery Stage**: Generate final delivery report
 
 ### Tools Module
 Secure tool execution with workspace validation:
 - File operations within project boundaries
 - Command execution with safety checks
 - Interactive tools for human-in-the-loop validation
+- 30+ ADK tools for file, data, validation, and memory operations
 
 ### Persistence Layer
 Data management and storage:
 - Iteration storage and retrieval
-- Artifact management
-- Configuration persistence
+- Artifact management with versioning
+- Project memory system for cross-iteration knowledge retention
 
 # 🧠 How It Works
 
-Cowork Forge uses a sophisticated multi-stage workflow orchestrated by the `Orchestrator`:
+Cowork Forge uses a sophisticated multi-stage workflow orchestrated by the `Pipeline Controller`:
 
 ```mermaid
 sequenceDiagram
     participant User as User
     participant CLI as Cowork Forge CLI
-    participant Orch as Orchestrator
+    participant Pipeline as Pipeline Controller
+    participant Stage as Stage Executor
     participant Agents as AI Agents
-    participant LLM as OpenAI LLM
-    participant FS as File System
-    participant CMD as Command Line
+    participant LLM as LLM API
+    participant Store as Iteration Store
 
     User->>CLI: Provide idea/requirement
-    CLI->>Orch: Start new session
-    Orch->>Agents: Execute IdeaIntakeAgent
-    Agents->>LLM: Structure requirements
-    LLM-->>Agents: Return IdeaSpec
-    Agents->>User: HITL validation
-    User-->>Agents: Confirm/edit
+    CLI->>Pipeline: Initialize pipeline context
+    Pipeline->>Store: Create genesis/evolution iteration
     
-    loop For each stage
-        Orch->>Agents: Execute next agent
-        Agents->>LLM: Generate stage output
-        LLM-->>Agents: Return results
+    loop For each stage (7 stages)
+        Pipeline->>Stage: Execute stage with context
+        Stage->>Agents: Create agent with instructions
+        Agents->>LLM: Generate content
+        LLM-->>Agents: Stream response
         
-        alt Critical stage
+        alt Critical stage (PRD/Design/Plan/Coding)
             Agents->>User: HITL validation
-            User-->>Agents: Confirm/edit
+            User-->>Agents: Confirm/Edit/Feedback
         end
         
         alt Coding stage
-            Agents->>FS: Read project files
-            Agents->>LLM: Plan code changes
-            LLM-->>Agents: Return code plan
-            Agents->>User: HITL validation
-            User-->>Agents: Confirm plan
-            Agents->>FS: Write code changes
-            Agents->>CMD: Run build/test
-            CMD-->>Agents: Return results
+            Agents->>Store: Read project files
+            Agents->>LLM: Generate code changes
+            LLM-->>Agents: Return code
+            Agents->>Store: Write code files
+            Agents->>Store: Run build/test commands
         end
+        
+        Stage->>Store: Persist stage artifacts
+        Pipeline->>Pipeline: Transition to next stage
     end
     
-    Orch->>Agents: Execute DeliveryAgent
-    Agents->>User: Present delivery report
+    Pipeline->>Store: Update iteration status (Completed)
+    Pipeline->>Store: Generate knowledge snapshot
 ```
 
 # 🖥 Getting Started
@@ -375,10 +381,10 @@ Cowork Forge offers two ways to interact with your AI development team: the Comm
 cowork init --name "My Project"
 
 # Create a new iteration (Genesis)
-cowork iter --title "Build a REST API" --description "Task management API with authentication"
+cowork iter --project "my-project" "Build a REST API for task management"
 
 # Create an evolution iteration
-cowork iter --title "Add user profiles" --base iter-1-1234567890 --inherit partial
+cowork iter --project "my-project" --base iter-1 --inherit partial "Add user profiles"
 
 # List all iterations
 cowork list
@@ -544,46 +550,40 @@ graph TD
     subgraph "Workspace"
         CLI["cowork-cli"]
         CORE["cowork-core"]
-        GUI["cowork-gui (optional)"]
+        GUI["cowork-gui"]
     end
 
-    subgraph "Dependencies"
-        ADK["adk-rust 0.2.1"]
-        ADK_MODEL["adk-model 0.2.1"]
+    subgraph "ADK Framework"
+        ADK["adk-rust"]
     end
     
     subgraph "External Services"
-        LLM[("LLM API")]
-        EMBEDDING[("Embedding API")]
+        LLM[("LLM API<br/>OpenAI Compatible")]
         FS[("File System")]
     end
 
-    %% Define Dependencies
     CLI --> CORE
+    GUI --> CORE
     CORE --> ADK
-    CORE --> ADK_MODEL
-    
-    ADK_MODEL --> LLM
-    ADK_MODEL --> EMBEDDING
+    ADK --> LLM
     CORE --> FS
 ```
 
-- <strong>`cowork-core`</strong>: Core library containing domain logic, agent implementations, and iteration management.
+- <strong>`cowork-core`</strong>: Core library containing domain logic, pipeline orchestration, tools, and persistence.
 - <strong>`cowork-cli`</strong>: Command-line interface for iteration management and project interaction.
-- <strong>`cowork-gui`</strong>: Optional graphical user interface based on Tauri framework.
+- <strong>`cowork-gui`</strong>: Graphical user interface based on Tauri framework with React frontend.
 
 ### Core Modules
 
 <strong>cowork-core</strong> is organized into the following domain modules:
 
-- <strong>`pipeline`</strong>: Iteration pipeline orchestration managing iteration lifecycle and stage execution.
-- <strong>`agents`</strong>: Specialized AI agents built with adk-rust framework (Idea, PRD Loop, Design Loop, Plan Loop, Coding Loop, Check, Delivery).
-- <strong>`instructions`</strong>: Prompt templates for each agent using adk-rust instruction system.
-- <strong>`tools`</strong>: File operations and command execution with workspace validation and security checks.
-- <strong>`llm`</strong>: LLM integration layer using adk-model for OpenAI and custom providers.
-- <strong>`domain`</strong>: Core domain entities including Iteration, Project, and Stage definitions.
-- <strong>`persistence`</strong>: Iteration storage and retrieval system with inheritance support.
-- <strong>`tech_stack`</strong>: Technology stack detection and configuration management.
+- <strong>`pipeline`</strong>: 7-stage pipeline orchestration managing iteration lifecycle and stage execution.
+- <strong>`domain`</strong>: Core domain entities (Project, Iteration, Memory aggregates) with DDD patterns.
+- <strong>`persistence`</strong>: JSON-based storage with workspace isolation.
+- <strong>`tools`</strong>: 30+ ADK tools for file operations, command execution, and validation.
+- <strong>`llm`</strong>: LLM integration with rate limiting (30 req/min, concurrency=1).
+- <strong>`interaction`</strong>: InteractiveBackend trait for CLI/GUI abstraction.
+- <strong>`memory`</strong>: Project memory system for cross-iteration knowledge retention.
 
 
 # 🔒 Security
