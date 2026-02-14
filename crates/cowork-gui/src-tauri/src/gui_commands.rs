@@ -2,7 +2,6 @@
 use super::gui_types::FileReadResult;
 use super::gui_types::*;
 use crate::AppState;
-use crate::preview_server::PreviewServerManager;
 use crate::project_runner::ProjectRunner;
 use cowork_core::llm::config::LlmConfig;
 use cowork_core::persistence::IterationStore;
@@ -14,7 +13,6 @@ use tauri::{State, Window};
 
 // Global instances
 lazy_static::lazy_static! {
-    static ref PREVIEW_SERVER_MANAGER: PreviewServerManager = PreviewServerManager::new();
     static ref PROJECT_RUNNER: ProjectRunner = ProjectRunner::new();
     static ref RUNTIME_ANALYZER: std::sync::Mutex<Option<RuntimeAnalyzer>> = std::sync::Mutex::new(None);
 }
@@ -373,11 +371,13 @@ pub async fn check_preview_status(
         iteration_id
     );
 
-    if PREVIEW_SERVER_MANAGER.is_running(&iteration_id) {
-        Ok(PREVIEW_SERVER_MANAGER.get_info(&iteration_id))
-    } else {
-        Ok(None)
+    // Check if process is running via ProjectRunner
+    if PROJECT_RUNNER.is_running(&iteration_id) {
+        if let Some(info) = PROJECT_RUNNER.get_info(&iteration_id) {
+            return Ok(Some(info));
+        }
     }
+    Ok(None)
 }
 
 /// Install dependencies if package.json exists and node_modules is missing
@@ -439,7 +439,7 @@ pub async fn stop_iteration_preview(
     _state: State<'_, AppState>,
 ) -> Result<(), String> {
     println!("[GUI] Stopping preview for iteration: {}", iteration_id);
-    PREVIEW_SERVER_MANAGER.stop(iteration_id).await
+    PROJECT_RUNNER.stop(iteration_id).await
 }
 
 #[tauri::command]

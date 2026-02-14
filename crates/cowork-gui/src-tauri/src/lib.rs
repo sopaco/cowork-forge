@@ -13,7 +13,6 @@ use serde_json::Value;
 // GUI-specific modules
 mod gui_types;
 mod gui_commands;
-mod preview_server;
 mod project_runner;
 mod project_manager;
 mod iteration_commands;

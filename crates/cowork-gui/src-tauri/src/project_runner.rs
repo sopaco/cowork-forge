@@ -5,6 +5,9 @@ use tauri::Emitter;
 use tokio::process::{Child, Command};
 use tokio::sync::mpsc;
 
+// Import PreviewInfo from gui_types
+use super::gui_types::PreviewInfo;
+
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
@@ -293,6 +296,19 @@ impl ProjectRunner {
                 iteration_id
             );
             Ok(())
+        }
+    }
+
+    pub fn get_info(&self, iteration_id: &str) -> Option<PreviewInfo> {
+        // This is a stub implementation - ProjectRunner doesn't track URLs/ports
+        // The actual URL/port info should come from the start_iteration_preview command
+        // For now, return None to indicate we don't have the info
+        let processes = self.processes.lock().unwrap();
+        if processes.contains_key(iteration_id) {
+            // Return a basic PreviewInfo - the actual URL should be stored elsewhere
+            None
+        } else {
+            None
         }
     }
 }
