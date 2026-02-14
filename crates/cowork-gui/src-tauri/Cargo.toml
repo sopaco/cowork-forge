@@ -1,9 +1,9 @@
 [package]
 name = "cowork-gui"
-version = "0.1.0"
+version = "2.0.0"
 description = "Cowork Forge GUI"
 authors = ["cowork-forge"]
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "cowork_gui_lib"
@@ -47,4 +47,3 @@ adk-core = "0.2"
 adk-runner = "0.2"
 adk-session = "0.2"
 which = "8.0.0"
-
