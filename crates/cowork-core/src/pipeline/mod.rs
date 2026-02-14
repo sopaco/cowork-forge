@@ -21,6 +21,7 @@ pub enum StageResult {
     Failed(String),          // Error message
     Paused,                  // Waiting for human confirmation
     NeedsRevision(String),   // Needs revision with feedback
+    GotoStage(String, String), // (target_stage, reason) - Jump to another stage and continue from there
 }
 
 /// Pipeline context for stage execution

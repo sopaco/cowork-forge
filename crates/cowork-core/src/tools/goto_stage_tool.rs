@@ -89,11 +89,11 @@ impl Tool for GotoStageTool {
         save_session_meta(&meta)
             .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
 
-        Ok(json!({
-            "status": "restart_scheduled",
-            "stage": stage_str,
-            "reason": reason,
-            "message": format!("Pipeline will restart from {} stage. Feedback saved for incremental update.", stage_str)
-        }))
+        // Signal to stage executor that we need to jump to another stage
+        // This will be caught by the executor and trigger a proper stage transition
+        Err(adk_core::AdkError::Tool(format!(
+            "GOTO_STAGE:{}:{}",
+            stage_str, reason
+        )))
     }
 }

@@ -168,7 +168,29 @@ pub async fn execute_stage_with_instruction(
     ));
     let stream = match agent.run(invocation_ctx).await {
         Ok(s) => s,
-        Err(e) => return StageResult::Failed(format!("Agent execution failed: {}", e)),
+        Err(e) => {
+            let err_msg = format!("{}", e);
+            // Check if this is a goto_stage signal
+            if err_msg.starts_with("GOTO_STAGE:") {
+                // Parse the target stage and reason
+                let parts: Vec<&str> = err_msg.strip_prefix("GOTO_STAGE:").unwrap().splitn(2, ':').collect();
+                if parts.len() == 2 {
+                    let target_stage = parts[0].to_string();
+                    let reason = parts[1].to_string();
+                    
+                    interaction
+                        .show_message_with_context(
+                            crate::interaction::MessageLevel::Warning,
+                            format!("🔄 Stage jump requested: {} → {}", stage_name, target_stage),
+                            MessageContext::new(&display_name).with_stage(stage_name),
+                        )
+                        .await;
+                    
+                    return StageResult::GotoStage(target_stage, reason);
+                }
+            }
+            return StageResult::Failed(format!("Agent execution failed: {}", e));
+        }
     };
 
     let mut generated_text = String::new();

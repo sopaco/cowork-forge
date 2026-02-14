@@ -431,7 +431,7 @@ impl IterationExecutor {
         project: &mut Project,
         iteration_id: &str,
         resume_stage: Option<String>,
-        model: Option<Arc<dyn adk_core::Llm>>,
+        _model: Option<Arc<dyn adk_core::Llm>>,
     ) -> anyhow::Result<()> {
         // Load iteration
         let mut iteration = self.iteration_store.load(iteration_id)?;
@@ -440,7 +440,7 @@ impl IterationExecutor {
         let workspace = self.prepare_workspace(&iteration).await?;
 
         // Create pipeline context (clone workspace for later use in self-healing)
-        let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
+        let _ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
 
         // Determine starting stage
         // If resume_stage is provided (resuming from pause), use it
@@ -505,10 +505,26 @@ impl IterationExecutor {
 
         println!("[Executor] Starting stage execution loop...");
 
+        // Execute stages
+        self.execute_stages_from(project, &mut iteration, stages, workspace).await
+    }
+
+    /// Execute stages starting from a given list
+    /// This is used both for initial execution and for goto_stage jumps
+    async fn execute_stages_from(
+        &self,
+        project: &mut Project,
+        iteration: &mut Iteration,
+        stages: Vec<Box<dyn crate::pipeline::Stage>>,
+        workspace: std::path::PathBuf,
+    ) -> anyhow::Result<()> {
         // Execute stages with retry logic
         const MAX_STAGE_RETRIES: u32 = 3;
         const RETRY_DELAY_MS: u64 = 2000;
         let total_stages = stages.len();
+        
+        // Create pipeline context
+        let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
 
         for (stage_idx, stage) in stages.into_iter().enumerate() {
             let stage_name = stage.name().to_string();
@@ -520,7 +536,7 @@ impl IterationExecutor {
 
             println!(
                 "[Executor] Stage updated: {} (iteration: {})",
-                stage_name, iteration_id
+                stage_name, iteration.id
             );
 
             // Emit stage started event with progress info and agent context
@@ -576,6 +592,54 @@ impl IterationExecutor {
                     };
 
                     match result {
+                        StageResult::GotoStage(target_stage, reason) => {
+                            // Agent requested to jump to another stage
+                            self.interaction
+                                .show_message_with_context(
+                                    crate::interaction::MessageLevel::Warning,
+                                    format!(
+                                        "🔄 Stage jump requested: {} → {}\nReason: {}",
+                                        stage_name, target_stage, reason
+                                    ),
+                                    MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+                                )
+                                .await;
+
+                            // Clear current stage feedback
+                            if let Err(e) = crate::storage::clear_stage_feedback(&stage_name) {
+                                eprintln!(
+                                    "[Warning] Failed to clear feedback for stage '{}': {}",
+                                    stage_name, e
+                                );
+                            }
+
+                            // Update iteration to jump to target stage
+                            iteration.set_stage(&target_stage);
+                            self.iteration_store.save(&iteration)?;
+
+                            // Get new stages starting from target stage
+                            let new_stages = get_stages_from(&target_stage);
+                            
+                            self.interaction
+                                .show_message_with_context(
+                                    crate::interaction::MessageLevel::Info,
+                                    format!(
+                                        "Restarting pipeline from '{}' stage with {} stages to execute",
+                                        target_stage,
+                                        new_stages.len()
+                                    ),
+                                    MessageContext::new("Pipeline Controller"),
+                                )
+                                .await;
+
+                            // Execute new stages starting from target
+                            return Box::pin(self.execute_stages_from(
+                                project,
+                                iteration,
+                                new_stages,
+                                workspace.clone(),
+                            )).await;
+                        }
                         StageResult::Success(artifact_path) => {
                             // Artifacts validation check
                             let artifact_exists = if let Some(ref path) = artifact_path {
@@ -954,7 +1018,7 @@ impl IterationExecutor {
 
         // Promote insights to decisions (V2 architecture - memory elevation)
         let memory_store = crate::persistence::MemoryStore::new();
-        match memory_store.promote_insights_to_decisions(iteration_id) {
+        match memory_store.promote_insights_to_decisions(&iteration.id) {
             Ok(count) => {
                 if count > 0 {
                     println!(
@@ -975,54 +1039,8 @@ impl IterationExecutor {
             }
         }
 
-        // Generate iteration knowledge (new feature)
-        if let Some(ref model) = model {
-            println!("[Executor] Generating iteration knowledge...");
-            match self
-                .generate_document_summaries(&iteration, model.clone())
-                .await
-            {
-                Ok(_) => {
-                    match self
-                        .generate_iteration_knowledge(&iteration, model.clone())
-                        .await
-                    {
-                        Ok(_) => {
-                            println!("[Executor] Iteration knowledge generated successfully");
-                            self.interaction
-                                .show_message_with_context(
-                                    crate::interaction::MessageLevel::Info,
-                                    "Project knowledge has been generated and saved.".to_string(),
-                                    MessageContext::new("Knowledge System"),
-                                )
-                                .await;
-                        }
-                        Err(e) => {
-                            println!(
-                                "[Executor] Warning: Failed to generate iteration knowledge: {}",
-                                e
-                            );
-                            self.interaction
-                                .show_message_with_context(
-                                    crate::interaction::MessageLevel::Warning,
-                                    format!("Knowledge generation completed with warnings: {}", e),
-                                    MessageContext::new("Knowledge System"),
-                                )
-                                .await;
-                        }
-                    }
-                }
-                Err(e) => {
-                    println!(
-                        "[Executor] Warning: Failed to generate document summaries: {}",
-                        e
-                    );
-                }
-            }
-        }
-
         // Update project
-        project.current_iteration_id = Some(iteration_id.to_string());
+        project.current_iteration_id = Some(iteration.id.clone());
         self.project_store.save(project)?;
 
         self.interaction
