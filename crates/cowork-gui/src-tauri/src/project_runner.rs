@@ -65,19 +65,14 @@ impl ProjectRunner {
 
         #[cfg(target_os = "windows")]
         let mut child = {
-            let mut cmd = std::process::Command::new("cmd");
+            let mut cmd = tokio::process::Command::new("cmd");
             cmd.args(["/C", &command])
                 .current_dir(&code_path)
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::piped())
                 .creation_flags(0x08000000); // CREATE_NO_WINDOW
 
-            // Convert std::process::Command to tokio::process::Command
-            let std_child = cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?;
-
-            // Convert to tokio child
-            let pid = std_child.id();
-            tokio::process::Child::from(std_child)
+            cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
         };
 
         #[cfg(not(target_os = "windows"))]
