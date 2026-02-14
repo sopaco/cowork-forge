@@ -5,6 +5,9 @@ use tokio::process::{Command, Child};
 use tokio::sync::mpsc;
 use tauri::Emitter;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 pub struct ProjectRunner {
     processes: Arc<Mutex<HashMap<String, ProjectProcess>>>,
     app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
@@ -48,12 +51,30 @@ impl ProjectRunner {
 
         println!("[Runner] Starting command: {} in {}", command, code_dir);
 
-        let mut child = Command::new("cmd")
-            .args(["/C", &command])
+        #[cfg(target_os = "windows")]
+        let mut child = {
+            let mut cmd = std::process::Command::new("cmd");
+            cmd.args(["/C", &command])
+                .current_dir(&code_path)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .creation_flags(0x08000000); // CREATE_NO_WINDOW
+            
+            // Convert std::process::Command to tokio::process::Command
+            let std_child = cmd.spawn()
+                .map_err(|e| format!("Failed to start: {}", e))?;
+            
+            // Convert to tokio child
+            let pid = std_child.id();
+            tokio::process::Child::from(std_child)
+        };
+
+        #[cfg(not(target_os = "windows"))]
+        let mut child = Command::new("sh")
+            .args(["-c", &command])
             .current_dir(&code_path)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
-            .creation_flags(0x08000000) // CREATE_NO_WINDOW
             .spawn()
             .map_err(|e| format!("Failed to start: {}", e))?;
 
@@ -158,11 +179,11 @@ impl ProjectRunner {
                         
                         // Emit error event
                         if let Some(ref handle) = app_handle_stderr {
-                            if let Err(e) = handle.emit("process_error", serde_json::json!({
+                            if let Err(emit_err) = handle.emit("process_error", serde_json::json!({
                                 "iteration_id": iteration_id_clone,
                                 "error": e.to_string()
                             })) {
-                                eprintln!("[Runner] Failed to emit process_error event: {}", e);
+                                eprintln!("[Runner] Failed to emit process_error event: {}", emit_err);
                             }
                         }
                         break;
@@ -250,14 +271,34 @@ impl ProjectRunner {
             return Err(format!("Project directory not found: {}", project_root.display()));
         }
 
-        let output = Command::new("cmd")
-            .args(["/C", &command])
-            .current_dir(&project_root)
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .creation_flags(0x08000000) // CREATE_NO_WINDOW
-            .output()
-            .await;
+        #[cfg(target_os = "windows")]
+        let output = {
+            let mut cmd = std::process::Command::new("cmd");
+            cmd.args(["/C", &command])
+                .current_dir(&project_root)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .creation_flags(0x08000000); // CREATE_NO_WINDOW
+            
+            let std_output = cmd.output()
+                .map_err(|e| format!("Failed to execute command: {}", e))?;
+            
+            // Convert std::process::Output to compatible format
+            Ok::<_, String>(std_output)
+        };
+
+        #[cfg(not(target_os = "windows"))]
+        let output = {
+            let std_output = std::process::Command::new("sh")
+                .args(["-c", &command])
+                .current_dir(&project_root)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .output()
+                .map_err(|e| format!("Failed to execute command: {}", e))?;
+            
+            Ok::<_, String>(std_output)
+        };
 
         match output {
             Ok(output) => {
