@@ -9,11 +9,11 @@ description = "AI-powered software development system - Core library with adk-ru
 
 [dependencies]
 # ADK Rust framework (CRITICAL: Keep version at 0.2.1)
-adk-rust = "0.2.1"
-adk-core = "0.2.1"
-adk-agent = "0.2.1"
-adk-model = { version = "0.2.1", features = ["openai"] }
-adk-tool = "0.2.1"
+adk-rust = { workspace = true }
+adk-core = { workspace = true }
+adk-agent = { workspace = true }
+adk-model = { workspace = true, features = ["openai"] }
+adk-tool = { workspace = true }
 
 # Async runtime
 tokio = { workspace = true }
@@ -44,17 +44,20 @@ walkdir = { workspace = true }
 ignore = { workspace = true }
 
 # HTTP client (for custom LLM provider)
-reqwest = { version = "0.12", features = ["json", "stream"] }
+reqwest = { version = "0.13", features = ["json", "stream"] }
 
 # CLI interaction (for HITL tools)
 dialoguer = { workspace = true }
 console = { workspace = true }
 
-[dev-dependencies]
-tempfile = "3.8"
-
-# JSON Schema (must match adk-tool version)
-schemars = "0.8"
+# Global state for InteractiveBackend
+once_cell = "1.21"
 
 # Regex for validation
 regex = "1"
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+# JSON Schema (must match adk-tool version)
+schemars = "1.0"

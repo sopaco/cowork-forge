@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/cowork-core",
     "crates/cowork-cli",
+    "crates/cowork-gui/src-tauri",
 ]
 
 [workspace.package]
@@ -14,8 +15,13 @@ repository = "https://github.com/sopaco/cowork-forge"
 
 [workspace.dependencies]
 # ADK Rust framework
-adk-rust = "0.2.1"
-adk-model = { version = "0.2.1", features = ["openai"] }
+adk-rust = "0.3.0"
+adk-core = "0.3.0"
+adk-agent = "0.3.0"
+adk-model = { version = "0.3.0", features = ["openai"] }
+adk-tool = "0.3.0"
+adk-runner = "0.3.0"
+adk-session = "0.3.0"
 
 # Core dependencies
 tokio = { version = "1", features = ["full"] }
@@ -25,7 +31,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # Configuration
-toml = "0.9"
+toml = "1.0"
 
 # CLI dependencies
 clap = { version = "4", features = ["derive"] }
@@ -41,6 +47,7 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 
 # File and path
+dirs = "6"
 walkdir = "2"
 ignore = "0.4"
 

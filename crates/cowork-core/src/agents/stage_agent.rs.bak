@@ -1,0 +1,213 @@
+// Stage Agent - Generic agent framework using adk-rust's LlmAgentBuilder
+//
+// This module provides a unified framework for executing pipeline stages with:
+// - Stage-specific instructions loaded from instruction modules
+// - Tool support (Memory, File operations, HITL) via adk-rust's tool system
+// - Actor-Critic loop using adk-rust's LoopAgent
+// - Integration with adk-rust's Agent framework
+
+use std::sync::Arc;
+
+use crate::interaction::InteractiveBackend;
+use crate::llm::{create_llm_client, ModelConfig};
+use crate::persistence::MemoryStore;
+use crate::domain::{MemoryQuery, MemoryScope, MemoryQueryType};
+use adk_core::{Content, LlmRequest, Llm};
+use futures::StreamExt;
+
+/// Configuration for creating a stage agent
+#[derive(Clone)]
+pub struct StageAgentConfig {
+    pub stage_name: String,
+    pub instruction: String,
+    pub iteration_id: String,
+    pub enable_memory: bool,
+    pub enable_file_operations: bool,
+    pub enable_critic_loop: bool,
+    pub max_critic_iterations: usize,
+}
+
+impl Default for StageAgentConfig {
+    fn default() -> Self {
+        Self {
+            stage_name: String::new(),
+            instruction: String::new(),
+            iteration_id: String::new(),
+            enable_memory: true,
+            enable_file_operations: true,
+            enable_critic_loop: true,
+            max_critic_iterations: 3,
+        }
+    }
+}
+
+/// Stage Agent - Executes stage using adk-rust's LlmAgentBuilder
+pub struct StageAgent;
+
+impl StageAgent {
+/// Execute a stage with instruction
+    pub async fn execute_stage(
+        config: &StageAgentConfig,
+        interaction: Arc<dyn InteractiveBackend>,
+    ) -> Result<String, String> {
+        // Load LLM client
+        let llm_config = Self::load_config()
+            .map_err(|e| format!("Failed to load config: {}", e))?;
+        let llm_client = create_llm_client(&llm_config.llm)
+            .map_err(|e| format!("Failed to create LLM client: {}", e))?;
+
+        // Prepare enhanced instruction with tool context
+        let enhanced_instruction = Self::prepare_enhanced_instruction(config)?;
+
+        // Execute with critic loop
+        let mut output = String::new();
+        let mut iteration_count = 0;
+
+        loop {
+            iteration_count += 1;
+
+            interaction.show_message(
+                crate::interaction::MessageLevel::Info,
+                format!("Agent iteration {}/{}", iteration_count, config.max_critic_iterations),
+            ).await;
+
+            // Build prompt
+            let prompt = Self::build_prompt(&enhanced_instruction, &output, iteration_count > 1);
+
+            // Call LLM
+            let llm_output = Self::call_llm(&llm_client, &prompt, &llm_config.llm.model_name).await?;
+            output = llm_output;
+
+            // Check if critic loop is enabled and we haven't reached max iterations
+            if !config.enable_critic_loop || iteration_count >= config.max_critic_iterations {
+                break;
+            }
+
+            // Run critic evaluation
+            let should_continue = Self::run_critic_evaluation(&output, interaction.clone()).await?;
+            if !should_continue {
+                interaction.show_message(
+                    crate::interaction::MessageLevel::Success,
+                    "Quality check passed, agent execution complete".to_string(),
+                ).await;
+                break;
+            }
+
+            interaction.show_message(
+                crate::interaction::MessageLevel::Info,
+                "Critic evaluation identified issues, refining...".to_string(),
+            ).await;
+        }
+
+        Ok(output)
+    }
+
+    /// Build tool usage guidance
+    fn build_tool_guidance(config: &StageAgentConfig) -> String {
+        let mut guidance = "\n\n# Available Tools\n".to_string();
+
+        if config.enable_memory {
+            guidance.push_str("## Memory Tools\n");
+            guidance.push_str("- **query_memory**: Query project and iteration memory for context\n");
+            guidance.push_str("- **save_insight**: Save important insights and learnings\n");
+            guidance.push_str("- **save_issue**: Save issues or problems encountered\n");
+            guidance.push_str("- **promote_to_decision**: Promote insights to project-level decisions\n");
+            guidance.push_str("- **promote_to_pattern**: Promote learnings to project-level patterns\n\n");
+        }
+
+        if config.enable_file_operations {
+            guidance.push_str("## File Operation Tools\n");
+            guidance.push_str("- **read_file**: Read file contents\n");
+            guidance.push_str("- **write_file**: Write or update files\n");
+            guidance.push_str("- **list_files**: List files in a directory\n\n");
+        }
+
+        guidance.push_str("## Interaction Tools\n");
+        guidance.push_str("- **review_and_edit_file**: Request human review and editing of files\n");
+        guidance.push_str("- **review_with_feedback**: Request human feedback on content\n\n");
+
+        guidance.push_str("# Tool Usage\n");
+        guidance.push_str("You can use tools by calling them in your response. ");
+        guidance.push_str("The tool system will automatically execute the tool and provide the result.\n");
+
+        guidance
+    }
+
+    /// Build memory context
+    fn build_memory_context(config: &StageAgentConfig) -> Result<String, String> {
+        let memory_store = MemoryStore::new();
+
+        // Query relevant memory
+        let query = crate::domain::MemoryQuery {
+            scope: crate::domain::MemoryScope::Smart,
+            query_type: crate::domain::MemoryQueryType::All,
+            keywords: vec![config.stage_name.clone()],
+            limit: Some(10),
+        };
+
+        let memory_result = memory_store.query(&query, Some(&config.iteration_id));
+        let context = match memory_result {
+            Ok(result) => {
+                let mut context = "\n\n# Relevant Memory\n".to_string();
+                if !result.decisions.is_empty() {
+                    context.push_str("## Decisions\n");
+                    for decision in result.decisions {
+                        context.push_str(&format!("- {}: {}\n", decision.title, decision.decision));
+                    }
+                }
+                if !result.patterns.is_empty() {
+                    context.push_str("\n## Patterns\n");
+                    for pattern in result.patterns {
+                        context.push_str(&format!("- {}: {}\n", pattern.name, pattern.description));
+                    }
+                }
+                if !result.insights.is_empty() {
+                    context.push_str("## Insights\n");
+                    for insight in result.insights {
+                        context.push_str(&format!("- [{}] {}\n", insight.stage, insight.content));
+                    }
+                }
+                context
+            }
+            Err(_) => "\n\n# Relevant Memory\n(No memory available)\n".to_string(),
+        };
+
+        Ok(context)
+    }
+}
+
+/// Load config from file or environment
+fn load_config() -> Result<ModelConfig, String> {
+    use std::path::Path;
+
+    // Try loading from config.toml
+    if Path::new("config.toml").exists() {
+        ModelConfig::from_file("config.toml")
+            .map_err(|e| format!("Failed to load config: {}", e))
+    } else if let Ok(exe_path) = std::env::current_exe() {
+        let exe_dir = exe_path.parent().unwrap_or(&exe_path);
+        let config_path = exe_dir.join("config.toml");
+        if config_path.exists() {
+            ModelConfig::from_file(config_path.to_str().unwrap())
+                .map_err(|e| format!("Failed to load config: {}", e))
+        } else {
+            ModelConfig::from_env()
+                .map_err(|e| format!("Failed to load config from env: {}", e))
+        }
+    } else {
+        ModelConfig::from_env()
+            .map_err(|e| format!("Failed to load config from env: {}", e))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_simple_context() {
+        let context = SimpleInvocationContext::new();
+        // Just verify it compiles
+        assert!(true);
+    }
+}

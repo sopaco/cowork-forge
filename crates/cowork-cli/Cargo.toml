@@ -16,14 +16,14 @@ path = "src/main.rs"
 cowork-core = { path = "../cowork-core" }
 
 # ADK Runner
-adk-runner = "0.2.1"
-adk-session = "0.2.1"
-adk-core = "0.2.1"
+adk-core = { workspace = true }
+adk-runner = { workspace = true }
+adk-session = { workspace = true }
 
 # CLI
 clap = { workspace = true }
-dialoguer = "0.12"
-console = "0.16"
+dialoguer = { workspace = true }
+console = { workspace = true }
 
 # Error handling
 anyhow = { workspace = true }
@@ -31,7 +31,7 @@ thiserror = { workspace = true }
 
 # Async runtime
 tokio = { workspace = true }
-futures = "0.3"
+futures = { workspace = true }
 
 # Serialization
 serde = { workspace = true }
@@ -51,5 +51,5 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 chrono = { workspace = true }
 
 # File system
-walkdir = "2.5"
-dirs = "6.0"
+walkdir = { workspace = true }
+dirs = { workspace = true }

@@ -216,6 +216,8 @@ pub struct CodeMetadata {
     pub files: Vec<FileMetadata>,
     pub build_status: BuildStatus,
     pub test_status: TestStatus,
+    pub readme_path: Option<String>,
+    pub project_type: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -257,12 +259,12 @@ pub struct TestDetail {
 }
 
 // ============================================================================
-// Session Meta (session/meta.json)
+// Session Meta (iteration session/meta.json)
 // ============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionMeta {
-    pub session_id: String,
+    pub session_id: String,  // Agent execution session ID (same as iteration_id in V2)
     pub created_at: DateTime<Utc>,
     pub current_stage: Option<Stage>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -292,6 +294,7 @@ pub struct FeedbackHistory {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Feedback {
+    pub stage: String,  // 标识反馈来自哪个阶段 (idea, prd, design, plan, coding, check, delivery)
     pub feedback_type: FeedbackType,
     pub severity: Severity,
     pub details: String,
@@ -318,214 +321,8 @@ pub enum Severity {
 }
 
 // ============================================================================
-// Session-scoped Models (for session isolation)
-// ============================================================================
-
-/// Project index - tracks all sessions and current state
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectIndex {
-    pub schema_version: String,
-    pub project_name: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    /// The latest successful session (for modify to use as base)
-    pub latest_successful_session: Option<String>,
-    /// All session records
-    pub sessions: Vec<SessionRecord>,
-}
-
-/// Record of a single session (new/modify/revert execution)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionRecord {
-    pub session_id: String,
-    pub session_type: SessionType,
-    pub created_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
-    pub status: SessionStatus,
-    /// For modify sessions: which session is the base
-    pub base_session_id: Option<String>,
-    /// Input description (idea for new, change request for modify)
-    pub input_description: String,
-    /// Change request (only for modify sessions)
-    pub change_request_id: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum SessionType {
-    New,      // Full project creation (new command)
-    Modify,   // Incremental change (modify command)
-    Revert,   // Revert and rerun (revert command)
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum SessionStatus {
-    InProgress,
-    Completed,
-    Failed,
-}
-
-/// Change request - describes an incremental modification
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChangeRequest {
-    pub id: String,
-    pub session_id: String,
-    pub created_at: DateTime<Utc>,
-    /// User's idea/description of the change
-    pub idea: String,
-    /// Which session to use as baseline
-    pub base_session_id: String,
-    /// Automatically determined scope (which artifacts need update)
-    pub scope: ChangeScope,
-    /// Acceptance criteria extracted from idea
-    pub acceptance_criteria: Vec<String>,
-    /// Constraints (e.g., don't break existing features)
-    pub constraints: Vec<String>,
-    /// Analysis result from triage agent
-    pub analysis: Option<ChangeAnalysis>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChangeScope {
-    pub requires_prd_update: bool,
-    pub requires_design_update: bool,
-    pub requires_plan_update: bool,
-    pub requires_code_change: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChangeAnalysis {
-    /// Affected components
-    pub affected_components: Vec<String>,
-    /// Affected features
-    pub affected_features: Vec<String>,
-    /// Risk assessment
-    pub risk_level: RiskLevel,
-    /// Estimated effort
-    pub estimated_effort: String,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum RiskLevel {
-    Low,
-    Medium,
-    High,
-}
-
-/// Patch metadata - tracks what changed in a modify session
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PatchMetadata {
-    pub session_id: String,
-    pub base_session_id: String,
-    pub created_at: DateTime<Utc>,
-    /// Files added
-    pub added_files: Vec<String>,
-    /// Files modified
-    pub modified_files: Vec<String>,
-    /// Files deleted
-    pub deleted_files: Vec<String>,
-    /// Artifact updates
-    pub artifact_updates: Vec<ArtifactUpdate>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ArtifactUpdate {
-    pub artifact_type: ArtifactType,
-    pub change_type: ChangeType,
-    pub summary: String,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ArtifactType {
-    Requirements,
-    Features,
-    Design,
-    Plan,
-    Code,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ChangeType {
-    Added,
-    Modified,
-    Deleted,
-}
-
-// ============================================================================
 // Helper implementations
 // ============================================================================
-
-impl ProjectIndex {
-    pub fn new(project_name: String) -> Self {
-        Self {
-            schema_version: "2.0".to_string(),
-            project_name,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            latest_successful_session: None,
-            sessions: Vec::new(),
-        }
-    }
-
-    pub fn add_session(&mut self, record: SessionRecord) {
-        self.sessions.push(record);
-        self.updated_at = Utc::now();
-    }
-
-    pub fn update_latest_successful(&mut self, session_id: String) {
-        self.latest_successful_session = Some(session_id);
-        self.updated_at = Utc::now();
-    }
-}
-
-impl ChangeRequest {
-    pub fn new(
-        session_id: String,
-        idea: String,
-        base_session_id: String,
-    ) -> Self {
-        Self {
-            id: format!("CR-{}", Utc::now().timestamp()),
-            session_id,
-            created_at: Utc::now(),
-            idea,
-            base_session_id,
-            scope: ChangeScope::default(),
-            acceptance_criteria: Vec::new(),
-            constraints: Vec::new(),
-            analysis: None,
-        }
-    }
-}
-
-impl Default for ChangeScope {
-    fn default() -> Self {
-        Self {
-            requires_prd_update: false,
-            requires_design_update: false,
-            requires_plan_update: false,
-            requires_code_change: true, // Default to code-only change
-        }
-    }
-}
-
-impl PatchMetadata {
-    pub fn new(session_id: String, base_session_id: String) -> Self {
-        Self {
-            session_id,
-            base_session_id,
-            created_at: Utc::now(),
-            added_files: Vec::new(),
-            modified_files: Vec::new(),
-            deleted_files: Vec::new(),
-            artifact_updates: Vec::new(),
-        }
-    }
-}
 
 impl Requirements {
     pub fn new() -> Self {
@@ -595,6 +392,8 @@ impl CodeMetadata {
                 failed: 0,
                 details: Vec::new(),
             },
+            readme_path: None,
+            project_type: "Unknown".to_string(),
         }
     }
 }

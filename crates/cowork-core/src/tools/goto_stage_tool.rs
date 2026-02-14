@@ -1,20 +1,13 @@
-// Goto Stage tool for Check Agent (Session-scoped)
+// Goto Stage tool for Check Agent
 use crate::data::*;
 use crate::storage::*;
 use adk_core::{Tool, ToolContext};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::sync::Arc;
+use super::get_required_string_param;
 
-pub struct GotoStageTool {
-    session_id: String,
-}
-
-impl GotoStageTool {
-    pub fn new(session_id: String) -> Self {
-        Self { session_id }
-    }
-}
+pub struct GotoStageTool;
 
 #[async_trait]
 impl Tool for GotoStageTool {
@@ -46,8 +39,8 @@ impl Tool for GotoStageTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let stage_str = args["stage"].as_str().unwrap();
-        let reason = args["reason"].as_str().unwrap();
+        let stage_str = get_required_string_param(&args, "stage")?;
+        let reason = get_required_string_param(&args, "reason")?;
 
         // Parse stage
         let stage = match stage_str {
@@ -63,11 +56,26 @@ impl Tool for GotoStageTool {
             }
         };
 
+        // Save detailed feedback to FeedbackHistory for incremental update support
+        let feedback = Feedback {
+            stage: stage_str.to_string(),  // 标识反馈来自当前 stage
+            feedback_type: FeedbackType::QualityIssue,
+            severity: Severity::Critical,
+            details: reason.to_string(),
+            suggested_fix: Some(format!("Restart from {} stage to address the issue", stage_str)),
+            timestamp: chrono::Utc::now(),
+        };
+
+        if let Err(e) = crate::storage::append_feedback(&feedback) {
+            // Log warning but don't fail the operation
+            eprintln!("[GotoStageTool] Warning: Failed to save feedback: {}", e);
+        }
+
         // Load or create session meta
-        let mut meta = load_session_meta(&self.session_id)
+        let mut meta = load_session_meta()
             .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?
             .unwrap_or_else(|| SessionMeta {
-                session_id: self.session_id.clone(),
+                session_id: uuid::Uuid::new_v4().to_string(),
                 created_at: chrono::Utc::now(),
                 current_stage: Some(Stage::Check),
                 restart_reason: None,
@@ -78,14 +86,14 @@ impl Tool for GotoStageTool {
         meta.restart_reason = Some(reason.to_string());
 
         // Save session meta
-        save_session_meta(&self.session_id, &meta)
+        save_session_meta(&meta)
             .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
 
-        Ok(json!({
-            "status": "restart_scheduled",
-            "stage": stage_str,
-            "reason": reason,
-            "message": format!("Pipeline will restart from {} stage. User should re-run with 'cowork revert --from {}' command.", stage_str, stage_str)
-        }))
+        // Signal to stage executor that we need to jump to another stage
+        // This will be caught by the executor and trigger a proper stage transition
+        Err(adk_core::AdkError::Tool(format!(
+            "GOTO_STAGE:{}:{}",
+            stage_str, reason
+        )))
     }
 }

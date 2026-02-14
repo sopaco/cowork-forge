@@ -1,0 +1,49 @@
+[package]
+name = "cowork-gui"
+version = "2.0.0"
+description = "Cowork Forge GUI"
+authors = ["cowork-forge"]
+edition = "2024"
+
+[lib]
+name = "cowork_gui_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync", "full"] }
+tokio-stream = "0.1"
+async-trait = "0.1"
+chrono = "0.4"
+anyhow = "1"
+futures = "0.3"
+
+# Preview server
+tiny_http = "0.12"
+attohttpc = "0.30"
+urlencoding = "2.1"
+
+# Global state
+lazy_static = "1.5"
+
+# Logging
+tracing = "0.1"
+
+# File system
+dirs = { workspace = true }
+
+# Cowork Core
+cowork-core = { path = "../../cowork-core" }
+
+# ADK (Agent Development Kit)
+adk-core = { workspace = true }
+adk-runner = { workspace = true }
+adk-session = { workspace = true }
+which = "8.0.0"

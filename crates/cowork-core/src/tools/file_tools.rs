@@ -1,72 +1,110 @@
-// File operation tools with SECURITY constraints
+// File operation tools with workspace support
+
 use adk_core::{Tool, ToolContext};
 use async_trait::async_trait;
-use serde_json::{json, Value};
-use std::sync::Arc;
+use serde_json::{Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use walkdir::WalkDir;
+
+use super::get_required_string_param;
+use crate::persistence::IterationStore;
+use crate::storage::get_iteration_id;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/// Helper function to strip UNC path prefix on Windows
+/// Windows uses \\?\ prefix for paths > 260 characters, but this can cause
+/// issues with path comparison. This function removes the prefix if present.
+pub fn strip_unc_prefix(path: &Path) -> PathBuf {
+    let path_str = path.display().to_string();
+    if path_str.starts_with(r"\\?\") {
+        PathBuf::from(&path_str[4..])
+    } else {
+        path.to_path_buf()
+    }
+}
 
 // ============================================================================
 // Security Helper - Path Validation
 // ============================================================================
 
-/// Validate that a path is safe to access
+/// Validate that a path is safe to access within a workspace
 /// Rules:
 /// 1. Must be relative path (no absolute paths like /tmp, C:\)
-/// 2. Must not escape current directory (no ..)
-/// 3. Must be within current working directory or .cowork
-fn validate_path_security(path: &str) -> Result<PathBuf, String> {
+/// 2. Must not escape workspace directory (no ..)
+/// 3. Must be within the provided workspace directory
+fn validate_path_security_within_workspace(
+    path: &str,
+    workspace_dir: &Path,
+) -> Result<PathBuf, String> {
     let path_obj = Path::new(path);
-    
+
+    // Rule 0: Reject empty or whitespace-only paths
+    let trimmed_path = path.trim();
+    if trimmed_path.is_empty() {
+        return Err(format!(
+            "Security: Empty path is not allowed. Path '{}' must be a valid relative path.",
+            path
+        ));
+    }
+
     // Rule 1: Reject absolute paths
     if path_obj.is_absolute() {
         return Err(format!(
-            "Security: Absolute paths are not allowed. Path '{}' must be relative to current directory.",
+            "Security: Absolute paths are not allowed. Path '{}' must be relative to workspace. Use relative paths like 'src/index.html' or 'components/Button.jsx'.",
             path
         ));
     }
-    
+
     // Rule 2: Reject parent directory access (..)
     if path.contains("..") {
         return Err(format!(
-            "Security: Parent directory access (..) is not allowed. Path: '{}'",
+            "Security: Parent directory access (..) is not allowed. Path: '{}'. Files must be within the iteration workspace directory.",
             path
         ));
     }
-    
-    // Rule 3: Canonicalize and verify it's within current directory
-    let current_dir = std::env::current_dir()
-        .map_err(|e| format!("Failed to get current directory: {}", e))?;
-    
-    // Normalize current_dir for consistent comparison (handle UNC paths on Windows)
-    // On Windows, canonicalize() may return \\?\ prefix paths
-    let normalized_current_dir = current_dir.canonicalize()
-        .unwrap_or_else(|_| current_dir.clone());
-    
-    let full_path = current_dir.join(path);
-    
-    // Canonicalize if path exists, otherwise just check the constructed path
-    let canonical_path = if full_path.exists() {
-        full_path.canonicalize()
-            .map_err(|e| format!("Failed to resolve path: {}", e))?
-    } else {
-        // For non-existent paths (e.g., files to be created), just verify parent
-        full_path
-    };
-    
-    // Verify the path is within current directory
-    // Use normalized paths for comparison to handle Windows UNC path prefixes
-    if !canonical_path.starts_with(&normalized_current_dir) {
+
+    // Rule 2.5: Warn about paths that might contain workspace directory
+    if path.contains(".cowork-v2") || path.contains("iterations") {
         return Err(format!(
-            "Security: Path escapes current directory. Path '{}' resolves to '{}', expected to be within '{}'",
-            path,
-            canonical_path.display(),
-            normalized_current_dir.display()
+            "Security: Path '{}' appears to contain workspace directory structure. Use relative paths within workspace only (e.g., 'src/index.html' instead of '.cowork-v2/iterations/iter-X/workspace/src/index.html').",
+            path
         ));
     }
-    
-    Ok(canonical_path)
+
+    // CRITICAL: workspace_dir might be relative (e.g., ".cowork-v2/...")
+    // We need to canonicalize it to get the absolute path for comparison
+    let workspace_dir_absolute = workspace_dir
+        .canonicalize()
+        .map_err(|e| format!("Failed to canonicalize workspace directory: {}", e))?;
+
+    // Construct the absolute path of full_path
+    // Since full_path might not exist, we construct it by joining workspace_dir_absolute with the relative path
+    let full_path_absolute = workspace_dir_absolute.join(path);
+
+    // Verify the full_path is within workspace_dir_absolute
+    // Strip UNC prefixes for comparison
+    let full_path_stripped = strip_unc_prefix(&full_path_absolute);
+    let workspace_stripped = strip_unc_prefix(&workspace_dir_absolute);
+
+    if !full_path_stripped.starts_with(&workspace_stripped) {
+        return Err(format!(
+            "Security: Path escapes workspace directory. Path '{}' resolves to '{}', expected to be within workspace: '{}'",
+            path,
+            full_path_stripped.display(),
+            workspace_stripped.display()
+        ));
+    }
+
+    // Return the original path (relative to workspace)
+
+    // The caller will join it with workspace_dir to get the full path
+
+    Ok(PathBuf::from(path))
 }
 
 // ============================================================================
@@ -108,33 +146,64 @@ impl Tool for ListFilesTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let path = args.get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or(".");
-        
-        // Security check
-        let safe_path = match validate_path_security(path) {
-            Ok(p) => p,
-            Err(e) => {
-                return Ok(json!({
-                    "status": "security_error",
-                    "message": e
-                }));
-            }
+        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+
+        // Get iteration workspace path
+        let iteration_id = get_iteration_id().ok_or_else(|| {
+            adk_core::AdkError::Tool(
+                "Iteration ID not set. Cannot list files without an active iteration.".to_string(),
+            )
+        })?;
+
+        let iteration_store = IterationStore::new();
+        let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
+            adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e))
+        })?;
+
+        // Ensure workspace exists
+        fs::create_dir_all(&workspace_dir)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to create workspace: {}", e)))?;
+
+        // Handle the case where Agent passes the workspace path itself
+        // If the path equals the workspace directory, treat it as "."
+        let path_str = path.trim();
+        let safe_path = if path_str == workspace_dir.display().to_string()
+            || path_str == workspace_dir.to_string_lossy().as_ref()
+        {
+            "."
+        } else if path_str.contains(".cowork-v2/iterations") && path_str.contains("workspace") {
+            // Agent might have passed the full workspace path, extract just "."
+            "."
+        } else {
+            path_str
         };
-        
-        let recursive = args.get("recursive")
+
+        // Security check - ensure path doesn't escape workspace
+        let validated_path =
+            match validate_path_security_within_workspace(&safe_path, &workspace_dir) {
+                Ok(p) => p,
+                Err(e) => {
+                    return Ok(json!({
+                        "status": "security_error",
+                        "message": e
+                    }));
+                }
+            };
+
+        // Construct full path in workspace
+        let full_path = workspace_dir.join(&validated_path);
+
+        let recursive = args
+            .get("recursive")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
-        
-        let max_depth = args.get("max_depth")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(3) as usize;
 
-        if !safe_path.exists() {
+        let max_depth = args.get("max_depth").and_then(|v| v.as_u64()).unwrap_or(3) as usize;
+
+        if !full_path.exists() {
             return Ok(json!({
                 "status": "error",
-                "message": format!("Path not found: {}", path)
+                "message": format!("Path not found: {} (in workspace: {})", path, iteration_id)
             }));
         }
 
@@ -143,10 +212,7 @@ impl Tool for ListFilesTool {
 
         if recursive {
             // Recursive listing with max depth
-            let cwd = std::env::current_dir()
-                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get current dir: {}", e)))?;
-
-            for entry in WalkDir::new(&safe_path)
+            for entry in WalkDir::new(&full_path)
                 .max_depth(max_depth)
                 .follow_links(false)
                 .into_iter()
@@ -161,8 +227,15 @@ impl Tool for ListFilesTool {
                 })
                 .filter_map(|e| e.ok())
             {
-                // Convert to relative path for stable ignore matching
-                let rel = entry.path().strip_prefix(&cwd).unwrap_or(entry.path());
+                // Convert to relative path (relative to workspace)
+                // Strip UNC prefixes for reliable comparison
+                let entry_path = entry.path();
+                let entry_path_stripped = strip_unc_prefix(entry_path);
+                let workspace_dir_stripped = strip_unc_prefix(&workspace_dir);
+
+                let rel = entry_path_stripped
+                    .strip_prefix(&workspace_dir_stripped)
+                    .unwrap_or(&entry_path_stripped);
                 let rel_str = rel.to_string_lossy();
                 let path_str = format!("./{}", rel_str.trim_start_matches("./"));
 
@@ -179,11 +252,9 @@ impl Tool for ListFilesTool {
             }
         } else {
             // Non-recursive listing
-            let cwd = std::env::current_dir()
-                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get current dir: {}", e)))?;
-
-            let entries = fs::read_dir(&safe_path)
-                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read directory: {}", e)))?;
+            let entries = fs::read_dir(&full_path).map_err(|e| {
+                adk_core::AdkError::Tool(format!("Failed to read directory: {}", e))
+            })?;
 
             for entry in entries {
                 let entry = entry.map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
@@ -196,7 +267,13 @@ impl Tool for ListFilesTool {
                 }
 
                 let full = entry.path().to_path_buf();
-                let rel = full.strip_prefix(&cwd).unwrap_or(&full);
+                // Strip UNC prefixes for reliable comparison
+                let full_stripped = strip_unc_prefix(&full);
+                let workspace_dir_stripped = strip_unc_prefix(&workspace_dir);
+
+                let rel = full_stripped
+                    .strip_prefix(&workspace_dir_stripped)
+                    .unwrap_or(&full_stripped);
                 let rel_str = rel.to_string_lossy();
                 let path_str = format!("./{}", rel_str.trim_start_matches("./"));
 
@@ -218,7 +295,8 @@ impl Tool for ListFilesTool {
             "files": files,
             "directories": directories,
             "total_files": files.len(),
-            "total_directories": directories.len()
+            "total_directories": directories.len(),
+            "workspace": workspace_dir.to_string_lossy().to_string()
         }))
     }
 }
@@ -236,11 +314,22 @@ fn should_ignore(path: &str) -> bool {
 
     // 2) Common ignore patterns
     let ignore_patterns = [
-        "./.git", "./target", "./node_modules", "./.cowork", "./.litho",
-        "./.idea", "./.vscode", "./dist", "./build", "./docs", "./tests",
-        "__tests__", "./.archived",
-        ".DS_Store", "Thumbs.db",
+        "./.git",
+        "./target",
+        "./node_modules",
+        "./.litho",
+        "./.idea",
+        "./.vscode",
+        "./dist",
+        "./build",
+        "./docs",
+        "./tests",
+        "__tests__",
+        "./.archived",
+        ".DS_Store",
+        "Thumbs.db",
     ];
+    // Note: .cowork-v2 is NOT ignored - it's the V2 architecture directory structure
 
     ignore_patterns.iter().any(|pattern| path.contains(pattern))
 }
@@ -276,10 +365,22 @@ impl Tool for ReadFileTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let path = args["path"].as_str().unwrap();
+        let path = get_required_string_param(&args, "path")?;
 
-        // Security check
-        let safe_path = match validate_path_security(path) {
+        // Get iteration workspace path
+        let iteration_id = get_iteration_id().ok_or_else(|| {
+            adk_core::AdkError::Tool(
+                "Iteration ID not set. Cannot read files without an active iteration.".to_string(),
+            )
+        })?;
+
+        let iteration_store = IterationStore::new();
+        let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
+            adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e))
+        })?;
+
+        // Security check - ensure path is within workspace
+        let safe_path = match validate_path_security_within_workspace(path, &workspace_dir) {
             Ok(p) => p,
             Err(e) => {
                 return Ok(json!({
@@ -289,18 +390,23 @@ impl Tool for ReadFileTool {
             }
         };
 
-        if !safe_path.exists() {
+        // Construct full path in workspace
+        let full_path = workspace_dir.join(&safe_path);
+
+        if !full_path.exists() {
             return Ok(json!({
                 "status": "error",
-                "message": format!("File not found: {}", path)
+                "message": format!("File not found: {} (in workspace: {})", path, iteration_id)
             }));
         }
-        
-        match fs::read_to_string(&safe_path) {
+
+        match fs::read_to_string(&full_path) {
             Ok(content) => Ok(json!({
                 "status": "success",
                 "path": path,
-                "content": content
+                "workspace_path": full_path.to_string_lossy().to_string(),
+                "content": content,
+                "workspace": workspace_dir.to_string_lossy().to_string()
             })),
             Err(e) => Ok(json!({
                 "status": "error",
@@ -345,13 +451,36 @@ impl Tool for WriteFileTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let path = args["path"].as_str().unwrap();
-        let content = args["content"].as_str().unwrap();
+        let path = get_required_string_param(&args, "path")?;
+        let content = get_required_string_param(&args, "content")?;
 
-        // Security check
-        let safe_path = match validate_path_security(path) {
+        // Notify tool call
+        super::notify_tool_call("write_file", &json!({"path": path}));
+
+        // Get iteration workspace path
+        let iteration_id = get_iteration_id().ok_or_else(|| {
+            adk_core::AdkError::Tool(
+                "Iteration ID not set. Cannot write files without an active iteration.".to_string(),
+            )
+        })?;
+
+        let iteration_store = IterationStore::new();
+        let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
+            adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e))
+        })?;
+
+        // Ensure workspace exists
+        fs::create_dir_all(&workspace_dir)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to create workspace: {}", e)))?;
+
+        // Security check - ensure path is within workspace
+        let safe_path = match validate_path_security_within_workspace(path, &workspace_dir) {
             Ok(p) => p,
             Err(e) => {
+                super::notify_tool_result(
+                    "write_file",
+                    &Err(adk_core::AdkError::Tool("security error".to_string())),
+                );
                 return Ok(json!({
                     "status": "security_error",
                     "message": e
@@ -359,26 +488,48 @@ impl Tool for WriteFileTool {
             }
         };
 
+        // Construct full path in workspace
+        let full_path = workspace_dir.join(&safe_path);
+
         // Create parent directories if needed
-        if let Some(parent) = safe_path.parent() {
+        if let Some(parent) = full_path.parent() {
             fs::create_dir_all(parent).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
         }
 
-        match fs::write(&safe_path, content) {
+        let result = match fs::write(&full_path, content) {
             Ok(_) => {
                 // Log file creation for user visibility
-                println!("📝 Writing file: {} ({} lines)", path, content.lines().count());
+                println!(
+                    "📝 Writing file: {} ({} lines) [iteration: {}]",
+                    path,
+                    content.lines().count(),
+                    iteration_id
+                );
                 Ok(json!({
                     "status": "success",
                     "path": path,
-                    "lines_written": content.lines().count()
+                    "workspace_path": full_path.to_string_lossy().to_string(),
+                    "lines_written": content.lines().count(),
+                    "workspace": workspace_dir.to_string_lossy().to_string()
                 }))
-            },
+            }
             Err(e) => Ok(json!({
                 "status": "error",
                 "message": format!("Failed to write file: {}", e)
             })),
+        };
+
+        // Notify tool result
+        if result.is_ok() {
+            super::notify_tool_result("write_file", &Ok(json!({"status": "success"})));
+        } else {
+            super::notify_tool_result(
+                "write_file",
+                &Err(adk_core::AdkError::Tool("error".to_string())),
+            );
         }
+
+        result
     }
 }
 
@@ -391,26 +542,28 @@ pub struct RunCommandTool;
 /// Detect if a command is a long-running service that would block execution
 fn is_blocking_service_command(command: &str) -> bool {
     let blocking_patterns = vec![
-        "http.server",      // python -m http.server
-        "npm run dev",      // npm dev server
-        "npm start",        // npm start
+        "http.server", // python -m http.server
+        "npm run dev", // npm dev server
+        "npm start",   // npm start
         "yarn dev",
         "yarn start",
         "pnpm dev",
         "pnpm start",
-        "uvicorn",          // Python ASGI server
-        "gunicorn",         // Python WSGI server
+        "uvicorn",  // Python ASGI server
+        "gunicorn", // Python WSGI server
         "flask run",
         "django runserver",
         "rails server",
-        "cargo run",        // Might be a server
-        "serve",            // serve package
+        "cargo run", // Might be a server
+        "serve",     // serve package
         "webpack-dev-server",
         "vite",
         "next dev",
     ];
 
-    blocking_patterns.iter().any(|pattern| command.contains(pattern))
+    blocking_patterns
+        .iter()
+        .any(|pattern| command.contains(pattern))
 }
 
 #[async_trait]
@@ -440,7 +593,7 @@ impl Tool for RunCommandTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let command = args["command"].as_str().unwrap();
+        let command = get_required_string_param(&args, "command")?;
 
         // Check if command would block
         if is_blocking_service_command(command) {
@@ -455,14 +608,26 @@ impl Tool for RunCommandTool {
             }));
         }
 
-        // Execute command with timeout
+        // Get iteration workspace path
+        let iteration_id = get_iteration_id().ok_or_else(|| {
+            adk_core::AdkError::Tool(
+                "Iteration ID not set. Cannot run command without an active iteration.".to_string(),
+            )
+        })?;
+
+        let iteration_store = IterationStore::new();
+        let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
+            adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e))
+        })?;
+
+        // Execute command with timeout in workspace directory
         let output = tokio::time::timeout(
             std::time::Duration::from_secs(30),
             tokio::process::Command::new("sh")
                 .arg("-c")
                 .arg(command)
-                .current_dir(std::env::current_dir().unwrap()) // Run in current dir
-                .output()
+                .current_dir(&workspace_dir) // Run in workspace
+                .output(),
         )
         .await;
 
@@ -475,41 +640,39 @@ impl Tool for RunCommandTool {
                     "status": if output.status.success() { "success" } else { "failed" },
                     "exit_code": output.status.code(),
                     "stdout": stdout,
-                    "stderr": stderr
+                    "stderr": stderr,
+                    "workspace": workspace_dir.to_string_lossy().to_string()
                 }))
             }
-            Ok(Err(e)) => {
-                Ok(json!({
-                    "status": "error",
-                    "message": format!("Failed to execute command: {}", e)
-                }))
-            }
-            Err(_) => {
-                Ok(json!({
-                    "status": "timeout",
-                    "message": "Command execution timeout (30s limit)"
-                }))
-            }
+            Ok(Err(e)) => Ok(json!({
+                "status": "error",
+                "message": format!("Failed to execute command: {}", e)
+            })),
+            Err(_) => Ok(json!({
+                "status": "timeout",
+                "message": "Command execution timeout (30s limit)"
+            })),
         }
     }
 }
 
 // ============================================================================
-// DeleteFileTool
+// ReadFileTruncatedTool - Smart truncated file reading for knowledge generation
 // ============================================================================
 
-pub struct DeleteFileTool;
+pub struct ReadFileTruncatedTool;
 
 #[async_trait]
-impl Tool for DeleteFileTool {
+impl Tool for ReadFileTruncatedTool {
     fn name(&self) -> &str {
-        "delete_file"
+        "read_file_truncated"
     }
 
     fn description(&self) -> &str {
-        "Delete a file from the project. \
-         SECURITY: Only works within current directory. \
-         Useful for removing deprecated or unused files during iterative changes."
+        "Read a file with intelligent truncation to prevent context overflow. \
+         This tool automatically summarizes large files and provides a structured output. \
+         Use this when you need to read files for knowledge generation but want to avoid \
+         excessive token consumption."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
@@ -518,7 +681,17 @@ impl Tool for DeleteFileTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "File path to delete (must be relative path within current directory)"
+                    "description": "Relative path to the file within workspace"
+                },
+                "max_chars": {
+                    "type": "number",
+                    "description": "Maximum characters to return (default: 2000)",
+                    "default": 2000
+                },
+                "prefer_structure": {
+                    "type": "boolean",
+                    "description": "If true, prefer structure over content for code files (default: true)",
+                    "default": true
                 }
             },
             "required": ["path"]
@@ -526,70 +699,111 @@ impl Tool for DeleteFileTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let path = args["path"].as_str().unwrap();
+        let path = get_required_string_param(&args, "path")?;
+        let max_chars = args
+            .get("max_chars")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(2000) as usize;
+        let prefer_structure = args
+            .get("prefer_structure")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
 
-        // Security check
-        let safe_path = match validate_path_security(path) {
-            Ok(p) => p,
-            Err(e) => {
-                return Ok(json!({
-                    "status": "security_error",
-                    "message": e
-                }));
-            }
+        // Get iteration workspace path
+        let iteration_id = get_iteration_id()
+            .ok_or_else(|| adk_core::AdkError::Tool("Iteration ID not set".to_string()))?;
+
+        let iteration_store = IterationStore::new();
+        let workspace_dir = iteration_store
+            .workspace_path(&iteration_id)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get workspace: {}", e)))?;
+
+        // Validate path security
+        let safe_path = validate_path_security_within_workspace(&path, &workspace_dir)
+            .map_err(|e| adk_core::AdkError::Tool(e))?;
+
+        // Construct full path in workspace
+        let full_path = workspace_dir.join(&safe_path);
+
+        // Read file content
+        let content = fs::read_to_string(&full_path)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read file: {}", e)))?;
+        let file_ext = full_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+
+        let is_code_file = matches!(
+            file_ext,
+            "rs" | "js" | "jsx" | "ts" | "tsx" | "py" | "java" | "go" | "cpp" | "c" | "h"
+        );
+
+        // Smart truncation based on file type and preferences
+        let truncated_content = if content.len() <= max_chars {
+            content.clone()
+        } else if is_code_file && prefer_structure {
+            // For code files, extract structure (functions, classes, etc.)
+            extract_code_structure(&content, max_chars, file_ext)
+        } else {
+            // For other files, simple truncation with context
+            truncate_with_context(&content, max_chars)
         };
 
-        // Check if file exists
-        if !safe_path.exists() {
-            return Ok(json!({
-                "status": "not_found",
-                "message": format!("File not found: {}", path)
-            }));
-        }
+        let total_chars = content.len();
+        let truncated = total_chars > max_chars;
 
-        // Check if it's a directory (we only delete files, not directories)
-        if safe_path.is_dir() {
-            return Ok(json!({
-                "status": "error",
-                "message": format!("Path '{}' is a directory. Use delete_directory for directories.", path)
-            }));
-        }
-
-        // Delete the file
-        match fs::remove_file(&safe_path) {
-            Ok(_) => {
-                // Log file deletion for user visibility
-                println!("🗑️  Deleted file: {}", path);
-                Ok(json!({
-                    "status": "success",
-                    "path": path,
-                    "message": format!("File '{}' deleted successfully", path)
-                }))
-            },
-            Err(e) => Ok(json!({
-                "status": "error",
-                "message": format!("Failed to delete file: {}", e)
-            })),
-        }
+        Ok(json!({
+            "path": path,
+            "file_size": total_chars,
+            "returned_size": truncated_content.len(),
+            "truncated": truncated,
+            "is_code_file": is_code_file,
+            "content": truncated_content,
+            "original_lines": content.lines().count(),
+            "returned_lines": truncated_content.lines().count()
+        }))
     }
 }
 
 // ============================================================================
-// DeleteDirectoryTool
+// ReadFileWithLimitTool - File reading with call count tracking
 // ============================================================================
 
-pub struct DeleteDirectoryTool;
+pub struct ReadFileWithLimitTool {
+    max_calls: usize,
+    call_count: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl ReadFileWithLimitTool {
+    pub fn new(max_calls: usize) -> Self {
+        Self {
+            max_calls,
+            call_count: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        }
+    }
+
+    pub fn reset(&self) {
+        self.call_count
+            .store(0, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    pub fn calls_remaining(&self) -> usize {
+        let current = self.call_count.load(std::sync::atomic::Ordering::SeqCst);
+        if current >= self.max_calls {
+            0
+        } else {
+            self.max_calls - current
+        }
+    }
+}
 
 #[async_trait]
-impl Tool for DeleteDirectoryTool {
+impl Tool for ReadFileWithLimitTool {
     fn name(&self) -> &str {
-        "delete_directory"
+        "read_file_with_limit"
     }
 
     fn description(&self) -> &str {
-        "Delete a directory and all its contents recursively. \
-         SECURITY: Only works within current directory. \
-         WARNING: This operation is irreversible! Use with caution."
+        "Read a file with a call limit to prevent excessive file reading. \
+         This tool tracks the number of calls and enforces a maximum limit. \
+         Use this when you need to read multiple files but want to control token usage."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
@@ -598,7 +812,12 @@ impl Tool for DeleteDirectoryTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Directory path to delete (must be relative path within current directory)"
+                    "description": "Relative path to the file within workspace"
+                },
+                "max_chars": {
+                    "type": "number",
+                    "description": "Maximum characters to return (default: 3000)",
+                    "default": 3000
                 }
             },
             "required": ["path"]
@@ -606,50 +825,154 @@ impl Tool for DeleteDirectoryTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let path = args["path"].as_str().unwrap();
+        // Check call limit
+        let current_calls = self
+            .call_count
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-        // Security check
-        let safe_path = match validate_path_security(path) {
-            Ok(p) => p,
-            Err(e) => {
-                return Ok(json!({
-                    "status": "security_error",
-                    "message": e
-                }));
-            }
+        if current_calls >= self.max_calls {
+            return Ok(json!({
+                "status": "limit_exceeded",
+                "message": format!(
+                    "File reading limit exceeded (max {} calls). Please use the information you've already gathered.",
+                    self.max_calls
+                ),
+                "calls_made": current_calls + 1,
+                "max_calls": self.max_calls
+            }));
+        }
+
+        let path = get_required_string_param(&args, "path")?;
+        let max_chars = args
+            .get("max_chars")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(3000) as usize;
+
+        // Get iteration workspace path
+        let iteration_id = get_iteration_id()
+            .ok_or_else(|| adk_core::AdkError::Tool("Iteration ID not set".to_string()))?;
+
+        let iteration_store = IterationStore::new();
+        let workspace_dir = iteration_store
+            .workspace_path(&iteration_id)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get workspace: {}", e)))?;
+
+        // Validate path security
+        let safe_path = validate_path_security_within_workspace(&path, &workspace_dir)
+            .map_err(|e| adk_core::AdkError::Tool(e))?;
+
+        // Construct full path in workspace
+        let full_path = workspace_dir.join(&safe_path);
+
+        // Read file content
+        let content = fs::read_to_string(&full_path)
+            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read file: {}", e)))?;
+
+        // Smart truncation
+        let truncated_content = if content.len() <= max_chars {
+            content.clone()
+        } else {
+            truncate_with_context(&content, max_chars)
         };
 
-        // Check if directory exists
-        if !safe_path.exists() {
-            return Ok(json!({
-                "status": "not_found",
-                "message": format!("Directory not found: {}", path)
-            }));
+        Ok(json!({
+            "status": "success",
+            "path": path,
+            "file_size": content.len(),
+            "returned_size": truncated_content.len(),
+            "truncated": content.len() > max_chars,
+            "content": truncated_content,
+            "calls_remaining": self.max_calls - (current_calls + 1)
+        }))
+    }
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/// Extract code structure (functions, classes, etc.) instead of full content
+fn extract_code_structure(content: &str, max_chars: usize, file_ext: &str) -> String {
+    let mut structure = String::new();
+
+    // Define patterns for different languages
+    let patterns = match file_ext {
+        "rs" => vec![
+            (r"(?m)^(pub )?(async )?fn \w+.*?\{", "Function"),
+            (r"(?m)^pub (struct|enum|trait) \w+", "Type"),
+            (r"(?m)^impl \w+", "Implementation"),
+        ],
+        "js" | "jsx" | "ts" | "tsx" => vec![
+            (r"(?m)^(export )?(async )?function \w+.*?\{", "Function"),
+            (
+                r"(?m)^(export )?(const|let|var) \w+.*?=.*=>",
+                "Arrow Function",
+            ),
+            (r"(?m)^class \w+", "Class"),
+            (r"(?m)^interface \w+", "Interface"),
+        ],
+        "py" => vec![
+            (r"(?m)^def \w+.*?\:", "Function"),
+            (r"(?m)^class \w+.*?\:", "Class"),
+        ],
+        _ => vec![],
+    };
+
+    let lines: Vec<&str> = content.lines().collect();
+    let mut char_count = 0;
+
+    for line in &lines {
+        // Check if line matches any pattern
+        let mut is_structure = false;
+        for (pattern, _) in &patterns {
+            if let Ok(re) = regex::Regex::new(pattern) {
+                if re.is_match(line) {
+                    is_structure = true;
+                    break;
+                }
+            }
         }
 
-        // Check if it's actually a directory
-        if !safe_path.is_dir() {
-            return Ok(json!({
-                "status": "error",
-                "message": format!("Path '{}' is a file. Use delete_file for files.", path)
-            }));
-        }
-
-        // Delete the directory recursively
-        match fs::remove_dir_all(&safe_path) {
-            Ok(_) => {
-                // Log directory deletion for user visibility
-                println!("🗑️  Deleted directory: {}", path);
-                Ok(json!({
-                    "status": "success",
-                    "path": path,
-                    "message": format!("Directory '{}' and all its contents deleted successfully", path)
-                }))
-            },
-            Err(e) => Ok(json!({
-                "status": "error",
-                "message": format!("Failed to delete directory: {}", e)
-            })),
+        // Include structure lines and important comments
+        if is_structure || line.trim().starts_with("//") || line.trim().starts_with("#") {
+            let line_with_newline = format!("{}\n", line);
+            if char_count + line_with_newline.len() > max_chars {
+                structure.push_str("...\n");
+                break;
+            }
+            structure.push_str(&line_with_newline);
+            char_count += line_with_newline.len();
         }
     }
+
+    // If no structure found, return first N lines
+    if structure.is_empty() {
+        let mut result = String::new();
+        for line in lines.iter().take(20) {
+            if result.len() + line.len() > max_chars {
+                break;
+            }
+            result.push_str(line);
+            result.push('\n');
+        }
+        result
+    } else {
+        structure
+    }
+}
+
+/// Truncate content with context preservation
+fn truncate_with_context(content: &str, max_chars: usize) -> String {
+    if content.len() <= max_chars {
+        return content.to_string();
+    }
+
+    // For longer content, return beginning and end with ellipsis
+    let keep_start = max_chars / 2;
+    let keep_end = max_chars - keep_start - 10; // 10 for ellipsis
+
+    let start = &content[..keep_start];
+    let end = &content[content.len().saturating_sub(keep_end)..];
+
+    format!("{}\n\n[... content truncated ...]\n\n{}", start, end)
 }

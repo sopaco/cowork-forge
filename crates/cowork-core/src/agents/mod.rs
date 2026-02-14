@@ -1,33 +1,30 @@
 // Agents module - Agent builders using adk-rust
-// 
-// IMPORTANT: This file uses StageExecutor instead of SequentialAgent to allow
-// LoopAgents to use ExitLoopTool without affecting other stages.
 //
-// SOLUTION: StageExecutor isolates each stage's escalate flag, so when a
-// sub-agent in LoopAgent calls exit_loop(), it only terminates that specific
-// LoopAgent, not the entire workflow.
+// IMPORTANT: This file solves a CRITICAL bug where SequentialAgent stops after
+// the first LoopAgent completes.
+//
+// PROBLEM: When a sub-agent in LoopAgent calls exit_loop(), it terminates the
+// ENTIRE SequentialAgent, not just the LoopAgent. This is adk-rust's design.
+//
+// SOLUTION: Remove exit_loop tools and use max_iterations=1 to let LoopAgent
+// complete naturally, allowing SequentialAgent to continue to next agent.
 
 use crate::instructions::*;
 use crate::tools::*;
 use adk_agent::{LlmAgentBuilder, LoopAgent};
 use adk_core::{Llm, IncludeContents};
-use adk_tool::ExitLoopTool;
 use anyhow::Result;
 use std::sync::Arc;
-
-mod hitl;
-use hitl::ResilientAgent;
 
 // ============================================================================
 // IdeaAgent - Simple agent to capture initial idea
 // ============================================================================
 
-pub fn create_idea_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {
+pub fn create_idea_agent(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>> {
     let agent = LlmAgentBuilder::new("idea_agent")
         .instruction(IDEA_AGENT_INSTRUCTION)
         .model(model)
-        .tool(Arc::new(SaveIdeaTool::new(session_id.to_string())))
-        .tool(Arc::new(LoadIdeaTool::new(session_id.to_string())))
+        .tool(Arc::new(SaveIdeaTool))
         .tool(Arc::new(ReviewAndEditContentTool))
         .include_contents(IncludeContents::None)
         .build()?;
@@ -35,138 +32,270 @@ pub fn create_idea_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dy
     Ok(Arc::new(agent))
 }
 
+pub fn create_idea_agent_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Result<Arc<dyn adk_core::Agent>> {
+    // Replace {ITERATION_ID} placeholder in instruction
+    let instruction = IDEA_AGENT_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
+
+    let save_idea_tool = Arc::new(SaveIdeaTool);
+    eprintln!("[DEBUG] Created SaveIdeaTool");
+
+    let agent = LlmAgentBuilder::new("idea_agent")
+        .instruction(&instruction)
+        .model(model)
+        .tool(save_idea_tool)
+        .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveInsightTool::new(iteration_id.clone())))
+        .include_contents(IncludeContents::None)
+        .build()?;
+
+    eprintln!("[DEBUG] Created idea_agent successfully");
+    Ok(Arc::new(agent))
+}
+
 // ============================================================================
 // PRD Loop - Actor + Critic with LoopAgent
 // ============================================================================
 
-pub fn create_prd_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {
-    let session = session_id.to_string();
-    
+pub fn create_prd_loop(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>> {
     let prd_actor = LlmAgentBuilder::new("prd_actor")
         .instruction(PRD_ACTOR_INSTRUCTION)
         .model(model.clone())
-        .tool(Arc::new(LoadIdeaTool::new(session.clone())))
-        .tool(Arc::new(ReviewWithFeedbackContentTool))
-        .tool(Arc::new(CreateRequirementTool::new(session.clone())))
-        .tool(Arc::new(AddFeatureTool::new(session.clone())))
-        .tool(Arc::new(GetRequirementsTool::new(session.clone())))
-        .tool(Arc::new(SavePrdDocTool::new(session.clone())))
+        .tool(Arc::new(LoadIdeaTool))  // Load idea document
+        .tool(Arc::new(ReviewWithFeedbackContentTool))  // HITL tool (content-based)
+        .tool(Arc::new(CreateRequirementTool))
+        .tool(Arc::new(AddFeatureTool))
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(SavePrdDocTool))  // Save final PRD document
         .include_contents(IncludeContents::None)
         .build()?;
 
     let prd_critic = LlmAgentBuilder::new("prd_critic")
         .instruction(PRD_CRITIC_INSTRUCTION)
         .model(model)
-        .tool(Arc::new(ReadFileTool))
-        .tool(Arc::new(GetRequirementsTool::new(session.clone())))
-        .tool(Arc::new(ProvideFeedbackTool::new(session.clone()))) // Write feedback to file when checks fail
-        .tool(Arc::new(ExitLoopTool::new())) // Exit loop when checks pass
-        .tool(Arc::new(RequestHumanReviewTool::new(session.clone())))
-        .include_contents(IncludeContents::Default)
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(LoadIdeaTool))  // Load idea for context
+        .tool(Arc::new(ProvideFeedbackTool))
+        .include_contents(IncludeContents::None)
         .build()?;
 
-    let mut loop_agent = LoopAgent::new("prd_loop", vec![Arc::new(prd_actor), Arc::new(prd_critic)]);
-    loop_agent = loop_agent.with_max_iterations(3); // Loop will complete naturally after 3 iterations
+    // Create LoopAgent with agents vector
+    let mut loop_agent = LoopAgent::new(
+        "prd_loop",
+        vec![Arc::new(prd_actor), Arc::new(prd_critic)],
+    );
+    // Use max_iterations=1 to avoid SequentialAgent termination bug
+    loop_agent = loop_agent.with_max_iterations(1);
 
-    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
+    Ok(Arc::new(loop_agent))
+}
+
+pub fn create_prd_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Result<Arc<dyn adk_core::Agent>> {
+    // Replace {ITERATION_ID} placeholder in instructions
+    let actor_instruction = PRD_ACTOR_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
+    let critic_instruction = PRD_CRITIC_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
+
+    let prd_actor = LlmAgentBuilder::new("prd_actor")
+        .instruction(&actor_instruction)
+        .model(model.clone())
+        .tool(Arc::new(LoadFeedbackHistoryTool))  // For incremental update support
+        .tool(Arc::new(LoadIdeaTool))  // Load idea document
+        .tool(Arc::new(CreateRequirementTool))
+        .tool(Arc::new(AddFeatureTool))
+        .tool(Arc::new(UpdateRequirementTool))  // For incremental updates
+        .tool(Arc::new(UpdateFeatureTool))  // For incremental updates
+        .tool(Arc::new(DeleteRequirementTool))  // For incremental updates
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(SavePrdDocTool))  // Save final PRD document
+        .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveInsightTool::new(iteration_id.clone())))
+        .include_contents(IncludeContents::None)
+        .build()?;
+
+    let prd_critic = LlmAgentBuilder::new("prd_critic")
+        .instruction(&critic_instruction)
+        .model(model)
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(LoadIdeaTool))  // Load idea for context
+        .tool(Arc::new(ProvideFeedbackTool))
+        .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveIssueTool::new(iteration_id.clone())))
+        .include_contents(IncludeContents::None)
+        .build()?;
+
+    // Create LoopAgent with agents vector
+    let mut loop_agent = LoopAgent::new(
+        "prd_loop",
+        vec![Arc::new(prd_actor), Arc::new(prd_critic)],
+    );
+    // Use max_iterations=1 to avoid SequentialAgent termination bug
+    loop_agent = loop_agent.with_max_iterations(1);
+
+    Ok(Arc::new(loop_agent))
 }
 
 // ============================================================================
 // Design Loop - Actor + Critic
 // ============================================================================
 
-pub fn create_design_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {
-    let session = session_id.to_string();
-    
+pub fn create_design_loop(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>> {
     let design_actor = LlmAgentBuilder::new("design_actor")
         .instruction(DESIGN_ACTOR_INSTRUCTION)
         .model(model.clone())
-        .tool(Arc::new(GetRequirementsTool::new(session.clone())))
-        .tool(Arc::new(GetDesignTool::new(session.clone())))
-        .tool(Arc::new(ReviewWithFeedbackContentTool))
-        .tool(Arc::new(CreateDesignComponentTool::new(session.clone())))
-        .tool(Arc::new(SaveDesignDocTool::new(session.clone())))
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(GetDesignTool))
+        .tool(Arc::new(LoadPrdDocTool))  // Load PRD document
+        .tool(Arc::new(ReviewWithFeedbackContentTool))  // HITL tool (content-based)
+        .tool(Arc::new(CreateDesignComponentTool))
+        .tool(Arc::new(SaveDesignDocTool))  // Save final design document
         .include_contents(IncludeContents::None)
         .build()?;
 
     let design_critic = LlmAgentBuilder::new("design_critic")
         .instruction(DESIGN_CRITIC_INSTRUCTION)
         .model(model)
-        .tool(Arc::new(ReadFileTool))
-        .tool(Arc::new(GetRequirementsTool::new(session.clone())))
-        .tool(Arc::new(GetDesignTool::new(session.clone())))
-        .tool(Arc::new(CheckFeatureCoverageTool::new(session.clone())))
-        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))
-        .tool(Arc::new(ExitLoopTool::new()))
-        .tool(Arc::new(RequestHumanReviewTool::new(session.clone())))
-        .include_contents(IncludeContents::Default)
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(GetDesignTool))
+        .tool(Arc::new(LoadDesignDocTool))  // Verify design markdown
+        .tool(Arc::new(CheckFeatureCoverageTool))
+        .tool(Arc::new(ProvideFeedbackTool))
+        .include_contents(IncludeContents::None)
         .build()?;
 
     let mut loop_agent = LoopAgent::new("design_loop", vec![Arc::new(design_actor), Arc::new(design_critic)]);
-    loop_agent = loop_agent.with_max_iterations(3); // Loop will complete naturally after 3 iterations
+    loop_agent = loop_agent.with_max_iterations(1);
 
-    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
+    Ok(Arc::new(loop_agent))
+}
+
+pub fn create_design_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Result<Arc<dyn adk_core::Agent>> {
+    // Replace {ITERATION_ID} placeholder in instructions
+    let actor_instruction = DESIGN_ACTOR_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
+    let critic_instruction = DESIGN_CRITIC_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
+
+    let design_actor = LlmAgentBuilder::new("design_actor")
+        .instruction(&actor_instruction)
+        .model(model.clone())
+        .tool(Arc::new(LoadFeedbackHistoryTool))  // For incremental update support
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(GetDesignTool))
+        .tool(Arc::new(LoadPrdDocTool))  // Load PRD document
+        .tool(Arc::new(CreateDesignComponentTool))
+        .tool(Arc::new(SaveDesignDocTool))  // Save final design document
+        .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveInsightTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveIssueTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveLearningTool::new(iteration_id.clone())))
+        .include_contents(IncludeContents::None)
+        .build()?;
+
+    let design_critic = LlmAgentBuilder::new("design_critic")
+        .instruction(&critic_instruction)
+        .model(model)
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(GetDesignTool))
+        .tool(Arc::new(LoadDesignDocTool))  // Verify design markdown
+        .tool(Arc::new(CheckFeatureCoverageTool))
+        .tool(Arc::new(ProvideFeedbackTool))
+        .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveIssueTool::new(iteration_id.clone())))
+        .include_contents(IncludeContents::None)
+        .build()?;
+
+    let mut loop_agent = LoopAgent::new("design_loop", vec![Arc::new(design_actor), Arc::new(design_critic)]);
+    loop_agent = loop_agent.with_max_iterations(1);
+
+    Ok(Arc::new(loop_agent))
 }
 
 // ============================================================================
 // Plan Loop - Actor + Critic
 // ============================================================================
 
-pub fn create_plan_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {
-    let session = session_id.to_string();
-    
+pub fn create_plan_loop(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>> {
     let plan_actor = LlmAgentBuilder::new("plan_actor")
         .instruction(PLAN_ACTOR_INSTRUCTION)
         .model(model.clone())
-        .tool(Arc::new(GetRequirementsTool::new(session.clone())))
-        .tool(Arc::new(GetDesignTool::new(session.clone())))
-        .tool(Arc::new(GetPlanTool::new(session.clone())))
-        .tool(Arc::new(ReviewWithFeedbackContentTool))
-        .tool(Arc::new(CreateTaskTool::new(session.clone())))
-        // Add task management tools so Actor can respond to Critic feedback
-        .tool(Arc::new(UpdateTaskTool::new(session.clone())))
-        .tool(Arc::new(DeleteTaskTool::new(session.clone())))
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(GetDesignTool))
+        .tool(Arc::new(GetPlanTool))
+        .tool(Arc::new(LoadPrdDocTool))  // Load PRD document
+        .tool(Arc::new(LoadDesignDocTool))  // Load design document
+        .tool(Arc::new(ReviewWithFeedbackContentTool))  // HITL tool (content-based)
+        .tool(Arc::new(CreateTaskTool))
+        .tool(Arc::new(SavePlanDocTool))  // Save final plan document
         .include_contents(IncludeContents::None)
         .build()?;
 
     let plan_critic = LlmAgentBuilder::new("plan_critic")
         .instruction(PLAN_CRITIC_INSTRUCTION)
         .model(model)
-        .tool(Arc::new(GetPlanTool::new(session.clone())))
-        .tool(Arc::new(GetRequirementsTool::new(session.clone())))
-        .tool(Arc::new(GetDesignTool::new(session.clone())))
-        .tool(Arc::new(CheckTaskDependenciesTool::new(session.clone())))
-        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))
-        .tool(Arc::new(ExitLoopTool::new()))
-        .tool(Arc::new(RequestHumanReviewTool::new(session.clone())))
-        .include_contents(IncludeContents::Default)
+        .tool(Arc::new(GetPlanTool))
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(LoadPlanDocTool))  // Verify plan markdown
+        .tool(Arc::new(CheckTaskDependenciesTool))
+        .tool(Arc::new(ProvideFeedbackTool))
+        .include_contents(IncludeContents::None)
         .build()?;
 
     let mut loop_agent = LoopAgent::new("plan_loop", vec![Arc::new(plan_actor), Arc::new(plan_critic)]);
-    loop_agent = loop_agent.with_max_iterations(3); // Loop will complete naturally after 3 iterations
+    loop_agent = loop_agent.with_max_iterations(1);
 
-    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
+    Ok(Arc::new(loop_agent))
+}
+
+pub fn create_plan_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Result<Arc<dyn adk_core::Agent>> {
+    // Replace {ITERATION_ID} placeholder in instructions
+    let actor_instruction = PLAN_ACTOR_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
+    let critic_instruction = PLAN_CRITIC_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
+
+    let plan_actor = LlmAgentBuilder::new("plan_actor")
+        .instruction(&actor_instruction)
+        .model(model.clone())
+        .tool(Arc::new(LoadFeedbackHistoryTool))  // For incremental update support
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(GetDesignTool))
+        .tool(Arc::new(GetPlanTool))
+        .tool(Arc::new(LoadPrdDocTool))  // Load PRD document
+        .tool(Arc::new(LoadDesignDocTool))  // Load design document
+        .tool(Arc::new(CreateTaskTool))
+        .tool(Arc::new(SavePlanDocTool))  // Save final plan document
+        .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveInsightTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveIssueTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveLearningTool::new(iteration_id.clone())))
+        .include_contents(IncludeContents::None)
+        .build()?;
+
+    let plan_critic = LlmAgentBuilder::new("plan_critic")
+        .instruction(&critic_instruction)
+        .model(model)
+        .tool(Arc::new(GetPlanTool))
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(LoadPlanDocTool))  // Verify plan markdown
+        .tool(Arc::new(CheckTaskDependenciesTool))
+        .tool(Arc::new(ProvideFeedbackTool))
+        .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveIssueTool::new(iteration_id.clone())))
+        .include_contents(IncludeContents::None)
+        .build()?;
+
+    let mut loop_agent = LoopAgent::new("plan_loop", vec![Arc::new(plan_actor), Arc::new(plan_critic)]);
+    loop_agent = loop_agent.with_max_iterations(1);
+
+    Ok(Arc::new(loop_agent))
 }
 
 // ============================================================================
 // Coding Loop - Actor + Critic
 // ============================================================================
 
-pub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {
-    let session = session_id.to_string();
-    
+pub fn create_coding_loop(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>> {
     let coding_actor = LlmAgentBuilder::new("coding_actor")
         .instruction(CODING_ACTOR_INSTRUCTION)
         .model(model.clone())
-        .tool(Arc::new(GetPlanTool::new(session.clone())))
-        .tool(Arc::new(ReviewWithFeedbackContentTool)) // Read Critic feedback
-        .tool(Arc::new(UpdateTaskStatusTool::new(session.clone())))
-        .tool(Arc::new(UpdateFeatureStatusTool::new(session.clone())))
-        // Task management tools
-        .tool(Arc::new(CreateTaskTool::new(session.clone())))
-        .tool(Arc::new(UpdateTaskTool::new(session.clone())))
-        .tool(Arc::new(DeleteTaskTool::new(session.clone())))
-        // File operations
+        .tool(Arc::new(GetPlanTool))
+        .tool(Arc::new(UpdateTaskStatusTool))
+        .tool(Arc::new(UpdateFeatureStatusTool))
         .tool(Arc::new(ReadFileTool))
         .tool(Arc::new(WriteFileTool))
         .tool(Arc::new(ListFilesTool))
@@ -178,45 +307,119 @@ pub fn create_coding_loop(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<d
     let coding_critic = LlmAgentBuilder::new("coding_critic")
         .instruction(CODING_CRITIC_INSTRUCTION)
         .model(model)
-        .tool(Arc::new(GetPlanTool::new(session.clone())))
+        .tool(Arc::new(GetPlanTool))
         .tool(Arc::new(ReadFileTool))
         .tool(Arc::new(ListFilesTool))
         .tool(Arc::new(RunCommandTool))
-        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))
-        .tool(Arc::new(ExitLoopTool::new()))
-        .tool(Arc::new(RequestReplanningTool::new(session.clone())))
-        .include_contents(IncludeContents::Default)
+        // Removed check_tests and check_lint - not applicable for pure frontend projects
+        .tool(Arc::new(ProvideFeedbackTool))
+        .include_contents(IncludeContents::None)
         .build()?;
 
+    // Coding needs more iterations to implement and review tasks
     let mut loop_agent = LoopAgent::new("coding_loop", vec![Arc::new(coding_actor), Arc::new(coding_critic)]);
-    loop_agent = loop_agent.with_max_iterations(5); // Loop will complete naturally after 5 iterations
+    loop_agent = loop_agent.with_max_iterations(5);
 
-    Ok(Arc::new(ResilientAgent::new(Arc::new(loop_agent))))
+    Ok(Arc::new(loop_agent))
+}
+
+pub fn create_coding_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Result<Arc<dyn adk_core::Agent>> {
+    // Replace {ITERATION_ID} placeholder in instructions
+    let actor_instruction = CODING_ACTOR_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
+    let critic_instruction = CODING_CRITIC_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
+
+    let coding_actor = LlmAgentBuilder::new("coding_actor")
+        .instruction(&actor_instruction)
+        .model(model.clone())
+        .tool(Arc::new(LoadFeedbackHistoryTool))  // For incremental update support
+        .tool(Arc::new(GetPlanTool))
+        .tool(Arc::new(UpdateTaskStatusTool))
+        .tool(Arc::new(UpdateFeatureStatusTool))
+        .tool(Arc::new(ReadFileTool))
+        .tool(Arc::new(WriteFileTool))
+        .tool(Arc::new(ListFilesTool))
+        .tool(Arc::new(RunCommandTool))
+        .tool(Arc::new(CheckTestsTool))
+        .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveInsightTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveIssueTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveLearningTool::new(iteration_id.clone())))
+        .include_contents(IncludeContents::None)
+        .build()?;
+
+    let coding_critic = LlmAgentBuilder::new("coding_critic")
+        .instruction(&critic_instruction)
+        .model(model)
+        .tool(Arc::new(GetPlanTool))
+        .tool(Arc::new(ReadFileTool))
+        .tool(Arc::new(ListFilesTool))
+        .tool(Arc::new(RunCommandTool))
+        // Removed check_tests and check_lint - not applicable for pure frontend projects
+        .tool(Arc::new(ProvideFeedbackTool))
+        .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveIssueTool::new(iteration_id.clone())))
+        .include_contents(IncludeContents::None)
+        .build()?;
+
+    // Coding needs more iterations to implement and review tasks
+    let mut loop_agent = LoopAgent::new("coding_loop", vec![Arc::new(coding_actor), Arc::new(coding_critic)]);
+    loop_agent = loop_agent.with_max_iterations(5);
+
+    Ok(Arc::new(loop_agent))
 }
 
 // ============================================================================
 // Check Agent - Quality assurance
 // ============================================================================
 
-pub fn create_check_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {
-    let session = session_id.to_string();
-    
+pub fn create_check_agent(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>> {
     let agent = LlmAgentBuilder::new("check_agent")
         .instruction(CHECK_AGENT_INSTRUCTION)
         .model(model)
-        .tool(Arc::new(GetRequirementsTool::new(session.clone())))
-        .tool(Arc::new(GetDesignTool::new(session.clone())))
-        .tool(Arc::new(GetPlanTool::new(session.clone())))
-        .tool(Arc::new(CheckDataFormatTool::new(session.clone())))
-        .tool(Arc::new(CheckFeatureCoverageTool::new(session.clone())))
-        .tool(Arc::new(CheckTaskDependenciesTool::new(session.clone())))
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(GetDesignTool))
+        .tool(Arc::new(GetPlanTool))
+        .tool(Arc::new(CheckDataFormatTool))
+        .tool(Arc::new(CheckFeatureCoverageTool))
+        .tool(Arc::new(CheckTaskDependenciesTool))
         .tool(Arc::new(RunCommandTool))
         .tool(Arc::new(ReadFileTool))
         .tool(Arc::new(ListFilesTool))
         .tool(Arc::new(CheckTestsTool))
         .tool(Arc::new(CheckLintTool))
-        .tool(Arc::new(ProvideFeedbackTool::new(session.clone())))
-        .tool(Arc::new(GotoStageTool::new(session.clone())))
+        .tool(Arc::new(ProvideFeedbackTool))
+        .tool(Arc::new(GotoStageTool))
+        .include_contents(IncludeContents::None)
+        .build()?;
+
+    Ok(Arc::new(agent))
+}
+
+pub fn create_check_agent_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Result<Arc<dyn adk_core::Agent>> {
+    // Replace {ITERATION_ID} placeholder in instruction
+    let instruction = CHECK_AGENT_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
+
+    let agent = LlmAgentBuilder::new("check_agent")
+        .instruction(&instruction)
+        .model(model)
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(GetDesignTool))
+        .tool(Arc::new(GetPlanTool))
+        .tool(Arc::new(CheckDataFormatTool))
+        .tool(Arc::new(CheckFeatureCoverageTool))
+        .tool(Arc::new(CheckTaskDependenciesTool))
+        .tool(Arc::new(RunCommandTool))
+        .tool(Arc::new(ReadFileTool))
+        .tool(Arc::new(ListFilesTool))
+        .tool(Arc::new(CheckTestsTool))
+        .tool(Arc::new(CheckLintTool))
+        .tool(Arc::new(ProvideFeedbackTool))
+        .tool(Arc::new(GotoStageTool))
+        .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveInsightTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveIssueTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveLearningTool::new(iteration_id.clone())))
+        .tool(Arc::new(PromoteToDecisionTool::new(iteration_id.clone())))
         .include_contents(IncludeContents::None)
         .build()?;
 
@@ -227,23 +430,102 @@ pub fn create_check_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<d
 // Delivery Agent - Final report generation
 // ============================================================================
 
-pub fn create_delivery_agent(model: Arc<dyn Llm>, session_id: &str) -> Result<Arc<dyn adk_core::Agent>> {
-    let session = session_id.to_string();
-    
+pub fn create_delivery_agent(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>> {
     let agent = LlmAgentBuilder::new("delivery_agent")
         .instruction(DELIVERY_AGENT_INSTRUCTION)
         .model(model)
-        .tool(Arc::new(GetRequirementsTool::new(session.clone())))
-        .tool(Arc::new(GetDesignTool::new(session.clone())))
-        .tool(Arc::new(GetPlanTool::new(session.clone())))
-        .tool(Arc::new(LoadFeedbackHistoryTool::new(session.clone())))
-        .tool(Arc::new(ListFilesTool))
-        .tool(Arc::new(ReadFileTool))
-        .tool(Arc::new(SaveDeliveryReportTool::new(session.clone())))
-        .tool(Arc::new(SavePrdDocTool::new(session.clone())))
-        .tool(Arc::new(SaveDesignDocTool::new(session.clone())))
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(GetDesignTool))
+        .tool(Arc::new(GetPlanTool))
+        .tool(Arc::new(LoadFeedbackHistoryTool))
+        .tool(Arc::new(ListFilesTool))  // To verify project files exist
+        .tool(Arc::new(LoadIdeaTool))  // Load idea document
+        .tool(Arc::new(LoadPrdDocTool))  // Load PRD document
+        .tool(Arc::new(LoadDesignDocTool))  // Load design document
+        .tool(Arc::new(SaveDeliveryReportTool))
+        .tool(Arc::new(CopyWorkspaceToProjectTool))  // Copy files to project root
         .include_contents(IncludeContents::None)
         .build()?;
+
+    Ok(Arc::new(agent))
+}
+
+pub fn create_delivery_agent_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Result<Arc<dyn adk_core::Agent>> {
+    // Replace {ITERATION_ID} placeholder in instruction
+    let instruction = DELIVERY_AGENT_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
+
+    let agent = LlmAgentBuilder::new("delivery_agent")
+        .instruction(&instruction)
+        .model(model)
+        .tool(Arc::new(GetRequirementsTool))
+        .tool(Arc::new(GetDesignTool))
+        .tool(Arc::new(GetPlanTool))
+        .tool(Arc::new(LoadFeedbackHistoryTool))
+        .tool(Arc::new(ListFilesTool))  // To verify project files exist
+        .tool(Arc::new(LoadIdeaTool))  // Load idea document
+        .tool(Arc::new(LoadPrdDocTool))  // Load PRD document
+        .tool(Arc::new(LoadDesignDocTool))  // Load design document
+        .tool(Arc::new(SaveDeliveryReportTool))
+        .tool(Arc::new(CopyWorkspaceToProjectTool))  // Copy files to project root
+        .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveInsightTool::new(iteration_id.clone())))
+        .tool(Arc::new(SaveLearningTool::new(iteration_id.clone())))
+        .tool(Arc::new(PromoteToPatternTool::new(iteration_id.clone())))
+        .include_contents(IncludeContents::None)
+        .build()?;
+
+    Ok(Arc::new(agent))
+}
+
+// ============================================================================
+// Summary Agent - Generates summaries of iteration documents
+// ============================================================================
+
+pub fn create_summary_agent(model: Arc<dyn Llm>, iteration_id: String, iteration_number: u32) -> Result<Arc<dyn adk_core::Agent>> {
+    let instruction = SUMMARY_AGENT_INSTRUCTION
+        .replace("{iteration_id}", &iteration_id)
+        .replace("{iteration_number}", &iteration_number.to_string());
+
+    let agent = LlmAgentBuilder::new(SUMMARY_AGENT_NAME)
+        .instruction(&instruction)
+        .model(model)
+        .include_contents(IncludeContents::None)
+        .build()?;
+
+    Ok(Arc::new(agent))
+}
+
+// ============================================================================
+// Knowledge Generation Agent - Extracts project-level knowledge from iterations
+// ============================================================================
+
+pub fn create_knowledge_generation_agent(
+    model: Arc<dyn Llm>,
+    iteration_id: String,
+    iteration_number: u32,
+    base_iteration_id: Option<String>
+) -> Result<Arc<dyn adk_core::Agent>> {
+    let instruction = KNOWLEDGE_GEN_AGENT_INSTRUCTION
+        .replace("{iteration_id}", &iteration_id)
+        .replace("{iteration_number}", &iteration_number.to_string());
+
+    let read_file_with_limit = Arc::new(ReadFileWithLimitTool::new(10)); // Limit to 10 calls
+
+    let mut builder = LlmAgentBuilder::new(KNOWLEDGE_GEN_AGENT_NAME)
+        .instruction(&instruction)
+        .model(model)
+        .tool(Arc::new(LoadDocumentSummaryTool::new(iteration_id.clone())))
+        .tool(read_file_with_limit.clone())
+        .tool(Arc::new(ListFilesWorkspaceTool))
+        .tool(Arc::new(SaveKnowledgeSnapshotTool::new(iteration_id.clone(), iteration_number)))
+        .include_contents(IncludeContents::None);
+
+    // Add base knowledge tool if this is an evolution iteration
+    if let Some(base_id) = base_iteration_id {
+        builder = builder.tool(Arc::new(LoadBaseKnowledgeTool::new(base_id)));
+    }
+
+    let agent = builder.build()?;
 
     Ok(Arc::new(agent))
 }

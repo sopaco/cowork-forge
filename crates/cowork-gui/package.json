@@ -1,0 +1,32 @@
+{
+	"name": "cowork-gui",
+	"private": true,
+	"version": "2.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"tauri": "tauri",
+		"tauri:dev": "tauri dev",
+		"tauri:build": "tauri build"
+	},
+	"dependencies": {
+		"@monaco-editor/react": "^4.6.0",
+		"@tauri-apps/api": "^2.6.0",
+		"@tauri-apps/plugin-dialog": "^2.6.0",
+		"antd": "^5.12.0",
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1",
+		"react-json-view": "^1.21.3",
+		"react-markdown": "^9.0.1",
+		"react-window": "^2.2.6",
+		"rehype-highlight": "^7.0.2",
+		"rehype-raw": "^7.0.0",
+		"remark-gfm": "^4.0.1"
+	},
+	"devDependencies": {
+		"@tauri-apps/cli": "^2.6.0",
+		"@vitejs/plugin-react": "^4.3.0",
+		"vite": "^5.0.0"
+	}
+}

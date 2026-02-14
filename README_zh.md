@@ -30,9 +30,9 @@
 
 与只能生成代码片段的 AI 编程助手不同，Cowork Forge 提供端到端的开发生命周期管理：
 - **产品经理 AI**：将你的想法转化为详细的产品需求文档（PRD）
-- **架构师 AI**：设计完整的技术架构和系统组件
-- **项目经理 AI**：拆解任务、规划依赖关系和实施路径
-- **工程师 AI**：实现代码、保证质量并生成交付报告
+- **架构师 AI**：设计简洁实用的技术架构和系统组件，优先选择标准库和内置工具
+- **项目经理 AI**：拆解任务、规划依赖关系和实施路径，专注核心功能实现
+- **工程师 AI**：实现简洁可用的代码，避免过度工程化和测试样板，快速验证想法
 
 每个角色都采用 Actor-Critic 模式进行自我审查和优化，关键决策点引入人工验证，确保输出质量和方向正确。
 
@@ -78,10 +78,35 @@
 - <strong>端到端自动化：</strong> 从想法到交付，Cowork Forge 通过协调的 AI 智能体自动化整个软件开发生命周期。
 - <strong>多智能体协作：</strong> 7 个专业智能体协同工作，每个都在其领域带来专业知识——需求、设计、规划、编码和验证。其中 4 个关键阶段（PRD、设计、规划、编码）采用智能体循环模式进行迭代优化。
 - <strong>人机协作：</strong> 关键决策点包含人工验证，在保持自动化效率的同时确保质量和控制。
+- <strong>快速原型与最小化工程：</strong> 专注于核心功能实现，自动生成简洁可用的代码，避免过度工程化和测试样板代码，让你快速验证想法。
 - <strong>增量代码更新：</strong> 智能代码分析实现有针对性的更新，无需重新生成整个代码库，保留你的自定义内容。
 - <strong>多语言支持：</strong> 内置支持 Rust、Python、JavaScript/TypeScript 等，并自动检测项目类型。
 - <strong>安全优先：</strong> 多层安全检查防止危险命令并确保安全的代码执行。
 - <strong>高性能：</strong> 使用 Rust 构建，确保速度、内存安全和高效的资源利用。
+
+## ✨ 功能概览
+
+> Cowork Forge 是一个智能研发引擎，可作为cowork-core高性能库通过FFI被各种技术栈（Python/Java/NodeJS）调用；也通过 cowork-cli 轻松集成到工作流；同时包括 一个可本地部署的GUI 项目提供友好的交互界面。下面通过Cowork Forge GUI项目为例我们直观的界面体验软件开发的完整生命周期。
+
+|  |  |
+| :--- | :--- |
+| **📄 实时工件预览**：实时观看文档编写过程。查看生成的格式化 **PRD**、**系统设计** 和 **实施计划**。支持 Markdown 渲染，便于进行清晰、结构化的文档审查。![Artifact Viewer](./assets/snapshots/artifact_preview.png) | **💬 交互式代理聊天**：直接与您的 AI 团队协作。与产品经理讨论需求，与架构师审查架构，或向工程师提供反馈。聊天界面保持整个项目历史的上下文。![Agent Chat Interface](./assets/snapshots/chat_preview.png) |
+| **🌐 内置应用预览**：即时查看结果。Cowork Forge GUI 包含一个网页视图，在构建完成后立即预览生成的 Web 应用程序，无需离开工具。![App Preview](./assets/snapshots/app_preview.png) | **📝 任务与待办事项管理**：跟踪进度。系统自动为当前迭代生成并维护待办事项列表，在代理完成任务时会自动删除已完成的项目。![Todo List](./assets/snapshots/todo_preview.png) |
+| **🚀 项目仪表板**：所有开发项目的中心枢纽。查看活跃项目，检查其状态（运行中、暂停、已完成），并通过清晰简洁的现代界面快速启动新项目。![Project Dashboard](./assets/snapshots/dashboard_preview.png) | **⚡ 实时代码执行**：监控 **编码代理** 创建文件、运行构建和执行测试。内置终端视图显示正在运行的确切命令及其输出，确保透明性和控制力。![Terminal & Execution](./assets/snapshots/execution_preview.png) |
+
+---
+
+## 🔄 开发工作流程
+
+Cowork Forge GUI 引导您完成标准的 **七阶段开发生命周期**：
+
+1.  **💡 概念输入**: 与代理聊天以定义您的概念。
+2.  **📋 PRD 生成**: 审查生成的产品需求文档。
+3.  **🏗️ 架构设计**: 确认技术设计和系统边界。
+4.  **📅 实施计划**: 查看任务分解和时间表。
+5.  **💻 编码与测试**: 观看代码编写和测试通过。
+6.  **✅ 质量检查**: 根据需求验证实施情况。
+7.  **📦 交付**: 接收最终项目报告和工件。
 
 # 🏆 Cowork Forge 与竞品对比
 
@@ -94,9 +119,10 @@ Cowork Forge 在 AI 开发工具领域通过其独特的多智能体架构和全
 | **端到端工作流** | ✅ 完整（想法→交付） | ❌ 仅代码补全 | ❌ 专注于代码编辑 | ❌ 仅代码辅助 |
 | **多智能体架构** | ✅ 8 个专业智能体 | ❌ 单一模型 | ❌ 单一模型 | ❌ 单一模型 |
 | **PRD 生成** | ✅ 自动化 | ❌ N/A | ❌ N/A | ❌ N/A |
-| **技术设计** | ✅ C4 架构文档 | ❌ N/A | ❌ N/A | ❌ N/A |
+| **技术设计** | ✅ 规范技术文档 | ❌ N/A | ❌ N/A | ❌ N/A |
 | **实施计划** | ✅ 任务分解和里程碑 | ❌ N/A | ❌ N/A | ❌ N/A |
 | **增量更新** | ✅ 智能增量分析 | ❌ N/A | ❌ 有限 | ❌ 有限 |
+| **简洁代码生成** | ✅ 专注核心功能，无测试样板 | ❌ 不可控 | ❌ 不可控 | ❌ 不可控 |
 | **多语言支持** | ✅ Rust、Python、JS/TS | ✅ 多种语言 | ✅ 多种语言 | ✅ 多种语言 |
 | **人机协作** | ✅ 关键决策点 | ❌ N/A | ❌ 有限 | ❌ 有限 |
 | **自动化验证** | ✅ 构建/测试集成 | ❌ N/A | ❌ N/A | ❌ N/A |
@@ -166,7 +192,7 @@ Cowork Forge 的专业智能体像真实开发团队一样协同工作:
 
 # 🏗️ 架构
 
-Cowork Forge 采用模块化、领域驱动的架构构建：
+Cowork Forge 是基于 adk-rust 框架构建的 Rust 工作空间，采用模块化、领域驱动设计架构：
 
 ```mermaid
 graph TB
@@ -174,140 +200,175 @@ graph TB
         CLI[cowork-cli]
     end
     
-    subgraph "核心层"
-        Orch[编排器]
-        Exec[阶段执行器]
+    subgraph "核心库"
+        CORE[cowork-core]
     end
     
-    subgraph "智能体层"
-        IDEA[Idea Agent]
-        PRD[PRD Loop Agent]
-        DESIGN[Design Loop Agent]
-        PLAN[Plan Loop Agent]
-        CODING[Coding Loop Agent]
-        CHECK[Check Agent]
-        DELIVERY[Delivery Agent]
-    end
-    
-    subgraph "基础设施层"
+    subgraph "核心模块"
+        AGENTS[智能体]
+        PIPELINE[流水线]
         TOOLS[工具]
-        VERIFY[验证]
-        MEMORY[内存]
-        HITL[HITL]
+        PERSISTENCE[持久化]
+        DOMAIN[领域]
+    end
+    
+    subgraph "ADK 框架"
+        ADK[adk-rust 0.2.1]
+        LLM[adk-model]
+    end
+    
+    subgraph "基础设施"
+        FS[文件系统]
         CONFIG[配置]
+        INTERACTION[交互]
     end
     
     subgraph "外部"
-        LLM[OpenAI LLM]
-        FS[文件系统]
-        CMD[命令行]
+        OPENAI[OpenAI LLM]
+        EMBEDDING[嵌入 API]
     end
     
-    CLI --> Orch
-    Orch --> Exec
-    Exec --> IDEA
-    Exec --> PRD
-    Exec --> DESIGN
-    Exec --> PLAN
-    Exec --> CODING
-    Exec --> CHECK
-    Exec --> DELIVERY
+    CLI --> CORE
+    CORE --> AGENTS
+    CORE --> PIPELINE
+    CORE --> TOOLS
     
-    IDEA --> TOOLS
-    CODING --> TOOLS
-    CHECK --> TOOLS
+    AGENTS --> ADK
+    PIPELINE --> DOMAIN
+    TOOLS --> PERSISTENCE
     
-    CHECK --> VERIFY
-    CODING --> VERIFY
+    ADK --> LLM
+    LLM --> OPENAI
+    LLM --> EMBEDDING
     
-    Exec --> HITL
-    
+    PIPELINE --> INTERACTION
     TOOLS --> FS
-    TOOLS --> CMD
-    
-    IDEA -.-> LLM
-    PRD -.-> LLM
-    DESIGN -.-> LLM
-    CODING -.-> LLM
+    CORE --> CONFIG
 ```
 
 ## 核心组件
 
-### 管道编排器
-管理会话生命周期、阶段依赖和工作流执行，支持完整流程和部分流程的灵活组装。
+### Rust 工作空间结构
+项目组织为多个 crate 的 Rust 工作空间：
+- `cowork-core`：包含领域逻辑、智能体和工具的核心库
+- `cowork-cli`：与系统交互的命令行界面
+- `cowork-gui`：可选的图形用户界面（基于 Tauri）
+
+### 迭代架构
+核心概念，将完整的开发周期管理为独立的、可继承的单元：
+- **起源迭代**：从零开始新项目
+- **演化迭代**：基于现有迭代构建，支持继承模式
+- **继承模式**：无（全新开始）、完全（完整代码复制）、部分（仅文档）
+
+### ADK 框架集成
+基于 adk-rust 框架（v0.2.1）构建：
+- 智能体编排和管理
+- 与 OpenAI 和自定义提供者的 LLM 集成
+- 工具系统用于安全代码操作
+- 内置迭代支持
 
 ### AI 智能体
-专业智能体协同工作，每个负责开发生命周期的特定阶段。其中 4 个智能体（PRD、设计、规划、编码）使用演员-评论家循环模式进行迭代优化和人类反馈整合。包括：Idea、PRD、Design、Plan、Coding、Check、Delivery、Change Triage、Code Patch、Modify Delivery。
-
-### 提示词模板
-为每个智能体提供专门的指令模板，定义其行为和输出格式。
+使用 adk-rust 智能体框架的专门智能体：
+- 创意智能体：结构化初始概念
+- 循环智能体（PRD、设计、计划、编码）：角色-评论者模式用于优化
+- 检查智能体：验证实现
+- 交付智能体：完成交付物
 
 ### 工具模块
-安全的文件操作和命令执行，包含安全检查和资源限制。
+通过工作空间验证的安全工具执行：
+- 项目边界内的文件操作
+- 带安全检查的命令执行
+- 人机交互验证的交互工具
 
-### LLM 集成层
-管理与大语言模型的交互，包括速率限制、API 客户端和请求优化。
-
-### 数据模块
-定义系统的数据模型和会话管理机制。
-
-### 存储模块
-提供持久化数据管理和检索能力。
+### 持久化层
+数据管理和存储：
+- 迭代存储和检索
+- 制品管理
+- 配置持久化
 
 # 🧠 工作原理
 
-Cowork Forge 使用由 `Orchestrator` 编排的复杂多阶段工作流：
+Cowork Forge 使用基于迭代架构的多阶段工作流，由 `Pipeline` 编排系统管理：
 
 ```mermaid
 sequenceDiagram
     participant User as 用户
     participant CLI as Cowork Forge CLI
-    participant Orch as 编排器
+    participant Pipeline as 流水线
+    participant Iteration as 迭代
     participant Agents as AI 智能体
-    participant LLM as OpenAI LLM
+    participant ADK as ADK 框架
+    participant LLM as LLM API
     participant FS as 文件系统
-    participant CMD as 命令行
 
-    User->>CLI: 提供想法/需求
-    CLI->>Orch: 启动新会话
-    Orch->>Agents: 执行需求采集智能体
-    Agents->>LLM: 结构化需求
-    LLM-->>Agents: 返回需求规格
-    Agents->>User: HITL 验证
-    User-->>Agents: 确认/编辑
+    User->>CLI: 创建迭代或继续现有迭代
+    CLI->>Pipeline: 初始化流水线
+    Pipeline->>Iteration: 创建或加载迭代
+    Iteration->>Agents: 执行当前阶段智能体
     
-    loop 对于每个阶段
-        Orch->>Agents: 执行下一个智能体
-        Agents->>LLM: 生成阶段输出
-        LLM-->>Agents: 返回结果
+    loop 每个阶段执行
+        Agents->>ADK: 准备智能体请求
+        ADK->>LLM: 发送请求
+        LLM-->>ADK: 返回响应
+        ADK-->>Agents: 处理响应
         
-        alt 关键阶段
-            Agents->>User: HITL 验证
-            User-->>Agents: 确认/编辑
+        alt 需要人工验证的阶段
+            Agents->>User: HITL 交互验证
+            User-->>Agents: 确认或提供反馈
         end
         
         alt 编码阶段
+            Agents->>FS: 验证文件路径安全性
             Agents->>FS: 读取项目文件
-            Agents->>LLM: 规划代码变更
-            LLM-->>Agents: 返回代码计划
-            Agents->>User: HITL 验证
-            User-->>Agents: 确认计划
-            Agents->>FS: 写入代码变更
-            Agents->>CMD: 运行构建/测试
-            CMD-->>Agents: 返回结果
+            Agents->>LLM: 请求生成代码
+            LLM-->>Agents: 返回代码变更计划
+            Agents->>User: HITL 验证代码计划
+            User-->>Agents: 确认或编辑
+            Agents->>FS: 应用代码变更
+            Agents->>ADK: 运行构建命令
+            ADK->>FS: 执行命令并返回结果
         end
+        
+        Iteration->>Pipeline: 阶段完成，进入下一阶段
     end
     
-    Orch->>Agents: 执行交付智能体
+    Iteration->>Agents: 执行最终交付智能体
     Agents->>User: 展示交付报告
 ```
+
+### 迭代生命周期
+
+迭代有以下几种状态：
+
+```mermaid
+stateDiagram-v2
+    [*] --> Draft: 创建迭代
+    Draft --> Running: 启动迭代
+    Running --> Paused: 暂停迭代
+    Paused --> Running: 继续迭代
+    Running --> Completed: 完成迭代
+    Running --> Failed: 迭代失败
+    Completed --> [*]
+    Failed --> [*]
+```
+
+### 迭代类型
+
+1. **起源迭代（Genesis）**：从零开始的新项目
+2. **演化迭代（Evolution）**：基于现有迭代创建的迭代
+
+### 继承模式
+
+- **无继承（None）**：全新开始，不复制任何内容
+- **完全继承（Full）**：复制工作空间代码和所有制品
+- **部分继承（Partial）**：仅复制制品和结构化数据，重新生成代码
 
 # 🖥 快速开始
 
 ### 前置要求
-- [**Rust**](https://www.rust-lang.org)（版本 1.70 或更高）
-- [**OpenAI API 密钥**](https://platform.openai.com/) 用于 LLM 访问
-- Git 和语言特定的构建工具（cargo、npm、pip 等）
+- [**Rust**](https://www.rust-lang.org)（edition 2024）
+- [**LLM API 访问权限**](https://platform.openai.com/)（OpenAI 或兼容提供商）
+- Git 和特定语言的构建工具（cargo、npm、pip 等）
 
 ### 安装
 
@@ -318,7 +379,7 @@ sequenceDiagram
 git clone https://github.com/sopaco/cowork-forge.git
 cd cowork-forge
 
-# 构建项目
+# 构建整个工作空间
 cargo build --release
 
 # CLI 二进制文件将位于：
@@ -334,10 +395,20 @@ Cowork Forge 使用 `config.toml` 文件进行配置。在项目目录中创建�
 [llm]
 api_base_url = "https://api.openai.com/v1"
 api_key = "sk-your-openai-api-key"
-model_name = "gpt-5-codex"
+model_name = "gpt-4"
+
+# 可选：嵌入配置
+[embedding]
+api_base_url = "https://your-embedding-api.com/v1"
+api_key = "your-embedding-api-key"
+model_name = "text-embedding-ada-002"
 ```
 
-# 🚀 使用
+# 🚀 使用指南
+
+Cowork Forge 提供两种交互方式：命令行界面 (CLI) 和图形用户界面 (GUI)。
+
+## 🖥️ Cowork CLI
 
 ### 启动新的开发会话
 
@@ -369,78 +440,130 @@ cowork resume
 ### 示例会话流程
 
 ```sh
-$ cowork new "构建文件转换的 CLI 工具"
+# 初始化新项目
+$ cowork init --name "我的文件转换器"
 
-[阶段 1/7] Idea Agent
-正在分析你的需求...
-生成的需求规格: "用于在格式之间转换文件的命令行工具"
+# 创建新迭代
+$ cowork iter --title "构建 CLI 工具" --description "用于在格式之间转换文件的命令行工具"
 
-你想要：
-  [1] 接受并继续
-  [2] 编辑规范
-  [3] 重新生成
-> 1
+[流水线] 启动起源迭代：iter-1-1770536303
+[迭代] 第 1/7 阶段：Idea Agent
+[Idea Agent] 处理需求...
+[Idea Agent] 在以下位置生成 IdeaSpec：.cowork-v2/iterations/iter-1-1770536303/artifacts/idea.md
 
-[阶段 2/7] PRD 生成智能体
-正在生成产品需求文档...
-创建了包含 12 个需求和 5 个用户故事的 PRD
+审查规格并提供反馈（或输入 'continue' 继续）：
 
-在以下位置审查 PRD: .cowork/artifacts/session-001/prd.md
-你想要：
-  [1] 接受并继续
-  [2] 编辑 PRD
-  [3] 重新生成
-> 1
+> continue
 
-[阶段 3/7] 设计智能体
-正在创建技术架构...
-生成了 C4 系统上下文和容器图
+[迭代] 第 2/7 阶段：PRD Loop Agent
+[PRD Agent] 生成产品需求文档...
+[PRD Agent] 在以下位置生成 PRD：.cowork-v2/iterations/iter-1-1770536303/artifacts/prd.md
 
-在以下位置审查设计: .cowork/artifacts/session-001/design.md
-你想要：
-  [1] 接受并继续
-  [2] 编辑设计
-  [3] 重新生成
-> 1
+审查 PRD 并提供反馈（或输入 'continue' 继续）：
 
-... （继续完成所有 7 个阶段）
+> continue
 
-[交付] 会话完成！
-交付报告: .cowork/artifacts/session-001/delivery.md
+[迭代] 第 3/7 阶段：Design Loop Agent
+[Design Agent] 创建技术架构...
+[Design Agent] 在以下位置生成设计：.cowork-v2/iterations/iter-1-1770536303/artifacts/design.md
 
-摘要:
+审查设计并提供反馈（或输入 'continue' 继续）：
+
+> continue
+
+...（继续完成所有 7 个阶段）
+
+[迭代] 第 7/7 阶段：Delivery Agent
+[Delivery Agent] 生成交付报告...
+[Delivery Agent] 迭代在以下位置成功完成：.cowork-v2/iterations/iter-1-1770536303/artifacts/delivery.md
+
+摘要：
 - 12 个需求已实现
 - 4 个模块已创建
 - 15 个测试用例已添加
-- 构建: 通过
-- 测试: 15/15 通过
+- 构建：通过
+- 测试：15/15 通过
+
+[流水线] 迭代 iter-1-1770536303 成功完成
 ```
 
-### 管理项目
+### 管理迭代
 
 ```sh
-# 查看项目状态
-cowork status
+# 列出所有迭代
+$ cowork list
+ID                     标题                     状态    创建时间
+iter-1-1770536303      构建 CLI 工具            已完成  2023-12-01 10:30
+iter-2-1770537500      添加批处理               已暂停  2023-12-01 14:45
 
-# 从特定阶段修改
-cowork modify --from prd
-cowork modify --from design
-cowork modify --from plan
-cowork modify --from coding
+# 查看迭代详情
+$ cowork show iter-1-1770536303
+
+# 继续已暂停的迭代
+$ cowork continue iter-2-1770537500
+
+# 删除迭代
+$ cowork delete iter-2-1770537500
+
+# 创建演化迭代（基于现有）
+$ cowork iter --title "添加批处理" --base iter-1-1770536303 --inherit partial
 ```
+
+### 继承模式
+
+创建演化迭代时，您可以从三种继承模式中选择：
+
+| 模式   | 描述               | 使用场景                 |
+|--------|-------------------|-------------------------|
+| `none` | 全新开始，不继承    | 完全重写、新项目        |
+| `full` | 复制工作空间代码+制品 | Bug 修复、小功能增强    |
+| `partial` | 仅复制制品，重新生成代码 | 大功能、架构变更      |
 
 ### 配置管理
 
 ```sh
 # 初始化配置文件
-cowork init
+cowork init --name "我的项目"
 
-# 使用详细日志
-cowork new "你的想法" --verbose
+# 使用自定义配置
+cowork iter --title "您的创意" --config ./custom-config.toml
 
-# 启用 LLM 流式输出
-cowork new "你的想法" --stream
+# 列出带有详细状态的迭代
+cowork list --all
+
+# 检查当前项目状态
+cowork status
 ```
+
+## 🎨 Cowork GUI
+
+Cowork GUI 提供了一个丰富的可视化界面，用于管理项目、监控智能体进度和预览结果。
+
+### 主要特性
+- **可视化仪表板**：概览所有项目和迭代状态。
+- **实时监控**：通过详细日志和状态更新实时观察智能体工作。
+- **交互式聊天**：通过聊天界面直接与智能体沟通。
+- **内置预览**：在应用内直接预览生成的 Web 应用。
+
+### 运行 GUI
+
+从源码运行 GUI：
+
+1. 确保已安装 Node.js 和 Rust。
+2. 进入 GUI 目录：
+   ```sh
+   cd crates/cowork-gui
+   ```
+3. 安装前端依赖：
+   ```sh
+   npm install
+   # 或
+   bun install
+   ```
+4. 启动应用：
+   ```sh
+   cargo tauri dev
+   ```
 
 # 🔒 安全
 
@@ -478,12 +601,13 @@ cargo test -p cowork-core
 
 # 📚 文档
 
-全面的文档可在 [litho.docs](./litho.docs/) 目录中找到：
+全面的文档位于 [docs](./docs/) 目录：
 
-- [项目概述](./litho.docs/1、项目概述.md) - 系统上下文和架构
-- [架构概述](./litho.docs/2、架构概览.md) - 详细的架构文档
-- [核心工作流](./litho.docs/3、工作流程.md) - 工作流和流程文档
-- [领域模块](./litho.docs/4、深入探索/) - 深入的领域分析
+- [架构概述](./docs/architecture/overview.md) - 系统架构和设计原则
+- [迭代架构](./docs/architecture/iteration-architecture.md) - 核心迭代系统
+- [智能体系统](./docs/architecture/agent-system.md) - AI 智能体实现细节
+- [流水线工作流](./docs/architecture/pipeline.md) - 阶段执行和管理
+- [开发指南](./docs/development/) - 贡献者资源和模式
 
 # 🪪 许可证
 
