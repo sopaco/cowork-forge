@@ -1,16 +1,16 @@
 // GUI-specific commands for enhanced functionality
-use super::gui_types::*;
 use super::gui_types::FileReadResult;
+use super::gui_types::*;
 use crate::AppState;
 use crate::preview_server::PreviewServerManager;
 use crate::project_runner::ProjectRunner;
-use cowork_core::persistence::IterationStore;
-use cowork_core::{RuntimeAnalyzer, ProjectRuntimeConfig};
 use cowork_core::llm::config::LlmConfig;
-use tauri::{State, Window};
+use cowork_core::persistence::IterationStore;
+use cowork_core::{ProjectRuntimeConfig, RuntimeAnalyzer};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use tauri::{State, Window};
 
 // Global instances
 lazy_static::lazy_static! {
@@ -38,22 +38,24 @@ pub async fn open_in_file_manager(path: String, _window: Window) -> Result<(), S
         // It's a workspace path
         let iteration_id = path.strip_prefix("workspace_").unwrap_or(&path);
         let iteration_store = IterationStore::new();
-        iteration_store.workspace_path(iteration_id)
+        iteration_store
+            .workspace_path(iteration_id)
             .map_err(|e| format!("Failed to get workspace path: {}", e))?
     } else if path.contains("iter-") {
         // It's an iteration artifacts path
         let iteration_store = IterationStore::new();
-        iteration_store.iteration_path(&path)
+        iteration_store
+            .iteration_path(&path)
             .map_err(|e| format!("Failed to get iteration path: {}", e))?
     } else {
         // It's a direct path
         PathBuf::from(path)
     };
-    
+
     if !resolved_path.exists() {
         return Err(format!("Path does not exist: {}", resolved_path.display()));
     }
-    
+
     // Open in file manager based on OS
     if cfg!(target_os = "windows") {
         Command::new("explorer")
@@ -72,7 +74,7 @@ pub async fn open_in_file_manager(path: String, _window: Window) -> Result<(), S
             .spawn()
             .map_err(|e| format!("Failed to open folder: {}", e))?;
     }
-    
+
     Ok(())
 }
 
@@ -89,11 +91,13 @@ pub async fn get_iteration_artifacts(
     println!("[GUI] Getting artifacts for iteration: {}", iteration_id);
 
     let iteration_store = IterationStore::new();
-    let _iteration = iteration_store.load(&iteration_id)
+    let _iteration = iteration_store
+        .load(&iteration_id)
         .map_err(|e| format!("Failed to load iteration: {}", e))?;
 
     // Get iteration artifacts directory
-    let iteration_dir = iteration_store.iteration_path(&iteration_id)
+    let iteration_dir = iteration_store
+        .iteration_path(&iteration_id)
         .map_err(|e| format!("Failed to get iteration dir: {}", e))?;
     let artifacts_dir = iteration_dir.join("artifacts");
 
@@ -124,7 +128,8 @@ pub async fn get_iteration_artifacts(
     println!("[GUI] PRD loaded: {}", prd.is_some());
 
     // Load workspace code files if available
-    let workspace = iteration_store.workspace_path(&iteration_id)
+    let workspace = iteration_store
+        .workspace_path(&iteration_id)
         .map_err(|e| format!("Failed to get workspace: {}", e))?;
     let code_files = if workspace.exists() {
         collect_files(&workspace)
@@ -144,10 +149,6 @@ pub async fn get_iteration_artifacts(
     })
 }
 
-
-
-
-
 #[tauri::command]
 pub async fn read_iteration_file(
     iteration_id: String,
@@ -157,18 +158,22 @@ pub async fn read_iteration_file(
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<FileReadResult, String> {
-    println!("[GUI] Reading file for iteration {}: {}", iteration_id, file_path);
+    println!(
+        "[GUI] Reading file for iteration {}: {}",
+        iteration_id, file_path
+    );
 
     let iteration_store = IterationStore::new();
-    let workspace = iteration_store.workspace_path(&iteration_id)
+    let workspace = iteration_store
+        .workspace_path(&iteration_id)
         .map_err(|e| format!("Failed to get workspace: {}", e))?;
 
     let full_path = workspace.join(&file_path);
 
     // Get file metadata
-    let metadata = fs::metadata(&full_path)
-        .map_err(|e| format!("Failed to get file metadata: {}", e))?;
-    
+    let metadata =
+        fs::metadata(&full_path).map_err(|e| format!("Failed to get file metadata: {}", e))?;
+
     let file_size = metadata.len() as usize;
     const MAX_FILE_SIZE: usize = 10 * 1024 * 1024; // 10MB limit for full read
 
@@ -176,23 +181,24 @@ pub async fn read_iteration_file(
     if file_size > MAX_FILE_SIZE || offset.is_some() || limit.is_some() {
         let offset = offset.unwrap_or(0);
         let limit = limit.unwrap_or(1024 * 1024); // Default 1MB chunks
-        
-        let mut file = fs::File::open(&full_path)
-            .map_err(|e| format!("Failed to open file: {}", e))?;
-        
-        use std::io::{Seek, Read};
-        
+
+        let mut file =
+            fs::File::open(&full_path).map_err(|e| format!("Failed to open file: {}", e))?;
+
+        use std::io::{Read, Seek};
+
         file.seek(std::io::SeekFrom::Start(offset as u64))
             .map_err(|e| format!("Failed to seek in file: {}", e))?;
-        
+
         let mut buffer = vec![0; limit.min(file_size - offset)];
-        let bytes_read = file.read(&mut buffer)
+        let bytes_read = file
+            .read(&mut buffer)
             .map_err(|e| format!("Failed to read file: {}", e))?;
-        
+
         buffer.truncate(bytes_read);
-        
+
         let content = String::from_utf8_lossy(&buffer).to_string();
-        
+
         Ok(FileReadResult {
             content,
             offset: offset as u64,
@@ -201,9 +207,9 @@ pub async fn read_iteration_file(
         })
     } else {
         // Read full file for small files
-        let content = fs::read_to_string(&full_path)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
-        
+        let content =
+            fs::read_to_string(&full_path).map_err(|e| format!("Failed to read file: {}", e))?;
+
         Ok(FileReadResult {
             content,
             offset: 0,
@@ -213,8 +219,6 @@ pub async fn read_iteration_file(
     }
 }
 
-
-
 #[tauri::command]
 pub async fn save_iteration_file(
     iteration_id: String,
@@ -223,28 +227,28 @@ pub async fn save_iteration_file(
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<(), String> {
-    println!("[GUI] Saving file for iteration {}: {}", iteration_id, file_path);
+    println!(
+        "[GUI] Saving file for iteration {}: {}",
+        iteration_id, file_path
+    );
 
     let iteration_store = IterationStore::new();
-    let workspace = iteration_store.workspace_path(&iteration_id)
+    let workspace = iteration_store
+        .workspace_path(&iteration_id)
         .map_err(|e| format!("Failed to get workspace: {}", e))?;
 
     let full_path = workspace.join(&file_path);
 
     // Create parent directories if needed
     if let Some(parent) = full_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create directories: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directories: {}", e))?;
     }
 
-    fs::write(&full_path, content)
-        .map_err(|e| format!("Failed to write file: {}", e))?;
+    fs::write(&full_path, content).map_err(|e| format!("Failed to write file: {}", e))?;
 
     println!("[GUI] File saved successfully");
     Ok(())
 }
-
-
 
 #[tauri::command]
 pub async fn get_iteration_file_tree(
@@ -255,12 +259,17 @@ pub async fn get_iteration_file_tree(
     println!("[GUI] Getting file tree for iteration: {}", iteration_id);
 
     let iteration_store = IterationStore::new();
-    let workspace = iteration_store.workspace_path(&iteration_id)
+    let workspace = iteration_store
+        .workspace_path(&iteration_id)
         .map_err(|e| format!("Failed to get workspace: {}", e))?;
 
     if !workspace.exists() {
         return Ok(FileTreeNode {
-            name: workspace.file_name().unwrap_or(workspace.as_os_str()).to_string_lossy().to_string(),
+            name: workspace
+                .file_name()
+                .unwrap_or(workspace.as_os_str())
+                .to_string_lossy()
+                .to_string(),
             path: ".".to_string(),
             is_dir: true,
             children: Some(vec![]),
@@ -272,8 +281,6 @@ pub async fn get_iteration_file_tree(
     build_file_tree(&workspace, &workspace, 0)
         .map_err(|e| format!("Failed to build file tree: {}", e))
 }
-
-
 
 // ============================================================================
 // Iteration-based Preview and Run Commands (V2 API)
@@ -295,11 +302,17 @@ pub async fn start_iteration_preview(
 
     // Get start command and port from LLM analysis
     let (command, port, url) = detect_start_command_with_info(&code_dir)?;
-    
+
     println!("[GUI] Preview using command: {}, port: {}", command, port);
 
     // Start the development server using ProjectRunner
-    let _pid = PROJECT_RUNNER.start(iteration_id.clone(), command, code_dir.to_string_lossy().to_string()).await?;
+    let _pid = PROJECT_RUNNER
+        .start(
+            iteration_id.clone(),
+            command,
+            code_dir.to_string_lossy().to_string(),
+        )
+        .await?;
 
     Ok(PreviewInfo {
         url,
@@ -313,26 +326,38 @@ pub async fn start_iteration_preview(
 fn detect_start_command_with_info(code_dir: &Path) -> Result<(String, u16, String), String> {
     // Use RuntimeAnalyzer (LLM分析) 获取运行配置
     let analyzer_result = try_analyze_with_runtime(code_dir);
-    
+
     if let Ok(config) = analyzer_result {
         // Determine port and URL based on project type
         let (port, url) = if let Some(frontend) = &config.frontend {
-            (frontend.dev_port, format!("http://{}:{}", frontend.dev_host, frontend.dev_port))
+            (
+                frontend.dev_port,
+                format!("http://{}:{}", frontend.dev_host, frontend.dev_port),
+            )
         } else if let Some(backend) = &config.backend {
-            (backend.port, format!("http://{}:{}", backend.host, backend.port))
+            (
+                backend.port,
+                format!("http://{}:{}", backend.host, backend.port),
+            )
         } else if let Some(fullstack) = &config.fullstack {
-            (fullstack.frontend_port, format!("http://localhost:{}", fullstack.frontend_port))
+            (
+                fullstack.frontend_port,
+                format!("http://localhost:{}", fullstack.frontend_port),
+            )
         } else {
             (3000, "http://localhost:3000".to_string())
         };
-        
+
         // Generate start command
         if let Some(cmd) = generate_start_command_from_config(&config) {
-            println!("[GUI] LLM detected runtime type: {:?}, command: {}, port: {}", config.runtime_type, cmd, port);
+            println!(
+                "[GUI] LLM detected runtime type: {:?}, command: {}, port: {}",
+                config.runtime_type, cmd, port
+            );
             return Ok((cmd, port, url));
         }
     }
-    
+
     // LLM 分析失败，返回错误
     Err("无法通过大模型分析获取运行命令，请确保 config.toml 中配置了有效的 LLM".to_string())
 }
@@ -343,8 +368,11 @@ pub async fn check_preview_status(
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<Option<PreviewInfo>, String> {
-    println!("[GUI] Checking preview status for iteration: {}", iteration_id);
-    
+    println!(
+        "[GUI] Checking preview status for iteration: {}",
+        iteration_id
+    );
+
     if PREVIEW_SERVER_MANAGER.is_running(&iteration_id) {
         Ok(PREVIEW_SERVER_MANAGER.get_info(&iteration_id))
     } else {
@@ -356,14 +384,14 @@ pub async fn check_preview_status(
 async fn install_dependencies_if_needed(workspace: &std::path::Path) -> Result<(), String> {
     let package_json = workspace.join("package.json");
     let node_modules = workspace.join("node_modules");
-    
+
     if package_json.exists() && !node_modules.exists() {
         println!("[GUI] package.json found but node_modules missing, installing dependencies...");
-        
+
         // Try bun first, then npm
         let use_bun = which::which("bun").is_ok();
         let use_npm = which::which("npm").is_ok();
-        
+
         let install_cmd = if use_bun {
             "bun install"
         } else if use_npm {
@@ -371,14 +399,14 @@ async fn install_dependencies_if_needed(workspace: &std::path::Path) -> Result<(
         } else {
             return Err("Neither bun nor npm found. Cannot install dependencies.".to_string());
         };
-        
+
         println!("[GUI] Running: {} in {}", install_cmd, workspace.display());
-        
+
         let output = std::process::Command::new(if use_bun { "bun" } else { "npm" })
             .arg("install")
             .current_dir(workspace)
             .output();
-        
+
         match output {
             Ok(result) => {
                 if result.status.success() {
@@ -400,7 +428,7 @@ async fn install_dependencies_if_needed(workspace: &std::path::Path) -> Result<(
             }
         }
     }
-    
+
     Ok(())
 }
 
@@ -420,7 +448,10 @@ pub async fn get_project_runtime_info(
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<ProjectRuntimeInfo, String> {
-    println!("[GUI] Getting project runtime info for iteration: {}", iteration_id);
+    println!(
+        "[GUI] Getting project runtime info for iteration: {}",
+        iteration_id
+    );
 
     // Use project root (after delivery) or workspace (before delivery)
     let code_dir = get_code_directory(&iteration_id)?;
@@ -428,11 +459,11 @@ pub async fn get_project_runtime_info(
     // Try to get runtime config from LLM analysis
     let config_result = try_analyze_with_runtime(&code_dir);
 
-    let (has_frontend, has_backend, preview_url, frontend_port, backend_port, start_command) = 
+    let (has_frontend, has_backend, preview_url, frontend_port, backend_port, start_command) =
         if let Ok(config) = config_result {
             let has_frontend = config.frontend.is_some();
             let has_backend = config.backend.is_some() || config.fullstack.is_some();
-            
+
             let (preview_url, frontend_port) = if let Some(ref frontend) = config.frontend {
                 let url = format!("http://{}:{}", frontend.dev_host, frontend.dev_port);
                 (Some(url), Some(frontend.dev_port))
@@ -453,16 +484,23 @@ pub async fn get_project_runtime_info(
 
             let start_command = generate_start_command_from_config(&config);
 
-            (has_frontend, has_backend, preview_url, frontend_port, backend_port, start_command)
+            (
+                has_frontend,
+                has_backend,
+                preview_url,
+                frontend_port,
+                backend_port,
+                start_command,
+            )
         } else {
             // Fallback: detect based on file existence
-            let has_frontend = code_dir.join("index.html").exists() 
-                || code_dir.join("src").exists() 
+            let has_frontend = code_dir.join("index.html").exists()
+                || code_dir.join("src").exists()
                 || code_dir.join("package.json").exists();
             let has_backend = code_dir.join("Cargo.toml").exists()
                 || code_dir.join("main.py").exists()
                 || code_dir.join("server.js").exists();
-            
+
             (has_frontend, has_backend, None, None, None, None)
         };
 
@@ -495,7 +533,13 @@ pub async fn start_iteration_project(
     println!("[GUI] Detected start command: {}", command);
 
     let command_clone = command.clone();
-    let pid = PROJECT_RUNNER.start(iteration_id.clone(), command, code_dir.to_string_lossy().to_string()).await?;
+    let pid = PROJECT_RUNNER
+        .start(
+            iteration_id.clone(),
+            command,
+            code_dir.to_string_lossy().to_string(),
+        )
+        .await?;
 
     Ok(RunInfo {
         status: RunStatus::Running,
@@ -523,8 +567,6 @@ pub async fn check_project_status(
     Ok(PROJECT_RUNNER.is_running(&iteration_id))
 }
 
-
-
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -538,12 +580,10 @@ fn collect_files(dir: &Path) -> Vec<FileInfo> {
             let metadata = entry.metadata().ok();
 
             if let Some(meta) = metadata {
-                let name = path.file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .to_string();
+                let name = path.file_name().unwrap().to_string_lossy().to_string();
 
-                let relative_path = path.strip_prefix(dir)
+                let relative_path = path
+                    .strip_prefix(dir)
                     .unwrap()
                     .to_string_lossy()
                     .to_string();
@@ -556,7 +596,8 @@ fn collect_files(dir: &Path) -> Vec<FileInfo> {
                     size: meta.len(),
                     is_dir: meta.is_dir(),
                     language,
-                    modified_at: meta.modified()
+                    modified_at: meta
+                        .modified()
                         .ok()
                         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                         .map(|d| d.as_secs().to_string()),
@@ -569,12 +610,10 @@ fn collect_files(dir: &Path) -> Vec<FileInfo> {
 }
 
 fn build_file_tree(dir: &Path, root: &Path, depth: usize) -> Result<FileTreeNode, String> {
-    let name = dir.file_name()
-        .unwrap()
-        .to_string_lossy()
-        .to_string();
+    let name = dir.file_name().unwrap().to_string_lossy().to_string();
 
-    let path = dir.strip_prefix(root)
+    let path = dir
+        .strip_prefix(root)
         .unwrap()
         .to_string_lossy()
         .to_string();
@@ -591,21 +630,25 @@ fn build_file_tree(dir: &Path, root: &Path, depth: usize) -> Result<FileTreeNode
             let a_is_dir = a.path().is_dir();
             let b_is_dir = b.path().is_dir();
             // Directories first
-            b_is_dir.cmp(&a_is_dir)
+            b_is_dir
+                .cmp(&a_is_dir)
                 .then_with(|| a.file_name().cmp(&b.file_name()))
         });
 
-        Some(entries.into_iter()
-            .filter_map(|entry| {
-                let path = entry.path();
-                let name = path.file_name().unwrap().to_string_lossy().to_string();
-                // Skip hidden files
-                if name.starts_with('.') {
-                    return None;
-                }
-                build_file_tree(&path, root, depth + 1).ok()
-            })
-            .collect())
+        Some(
+            entries
+                .into_iter()
+                .filter_map(|entry| {
+                    let path = entry.path();
+                    let name = path.file_name().unwrap().to_string_lossy().to_string();
+                    // Skip hidden files
+                    if name.starts_with('.') {
+                        return None;
+                    }
+                    build_file_tree(&path, root, depth + 1).ok()
+                })
+                .collect(),
+        )
     } else {
         None
     };
@@ -656,20 +699,19 @@ fn detect_language(filename: &str) -> Option<String> {
 /// Priority: workspace (before delivery) > project root (after delivery)
 fn get_code_directory(iteration_id: &str) -> Result<PathBuf, String> {
     let iteration_store = IterationStore::new();
-    let workspace = iteration_store.workspace_path(iteration_id)
+    let workspace = iteration_store
+        .workspace_path(iteration_id)
         .map_err(|e| format!("Failed to get workspace path: {}", e))?;
 
     // Get project root (current working directory)
-    let project_root = std::env::current_dir()
-        .map_err(|e| format!("Failed to get project root: {}", e))?;
+    let project_root =
+        std::env::current_dir().map_err(|e| format!("Failed to get project root: {}", e))?;
 
     // Check if a directory has project files
     let has_frontend_files = |dir: &Path| -> bool {
-        dir.join("index.html").exists() 
-            || dir.join("src").exists()
-            || dir.join("public").exists()
+        dir.join("index.html").exists() || dir.join("src").exists() || dir.join("public").exists()
     };
-    
+
     let has_backend_files = |dir: &Path| -> bool {
         dir.join("Cargo.toml").exists()
             || dir.join("main.rs").exists()
@@ -677,39 +719,45 @@ fn get_code_directory(iteration_id: &str) -> Result<PathBuf, String> {
             || dir.join("server.js").exists()
             || dir.join("app.py").exists()
     };
-    
-    let has_node_project = |dir: &Path| -> bool {
-        dir.join("package.json").exists()
-    };
+
+    let has_node_project = |dir: &Path| -> bool { dir.join("package.json").exists() };
 
     // Check if workspace has actual project files (development phase)
-    let workspace_has_files = workspace.exists() && (
-        has_frontend_files(&workspace) 
-        || has_backend_files(&workspace) 
-        || has_node_project(&workspace)
-    );
+    let workspace_has_files = workspace.exists()
+        && (has_frontend_files(&workspace)
+            || has_backend_files(&workspace)
+            || has_node_project(&workspace));
 
     // Check if project root has actual project files (after delivery)
-    let project_root_has_files = has_frontend_files(&project_root) 
-        || has_backend_files(&project_root) 
+    let project_root_has_files = has_frontend_files(&project_root)
+        || has_backend_files(&project_root)
         || has_node_project(&project_root);
 
     // Priority: workspace > project root
     // Use workspace if it exists and has files (development phase)
     // Otherwise use project root (after delivery)
     if workspace_has_files {
-        println!("[GUI] Using workspace for preview/run: {}", workspace.display());
+        println!(
+            "[GUI] Using workspace for preview/run: {}",
+            workspace.display()
+        );
         Ok(workspace)
     } else if project_root_has_files {
-        println!("[GUI] Using project root for preview/run: {}", project_root.display());
+        println!(
+            "[GUI] Using project root for preview/run: {}",
+            project_root.display()
+        );
         Ok(project_root)
     } else if workspace.exists() {
         // Fallback: workspace exists but no project files
         println!("[GUI] Using workspace (fallback): {}", workspace.display());
         Ok(workspace)
     } else {
-        Err(format!("No valid code directory found. Workspace: {}, Project root: {}",
-            workspace.display(), project_root.display()))
+        Err(format!(
+            "No valid code directory found. Workspace: {}, Project root: {}",
+            workspace.display(),
+            project_root.display()
+        ))
     }
 }
 
@@ -717,15 +765,18 @@ fn get_code_directory(iteration_id: &str) -> Result<PathBuf, String> {
 fn detect_start_command(code_dir: &Path) -> Result<String, String> {
     // 使用 RuntimeAnalyzer (LLM分析) 获取运行配置
     let analyzer_result = try_analyze_with_runtime(code_dir);
-    
+
     if let Ok(config) = analyzer_result {
         // 从运行时配置生成启动命令
         if let Some(cmd) = generate_start_command_from_config(&config) {
-            println!("[GUI] LLM detected runtime type: {:?}, command: {}", config.runtime_type, cmd);
+            println!(
+                "[GUI] LLM detected runtime type: {:?}, command: {}",
+                config.runtime_type, cmd
+            );
             return Ok(cmd);
         }
     }
-    
+
     // LLM 分析失败，返回错误
     Err("无法通过大模型分析获取运行命令，请确保 config.toml 中配置了有效的 LLM".to_string())
 }
@@ -734,24 +785,22 @@ fn detect_start_command(code_dir: &Path) -> Result<String, String> {
 fn try_analyze_with_runtime(code_dir: &Path) -> Result<ProjectRuntimeConfig, String> {
     // Initialize analyzer with config if not already done
     init_runtime_analyzer();
-    
+
     let guard = RUNTIME_ANALYZER.lock().map_err(|e| e.to_string())?;
-    
+
     if let Some(analyzer) = guard.as_ref() {
         // Clone the necessary data to move into blocking task
         let code_dir = code_dir.to_path_buf();
-        
+
         // Use spawn_blocking to run the async analysis in a blocking context
         let result = tokio::task::block_in_place(move || {
             let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-            rt.block_on(async {
-                analyzer.analyze(&code_dir).await
-            })
+            rt.block_on(async { analyzer.analyze(&code_dir).await })
         });
-        
+
         return result;
     }
-    
+
     Err("RuntimeAnalyzer not initialized".to_string())
 }
 
@@ -764,18 +813,22 @@ fn init_runtime_analyzer() {
             return;
         }
     };
-    
+
     if guard.is_some() {
         return; // Already initialized
     }
-    
+
     // Try to load config.toml from project root
-    let config_path = std::env::current_dir()
-        .ok()
-        .and_then(|dir| dir.join("config.toml").exists().then_some(dir.join("config.toml")));
-    
+    let config_path = std::env::current_dir().ok().and_then(|dir| {
+        dir.join("config.toml")
+            .exists()
+            .then_some(dir.join("config.toml"))
+    });
+
     if let Some(path) = config_path {
-        if let Ok(config) = cowork_core::llm::config::ModelConfig::from_file(path.to_str().unwrap_or("config.toml")) {
+        if let Ok(config) =
+            cowork_core::llm::config::ModelConfig::from_file(path.to_str().unwrap_or("config.toml"))
+        {
             let llm_config = LlmConfig {
                 api_base_url: config.llm.api_base_url,
                 api_key: config.llm.api_key,
@@ -787,7 +840,7 @@ fn init_runtime_analyzer() {
             return;
         }
     }
-    
+
     // No config found, use heuristic-only analyzer
     *guard = Some(RuntimeAnalyzer::new());
     println!("[GUI] RuntimeAnalyzer initialized (heuristic mode)");
@@ -801,7 +854,7 @@ fn generate_start_command_from_config(config: &ProjectRuntimeConfig) -> Option<S
             return Some(frontend.dev_command.clone());
         }
     }
-    
+
     if let Some(ref backend) = config.backend {
         if !backend.dev_command.is_empty() {
             return Some(backend.dev_command.clone());
@@ -812,7 +865,7 @@ fn generate_start_command_from_config(config: &ProjectRuntimeConfig) -> Option<S
             }
         }
     }
-    
+
     // Check runtime type for common patterns
     match config.runtime_type {
         cowork_core::RuntimeType::ReactVite => Some("npm run dev".to_string()),
@@ -843,8 +896,10 @@ pub async fn query_memory_index(
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    println!("[GUI] Querying memory index: query_type={}, stage={:?}, limit={}, iteration_id={:?}",
-             query_type, stage, limit, iteration_id);
+    println!(
+        "[GUI] Querying memory index: query_type={}, stage={:?}, limit={}, iteration_id={:?}",
+        query_type, stage, limit, iteration_id
+    );
 
     let store = cowork_core::persistence::MemoryStore::new();
 
@@ -857,11 +912,7 @@ pub async fn query_memory_index(
         _ => cowork_core::domain::MemoryQueryType::All,
     };
 
-    let keywords = if let Some(s) = stage {
-        vec![s]
-    } else {
-        vec![]
-    };
+    let keywords = if let Some(s) = stage { vec![s] } else { vec![] };
 
     let query = cowork_core::domain::MemoryQuery {
         scope,
@@ -870,7 +921,8 @@ pub async fn query_memory_index(
         limit: Some(limit as usize),
     };
 
-    let result = store.query(&query, iteration_id.as_deref())
+    let result = store
+        .query(&query, iteration_id.as_deref())
         .map_err(|e| format!("Failed to query memory: {}", e))?;
 
     // Convert to format expected by frontend: { results: [], total: N }
@@ -956,34 +1008,38 @@ pub async fn load_memory_detail(
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    println!("[GUI] Loading memory detail: memory_id={}, iteration_id={:?}", memory_id, iteration_id);
+    println!(
+        "[GUI] Loading memory detail: memory_id={}, iteration_id={:?}",
+        memory_id, iteration_id
+    );
 
     let store = cowork_core::persistence::MemoryStore::new();
-    
+
     // Try to find the memory item in project memory first
-    let project_memory = store.load_project_memory()
+    let project_memory = store
+        .load_project_memory()
         .map_err(|e| format!("Failed to load project memory: {}", e))?;
-    
+
     // Search in decisions
     for decision in &project_memory.decisions {
         if decision.id == memory_id {
             return Ok(serde_json::json!({
                 "memory_id": memory_id,
-                "content": format!("**Context:** {}\n\n**Decision:** {}\n\n**Consequences:**\n{}", 
-                    decision.context, 
+                "content": format!("**Context:** {}\n\n**Decision:** {}\n\n**Consequences:**\n{}",
+                    decision.context,
                     decision.decision,
                     decision.consequences.join("\n")),
                 "type": "decision"
             }));
         }
     }
-    
+
     // Search in patterns
     for pattern in &project_memory.patterns {
         if pattern.id == memory_id {
             return Ok(serde_json::json!({
                 "memory_id": memory_id,
-                "content": format!("**Description:** {}\n\n**Usage:**\n{}\n\n**Tags:** {}\n\n**Code Example:**\n{}", 
+                "content": format!("**Description:** {}\n\n**Usage:**\n{}\n\n**Tags:** {}\n\n**Code Example:**\n{}",
                     pattern.description,
                     pattern.usage.join("\n"),
                     pattern.tags.join(", "),
@@ -992,7 +1048,7 @@ pub async fn load_memory_detail(
             }));
         }
     }
-    
+
     // Try iteration memory - use memory_id format like "insight-123" to identify items
     if let Some(iter_id) = iteration_id {
         if let Ok(iter_memory) = store.load_iteration_memory(&iter_id) {
@@ -1003,7 +1059,7 @@ pub async fn load_memory_detail(
                         if insight.created_at.timestamp() == ts {
                             return Ok(serde_json::json!({
                                 "memory_id": memory_id,
-                                "content": format!("**Stage:** {}\n\n**Content:** {}", 
+                                "content": format!("**Stage:** {}\n\n**Content:** {}",
                                     insight.stage,
                                     insight.content),
                                 "type": "insight"
@@ -1012,7 +1068,7 @@ pub async fn load_memory_detail(
                     }
                 }
             }
-            
+
             // Search in issues by timestamp
             if memory_id.starts_with("issue-") {
                 if let Ok(ts) = memory_id.replace("issue-", "").parse::<i64>() {
@@ -1020,7 +1076,7 @@ pub async fn load_memory_detail(
                         if issue.created_at.timestamp() == ts {
                             return Ok(serde_json::json!({
                                 "memory_id": memory_id,
-                                "content": format!("**Stage:** {}\n\n**Issue:** {}\n\n**Resolved:** {}", 
+                                "content": format!("**Stage:** {}\n\n**Issue:** {}\n\n**Resolved:** {}",
                                     issue.stage,
                                     issue.content,
                                     issue.resolved),
@@ -1030,7 +1086,7 @@ pub async fn load_memory_detail(
                     }
                 }
             }
-            
+
             // Search in learnings by timestamp
             if memory_id.starts_with("learning-") {
                 if let Ok(ts) = memory_id.replace("learning-", "").parse::<i64>() {
@@ -1047,7 +1103,7 @@ pub async fn load_memory_detail(
             }
         }
     }
-    
+
     Err(format!("Memory item not found: {}", memory_id))
 }
 
@@ -1065,31 +1121,29 @@ pub async fn save_session_memory(
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    println!("[GUI] Saving session memory: memory_type={}, title={}, iteration_id={}", memory_type, title, iteration_id);
-    
+    println!(
+        "[GUI] Saving session memory: memory_type={}, title={}, iteration_id={}",
+        memory_type, title, iteration_id
+    );
+
     let store = cowork_core::persistence::MemoryStore::new();
-    let mut memory = store.load_iteration_memory(&iteration_id)
+    let mut memory = store
+        .load_iteration_memory(&iteration_id)
         .map_err(|e| format!("Failed to load iteration memory: {}", e))?;
-    
+
     match memory_type.as_str() {
         "decision" => {
-            let decision = cowork_core::domain::Decision::new(
-                &title,
-                &summary,
-                &content,
-                &iteration_id
-            );
-            store.add_decision(decision)
+            let decision =
+                cowork_core::domain::Decision::new(&title, &summary, &content, &iteration_id);
+            store
+                .add_decision(decision)
                 .map_err(|e| format!("Failed to add decision: {}", e))?;
         }
         "pattern" => {
-            let mut pattern = cowork_core::domain::Pattern::new(
-                &title,
-                &content,
-                &iteration_id
-            );
+            let mut pattern = cowork_core::domain::Pattern::new(&title, &content, &iteration_id);
             pattern.tags = vec![stage.clone()];
-            store.add_pattern(pattern)
+            store
+                .add_pattern(pattern)
                 .map_err(|e| format!("Failed to add pattern: {}", e))?;
         }
         "insight" => {
@@ -1105,10 +1159,11 @@ pub async fn save_session_memory(
             return Err(format!("Unknown memory type: {}", memory_type));
         }
     }
-    
-    store.save_iteration_memory(&memory)
+
+    store
+        .save_iteration_memory(&memory)
         .map_err(|e| format!("Failed to save iteration memory: {}", e))?;
-    
+
     Ok(serde_json::json!({
         "message": "Memory saved successfully",
         "iteration_id": iteration_id
@@ -1123,12 +1178,16 @@ pub async fn promote_to_project_memory(
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    println!("[GUI] Promoting to project memory: memory_id={}, iteration_id={}", memory_id, iteration_id);
+    println!(
+        "[GUI] Promoting to project memory: memory_id={}, iteration_id={}",
+        memory_id, iteration_id
+    );
 
     let store = cowork_core::persistence::MemoryStore::new();
-    let iter_memory = store.load_iteration_memory(&iteration_id)
+    let iter_memory = store
+        .load_iteration_memory(&iteration_id)
         .map_err(|e| format!("Failed to load iteration memory: {}", e))?;
-    
+
     // Find and promote insight by timestamp
     if memory_id.starts_with("insight-") {
         if let Ok(ts) = memory_id.replace("insight-", "").parse::<i64>() {
@@ -1138,9 +1197,10 @@ pub async fn promote_to_project_memory(
                         &format!("Insight from {}", insight.stage),
                         &format!("Discovered during {} stage", insight.stage),
                         &insight.content,
-                        &iteration_id
+                        &iteration_id,
                     );
-                    store.add_decision(decision)
+                    store
+                        .add_decision(decision)
                         .map_err(|e| format!("Failed to add decision: {}", e))?;
                     return Ok(serde_json::json!({
                         "message": "Promoted to project decision successfully",
@@ -1150,7 +1210,7 @@ pub async fn promote_to_project_memory(
             }
         }
     }
-    
+
     // Find and promote learning by timestamp
     if memory_id.starts_with("learning-") {
         if let Ok(ts) = memory_id.replace("learning-", "").parse::<i64>() {
@@ -1159,9 +1219,10 @@ pub async fn promote_to_project_memory(
                     let pattern = cowork_core::domain::Pattern::new(
                         "Learning",
                         &learning.content,
-                        &iteration_id
+                        &iteration_id,
                     );
-                    store.add_pattern(pattern)
+                    store
+                        .add_pattern(pattern)
                         .map_err(|e| format!("Failed to add pattern: {}", e))?;
                     return Ok(serde_json::json!({
                         "message": "Promoted to project pattern successfully",
@@ -1171,8 +1232,11 @@ pub async fn promote_to_project_memory(
             }
         }
     }
-    
-    Err(format!("Memory item not found for promotion: {}", memory_id))
+
+    Err(format!(
+        "Memory item not found for promotion: {}",
+        memory_id
+    ))
 }
 
 #[tauri::command]
@@ -1181,22 +1245,29 @@ pub async fn get_memory_context(
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    println!("[GUI] Getting memory context: iteration_id={:?}", iteration_id);
+    println!(
+        "[GUI] Getting memory context: iteration_id={:?}",
+        iteration_id
+    );
 
     let store = cowork_core::persistence::MemoryStore::new();
-    
+
     // Get project memory
-    let project_memory = store.load_project_memory()
+    let project_memory = store
+        .load_project_memory()
         .map_err(|e| format!("Failed to load project memory: {}", e))?;
-    
+
     // Get iteration memory if available
     let iteration_memory = if let Some(iter_id) = iteration_id {
-        Some(store.load_iteration_memory(&iter_id)
-            .map_err(|e| format!("Failed to load iteration memory: {}", e))?)
+        Some(
+            store
+                .load_iteration_memory(&iter_id)
+                .map_err(|e| format!("Failed to load iteration memory: {}", e))?,
+        )
     } else {
         None
     };
-    
+
     Ok(serde_json::json!({
         "project_memory": {
             "total_decisions": project_memory.decisions.len(),
@@ -1216,75 +1287,6 @@ pub async fn get_memory_context(
 }
 
 // ============================================================================
-// Dummy Tool Context for GUI Commands
-// ============================================================================
-
-use adk_core::{ToolContext, CallbackContext, ReadonlyContext, EventActions, AdkError};
-
-/// Dummy tool context used for GUI commands that don't need full tool context
-pub struct DummyToolContext;
-
-impl CallbackContext for DummyToolContext {
-    fn artifacts(&self) -> Option<std::sync::Arc<dyn adk_core::Artifacts>> {
-        None
-    }
-}
-
-impl ReadonlyContext for DummyToolContext {
-    fn invocation_id(&self) -> &str {
-        "dummy_invocation"
-    }
-    
-    fn session_id(&self) -> &str {
-        "dummy_iteration"
-    }
-    
-    fn agent_name(&self) -> &str {
-        "dummy_agent"
-    }
-    
-    fn user_id(&self) -> &str {
-        "dummy_user"
-    }
-    
-    fn app_name(&self) -> &str {
-        "cowork_gui"
-    }
-    
-    fn branch(&self) -> &str {
-        "main"
-    }
-    
-    fn user_content(&self) -> &adk_core::Content {
-        use std::sync::OnceLock;
-        static CONTENT: OnceLock<adk_core::Content> = OnceLock::new();
-        CONTENT.get_or_init(|| adk_core::Content::new("user"))
-    }
-}
-
-#[async_trait::async_trait]
-impl ToolContext for DummyToolContext {
-    fn function_call_id(&self) -> &str {
-        "dummy"
-    }
-
-    fn actions(&self) -> EventActions {
-        EventActions::default()
-    }
-
-    fn set_actions(&self, _actions: EventActions) {
-        // No-op
-    }
-
-    async fn search_memory<'life0: 'async_trait, 'life1: 'async_trait>(
-        &'life0 self,
-        _query: &'life1 str,
-    ) -> Result<Vec<adk_core::MemoryEntry>, AdkError> {
-        Ok(vec![])
-    }
-}
-
-// ============================================================================
 // Code Formatting Commands
 // ============================================================================
 
@@ -1297,8 +1299,8 @@ pub async fn format_code(
 ) -> Result<FormatResult, String> {
     println!("[GUI] Formatting code in project root");
 
-    let project_root = std::env::current_dir()
-        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+    let project_root =
+        std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
 
     let code_dir = &project_root;
 
@@ -1326,7 +1328,7 @@ pub async fn format_code(
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout).to_string();
                 let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                
+
                 if output.status.success() {
                     // Parse formatted files from output
                     for line in stdout.lines() {
@@ -1355,7 +1357,7 @@ pub async fn format_code(
         match output {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-                
+
                 if output.status.success() {
                     // rustfmt doesn't output formatted files by default
                     formatted_files.push("All Rust files formatted".to_string());
@@ -1390,8 +1392,8 @@ pub async fn check_formatter_available(
 ) -> Result<FormatterAvailability, String> {
     println!("[GUI] Checking formatter availability in project root");
 
-    let project_root = std::env::current_dir()
-        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+    let project_root =
+        std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
 
     let code_dir = &project_root;
 
@@ -1439,7 +1441,7 @@ pub async fn get_templates(
 
     // Get templates directory
     let templates_dir = get_templates_dir()?;
-    
+
     if !templates_dir.exists() {
         return Ok(vec![]);
     }
@@ -1458,7 +1460,8 @@ pub async fn get_templates(
                     let path = entry.path();
                     if path.extension().and_then(|e| e.to_str()) == Some("json") {
                         if let Ok(content) = fs::read_to_string(&path) {
-                            if let Ok(template) = serde_json::from_str::<ProjectTemplate>(&content) {
+                            if let Ok(template) = serde_json::from_str::<ProjectTemplate>(&content)
+                            {
                                 templates.push(template);
                             }
                         }
@@ -1482,8 +1485,8 @@ pub async fn export_template(
 ) -> Result<ProjectTemplate, String> {
     println!("[GUI] Exporting template from project root");
 
-    let project_root = std::env::current_dir()
-        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+    let project_root =
+        std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
 
     let code_dir = &project_root;
 
@@ -1519,8 +1522,11 @@ pub async fn export_template(
         .map_err(|e| format!("Failed to create templates directory: {}", e))?;
 
     let template_file = templates_dir.join(format!("{}.json", template_id));
-    fs::write(&template_file, serde_json::to_string_pretty(&template).unwrap())
-        .map_err(|e| format!("Failed to save template: {}", e))?;
+    fs::write(
+        &template_file,
+        serde_json::to_string_pretty(&template).unwrap(),
+    )
+    .map_err(|e| format!("Failed to save template: {}", e))?;
 
     Ok(template)
 }
@@ -1547,8 +1553,11 @@ pub async fn import_template(
         .map_err(|e| format!("Failed to create templates directory: {}", e))?;
 
     let template_file = templates_dir.join(format!("{}.json", template.id));
-    fs::write(&template_file, serde_json::to_string_pretty(&template).unwrap())
-        .map_err(|e| format!("Failed to save template: {}", e))?;
+    fs::write(
+        &template_file,
+        serde_json::to_string_pretty(&template).unwrap(),
+    )
+    .map_err(|e| format!("Failed to save template: {}", e))?;
 
     Ok(template)
 }
@@ -1568,8 +1577,7 @@ pub async fn delete_template(
         return Err("Template not found".to_string());
     }
 
-    fs::remove_file(&template_file)
-        .map_err(|e| format!("Failed to delete template: {}", e))?;
+    fs::remove_file(&template_file).map_err(|e| format!("Failed to delete template: {}", e))?;
 
     Ok(())
 }
@@ -1607,15 +1615,15 @@ pub async fn apply_template(
     let mut created_files = Vec::new();
     for file in &template.files {
         let file_path = target_path.join(&file.path);
-        
+
         // Create parent directories
         if let Some(parent) = file_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create directory: {}", e))?;
+            fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
         }
 
         // Replace variables in content
-        let content = replace_template_variables(&file.content, &variables, &template.config.variables);
+        let content =
+            replace_template_variables(&file.content, &variables, &template.config.variables);
 
         // Write file
         fs::write(&file_path, content)
@@ -1632,9 +1640,8 @@ pub async fn apply_template(
 // ============================================================================
 
 fn get_templates_dir() -> Result<PathBuf, String> {
-    let config_dir = dirs::config_dir()
-        .ok_or("Failed to get config directory")?;
-    
+    let config_dir = dirs::config_dir().ok_or("Failed to get config directory")?;
+
     let templates_dir = config_dir.join("CoworkCreative").join("templates");
     Ok(templates_dir)
 }
@@ -1682,11 +1689,12 @@ fn collect_template_files(dir: &Path, files: &mut Vec<TemplateFile>) -> Result<(
             if let Ok(meta) = entry.metadata() {
                 if meta.is_file() {
                     if let Ok(content) = fs::read_to_string(&path) {
-                        let relative_path = path.strip_prefix(dir)
+                        let relative_path = path
+                            .strip_prefix(dir)
                             .map_err(|e| format!("Failed to get relative path: {}", e))?
                             .to_string_lossy()
                             .to_string();
-                        
+
                         files.push(TemplateFile {
                             path: relative_path,
                             content,
@@ -1702,17 +1710,22 @@ fn collect_template_files(dir: &Path, files: &mut Vec<TemplateFile>) -> Result<(
     Ok(())
 }
 
-fn replace_template_variables(content: &str, variables: &serde_json::Value, config_vars: &[TemplateVariable]) -> String {
+fn replace_template_variables(
+    content: &str,
+    variables: &serde_json::Value,
+    config_vars: &[TemplateVariable],
+) -> String {
     let mut result = content.to_string();
-    
+
     // Replace variables
     for var in config_vars {
         let placeholder = format!("{{{{{}}}}}", var.name);
-        let value = variables.get(&var.name)
+        let value = variables
+            .get(&var.name)
             .and_then(|v| v.as_str())
             .unwrap_or(&var.default_value);
         result = result.replace(&placeholder, value);
     }
-    
+
     result
 }

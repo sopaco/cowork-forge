@@ -1,14 +1,14 @@
 // Iteration Executor - Single entry point for all development cycles
 
-use std::sync::Arc;
 use futures::StreamExt;
+use std::sync::Arc;
 
 use crate::domain::{Iteration, IterationStatus, Project};
 use crate::interaction::{InteractiveBackend, MessageContext};
 use crate::persistence::{IterationStore, ProjectStore};
 use adk_core::Content;
 
-use super::{get_stages_from, is_critical_stage, PipelineContext, StageResult, Stage};
+use super::{PipelineContext, Stage, StageResult, get_stages_from, is_critical_stage};
 
 // Re-export from stage_executor
 use super::stage_executor::{SimpleInvocationContext, extract_text_from_event};
@@ -42,7 +42,8 @@ impl IterationExecutor {
         self.iteration_store.save(&iteration)?;
 
         // Update project
-        self.project_store.add_iteration(project, iteration.to_summary())?;
+        self.project_store
+            .add_iteration(project, iteration.to_summary())?;
 
         Ok(iteration)
     }
@@ -67,7 +68,8 @@ impl IterationExecutor {
         self.iteration_store.save(&iteration)?;
 
         // Update project
-        self.project_store.add_iteration(project, iteration.to_summary())?;
+        self.project_store
+            .add_iteration(project, iteration.to_summary())?;
 
         Ok(iteration)
     }
@@ -103,35 +105,49 @@ impl IterationExecutor {
             }
             InheritanceMode::Full => {
                 // Copy all workspace files and artifacts from base iteration
-                println!("[Executor] Full inheritance - copying all files from base iteration: {}", base_iteration_id);
-                
+                println!(
+                    "[Executor] Full inheritance - copying all files from base iteration: {}",
+                    base_iteration_id
+                );
+
                 let base_workspace = self.iteration_store.workspace_path(base_iteration_id)?;
                 if base_workspace.exists() {
                     self.copy_dir_all(&base_workspace, workspace).await?;
-                    println!("[Executor] Copied workspace from {}", base_workspace.display());
+                    println!(
+                        "[Executor] Copied workspace from {}",
+                        base_workspace.display()
+                    );
                 } else {
-                    println!("[Executor] Warning: Base workspace does not exist: {}", base_workspace.display());
+                    println!(
+                        "[Executor] Warning: Base workspace does not exist: {}",
+                        base_workspace.display()
+                    );
                 }
-                
+
                 // Also copy artifacts directory for Full inheritance
                 let base_iteration_dir = self.iteration_store.iteration_path(base_iteration_id)?;
                 let base_artifacts_dir = base_iteration_dir.join("artifacts");
-                let current_artifacts_dir = workspace.parent()
+                let current_artifacts_dir = workspace
+                    .parent()
                     .map(|p| p.join("artifacts"))
                     .unwrap_or_else(|| workspace.join("artifacts"));
 
                 if base_artifacts_dir.exists() {
                     std::fs::create_dir_all(&current_artifacts_dir)?;
-                    self.copy_dir_all(&base_artifacts_dir, &current_artifacts_dir).await?;
+                    self.copy_dir_all(&base_artifacts_dir, &current_artifacts_dir)
+                        .await?;
                     println!("[Executor] Copied artifacts from base iteration");
                 }
-                
+
                 Ok(())
             }
             InheritanceMode::Partial => {
                 // Copy code files but NOT artifacts (to avoid agent confusion)
                 // Agents will regenerate artifacts based on current iteration's description
-                println!("[Executor] Partial inheritance - copying code files only from base: {}", base_iteration_id);
+                println!(
+                    "[Executor] Partial inheritance - copying code files only from base: {}",
+                    base_iteration_id
+                );
 
                 let base_workspace = self.iteration_store.workspace_path(base_iteration_id)?;
 
@@ -140,11 +156,16 @@ impl IterationExecutor {
                     self.copy_code_files(&base_workspace, workspace).await?;
                     println!("[Executor] Copied code files from base workspace");
                 } else {
-                    println!("[Executor] Warning: Base workspace does not exist: {}", base_workspace.display());
+                    println!(
+                        "[Executor] Warning: Base workspace does not exist: {}",
+                        base_workspace.display()
+                    );
                 }
 
                 // Do NOT copy artifacts - let agents regenerate fresh artifacts
-                println!("[Executor] Skipping artifacts copy - agents will regenerate for current iteration");
+                println!(
+                    "[Executor] Skipping artifacts copy - agents will regenerate for current iteration"
+                );
 
                 Ok(())
             }
@@ -163,18 +184,18 @@ impl IterationExecutor {
             }
             "prd" => {
                 // Check prd.md or requirements.json
-                artifacts_dir.join("prd.md").exists() ||
-                iteration_dir.join("data/requirements.json").exists()
+                artifacts_dir.join("prd.md").exists()
+                    || iteration_dir.join("data/requirements.json").exists()
             }
             "design" => {
                 // Check design.md or design_spec.json
-                artifacts_dir.join("design.md").exists() ||
-                iteration_dir.join("data/design_spec.json").exists()
+                artifacts_dir.join("design.md").exists()
+                    || iteration_dir.join("data/design_spec.json").exists()
             }
             "plan" => {
                 // Check plan.md or implementation_plan.json
-                artifacts_dir.join("plan.md").exists() ||
-                iteration_dir.join("data/implementation_plan.json").exists()
+                artifacts_dir.join("plan.md").exists()
+                    || iteration_dir.join("data/implementation_plan.json").exists()
             }
             "coding" => {
                 // Check workspace has code files and perform quality checks
@@ -183,7 +204,10 @@ impl IterationExecutor {
                 }
 
                 // Check for any source code files (including web files)
-                let code_extensions = ["rs", "js", "jsx", "ts", "tsx", "py", "java", "go", "cpp", "c", "h", "html", "htm", "css", "scss", "json"];
+                let code_extensions = [
+                    "rs", "js", "jsx", "ts", "tsx", "py", "java", "go", "cpp", "c", "h", "html",
+                    "htm", "css", "scss", "json",
+                ];
                 let mut has_code_files = false;
                 let mut has_issues = false;
                 let mut issue_messages = Vec::new();
@@ -208,23 +232,33 @@ impl IterationExecutor {
                                     let sub_path = sub_entry.path();
 
                                     // Check if it's a code file
-                                    if let Some(ext) = sub_path.extension().and_then(|e| e.to_str()) {
+                                    if let Some(ext) = sub_path.extension().and_then(|e| e.to_str())
+                                    {
                                         if code_extensions.contains(&ext) {
                                             has_code_files = true;
 
                                             // Read file content and check for issues
-                                            if let Ok(content) = std::fs::read_to_string(&sub_path) {
+                                            if let Ok(content) = std::fs::read_to_string(&sub_path)
+                                            {
                                                 // Check for empty files
                                                 if content.trim().is_empty() {
                                                     has_issues = true;
-                                                    issue_messages.push(format!("Empty file: {}", sub_path.display()));
+                                                    issue_messages.push(format!(
+                                                        "Empty file: {}",
+                                                        sub_path.display()
+                                                    ));
                                                 }
 
                                                 // Check for TODO/FIXME comments
                                                 let content_lower = content.to_lowercase();
-                                                if content_lower.contains("todo:") || content_lower.contains("fixme:") {
+                                                if content_lower.contains("todo:")
+                                                    || content_lower.contains("fixme:")
+                                                {
                                                     has_issues = true;
-                                                    issue_messages.push(format!("TODO/FIXME found in: {}", sub_path.display()));
+                                                    issue_messages.push(format!(
+                                                        "TODO/FIXME found in: {}",
+                                                        sub_path.display()
+                                                    ));
                                                 }
 
                                                 // Check for placeholder code patterns
@@ -239,9 +273,15 @@ impl IterationExecutor {
                                                     "// fixme",
                                                 ];
                                                 for pattern in &placeholder_patterns {
-                                                    if content_lower.contains(&pattern.to_lowercase()) {
+                                                    if content_lower
+                                                        .contains(&pattern.to_lowercase())
+                                                    {
                                                         has_issues = true;
-                                                        issue_messages.push(format!("Placeholder pattern '{}' found in: {}", pattern, sub_path.display()));
+                                                        issue_messages.push(format!(
+                                                            "Placeholder pattern '{}' found in: {}",
+                                                            pattern,
+                                                            sub_path.display()
+                                                        ));
                                                         break;
                                                     }
                                                 }
@@ -261,14 +301,20 @@ impl IterationExecutor {
                                         // Check for empty files
                                         if content.trim().is_empty() {
                                             has_issues = true;
-                                            issue_messages.push(format!("Empty file: {}", path.display()));
+                                            issue_messages
+                                                .push(format!("Empty file: {}", path.display()));
                                         }
 
                                         // Check for TODO/FIXME comments
                                         let content_lower = content.to_lowercase();
-                                        if content_lower.contains("todo:") || content_lower.contains("fixme:") {
+                                        if content_lower.contains("todo:")
+                                            || content_lower.contains("fixme:")
+                                        {
                                             has_issues = true;
-                                            issue_messages.push(format!("TODO/FIXME found in: {}", path.display()));
+                                            issue_messages.push(format!(
+                                                "TODO/FIXME found in: {}",
+                                                path.display()
+                                            ));
                                         }
 
                                         // Check for placeholder code patterns
@@ -285,7 +331,11 @@ impl IterationExecutor {
                                         for pattern in &placeholder_patterns {
                                             if content_lower.contains(&pattern.to_lowercase()) {
                                                 has_issues = true;
-                                                issue_messages.push(format!("Placeholder pattern '{}' found in: {}", pattern, path.display()));
+                                                issue_messages.push(format!(
+                                                    "Placeholder pattern '{}' found in: {}",
+                                                    pattern,
+                                                    path.display()
+                                                ));
                                                 break;
                                             }
                                         }
@@ -297,13 +347,19 @@ impl IterationExecutor {
                 }
 
                 if !has_code_files {
-                    eprintln!("[Coding Quality Check] No code files found in workspace: {}", workspace.display());
+                    eprintln!(
+                        "[Coding Quality Check] No code files found in workspace: {}",
+                        workspace.display()
+                    );
                     return false;
                 }
 
                 // Log issues if any found (but don't fail the stage for now)
                 if has_issues {
-                    eprintln!("[Coding Quality Check] Found {} code quality issues:", issue_messages.len());
+                    eprintln!(
+                        "[Coding Quality Check] Found {} code quality issues:",
+                        issue_messages.len()
+                    );
                     for msg in &issue_messages {
                         eprintln!("  - {}", msg);
                     }
@@ -322,50 +378,6 @@ impl IterationExecutor {
                 true
             }
         }
-    }
-
-    /// Copy only non-code files (config, assets, docs)
-    async fn copy_non_code_files(
-        &self,
-        src: &std::path::Path,
-        dst: &std::path::Path,
-    ) -> anyhow::Result<()> {
-        let code_extensions = [
-            "rs", "js", "jsx", "ts", "tsx", "py", "java", "go", "cpp", "c", "h", "hpp",
-            "cs", "php", "rb", "swift", "kt", "scala", "r", "m", "mm",
-        ];
-
-        if !dst.exists() {
-            tokio::fs::create_dir_all(dst).await?;
-        }
-
-        let mut entries = tokio::fs::read_dir(src).await?;
-        while let Some(entry) = entries.next_entry().await? {
-            let path = entry.path();
-            let file_name = path.file_name().unwrap();
-            let dest_path = dst.join(file_name);
-
-            if path.is_dir() {
-                // Skip cowork directories and common build directories
-                let dir_name = file_name.to_string_lossy();
-                if matches!(dir_name.as_ref(), "node_modules" | "target" | ".git" | "dist" | "build" | ".cowork" | ".cowork-v2") {
-                    continue;
-                }
-                Box::pin(self.copy_non_code_files(&path, &dest_path)).await?;
-            } else {
-                // Check if it's a code file
-                let ext = path.extension()
-                    .and_then(|e| e.to_str())
-                    .unwrap_or("");
-
-                if !code_extensions.contains(&ext) {
-                    // Copy non-code files (config, readme, assets, etc.)
-                    tokio::fs::copy(&path, &dest_path).await?;
-                }
-            }
-        }
-
-        Ok(())
     }
 
     /// Copy only code files from src to dst (for Partial inheritance)
@@ -388,7 +400,17 @@ impl IterationExecutor {
             if path.is_dir() {
                 // Skip cowork directories and common build directories
                 let dir_name = file_name.to_string_lossy();
-                if matches!(dir_name.as_ref(), "node_modules" | "target" | ".git" | "dist" | "build" | ".cowork" | ".cowork-v2" | "artifacts") {
+                if matches!(
+                    dir_name.as_ref(),
+                    "node_modules"
+                        | "target"
+                        | ".git"
+                        | "dist"
+                        | "build"
+                        | ".cowork"
+                        | ".cowork-v2"
+                        | "artifacts"
+                ) {
                     continue;
                 }
                 Box::pin(self.copy_code_files(&path, &dest_path)).await?;
@@ -409,7 +431,7 @@ impl IterationExecutor {
         project: &mut Project,
         iteration_id: &str,
         resume_stage: Option<String>,
-        model: Option<Arc<dyn adk_core::Llm>>
+        model: Option<Arc<dyn adk_core::Llm>>,
     ) -> anyhow::Result<()> {
         // Load iteration
         let mut iteration = self.iteration_store.load(iteration_id)?;
@@ -441,28 +463,42 @@ impl IterationExecutor {
         // Start iteration
         iteration.start();
         self.iteration_store.save(&iteration)?;
-        self.project_store.set_current_iteration(project, iteration_id.to_string())?;
+        self.project_store
+            .set_current_iteration(project, iteration_id.to_string())?;
 
         // Ensure iteration memory exists (V2 architecture)
         let memory_store = crate::persistence::MemoryStore::new();
         if let Err(e) = memory_store.ensure_iteration_memory(iteration_id) {
-            println!("[Executor] Warning: Failed to create iteration memory: {}", e);
+            println!(
+                "[Executor] Warning: Failed to create iteration memory: {}",
+                e
+            );
         }
 
-                    println!("[Executor] Iteration '{}' started, will execute {} stages starting from '{}'",
-                    iteration.title, stages.len(), start_stage);
-        
-                        // Emit event with Pipeline context
-                        self.interaction
-                            .show_message_with_context(
-                                crate::interaction::MessageLevel::Info,
-                                format!("Starting iteration '{}' from stage '{}'", iteration.title, start_stage),
-                                MessageContext::new("Pipeline Controller"),
-                            )
-                            .await;        // Evolution iteration: Inject project knowledge from base iteration
+        println!(
+            "[Executor] Iteration '{}' started, will execute {} stages starting from '{}'",
+            iteration.title,
+            stages.len(),
+            start_stage
+        );
+
+        // Emit event with Pipeline context
+        self.interaction
+            .show_message_with_context(
+                crate::interaction::MessageLevel::Info,
+                format!(
+                    "Starting iteration '{}' from stage '{}'",
+                    iteration.title, start_stage
+                ),
+                MessageContext::new("Pipeline Controller"),
+            )
+            .await; // Evolution iteration: Inject project knowledge from base iteration
         if iteration.base_iteration_id.is_some() {
             if let Err(e) = self.inject_project_knowledge(&iteration).await {
-                println!("[Executor] Warning: Failed to inject project knowledge: {}", e);
+                println!(
+                    "[Executor] Warning: Failed to inject project knowledge: {}",
+                    e
+                );
                 // Continue anyway, just warn
             }
         }
@@ -482,18 +518,26 @@ impl IterationExecutor {
             iteration.set_stage(&stage_name);
             self.iteration_store.save(&iteration)?;
 
-            println!("[Executor] Stage updated: {} (iteration: {})", stage_name, iteration_id);
+            println!(
+                "[Executor] Stage updated: {} (iteration: {})",
+                stage_name, iteration_id
+            );
 
             // Emit stage started event with progress info and agent context
             self.interaction
                 .show_message_with_context(
                     crate::interaction::MessageLevel::Info,
-                    format!("🚀 [{}/{}] Starting stage: {}", stage_num, total_stages, stage.description()),
+                    format!(
+                        "🚀 [{}/{}] Starting stage: {}",
+                        stage_num,
+                        total_stages,
+                        stage.description()
+                    ),
                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                 )
                 .await;
 
-                        // Execute stage with retry
+            // Execute stage with retry
             let mut last_error = None;
             let mut success = false;
 
@@ -503,7 +547,12 @@ impl IterationExecutor {
                     self.interaction
                         .show_message_with_context(
                             crate::interaction::MessageLevel::Warning,
-                            format!("🔄 Stage '{}' retry {}/{}...", stage_name, attempt, MAX_STAGE_RETRIES - 1),
+                            format!(
+                                "🔄 Stage '{}' retry {}/{}...",
+                                stage_name,
+                                attempt,
+                                MAX_STAGE_RETRIES - 1
+                            ),
                             MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                         )
                         .await;
@@ -519,7 +568,9 @@ impl IterationExecutor {
                 loop {
                     // Execute or re-execute stage
                     let result = if let Some(ref feedback) = current_feedback {
-                        stage.execute_with_feedback(&ctx, self.interaction.clone(), feedback).await
+                        stage
+                            .execute_with_feedback(&ctx, self.interaction.clone(), feedback)
+                            .await
                     } else {
                         stage.execute(&ctx, self.interaction.clone()).await
                     };
@@ -536,7 +587,10 @@ impl IterationExecutor {
                             };
 
                             if !artifact_exists {
-                                last_error = Some(format!("Artifacts not generated for stage '{}'", stage_name));
+                                last_error = Some(format!(
+                                    "Artifacts not generated for stage '{}'",
+                                    stage_name
+                                ));
 
                                 // Show error message with context
                                 self.interaction
@@ -553,7 +607,10 @@ impl IterationExecutor {
 
                             // Clear feedback for this stage since it completed successfully
                             if let Err(e) = crate::storage::clear_stage_feedback(&stage_name) {
-                                eprintln!("[Warning] Failed to clear feedback for stage '{}': {}", stage_name, e);
+                                eprintln!(
+                                    "[Warning] Failed to clear feedback for stage '{}': {}",
+                                    stage_name, e
+                                );
                             }
 
                             // Complete stage
@@ -562,21 +619,28 @@ impl IterationExecutor {
 
                             // Show success message with progress info and agent context
                             let progress_msg = if feedback_loop_count > 0 {
-                                format!("✅ [{}/{}] Stage '{}' completed (revision {})",
-                                    stage_num, total_stages, stage_name, feedback_loop_count)
+                                format!(
+                                    "✅ [{}/{}] Stage '{}' completed (revision {})",
+                                    stage_num, total_stages, stage_name, feedback_loop_count
+                                )
                             } else if attempt > 0 {
-                                format!("✅ [{}/{}] Stage '{}' completed (after {} retries)",
-                                    stage_num, total_stages, stage_name, attempt)
+                                format!(
+                                    "✅ [{}/{}] Stage '{}' completed (after {} retries)",
+                                    stage_num, total_stages, stage_name, attempt
+                                )
                             } else {
-                                format!("✅ [{}/{}] Stage '{}' completed",
-                                    stage_num, total_stages, stage_name)
+                                format!(
+                                    "✅ [{}/{}] Stage '{}' completed",
+                                    stage_num, total_stages, stage_name
+                                )
                             };
 
                             self.interaction
                                 .show_message_with_context(
                                     crate::interaction::MessageLevel::Success,
                                     progress_msg,
-                                    MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+                                    MessageContext::new("Pipeline Controller")
+                                        .with_stage(&stage_name),
                                 )
                                 .await;
 
@@ -658,9 +722,12 @@ impl IterationExecutor {
                                 self.interaction
                                     .show_message_with_context(
                                         crate::interaction::MessageLevel::Success,
-                                        format!("✅ [{}/{}] Stage '{}' completed (auto-continuing)",
-                                            stage_num, total_stages, stage_name),
-                                        MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+                                        format!(
+                                            "✅ [{}/{}] Stage '{}' completed (auto-continuing)",
+                                            stage_num, total_stages, stage_name
+                                        ),
+                                        MessageContext::new("Pipeline Controller")
+                                            .with_stage(&stage_name),
                                     )
                                     .await;
                                 success = true;
@@ -679,10 +746,14 @@ impl IterationExecutor {
                             self.interaction
                                 .show_message_with_context(
                                     crate::interaction::MessageLevel::Info,
-                                    format!("Stage '{}' paused. Use 'continue' to resume.", stage_name),
-                                    MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+                                    format!(
+                                        "Stage '{}' paused. Use 'continue' to resume.",
+                                        stage_name
+                                    ),
+                                    MessageContext::new("Pipeline Controller")
+                                        .with_stage(&stage_name),
                                 )
-                            .await;
+                                .await;
 
                             return Ok(());
                         }
@@ -693,7 +764,8 @@ impl IterationExecutor {
                                     .show_message_with_context(
                                         crate::interaction::MessageLevel::Warning,
                                         format!("Maximum revision attempts reached. Proceeding..."),
-                                        MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+                                        MessageContext::new("Pipeline Controller")
+                                            .with_stage(&stage_name),
                                     )
                                     .await;
                                 iteration.resume();
@@ -707,9 +779,12 @@ impl IterationExecutor {
                             self.interaction
                                 .show_message_with_context(
                                     crate::interaction::MessageLevel::Info,
-                                    format!("Stage '{}' requesting revision ({} of {})...",
-                                        stage_name, feedback_loop_count, MAX_FEEDBACK_LOOPS),
-                                    MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+                                    format!(
+                                        "Stage '{}' requesting revision ({} of {})...",
+                                        stage_name, feedback_loop_count, MAX_FEEDBACK_LOOPS
+                                    ),
+                                    MessageContext::new("Pipeline Controller")
+                                        .with_stage(&stage_name),
                                 )
                                 .await;
                             continue; // Re-execute with feedback
@@ -737,18 +812,32 @@ impl IterationExecutor {
                         .await;
 
                     // Try to go back to coding stage with the error as feedback
-                    let feedback = format!("Validation failed with the following issues:\n\n{}\n\nPlease fix these issues in the code.", error);
+                    let feedback = format!(
+                        "Validation failed with the following issues:\n\n{}\n\nPlease fix these issues in the code.",
+                        error
+                    );
 
                     // Re-execute coding stage with feedback (clone workspace for reuse)
-                    let ctx_for_healing = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
+                    let ctx_for_healing =
+                        PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
 
                     let coding_stage = crate::pipeline::stages::CodingStage;
 
-                    match coding_stage.execute_with_feedback(&ctx_for_healing, self.interaction.clone(), &feedback).await {
+                    match coding_stage
+                        .execute_with_feedback(
+                            &ctx_for_healing,
+                            self.interaction.clone(),
+                            &feedback,
+                        )
+                        .await
+                    {
                         StageResult::Success(artifact_path) => {
                             // Clear feedback for coding stage since it completed successfully
                             if let Err(e) = crate::storage::clear_stage_feedback("coding") {
-                                eprintln!("[Warning] Failed to clear feedback for stage 'coding': {}", e);
+                                eprintln!(
+                                    "[Warning] Failed to clear feedback for stage 'coding': {}",
+                                    e
+                                );
                             }
 
                             self.interaction
@@ -768,23 +857,31 @@ impl IterationExecutor {
                                 .show_message_with_context(
                                     crate::interaction::MessageLevel::Info,
                                     "Re-running validation after self-healing...".to_string(),
-                                    MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+                                    MessageContext::new("Pipeline Controller")
+                                        .with_stage(&stage_name),
                                 )
                                 .await;
 
                             // Retry check (single attempt)
-                            match stage.execute(&ctx_for_healing, self.interaction.clone()).await {
+                            match stage
+                                .execute(&ctx_for_healing, self.interaction.clone())
+                                .await
+                            {
                                 StageResult::Success(_) => {
                                     // Clear feedback for check stage since it completed successfully
                                     if let Err(e) = crate::storage::clear_stage_feedback("check") {
-                                        eprintln!("[Warning] Failed to clear feedback for stage 'check': {}", e);
+                                        eprintln!(
+                                            "[Warning] Failed to clear feedback for stage 'check': {}",
+                                            e
+                                        );
                                     }
 
                                     self.interaction
                                         .show_message_with_context(
                                             crate::interaction::MessageLevel::Success,
                                             "✅ Validation passed after self-healing!".to_string(),
-                                            MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+                                            MessageContext::new("Pipeline Controller")
+                                                .with_stage(&stage_name),
                                         )
                                         .await;
                                     iteration.complete_stage(&stage_name, None);
@@ -834,12 +931,19 @@ impl IterationExecutor {
                     self.interaction
                         .show_message_with_context(
                             crate::interaction::MessageLevel::Error,
-                            format!("Stage '{}' failed after {} attempts: {}", stage_name, MAX_STAGE_RETRIES, error),
+                            format!(
+                                "Stage '{}' failed after {} attempts: {}",
+                                stage_name, MAX_STAGE_RETRIES, error
+                            ),
                             MessageContext::new("Pipeline Controller").with_stage(&stage_name),
                         )
                         .await;
 
-                    return Err(anyhow::anyhow!("Iteration failed at stage '{}' after {} retries", stage_name, MAX_STAGE_RETRIES));
+                    return Err(anyhow::anyhow!(
+                        "Iteration failed at stage '{}' after {} retries",
+                        stage_name,
+                        MAX_STAGE_RETRIES
+                    ));
                 }
             }
         } // End of for stage in stages
@@ -853,7 +957,10 @@ impl IterationExecutor {
         match memory_store.promote_insights_to_decisions(iteration_id) {
             Ok(count) => {
                 if count > 0 {
-                    println!("[Executor] Promoted {} insights to project decisions", count);
+                    println!(
+                        "[Executor] Promoted {} insights to project decisions",
+                        count
+                    );
                     self.interaction
                         .show_message_with_context(
                             crate::interaction::MessageLevel::Info,
@@ -871,9 +978,15 @@ impl IterationExecutor {
         // Generate iteration knowledge (new feature)
         if let Some(ref model) = model {
             println!("[Executor] Generating iteration knowledge...");
-            match self.generate_document_summaries(&iteration, model.clone()).await {
+            match self
+                .generate_document_summaries(&iteration, model.clone())
+                .await
+            {
                 Ok(_) => {
-                    match self.generate_iteration_knowledge(&iteration, model.clone()).await {
+                    match self
+                        .generate_iteration_knowledge(&iteration, model.clone())
+                        .await
+                    {
                         Ok(_) => {
                             println!("[Executor] Iteration knowledge generated successfully");
                             self.interaction
@@ -885,7 +998,10 @@ impl IterationExecutor {
                                 .await;
                         }
                         Err(e) => {
-                            println!("[Executor] Warning: Failed to generate iteration knowledge: {}", e);
+                            println!(
+                                "[Executor] Warning: Failed to generate iteration knowledge: {}",
+                                e
+                            );
                             self.interaction
                                 .show_message_with_context(
                                     crate::interaction::MessageLevel::Warning,
@@ -897,7 +1013,10 @@ impl IterationExecutor {
                     }
                 }
                 Err(e) => {
-                    println!("[Executor] Warning: Failed to generate document summaries: {}", e);
+                    println!(
+                        "[Executor] Warning: Failed to generate document summaries: {}",
+                        e
+                    );
                 }
             }
         }
@@ -918,14 +1037,24 @@ impl IterationExecutor {
     }
 
     /// Continue a paused iteration
-    pub async fn continue_iteration(&self, project: &mut Project, iteration_id: &str, model: Option<Arc<dyn adk_core::Llm>>) -> anyhow::Result<()> {
+    pub async fn continue_iteration(
+        &self,
+        project: &mut Project,
+        iteration_id: &str,
+        model: Option<Arc<dyn adk_core::Llm>>,
+    ) -> anyhow::Result<()> {
         let mut iteration = self.iteration_store.load(iteration_id)?;
 
-        println!("[Executor] Continuing iteration '{}' (status: {:?}, current_stage: {:?})",
-            iteration_id, iteration.status, iteration.current_stage);
+        println!(
+            "[Executor] Continuing iteration '{}' (status: {:?}, current_stage: {:?})",
+            iteration_id, iteration.status, iteration.current_stage
+        );
 
         if iteration.status != IterationStatus::Paused {
-            println!("[Executor] Error: Iteration is not paused (current status: {:?})", iteration.status);
+            println!(
+                "[Executor] Error: Iteration is not paused (current status: {:?})",
+                iteration.status
+            );
             return Err(anyhow::anyhow!("Iteration is not paused"));
         }
 
@@ -940,25 +1069,40 @@ impl IterationExecutor {
         self.interaction
             .show_message_with_context(
                 crate::interaction::MessageLevel::Info,
-                format!("Iteration '{}' resumed from stage: {}", iteration_id, resume_stage.as_ref().unwrap_or(&"unknown".to_string())),
-                MessageContext::new("Pipeline Controller").with_stage(resume_stage.as_deref().unwrap_or("unknown")),
+                format!(
+                    "Iteration '{}' resumed from stage: {}",
+                    iteration_id,
+                    resume_stage.as_ref().unwrap_or(&"unknown".to_string())
+                ),
+                MessageContext::new("Pipeline Controller")
+                    .with_stage(resume_stage.as_deref().unwrap_or("unknown")),
             )
             .await;
 
         // Resume execution from the saved stage
         println!("[Executor] Calling execute with resume_stage...");
-        self.execute(project, iteration_id, resume_stage, model).await
+        self.execute(project, iteration_id, resume_stage, model)
+            .await
     }
 
     /// Retry a failed iteration
-    pub async fn retry_iteration(&self, project: &mut Project, iteration_id: &str) -> anyhow::Result<()> {
+    pub async fn retry_iteration(
+        &self,
+        project: &mut Project,
+        iteration_id: &str,
+    ) -> anyhow::Result<()> {
         let mut iteration = self.iteration_store.load(iteration_id)?;
 
-        println!("[Executor] Retrying failed iteration '{}' (status: {:?}, current_stage: {:?})",
-            iteration_id, iteration.status, iteration.current_stage);
+        println!(
+            "[Executor] Retrying failed iteration '{}' (status: {:?}, current_stage: {:?})",
+            iteration_id, iteration.status, iteration.current_stage
+        );
 
         if iteration.status != IterationStatus::Failed {
-            println!("[Executor] Error: Iteration is not failed (current status: {:?})", iteration.status);
+            println!(
+                "[Executor] Error: Iteration is not failed (current status: {:?})",
+                iteration.status
+            );
             return Err(anyhow::anyhow!("Iteration is not failed"));
         }
 
@@ -979,11 +1123,13 @@ impl IterationExecutor {
         // Reset iteration status to running
         iteration.start();
         self.iteration_store.save(&iteration)?;
-        self.project_store.set_current_iteration(project, iteration_id.to_string())?;
+        self.project_store
+            .set_current_iteration(project, iteration_id.to_string())?;
 
         // Execute from the retry stage
         println!("[Executor] Calling execute for retry...");
-        self.execute(project, iteration_id, Some(retry_stage), None).await
+        self.execute(project, iteration_id, Some(retry_stage), None)
+            .await
     }
 
     /// Copy directory recursively
@@ -1014,17 +1160,21 @@ impl IterationExecutor {
 /// Confirmation action for user interaction
 #[derive(Debug, Clone)]
 pub enum ConfirmationAction {
-    Continue,           // User confirmed to continue
-    ViewArtifact,       // User wants to view the artifact
+    Continue,                // User confirmed to continue
+    ViewArtifact,            // User wants to view the artifact
     ProvideFeedback(String), // User provided feedback for revision
-    Cancel,             // User cancelled
+    Cancel,                  // User cancelled
 }
 
 #[async_trait::async_trait]
 pub trait InteractionExt {
     async fn request_confirmation(&self, prompt: &str) -> bool;
     async fn request_confirmation_with_artifact(&self, prompt: &str, artifact_type: &str) -> bool;
-    async fn request_confirmation_with_feedback(&self, prompt: &str, artifact_type: &str) -> ConfirmationAction;
+    async fn request_confirmation_with_feedback(
+        &self,
+        prompt: &str,
+        artifact_type: &str,
+    ) -> ConfirmationAction;
 }
 
 #[async_trait::async_trait]
@@ -1079,20 +1229,26 @@ impl InteractionExt for dyn InteractiveBackend {
                 "yes" => true,
                 "view_artifact" => {
                     // Emit event to frontend to view artifact
-                    let _ = self.show_message(
-                        crate::interaction::MessageLevel::Info,
-                        format!("[VIEW_ARTIFACT:{}]", artifact_type)
-                    ).await;
+                    let _ = self
+                        .show_message(
+                            crate::interaction::MessageLevel::Info,
+                            format!("[VIEW_ARTIFACT:{}]", artifact_type),
+                        )
+                        .await;
                     // Return false to pause, user will need to continue after viewing
                     false
                 }
                 _ => false,
-            }
+            },
             _ => false,
         }
     }
 
-    async fn request_confirmation_with_feedback(&self, prompt: &str, artifact_type: &str) -> ConfirmationAction {
+    async fn request_confirmation_with_feedback(
+        &self,
+        prompt: &str,
+        artifact_type: &str,
+    ) -> ConfirmationAction {
         use crate::interaction::{InputOption, InputResponse};
 
         let options = vec![
@@ -1126,24 +1282,28 @@ impl InteractionExt for dyn InteractiveBackend {
                 "view_artifact" => ConfirmationAction::ViewArtifact,
                 "feedback" => {
                     // Request feedback text
-                    let feedback_options = vec![
-                        InputOption {
-                            id: "submit".to_string(),
-                            label: "Submit Feedback".to_string(),
-                            description: Some("Submit your feedback".to_string()),
-                        },
-                    ];
+                    let feedback_options = vec![InputOption {
+                        id: "submit".to_string(),
+                        label: "Submit Feedback".to_string(),
+                        description: Some("Submit your feedback".to_string()),
+                    }];
 
-                    let feedback_prompt = "Please enter your feedback or suggestions for improvement:";
+                    let feedback_prompt =
+                        "Please enter your feedback or suggestions for improvement:";
 
-                    match self.request_input(feedback_prompt, feedback_options, Some(String::new())).await {
-                        Ok(InputResponse::Text(feedback)) => ConfirmationAction::ProvideFeedback(feedback),
+                    match self
+                        .request_input(feedback_prompt, feedback_options, Some(String::new()))
+                        .await
+                    {
+                        Ok(InputResponse::Text(feedback)) => {
+                            ConfirmationAction::ProvideFeedback(feedback)
+                        }
                         Ok(InputResponse::Selection(_)) => ConfirmationAction::ViewArtifact, // If user selects option, go back
                         _ => ConfirmationAction::Cancel,
                     }
                 }
                 _ => ConfirmationAction::Cancel,
-            }
+            },
             Ok(InputResponse::Text(feedback)) => ConfirmationAction::ProvideFeedback(feedback),
             _ => ConfirmationAction::Cancel,
         }
@@ -1159,9 +1319,12 @@ impl IterationExecutor {
     pub async fn generate_document_summaries(
         &self,
         iteration: &Iteration,
-        model: Arc<dyn adk_core::Llm>
+        model: Arc<dyn adk_core::Llm>,
     ) -> anyhow::Result<()> {
-        println!("[Executor] Generating document summaries for iteration {}...", iteration.id);
+        println!(
+            "[Executor] Generating document summaries for iteration {}...",
+            iteration.id
+        );
 
         let iteration_dir = self.iteration_store.iteration_path(&iteration.id)?;
         let artifacts_dir = iteration_dir.join("artifacts");
@@ -1188,27 +1351,22 @@ impl IterationExecutor {
             let summary_agent = crate::agents::create_summary_agent(
                 model.clone(),
                 iteration.id.clone(),
-                iteration.number
+                iteration.number,
             )?;
 
             // Create prompt
             let prompt = format!(
                 "Document Type: {}\n\nDocument Content:\n\n{}\n\nPlease generate a summary following the format specified in your instructions.",
-                doc_type,
-                content
+                doc_type, content
             );
 
             // Execute agent using adk-rust pattern
             let ctx_content = Content::new("user").with_text(&prompt);
             let dummy_project = crate::domain::Project::new("temp");
             let invocation_ctx = Arc::new(SimpleInvocationContext::new(
-                &PipelineContext::new(
-                    dummy_project,
-                    iteration.clone(),
-                    iteration_dir.clone()
-                ),
+                &PipelineContext::new(dummy_project, iteration.clone(), iteration_dir.clone()),
                 &ctx_content,
-                summary_agent.clone()
+                summary_agent.clone(),
             ));
 
             let stream = match summary_agent.run(invocation_ctx).await {
@@ -1253,16 +1411,25 @@ impl IterationExecutor {
     pub async fn generate_iteration_knowledge(
         &self,
         iteration: &Iteration,
-        model: Arc<dyn adk_core::Llm>
+        model: Arc<dyn adk_core::Llm>,
     ) -> anyhow::Result<()> {
-        println!("[Executor] Generating iteration knowledge for {}...", iteration.id);
+        println!(
+            "[Executor] Generating iteration knowledge for {}...",
+            iteration.id
+        );
 
         // Check if knowledge already exists
         let memory_store = crate::persistence::MemoryStore::new();
         let project_memory = memory_store.load_project_memory()?;
 
-        if project_memory.get_iteration_knowledge(&iteration.id).is_some() {
-            println!("[Executor] Knowledge already exists for iteration {}, skipping", iteration.id);
+        if project_memory
+            .get_iteration_knowledge(&iteration.id)
+            .is_some()
+        {
+            println!(
+                "[Executor] Knowledge already exists for iteration {}, skipping",
+                iteration.id
+            );
             return Ok(());
         }
 
@@ -1273,7 +1440,7 @@ impl IterationExecutor {
             model.clone(),
             iteration.id.clone(),
             iteration.number,
-            iteration.base_iteration_id.clone()
+            iteration.base_iteration_id.clone(),
         )?;
 
         println!("[Executor] Setting iteration ID for tool context...");
@@ -1291,13 +1458,9 @@ impl IterationExecutor {
         let ctx_content = Content::new("user").with_text(prompt);
         let dummy_project = crate::domain::Project::new("temp");
         let invocation_ctx = Arc::new(SimpleInvocationContext::new(
-            &PipelineContext::new(
-                dummy_project,
-                iteration.clone(),
-                iteration_dir.clone()
-            ),
+            &PipelineContext::new(dummy_project, iteration.clone(), iteration_dir.clone()),
             &ctx_content,
-            knowledge_agent.clone()
+            knowledge_agent.clone(),
         ));
 
         println!("[Executor] Running knowledge generation agent...");
@@ -1325,14 +1488,22 @@ impl IterationExecutor {
             }
         }
 
-        println!("[Executor] Stream processing completed after {} steps", step_count);
+        println!(
+            "[Executor] Stream processing completed after {} steps",
+            step_count
+        );
 
         // Verify knowledge was saved
         let project_memory = memory_store.load_project_memory()?;
-        if project_memory.get_iteration_knowledge(&iteration.id).is_some() {
+        if project_memory
+            .get_iteration_knowledge(&iteration.id)
+            .is_some()
+        {
             println!("[Executor] Iteration knowledge generated and saved successfully");
         } else {
-            eprintln!("[Executor] Warning: Knowledge generation completed but knowledge not found in project memory");
+            eprintln!(
+                "[Executor] Warning: Knowledge generation completed but knowledge not found in project memory"
+            );
         }
 
         Ok(())
@@ -1340,17 +1511,28 @@ impl IterationExecutor {
 
     /// Inject project knowledge into iteration memory (for evolution iterations)
     pub async fn inject_project_knowledge(&self, iteration: &Iteration) -> anyhow::Result<()> {
-        let base_iteration_id = iteration.base_iteration_id.as_ref()
+        let base_iteration_id = iteration
+            .base_iteration_id
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Evolution iteration must have base_iteration_id"))?;
 
-        println!("[Executor] Injecting project knowledge from base iteration {}...", base_iteration_id);
+        println!(
+            "[Executor] Injecting project knowledge from base iteration {}...",
+            base_iteration_id
+        );
 
         let memory_store = crate::persistence::MemoryStore::new();
 
         // Load base iteration knowledge
         let project_memory = memory_store.load_project_memory()?;
-        let base_knowledge = project_memory.get_iteration_knowledge(base_iteration_id)
-            .ok_or_else(|| anyhow::anyhow!("No knowledge found for base iteration {}", base_iteration_id))?;
+        let base_knowledge = project_memory
+            .get_iteration_knowledge(base_iteration_id)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "No knowledge found for base iteration {}",
+                    base_iteration_id
+                )
+            })?;
 
         // Inject into iteration memory
         let mut iter_memory = memory_store.load_iteration_memory(&iteration.id)?;
@@ -1374,7 +1556,7 @@ impl IterationExecutor {
                 base_knowledge.design_summary,
                 base_knowledge.plan_summary,
                 base_knowledge.key_decisions.join("; ")
-            )
+            ),
         );
 
         // Mark as critical
@@ -1384,7 +1566,10 @@ impl IterationExecutor {
 
         memory_store.save_iteration_memory(&iter_memory)?;
 
-        println!("[Executor] Project knowledge injected to iteration {}", iteration.id);
+        println!(
+            "[Executor] Project knowledge injected to iteration {}",
+            iteration.id
+        );
         Ok(())
     }
 
@@ -1392,15 +1577,20 @@ impl IterationExecutor {
     pub async fn regenerate_iteration_knowledge(
         &self,
         iteration_id: &str,
-        model: Arc<dyn adk_core::Llm>
+        model: Arc<dyn adk_core::Llm>,
     ) -> anyhow::Result<()> {
-        println!("[Executor] Regenerating knowledge for iteration {}...", iteration_id);
+        println!(
+            "[Executor] Regenerating knowledge for iteration {}...",
+            iteration_id
+        );
 
         let iteration = self.iteration_store.load(iteration_id)?;
 
         // Check if iteration is completed
         if iteration.status != IterationStatus::Completed {
-            return Err(anyhow::anyhow!("Cannot regenerate knowledge for incomplete iteration"));
+            return Err(anyhow::anyhow!(
+                "Cannot regenerate knowledge for incomplete iteration"
+            ));
         }
 
         // Remove existing knowledge if any
@@ -1410,7 +1600,8 @@ impl IterationExecutor {
         memory_store.save_project_memory(&project_memory)?;
 
         // Generate summaries first
-        self.generate_document_summaries(&iteration, model.clone()).await?;
+        self.generate_document_summaries(&iteration, model.clone())
+            .await?;
 
         // Then generate knowledge
         self.generate_iteration_knowledge(&iteration, model).await?;

@@ -5,9 +5,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-#[cfg(test)]
-mod storage_test;
-
 // Thread-local storage for current iteration ID
 static CURRENT_ITERATION_ID: Mutex<Option<String>> = Mutex::new(None);
 
@@ -71,8 +68,8 @@ pub fn load_requirements() -> Result<Requirements> {
     if !path.exists() {
         return Ok(Requirements::new());
     }
-    let content = fs::read_to_string(&path)
-        .with_context(|| format!("Failed to read {:?}", path))?;
+    let content =
+        fs::read_to_string(&path).with_context(|| format!("Failed to read {:?}", path))?;
     let requirements: Requirements = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse requirements.json"))?;
     Ok(requirements)
@@ -80,16 +77,15 @@ pub fn load_requirements() -> Result<Requirements> {
 
 pub fn save_requirements(requirements: &Requirements) -> Result<()> {
     let path = data_path("requirements.json")?;
-    
+
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
-    
+
     let content = serde_json::to_string_pretty(requirements)?;
-    fs::write(&path, content)
-        .with_context(|| format!("Failed to write {:?}", path))?;
+    fs::write(&path, content).with_context(|| format!("Failed to write {:?}", path))?;
     Ok(())
 }
 
@@ -109,13 +105,13 @@ pub fn load_feature_list() -> Result<FeatureList> {
 
 pub fn save_feature_list(features: &FeatureList) -> Result<()> {
     let path = data_path("feature_list.json")?;
-    
+
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
-    
+
     let content = serde_json::to_string_pretty(features)?;
     fs::write(&path, content)?;
     Ok(())
@@ -137,13 +133,13 @@ pub fn load_design_spec() -> Result<DesignSpec> {
 
 pub fn save_design_spec(design: &DesignSpec) -> Result<()> {
     let path = data_path("design_spec.json")?;
-    
+
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
-    
+
     let content = serde_json::to_string_pretty(design)?;
     fs::write(&path, content)?;
     Ok(())
@@ -165,13 +161,13 @@ pub fn load_implementation_plan() -> Result<ImplementationPlan> {
 
 pub fn save_implementation_plan(plan: &ImplementationPlan) -> Result<()> {
     let path = data_path("implementation_plan.json")?;
-    
+
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
-    
+
     let content = serde_json::to_string_pretty(plan)?;
     fs::write(&path, content)?;
     Ok(())
@@ -193,13 +189,13 @@ pub fn load_code_metadata() -> Result<CodeMetadata> {
 
 pub fn save_code_metadata(metadata: &CodeMetadata) -> Result<()> {
     let path = data_path("code_metadata.json")?;
-    
+
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
-    
+
     let content = serde_json::to_string_pretty(metadata)?;
     fs::write(&path, content)?;
     Ok(())
@@ -221,13 +217,13 @@ pub fn load_session_meta() -> Result<Option<SessionMeta>> {
 
 pub fn save_session_meta(meta: &SessionMeta) -> Result<()> {
     let path = session_path("meta.json")?;
-    
+
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
-    
+
     let content = serde_json::to_string_pretty(meta)?;
     fs::write(&path, content)?;
     Ok(())
@@ -249,13 +245,13 @@ pub fn load_feedback_history() -> Result<FeedbackHistory> {
 
 pub fn save_feedback_history(history: &FeedbackHistory) -> Result<()> {
     let path = session_path("feedback.json")?;
-    
+
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
-    
+
     let content = serde_json::to_string_pretty(history)?;
     fs::write(&path, content)?;
     Ok(())
@@ -326,39 +322,39 @@ pub fn save_plan_doc(content: &str) -> Result<()> {
 
 pub fn save_prd_doc(content: &str) -> Result<()> {
     let path = artifact_path("prd.md")?;
-    
+
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
-    
+
     fs::write(&path, content)?;
     Ok(())
 }
 
 pub fn save_design_doc(content: &str) -> Result<()> {
     let path = artifact_path("design.md")?;
-    
+
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
-    
+
     fs::write(&path, content)?;
     Ok(())
 }
 
 pub fn save_delivery_report(content: &str) -> Result<()> {
     let path = artifact_path("delivery_report.md")?;
-    
+
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
-    
+
     fs::write(&path, content)?;
     Ok(())
 }
@@ -380,9 +376,9 @@ pub fn cowork_dir_exists() -> bool {
 /// Check if current iteration directory exists
 pub fn iteration_dir_exists() -> bool {
     match get_iteration_id() {
-        Some(iteration_id) => {
-            Path::new(".cowork-v2/iterations").join(&iteration_id).exists()
-        }
+        Some(iteration_id) => Path::new(".cowork-v2/iterations")
+            .join(&iteration_id)
+            .exists(),
         None => false,
     }
 }

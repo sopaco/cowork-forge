@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 pub struct IterationArtifacts {
     pub iteration_id: String,
     pub idea: Option<String>,
-    pub requirements: Option<String>,  // Simplified to markdown string
-    pub design: Option<String>,        // Simplified to markdown string
-    pub plan: Option<String>,          // Simplified to markdown string
+    pub requirements: Option<String>, // Simplified to markdown string
+    pub design: Option<String>,       // Simplified to markdown string
+    pub plan: Option<String>,         // Simplified to markdown string
     pub code_files: Vec<FileInfo>,
     pub check_report: Option<String>,
     pub delivery_report: Option<String>,
@@ -76,14 +76,6 @@ pub enum RunStatus {
     Stopped,
     Failed(String),
     Success,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CommandResult {
-    pub status: String,
-    pub exit_code: Option<i32>,
-    pub stdout: String,
-    pub stderr: String,
 }
 
 // ============================================================================
@@ -166,21 +158,6 @@ pub struct TemplateVariable {
     pub description: String,
     pub default_value: String,
     pub required: bool,
-}
-
-// ============================================================================
-// Project Detection
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectInfo {
-    pub project_type: ProjectType,
-    pub start_command: Option<String>,
-    pub build_command: Option<String>,
-    pub preview_command: Option<String>,
-    pub has_index_html: bool,
-    pub has_package_json: bool,
-    pub has_cargo_toml: bool,
 }
 
 // ============================================================================

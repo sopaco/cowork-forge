@@ -1,7 +1,9 @@
 // Tauri implementation of InteractiveBackend (placeholder)
 // Actual implementation will be in cowork-gui crate
 
-use super::{InteractiveBackend, InputOption, InputResponse, MessageLevel, MessageContext, ProgressInfo};
+use super::{
+    InputOption, InputResponse, InteractiveBackend, MessageContext, MessageLevel, ProgressInfo,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::Value;
@@ -24,7 +26,12 @@ impl InteractiveBackend for TauriBackend {
         println!("{} [Tauri]: {}", level.emoji(), content);
     }
 
-    async fn show_message_with_context(&self, level: MessageLevel, content: String, context: MessageContext) {
+    async fn show_message_with_context(
+        &self,
+        level: MessageLevel,
+        content: String,
+        context: MessageContext,
+    ) {
         // Display agent name prefix for better clarity
         let prefix = match &context.stage_name {
             Some(stage) => format!("[{}:{}]", context.agent_name, stage),
@@ -38,16 +45,27 @@ impl InteractiveBackend for TauriBackend {
         println!("{} [{}] {}", prefix, agent_name, content);
     }
 
-    async fn send_tool_call(&self, tool_name: &str, arguments: &Value, agent_name: &str) {
+    async fn send_tool_call(&self, tool_name: &str, _arguments: &Value, agent_name: &str) {
         println!("🔧 [{}] Calling tool: {}", agent_name, tool_name);
     }
 
-    async fn send_tool_result(&self, tool_name: &str, result: &str, success: bool, agent_name: &str) {
+    async fn send_tool_result(
+        &self,
+        tool_name: &str,
+        _result: &str,
+        success: bool,
+        agent_name: &str,
+    ) {
         let status = if success { "✓" } else { "✗" };
         println!("{} [{}] Tool {} completed", status, agent_name, tool_name);
     }
 
-    async fn request_input(&self, _prompt: &str, _options: Vec<InputOption>, _initial_content: Option<String>) -> Result<InputResponse> {
+    async fn request_input(
+        &self,
+        _prompt: &str,
+        _options: Vec<InputOption>,
+        _initial_content: Option<String>,
+    ) -> Result<InputResponse> {
         // Tauri implementation will send HITL request event and wait for response
         // For now, return a placeholder
         Ok(InputResponse::Cancel)
@@ -60,7 +78,10 @@ impl InteractiveBackend for TauriBackend {
         } else {
             0
         };
-        println!("[Tauri Progress] [{}%] {}: {}/{}", percentage, task_id, progress.current, progress.total);
+        println!(
+            "[Tauri Progress] [{}%] {}: {}/{}",
+            percentage, task_id, progress.current, progress.total
+        );
     }
 
     async fn submit_response(&self, request_id: String, response: String) -> Result<()> {

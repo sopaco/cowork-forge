@@ -7,14 +7,14 @@
 // - Saves artifacts
 // - Sends real-time streaming output
 
-use std::sync::Arc;
-use futures::StreamExt;
-use crate::interaction::{InteractiveBackend, MessageContext};
-use crate::pipeline::{PipelineContext, StageResult};
 use crate::agents::*;
-use crate::llm::{create_llm_client, ModelConfig};
+use crate::interaction::{InteractiveBackend, MessageContext};
+use crate::llm::{ModelConfig, create_llm_client};
+use crate::pipeline::{PipelineContext, StageResult};
 use crate::storage::set_iteration_id;
 use adk_core::{Content, Event};
+use futures::StreamExt;
+use std::sync::Arc;
 
 /// Map internal agent names to user-friendly display names
 fn get_display_name(agent_name: &str) -> &'static str {
@@ -68,7 +68,10 @@ pub async fn execute_stage_with_instruction(
             interaction
                 .show_message(
                     crate::interaction::MessageLevel::Warning,
-                    format!("🔄 RESTART MODE: Restarting {} stage due to: {}", stage_name, restart_reason),
+                    format!(
+                        "🔄 RESTART MODE: Restarting {} stage due to: {}",
+                        stage_name, restart_reason
+                    ),
                 )
                 .await;
 
@@ -90,11 +93,7 @@ pub async fn execute_stage_with_instruction(
         let iteration_dir = ctx.workspace_path.parent().unwrap_or(&ctx.workspace_path);
 
         // Prepare artifact path - V2 architecture: .cowork-v2/iterations/{iteration_id}/artifacts/{stage_name}.md
-        let artifact_path = format!(
-            "{}/artifacts/{}.md",
-            iteration_dir.display(),
-            stage_name
-        );
+        let artifact_path = format!("{}/artifacts/{}.md", iteration_dir.display(), stage_name);
 
         // Ensure artifacts directory exists
         let artifacts_dir = format!("{}/artifacts", iteration_dir.display());
@@ -103,8 +102,7 @@ pub async fn execute_stage_with_instruction(
         }
 
         // Load LLM client
-        let llm_config = load_config()
-            .map_err(|e| format!("Failed to load config: {}", e))?;
+        let llm_config = load_config().map_err(|e| format!("Failed to load config: {}", e))?;
         let model = create_llm_client(&llm_config.llm)
             .map_err(|e| format!("Failed to create LLM client: {}", e))?;
 
@@ -128,7 +126,8 @@ pub async fn execute_stage_with_instruction(
         };
 
         Ok((agent, artifact_path))
-    }.await;
+    }
+    .await;
 
     let (agent, _artifact_path) = match result {
         Ok(v) => v,
@@ -161,7 +160,11 @@ pub async fn execute_stage_with_instruction(
     let initial_content = Content::new("user").with_text(prompt);
 
     // Execute agent - Agent::run() takes Arc<dyn InvocationContext>
-    let invocation_ctx = Arc::new(SimpleInvocationContext::new(ctx, &initial_content, agent.clone()));
+    let invocation_ctx = Arc::new(SimpleInvocationContext::new(
+        ctx,
+        &initial_content,
+        agent.clone(),
+    ));
     let stream = match agent.run(invocation_ctx).await {
         Ok(s) => s,
         Err(e) => return StageResult::Failed(format!("Agent execution failed: {}", e)),
@@ -179,7 +182,9 @@ pub async fn execute_stage_with_instruction(
                         if !text.trim().is_empty() {
                             generated_text.push_str(&text);
                             // Send content in real-time with display name
-                            interaction.send_streaming(text.clone(), &display_name, false).await;
+                            interaction
+                                .send_streaming(text.clone(), &display_name, false)
+                                .await;
                         }
                     }
                 } else if let Some(text) = extract_text_from_event(&event) {
@@ -191,11 +196,13 @@ pub async fn execute_stage_with_instruction(
                 }
             }
             Err(e) => {
-                interaction.show_message_with_context(
-                    crate::interaction::MessageLevel::Error,
-                    format!("Stream error: {}", e),
-                    MessageContext::new(&display_name).with_stage(stage_name),
-                ).await;
+                interaction
+                    .show_message_with_context(
+                        crate::interaction::MessageLevel::Error,
+                        format!("Stream error: {}", e),
+                        MessageContext::new(&display_name).with_stage(stage_name),
+                    )
+                    .await;
             }
         }
     }
@@ -223,12 +230,11 @@ pub async fn execute_stage_with_instruction(
 fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>) -> String {
     let mut prompt = format!(
         "You are working on iteration #{} - '{}'.\n",
-        ctx.iteration.number,
-        ctx.iteration.title
+        ctx.iteration.number, ctx.iteration.title
     );
 
     prompt.push_str(&format!("Iteration ID: {}\n\n", ctx.iteration.id));
-    
+
     // Provide stage-specific guidance
     match stage_name {
         "idea" => {
@@ -250,7 +256,10 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             prompt.push_str("1. Load idea using load_idea() tool\n");
             prompt.push_str("2. Analyze the idea and create requirements\n");
             prompt.push_str("3. SAVE PRD using save_prd_doc() tool (MANDATORY)\n\n");
-            prompt.push_str(&format!("Original request: {}\n\n", ctx.iteration.description));
+            prompt.push_str(&format!(
+                "Original request: {}\n\n",
+                ctx.iteration.description
+            ));
         }
         "design" => {
             prompt.push_str("========================================\n");
@@ -299,10 +308,13 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             prompt.push_str("4. Copy files using copy_workspace_to_project() tool\n\n");
         }
         _ => {
-            prompt.push_str(&format!("Original request: {}\n\n", ctx.iteration.description));
+            prompt.push_str(&format!(
+                "Original request: {}\n\n",
+                ctx.iteration.description
+            ));
         }
     }
-    
+
     prompt.push_str(&format!("Workspace: {}\n\n", ctx.workspace_path.display()));
 
     // Add artifact path information
@@ -315,7 +327,9 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
     prompt.push_str("IMPORTANT: You have access to tools and MUST use them to save your work.\n");
     prompt.push_str("For the ");
     prompt.push_str(stage_name);
-    prompt.push_str(" stage, you MUST use the appropriate save tool (e.g., save_idea for idea stage).\n\n");
+    prompt.push_str(
+        " stage, you MUST use the appropriate save tool (e.g., save_idea for idea stage).\n\n",
+    );
 
     if let Some(feedback_text) = feedback {
         prompt.push_str(&format!("USER FEEDBACK: {}\n\n", feedback_text));
@@ -325,23 +339,13 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
     prompt
 }
 
-/// Capitalize first letter of a string
-fn capitalize(s: &str) -> String {
-    let mut chars = s.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-    }
-}
-
 /// Load config from file or environment
 fn load_config() -> Result<ModelConfig, String> {
     use std::path::Path;
 
     // Try loading from config.toml
     if Path::new("config.toml").exists() {
-        ModelConfig::from_file("config.toml")
-            .map_err(|e| format!("Failed to load config: {}", e))
+        ModelConfig::from_file("config.toml").map_err(|e| format!("Failed to load config: {}", e))
     } else if let Ok(exe_path) = std::env::current_exe() {
         let exe_dir = exe_path.parent().unwrap_or(&exe_path);
         let config_path = exe_dir.join("config.toml");
@@ -349,12 +353,10 @@ fn load_config() -> Result<ModelConfig, String> {
             ModelConfig::from_file(config_path.to_str().unwrap())
                 .map_err(|e| format!("Failed to load config: {}", e))
         } else {
-            ModelConfig::from_env()
-                .map_err(|e| format!("Failed to load config from env: {}", e))
+            ModelConfig::from_env().map_err(|e| format!("Failed to load config from env: {}", e))
         }
     } else {
-        ModelConfig::from_env()
-            .map_err(|e| format!("Failed to load config from env: {}", e))
+        ModelConfig::from_env().map_err(|e| format!("Failed to load config from env: {}", e))
     }
 }
 
@@ -411,9 +413,14 @@ impl Clone for SimpleInvocationContext {
             agent: self.agent.clone(),
             memory: self.memory.clone(),
             // session can't be cloned, create a new one
-            session: Box::new(SimpleSession::new(&self.session_id, self.user_content.clone())),
+            session: Box::new(SimpleSession::new(
+                &self.session_id,
+                self.user_content.clone(),
+            )),
             run_config: self.run_config.clone(),
-            ended: std::sync::atomic::AtomicBool::new(self.ended.load(std::sync::atomic::Ordering::SeqCst)),
+            ended: std::sync::atomic::AtomicBool::new(
+                self.ended.load(std::sync::atomic::Ordering::SeqCst),
+            ),
             artifacts: self.artifacts.clone(),
         }
     }
@@ -569,11 +576,7 @@ pub fn extract_text_from_content(content: &Content) -> Option<String> {
             text.push_str(part_text);
         }
     }
-    if text.is_empty() {
-        None
-    } else {
-        Some(text)
-    }
+    if text.is_empty() { None } else { Some(text) }
 }
 
 /// Helper to extract text from Event

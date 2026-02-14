@@ -111,7 +111,12 @@ pub trait InteractiveBackend: Send + Sync {
     async fn show_message(&self, level: MessageLevel, content: String);
 
     /// Show a message with full context (agent name, message type, etc.)
-    async fn show_message_with_context(&self, level: MessageLevel, content: String, context: MessageContext) {
+    async fn show_message_with_context(
+        &self,
+        level: MessageLevel,
+        content: String,
+        _context: MessageContext,
+    ) {
         // Default implementation: just call show_message
         // Backends can override for richer display
         self.show_message(level, content).await;
@@ -128,13 +133,24 @@ pub trait InteractiveBackend: Send + Sync {
     }
 
     /// Send tool result notification
-    async fn send_tool_result(&self, _tool_name: &str, _result: &str, _success: bool, _agent_name: &str) {
+    async fn send_tool_result(
+        &self,
+        _tool_name: &str,
+        _result: &str,
+        _success: bool,
+        _agent_name: &str,
+    ) {
         // Default: no-op, backends can override
     }
 
     /// Request user input - either text or selection
     /// initial_content: Optional initial content to display in editor (for CLI edit mode)
-    async fn request_input(&self, prompt: &str, options: Vec<InputOption>, initial_content: Option<String>) -> Result<InputResponse>;
+    async fn request_input(
+        &self,
+        prompt: &str,
+        options: Vec<InputOption>,
+        initial_content: Option<String>,
+    ) -> Result<InputResponse>;
 
     /// Show progress for a long-running task
     async fn show_progress(&self, task_id: String, progress: ProgressInfo);

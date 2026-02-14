@@ -16,8 +16,6 @@ use adk_core::{Llm, IncludeContents};
 use anyhow::Result;
 use std::sync::Arc;
 
-mod hitl;
-
 // ============================================================================
 // IdeaAgent - Simple agent to capture initial idea
 // ============================================================================
