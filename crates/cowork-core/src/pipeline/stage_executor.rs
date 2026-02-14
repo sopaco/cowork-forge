@@ -14,6 +14,7 @@ use crate::pipeline::{PipelineContext, StageResult};
 use crate::storage::set_iteration_id;
 use adk_core::{Content, Event};
 use futures::StreamExt;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Map internal agent names to user-friendly display names
@@ -392,6 +393,7 @@ impl SimpleInvocationContext {
             session: Box::new(SimpleSession::new(&ctx.iteration.id, content.clone())),
             run_config: adk_core::RunConfig {
                 streaming_mode: adk_core::StreamingMode::None,
+                tool_confirmation_decisions: HashMap::new(),
             },
             ended: std::sync::atomic::AtomicBool::new(false),
             artifacts: None, // TODO: implement artifacts

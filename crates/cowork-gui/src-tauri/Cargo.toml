@@ -27,23 +27,23 @@ futures = "0.3"
 
 # Preview server
 tiny_http = "0.12"
-attohttpc = "0.22"
+attohttpc = "0.30"
 urlencoding = "2.1"
 
 # Global state
-lazy_static = "1.4"
+lazy_static = "1.5"
 
 # Logging
 tracing = "0.1"
 
 # File system
-dirs = "5"
+dirs = { workspace = true }
 
 # Cowork Core
 cowork-core = { path = "../../cowork-core" }
 
 # ADK (Agent Development Kit)
-adk-core = "0.2"
-adk-runner = "0.2"
-adk-session = "0.2"
+adk-core = { workspace = true }
+adk-runner = { workspace = true }
+adk-session = { workspace = true }
 which = "8.0.0"
