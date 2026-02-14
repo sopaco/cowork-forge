@@ -21,7 +21,6 @@ graph TB
         subgraph "Specialized Agents"
             Iterative[Iterative Assistant]
             Stage[Stage Agent]
-            Hitl[Human-in-Loop Agent]
         end
         
         Factory --> Base
@@ -30,7 +29,6 @@ graph TB
         Base --> LLM
         Base --> Iterative
         Base --> Stage
-        Base --> Hitl
     end
 ```
 
@@ -350,7 +348,6 @@ graph TB
         
         subgraph "Runner"
             ProcessMgr[进程管理]
-            PortAlloc[端口分配]
             Output[输出流]
         end
         
@@ -362,7 +359,6 @@ graph TB
         Manager --> Detect
         Detect --> Config
         Config --> ProcessMgr
-        ProcessMgr --> PortAlloc
         ProcessMgr --> Output
         Output --> Log
         Health --> Monitor

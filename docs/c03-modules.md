@@ -20,7 +20,6 @@ graph TB
             Core --> Agents[Agents Module]
             Agents --> Iterative[Iterative Assistant]
             Agents --> Stage[Stage Agent]
-            Agents --> HITL[Human in Loop]
         end
         
         subgraph "Tools"
@@ -125,14 +124,8 @@ classDiagram
         -process_artifacts()
     }
     
-    class HitlAgent {
-        +request_confirmation(prompt) Confirmation
-        +wait_for_input() UserResponse
-    }
-    
     Agent <|-- IterativeAssistant
     Agent <|-- StageAgent
-    Agent <|-- HitlAgent
     
     class IdeaAgent {
         +generate_idea() IdeaArtifact

@@ -184,7 +184,7 @@ graph TB
     subgraph "Infrastructure"
         FS[File System]
         CONFIG[Config]
-        HITL[HITL]
+        INTERACTION[Interaction]
     end
     
     subgraph "External"
@@ -205,7 +205,7 @@ graph TB
     LLM --> OPENAI
     LLM --> EMBEDDING
     
-    PIPELINE --> HITL
+    PIPELINE --> INTERACTION
     TOOLS --> FS
     CORE --> CONFIG
 ```
@@ -340,6 +340,10 @@ model_name = "text-embedding-ada-002"
 ```
 
 # 🚀 Usage
+
+Cowork Forge offers two ways to interact with your AI development team: the Command Line Interface (CLI) and the Graphical User Interface (GUI).
+
+## 🖥️ Cowork CLI
 
 ### Iteration Management
 
@@ -477,6 +481,36 @@ cowork list --all
 # Check current project status
 cowork status
 ```
+
+## 🎨 Cowork GUI
+
+The Cowork GUI provides a rich visual experience for managing your projects, monitoring agent progress, and previewing results.
+
+### Features
+- **Visual Dashboard**: Overview of all your projects and iterations.
+- **Real-time Monitoring**: Watch agents work in real-time with detailed logs and status updates.
+- **Interactive Chat**: Communicate with agents directly through a chat interface.
+- **Built-in Preview**: Preview your generated web applications directly within the app.
+
+### Running the GUI
+
+To run the GUI from source:
+
+1. Ensure you have Node.js and Rust installed.
+2. Navigate to the GUI directory:
+   ```sh
+   cd crates/cowork-gui
+   ```
+3. Install frontend dependencies:
+   ```sh
+   npm install
+   # or
+   bun install
+   ```
+4. Start the application:
+   ```sh
+   cargo tauri dev
+   ```
 
 # 🌐 The Cowork Forge Ecosystem
 

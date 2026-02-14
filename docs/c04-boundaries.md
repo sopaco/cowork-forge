@@ -14,21 +14,21 @@
 
 ```mermaid
 graph LR
-    subgraph "User Space"
+    subgraph "用户空间"
         User[用户终端]
     end
     
-    subgraph "CLI Boundary"
-        CLI[CLI Entry]
+    subgraph "CLI边界"
+        CLI[CLI入口]
         Parser[命令解析]
         Validator[输入验证]
     end
     
-    subgraph "Core"
-        Core[Core Engine]
+    subgraph "核心"
+        Core[核心引擎]
     end
     
-    User -->|Shell命令| CLI
+    User -- "Shell命令" --> CLI
     CLI --> Parser
     Parser --> Validator
     Validator --> Core
@@ -283,7 +283,6 @@ graph TB
     end
     
     subgraph "Dev Server Boundary"
-        PortAlloc[端口分配]
         ProcessMgr[进程管理]
         OutputLog[日志输出]
     end
@@ -294,8 +293,7 @@ graph TB
     end
     
     Runner --> Analyzer
-    Analyzer --> PortAlloc
-    PortAlloc --> ProcessMgr
+    Analyzer --> ProcessMgr
     ProcessMgr --> ViteDev
     ProcessMgr --> CargoRun
     ViteDev --> OutputLog

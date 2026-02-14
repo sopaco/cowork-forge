@@ -194,7 +194,7 @@ graph TB
     subgraph "基础设施"
         FS[文件系统]
         CONFIG[配置]
-        HITL[人机交互]
+        INTERACTION[交互]
     end
     
     subgraph "外部"
@@ -215,7 +215,7 @@ graph TB
     LLM --> OPENAI
     LLM --> EMBEDDING
     
-    PIPELINE --> HITL
+    PIPELINE --> INTERACTION
     TOOLS --> FS
     CORE --> CONFIG
 ```
@@ -378,7 +378,11 @@ api_key = "your-embedding-api-key"
 model_name = "text-embedding-ada-002"
 ```
 
-# 🚀 使用
+# 🚀 使用指南
+
+Cowork Forge 提供两种交互方式：命令行界面 (CLI) 和图形用户界面 (GUI)。
+
+## 🖥️ Cowork CLI
 
 ### 启动新的开发会话
 
@@ -504,6 +508,36 @@ cowork list --all
 # 检查当前项目状态
 cowork status
 ```
+
+## 🎨 Cowork GUI
+
+Cowork GUI 提供了一个丰富的可视化界面，用于管理项目、监控智能体进度和预览结果。
+
+### 主要特性
+- **可视化仪表板**：概览所有项目和迭代状态。
+- **实时监控**：通过详细日志和状态更新实时观察智能体工作。
+- **交互式聊天**：通过聊天界面直接与智能体沟通。
+- **内置预览**：在应用内直接预览生成的 Web 应用。
+
+### 运行 GUI
+
+从源码运行 GUI：
+
+1. 确保已安装 Node.js 和 Rust。
+2. 进入 GUI 目录：
+   ```sh
+   cd crates/cowork-gui
+   ```
+3. 安装前端依赖：
+   ```sh
+   npm install
+   # 或
+   bun install
+   ```
+4. 启动应用：
+   ```sh
+   cargo tauri dev
+   ```
 
 # 🔒 安全
 
