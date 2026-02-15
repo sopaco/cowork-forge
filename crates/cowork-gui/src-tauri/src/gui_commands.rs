@@ -2,6 +2,7 @@
 use super::gui_types::FileReadResult;
 use super::gui_types::*;
 use super::static_server;
+use super::iteration_commands::gui_execute_iteration;
 use crate::AppState;
 use crate::project_runner::ProjectRunner;
 use cowork_core::llm::config::LlmConfig;
@@ -10,7 +11,7 @@ use cowork_core::{ProjectRuntimeConfig, RuntimeAnalyzer, RuntimeType};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use tauri::{State, Window};
+use tauri::{Emitter, State, Window};
 
 // Global instances
 lazy_static::lazy_static! {
@@ -24,6 +25,37 @@ lazy_static::lazy_static! {
 
 pub fn init_app_handle(handle: tauri::AppHandle) {
     PROJECT_RUNNER.set_app_handle(handle);
+}
+
+// ============================================================================
+// System Locale Command
+// ============================================================================
+
+#[tauri::command]
+pub fn get_system_locale() -> String {
+    // 获取系统语言/区域设置
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        // 使用 PowerShell 获取 Windows 系统语言
+        let output = Command::new("powershell")
+            .args(["-Command", "(Get-Culture).Name"])
+            .output();
+        
+        if let Ok(output) = output {
+            let locale = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !locale.is_empty() {
+                // 存储到 cowork-core 全局配置
+                cowork_core::set_system_locale(locale.clone());
+                return locale;
+            }
+        }
+    }
+    
+    // 默认返回英语
+    let default_locale = "en-US".to_string();
+    cowork_core::set_system_locale(default_locale.clone());
+    default_locale
 }
 
 // ============================================================================
@@ -2108,4 +2140,199 @@ fn replace_template_variables(
     }
 
     result
+}
+
+// ============================================================================
+// Project Manager Agent Commands
+// ============================================================================
+
+/// PM Agent message response
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PMMessageResponse {
+    pub agent_message: String,
+    pub actions: Vec<PMActionInfo>,
+    pub needs_restart: bool,
+    pub target_stage: Option<String>,
+    pub new_iteration_id: Option<String>,
+}
+
+/// PM Action information for frontend
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PMActionInfo {
+    pub action_type: String,
+    pub description: String,
+}
+
+#[tauri::command]
+pub async fn pm_send_message(
+    iteration_id: String,
+    message: String,
+    history: Vec<serde_json::Value>,
+    window: Window,
+) -> Result<PMMessageResponse, String> {
+    println!("[GUI] PM Agent processing message for iteration: {} (history: {} messages)", iteration_id, history.len());
+
+    // Load LLM config
+    let model_config = load_model_config()?;
+    let llm_client = cowork_core::llm::config::create_llm_client(&model_config.llm)
+        .map_err(|e| format!("Failed to create LLM client: {}", e))?;
+
+    // Use the cowork-core helper to run PM agent
+    let result = cowork_core::agents::execute_pm_agent_message(
+        llm_client,
+        iteration_id.clone(),
+        message.clone(),
+        history,
+    ).await
+    .map_err(|e| format!("PM agent execution failed: {}", e))?;
+
+    // Extract response
+    let mut agent_message = result.0;
+    let _parts = result.1;
+
+    // Parse actions from embedded <!--ACTIONS:...--> marker
+    let mut actions = Vec::new();
+    let mut needs_restart = false;
+    let mut target_stage = None;
+    let new_iteration_id = None;
+
+    // Try to extract actions from the message marker
+    if let Some(start_idx) = agent_message.find("<!--ACTIONS:") {
+        if let Some(end_idx) = agent_message[start_idx..].find("-->") {
+            let actions_json = &agent_message[start_idx + 12..start_idx + end_idx];
+            
+            if let Ok(parsed_actions) = serde_json::from_str::<Vec<serde_json::Value>>(actions_json) {
+                for action in parsed_actions {
+                    let action_type = action.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                    
+                    let pm_action = PMActionInfo {
+                        action_type: action_type.to_string(),
+                        description: action.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    };
+                    
+                    // Check for specific actions
+                    if action_type == "pm_goto_stage" {
+                        needs_restart = true;
+                        target_stage = action.get("target_stage").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    }
+                    
+                    actions.push(pm_action);
+                }
+            }
+            
+            // Remove the marker from displayed message
+            agent_message = format!("{}{}", &agent_message[..start_idx], &agent_message[start_idx + end_idx + 3..]);
+        }
+    }
+
+    // Emit response event
+    let _ = window.emit("pm_message", serde_json::json!({
+        "iteration_id": iteration_id,
+        "agent_message": &agent_message,
+        "actions": &actions
+    }));
+
+    Ok(PMMessageResponse {
+        agent_message,
+        actions,
+        needs_restart,
+        target_stage,
+        new_iteration_id,
+    })
+}
+
+#[tauri::command]
+pub async fn pm_restart_iteration(
+    iteration_id: String,
+    target_stage: String,
+    window: Window,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    println!("[GUI] PM Agent restarting iteration {} from stage {}", iteration_id, target_stage);
+
+    // Load iteration
+    let iteration_store = IterationStore::new();
+    let mut iteration = iteration_store.load(&iteration_id)
+        .map_err(|e| format!("Failed to load iteration: {}", e))?;
+
+    // Update iteration status
+    iteration.status = cowork_core::domain::IterationStatus::Draft;
+    iteration.current_stage = Some(target_stage.clone());
+    iteration_store.save(&iteration)
+        .map_err(|e| format!("Failed to save iteration: {}", e))?;
+
+    // Start execution
+    gui_execute_iteration(iteration_id, window, state).await
+}
+
+#[tauri::command]
+pub async fn pm_get_iteration_context(
+    iteration_id: String,
+) -> Result<serde_json::Value, String> {
+    println!("[GUI] Getting iteration context for PM Agent: {}", iteration_id);
+
+    let iteration_store = IterationStore::new();
+    let iteration = iteration_store.load(&iteration_id)
+        .map_err(|e| format!("Failed to load iteration: {}", e))?;
+
+    // Load artifacts summary
+    let artifacts_summary = load_artifacts_summary(&iteration_id)?;
+
+    Ok(serde_json::json!({
+        "iteration_id": iteration_id,
+        "title": iteration.title,
+        "description": iteration.description,
+        "status": format!("{:?}", iteration.status),
+        "artifacts": artifacts_summary
+    }))
+}
+
+fn load_artifacts_summary(iteration_id: &str) -> Result<serde_json::Value, String> {
+    let iteration_store = IterationStore::new();
+    let iteration_dir = iteration_store.iteration_path(iteration_id)
+        .map_err(|e| format!("Failed to get iteration path: {}", e))?;
+
+    let artifacts_dir = iteration_dir.join("artifacts");
+
+    let mut summary = serde_json::Map::new();
+
+    // Check each artifact file
+    let artifact_files = [
+        ("idea", "idea.md"),
+        ("prd", "prd.md"),
+        ("design", "design.md"),
+        ("plan", "plan.md"),
+        ("delivery_report", "delivery_report.md"),
+    ];
+
+    for (key, filename) in artifact_files {
+        let path = artifacts_dir.join(filename);
+        if path.exists() {
+            if let Ok(content) = fs::read_to_string(&path) {
+                summary.insert(key.to_string(), serde_json::json!({
+                    "exists": true,
+                    "size": content.len(),
+                    "preview": content.chars().take(200).collect::<String>()
+                }));
+            }
+        }
+    }
+
+    Ok(serde_json::Value::Object(summary))
+}
+
+fn load_model_config() -> Result<cowork_core::llm::config::ModelConfig, String> {
+    // Try to load from config.toml
+    let config_path = std::env::current_dir()
+        .map_err(|e| format!("Failed to get current dir: {}", e))?
+        .join("config.toml");
+
+    if config_path.exists() {
+        cowork_core::llm::config::ModelConfig::from_file(config_path.to_str().unwrap())
+            .map_err(|e| format!("Failed to load config: {}", e))
+    } else {
+        // Fall back to environment variables
+        cowork_core::llm::config::ModelConfig::from_env()
+            .map_err(|e| format!("Failed to load config from env: {}", e))
+    }
 }

@@ -9,6 +9,7 @@ pub mod check;
 pub mod delivery;
 pub mod summary;
 pub mod knowledge_gen;
+pub mod project_manager;
 
 pub use idea::*;
 pub use prd::*;
@@ -19,3 +20,4 @@ pub use check::*;
 pub use delivery::*;
 pub use summary::*;
 pub use knowledge_gen::*;
+pub use project_manager::*;

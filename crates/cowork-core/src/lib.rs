@@ -1,5 +1,8 @@
 // Cowork Forge - Core Library (Iteration Architecture)
 
+// Global configuration
+pub mod config;
+
 // Domain-driven modules
 pub mod domain;
 pub mod persistence;
@@ -43,6 +46,9 @@ pub use runtime_security::RuntimeSecurityChecker;
 pub use runtime_analyzer::{
     RuntimeAnalyzer, ProjectInfo, save_runtime_config, load_runtime_config, has_runtime_config,
 };
+
+// Re-exports for config
+pub use config::{get_system_locale, set_system_locale, get_language_instruction};
 
 // Version info
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

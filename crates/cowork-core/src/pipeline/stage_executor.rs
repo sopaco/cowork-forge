@@ -8,6 +8,7 @@
 // - Sends real-time streaming output
 
 use crate::agents::*;
+use crate::config::{get_language_instruction};
 use crate::interaction::{InteractiveBackend, MessageContext};
 use crate::llm::{ModelConfig, create_llm_client};
 use crate::pipeline::{PipelineContext, StageResult};
@@ -358,6 +359,10 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
         prompt.push_str(&format!("USER FEEDBACK: {}\n\n", feedback_text));
         prompt.push_str("Please revise your previous work based on this feedback.\n");
     }
+
+    // Add language preference instruction
+    let lang_instruction = get_language_instruction();
+    prompt.push_str(&format!("\n{}\n", lang_instruction));
 
     prompt
 }

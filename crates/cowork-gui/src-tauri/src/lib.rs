@@ -665,6 +665,11 @@ pub fn run() {
             set_workspace,
             get_workspace,
             has_open_project,
+            // PM Agent commands
+            gui_commands::pm_send_message,
+            gui_commands::pm_restart_iteration,
+            gui_commands::get_system_locale,
+            gui_commands::pm_get_iteration_context,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

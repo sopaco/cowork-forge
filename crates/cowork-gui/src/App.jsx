@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { Layout, Menu, Button, Spin, Empty, Modal, message, Tooltip, Badge, Input, Tag, Space } from 'antd';
@@ -17,6 +17,7 @@ import {
   RocketOutlined,
   CloseCircleOutlined,
   BookOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -182,9 +183,31 @@ function App() {
   const [codeRefreshTrigger, setCodeRefreshTrigger] = useState(0);
   const [memoryRefreshTrigger, setMemoryRefreshTrigger] = useState(0);
   const [knowledgeRefreshTrigger, setKnowledgeRefreshTrigger] = useState(0);
-
+  
+  // PM Agent states
+  const [pmMessages, setPmMessages] = useState([]);
+  const [pmProcessing, setPmProcessing] = useState(false);
+  const pmMessagesContainerRef = useRef(null);
+  
   const listenersRegistered = useRef(false);
   const messagesContainerRef = useRef(null);
+  
+  // Compute chat mode based on iteration status
+  const chatMode = useMemo(() => {
+    if (!currentIteration) {
+      return 'disabled';
+    }
+    
+    if (currentIteration.status === 'Completed') {
+      return 'pm_agent';  // Delivery 后，启用项目经理 Agent
+    }
+    
+    if (isProcessing || currentIteration.status === 'Running') {
+      return 'pipeline';  // Pipeline 执行中，显示 Agent 消息流
+    }
+    
+    return 'pipeline';  // Draft/Paused/Failed 状态
+  }, [currentIteration, isProcessing]);
 
   // Load initial data
   const loadData = async () => {
@@ -524,6 +547,13 @@ function App() {
     }
   }, [messages]);
 
+  // Auto-scroll PM Agent messages
+  useEffect(() => {
+    if (pmMessagesContainerRef.current && pmMessages.length > 0) {
+      pmMessagesContainerRef.current.scrollTop = pmMessagesContainerRef.current.scrollHeight;
+    }
+  }, [pmMessages]);
+
   const handleSelectIteration = (iterationId) => {
     const iteration = iterations.find((i) => i.id === iterationId);
     setCurrentIteration(iteration);
@@ -606,6 +636,78 @@ function App() {
     }
 
     setUserInput('');
+  };
+
+  // PM Agent message handler
+  const handlePMSendMessage = async () => {
+    if (!userInput.trim() || !currentIteration) return;
+
+    const userMessage = userInput.trim();
+    const userMsgObj = { type: 'user', content: userMessage, timestamp: new Date().toISOString() };
+    
+    // 构建包含当前消息的历史（解决闭包问题）
+    const historyWithCurrent = [...pmMessages, userMsgObj];
+    
+    setUserInput('');
+    setPmProcessing(true);
+
+    try {
+      const response = await invoke('pm_send_message', {
+        iterationId: currentIteration.id,
+        message: userMessage,
+        history: historyWithCurrent,
+      });
+
+      // 一次更新所有消息（解决竞态问题）
+      setPmMessages([
+        ...historyWithCurrent,
+        {
+          type: 'pm_agent',
+          content: response.agent_message,
+          actions: response.actions || [],
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      // Handle actions that need immediate execution
+      if (response.needs_restart && response.target_stage) {
+        // Show confirmation for restart
+        Modal.confirm({
+          title: 'Restart Pipeline',
+          content: `Do you want to restart the pipeline from ${response.target_stage} stage?`,
+          onOk: async () => {
+            try {
+              await invoke('pm_restart_iteration', {
+                iterationId: currentIteration.id,
+                targetStage: response.target_stage,
+              });
+              message.success(`Pipeline restarted from ${response.target_stage}`);
+              loadData();
+            } catch (err) {
+              message.error('Failed to restart: ' + err);
+            }
+          },
+        });
+      }
+
+      if (response.new_iteration_id) {
+        message.success(`New iteration created! Switching to it...`);
+        loadData();
+      }
+
+    } catch (error) {
+      message.error('Failed to process message: ' + error);
+      setPmMessages((prev) => [
+        ...prev,
+        {
+          type: 'error',
+          content: `Error: ${error}`,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setPmProcessing(false);
+    }
   };
 
   const handleSelectOption = async (option) => {
@@ -795,39 +897,56 @@ function App() {
       <div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
         {currentIteration ? (
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '16px' }}>
-            <div style={{ marginBottom: '16px' }}>
-              <h3 style={{ margin: 0 }}>Chat - {currentIteration.title}</h3>
-              <p style={{ margin: '4px 0 0 0', color: '#888', fontSize: '12px' }}>
-                {currentIteration.description}
-              </p>
-            </div>
-
-            {/* Status Indicator */}
-            {isProcessing && currentAgent && (
-              <div style={{
-                padding: '12px 16px',
-                backgroundColor: '#e6f7ff',
-                border: '1px solid #91d5ff',
-                borderRadius: '6px',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-              }}>
-                <Spin size="small" />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 500, color: '#1890ff', marginBottom: '4px' }}>
-                    {currentAgent} is working...
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#666' }}>
-                    {currentIteration.current_stage ? `Stage: ${currentIteration.current_stage}` : 'Processing...'}
-                  </div>
-                </div>
+            {/* PM Agent 模式头部 */}
+            {chatMode === 'pm_agent' ? (
+              <div style={{ marginBottom: '16px' }}>
+                <h3 style={{ margin: 0 }}>
+                  <TeamOutlined style={{ marginRight: '8px' }} />
+                  Project Manager Agent
+                </h3>
+                <p style={{ margin: '4px 0 0 0', color: '#888', fontSize: '12px' }}>
+                  {currentIteration.title} - Ask questions, request changes, or discuss next steps
+                </p>
+                <Tag color="green" style={{ marginTop: '8px' }}>Post-Delivery Chat</Tag>
               </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: '16px' }}>
+                  <h3 style={{ margin: 0 }}>Chat - {currentIteration.title}</h3>
+                  <p style={{ margin: '4px 0 0 0', color: '#888', fontSize: '12px' }}>
+                    {currentIteration.description}
+                  </p>
+                </div>
+
+                {/* Status Indicator */}
+                {isProcessing && currentAgent && (
+                  <div style={{
+                    padding: '12px 16px',
+                    backgroundColor: '#e6f7ff',
+                    border: '1px solid #91d5ff',
+                    borderRadius: '6px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                  }}>
+                    <Spin size="small" />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 500, color: '#1890ff', marginBottom: '4px' }}>
+                        {currentAgent} is working...
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#666' }}>
+                        {currentIteration.current_stage ? `Stage: ${currentIteration.current_stage}` : 'Processing...'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
             
+            {/* 消息列表区域 */}
             <div 
-              ref={messagesContainerRef}
+              ref={chatMode === 'pm_agent' ? pmMessagesContainerRef : messagesContainerRef}
               style={{ 
                 flex: 1, 
                 overflow: 'auto', 
@@ -838,203 +957,348 @@ function App() {
                 backgroundColor: '#fafafa'
               }}
             >
-              {messages.length === 0 ? (
-                <div style={{ color: '#888', textAlign: 'center', marginTop: '40px' }}>
-                  {isProcessing ? 'Waiting for agent response...' : 'No messages yet. Start the iteration to begin chatting.'}
-                </div>
-              ) : (
-                messages.map((msg, index) => (
-                  <div key={index} style={{ marginBottom: '16px' }}>
-                    {msg.type === 'user' ? (
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{
-                          display: 'inline-block',
-                          backgroundColor: '#1890ff',
-                          color: '#fff',
-                          padding: '8px 12px',
-                          borderRadius: '4px',
-                          maxWidth: '70%',
-                          wordBreak: 'break-word'
-                        }}>
-                          {msg.content}
-                        </div>
-                      </div>
-                    ) : msg.type === 'thinking' ? (
-                      <div>
-                        <div
-                          style={{
-                            fontSize: '12px',
-                            color: '#888',
-                            marginBottom: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            cursor: 'pointer',
-                          }}
-                          onClick={() => {
-                            setMessages((prev) =>
-                              prev.map((m, i) =>
-                                i === index ? { ...m, isExpanded: !m.isExpanded } : m
-                              )
-                            );
-                          }}
-                        >
-                          <span>🤔</span>
-                          <span style={{ fontStyle: 'italic' }}>{msg.agentName || 'AI Agent'} thinking...</span>
-                          <span style={{ fontSize: '10px' }}>{msg.isExpanded ? '▼' : '▶'}</span>
-                        </div>
-                        {msg.isExpanded && (
+              {chatMode === 'pm_agent' ? (
+                /* PM Agent 消息列表 */
+                pmMessages.length === 0 ? (
+                  <div style={{ color: '#888', textAlign: 'center', marginTop: '40px' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>👋</div>
+                    <div style={{ fontSize: '16px', marginBottom: '8px' }}>Welcome to Project Manager Chat!</div>
+                    <div style={{ fontSize: '13px' }}>
+                      Ask me anything about this project, request changes, or discuss next steps.
+                    </div>
+                    <div style={{ marginTop: '24px', fontSize: '12px', color: '#999' }}>
+                      <div>I can help you with:</div>
+                      <div style={{ marginTop: '8px' }}>• Fix bugs by returning to earlier stages</div>
+                      <div>• Add new features through new iterations</div>
+                      <div>• Answer questions about the project</div>
+                    </div>
+                  </div>
+                ) : (
+                  pmMessages.map((msg, index) => (
+                    <div key={index} style={{ marginBottom: '16px' }}>
+                      {msg.type === 'user' ? (
+                        <div style={{ textAlign: 'right' }}>
                           <div style={{
-                            backgroundColor: '#f6f8fa',
-                            padding: '10px 14px',
+                            display: 'inline-block',
+                            backgroundColor: '#1890ff',
+                            color: '#fff',
+                            padding: '8px 12px',
                             borderRadius: '4px',
-                            border: '1px solid #e1e4e8',
                             maxWidth: '70%',
-                            wordBreak: 'break-word',
-                            fontSize: '13px',
-                            fontStyle: 'italic',
-                            color: '#555',
-                            lineHeight: '1.6',
+                            wordBreak: 'break-word'
                           }}>
                             {msg.content}
                           </div>
-                        )}
-                      </div>
-                    ) : msg.type === 'tool_call' ? (
-                      <div style={{
-                        backgroundColor: '#fff3e0',
-                        padding: '8px 12px',
-                        borderRadius: '4px',
-                        maxWidth: '70%',
-                        fontSize: '13px',
-                        borderLeft: '3px solid #ff9800',
-                      }}>
-                        <div style={{ fontWeight: 500, color: '#e65100', marginBottom: '4px' }}>
-                          🔧 {msg.agentName} 调用工具: <code style={{ 
-                            backgroundColor: 'rgba(0,0,0,0.05)',
-                            padding: '1px 4px',
-                            borderRadius: '2px',
-                            fontSize: '12px'
-                          }}>{msg.toolName}</code>
                         </div>
-                        {msg.arguments && Object.keys(msg.arguments).length > 0 && (
-                          <pre style={{ 
-                            margin: '4px 0 0', 
-                            fontSize: '11px', 
-                            color: '#666',
-                            backgroundColor: 'rgba(0,0,0,0.02)',
-                            padding: '6px',
-                            borderRadius: '3px',
-                            overflow: 'auto',
-                            maxHeight: '100px',
+                      ) : msg.type === 'pm_agent' ? (
+                        <div>
+                          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>
+                            <TeamOutlined style={{ marginRight: '4px' }} />
+                            Project Manager Agent
+                          </div>
+                          <div style={{
+                            backgroundColor: '#fff',
+                            padding: '12px 16px',
+                            borderRadius: '4px',
+                            border: '1px solid #e8e8e8',
+                            maxWidth: '70%',
+                            wordBreak: 'break-word',
                           }}>
-                            {JSON.stringify(msg.arguments, null, 2)}
-                          </pre>
-                        )}
-                      </div>
-                    ) : msg.type === 'tool_result' ? (
-                      <div style={{
-                        backgroundColor: msg.success ? '#e8f5e9' : '#ffebee',
-                        padding: '6px 12px',
-                        borderRadius: '4px',
-                        maxWidth: '70%',
-                        fontSize: '12px',
-                        borderLeft: msg.success ? '3px solid #4caf50' : '3px solid #f44336',
-                      }}>
-                        <span>
-                          {msg.success ? '✓' : '✗'} 工具 <code style={{
-                            backgroundColor: 'rgba(0,0,0,0.05)',
-                            padding: '1px 4px',
-                            borderRadius: '2px',
-                            fontSize: '11px'
-                          }}>{msg.toolName}</code> 执行{msg.success ? '成功' : '失败'}
-                        </span>
-                      </div>
-                    ) : (
-                      <div>
-                        <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>
-                          {msg.agentName || 'AI Agent'}
+                            <MarkdownMessage content={msg.content} />
+                          </div>
+                          {/* 显示操作建议 */}
+                          {msg.actions && msg.actions.length > 0 && (
+                            <div style={{ marginTop: '12px' }}>
+                              {msg.actions.map((action, idx) => (
+                                <div key={idx} style={{ 
+                                  display: 'inline-block',
+                                  marginRight: '8px',
+                                  marginBottom: '8px'
+                                }}>
+                                  {action.action_type === 'pm_goto_stage' && (
+                                    <Tag 
+                                      color="orange" 
+                                      style={{ cursor: 'pointer' }}
+                                      onClick={async () => {
+                                        Modal.confirm({
+                                          title: 'Confirm Stage Return',
+                                          content: `Return to ${action.target_stage} stage?`,
+                                          onOk: async () => {
+                                            try {
+                                              await invoke('pm_restart_iteration', {
+                                                iterationId: currentIteration.id,
+                                                targetStage: action.target_stage,
+                                              });
+                                              message.success(`Restarted from ${action.target_stage}`);
+                                              loadData();
+                                            } catch (err) {
+                                              message.error('Failed: ' + err);
+                                            }
+                                          },
+                                        });
+                                      }}
+                                    >
+                                      ↩️ Return to {action.target_stage}
+                                    </Tag>
+                                  )}
+                                  {action.action_type === 'pm_create_iteration' && (
+                                    <Tag 
+                                      color="blue" 
+                                      style={{ cursor: 'pointer' }}
+                                      onClick={async () => {
+                                        try {
+                                          await invoke('pm_restart_iteration', {
+                                            iterationId: currentIteration.id,
+                                            targetStage: 'plan',
+                                          });
+                                          message.success('New iteration created!');
+                                          loadData();
+                                        } catch (err) {
+                                          message.error('Failed: ' + err);
+                                        }
+                                      }}
+                                    >
+                                      ➕ New Iteration
+                                    </Tag>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <div style={{
-                          backgroundColor: '#fff',
-                          padding: '12px 16px',
-                          borderRadius: '4px',
-                          border: '1px solid #e8e8e8',
-                          maxWidth: '70%',
-                          wordBreak: 'break-word',
-                        }}>
-                          <MarkdownMessage content={msg.content} />
+                      ) : (
+                        <div style={{ color: '#f44336', padding: '12px', backgroundColor: '#ffebee', borderRadius: '4px' }}>
+                          {msg.content}
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
+                  ))
+                )
+              ) : (
+                /* Pipeline 消息列表 */
+                messages.length === 0 ? (
+                  <div style={{ color: '#888', textAlign: 'center', marginTop: '40px' }}>
+                    {isProcessing ? 'Waiting for agent response...' : 'No messages yet. Start the iteration to begin chatting.'}
                   </div>
-                ))
+                ) : (
+                  messages.map((msg, index) => (
+                    <div key={index} style={{ marginBottom: '16px' }}>
+                      {msg.type === 'user' ? (
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{
+                            display: 'inline-block',
+                            backgroundColor: '#1890ff',
+                            color: '#fff',
+                            padding: '8px 12px',
+                            borderRadius: '4px',
+                            maxWidth: '70%',
+                            wordBreak: 'break-word'
+                          }}>
+                            {msg.content}
+                          </div>
+                        </div>
+                      ) : msg.type === 'thinking' ? (
+                        <div>
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              color: '#888',
+                              marginBottom: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              cursor: 'pointer',
+                            }}
+                            onClick={() => {
+                              setMessages((prev) =>
+                                prev.map((m, i) =>
+                                  i === index ? { ...m, isExpanded: !m.isExpanded } : m
+                                )
+                              );
+                            }}
+                          >
+                            <span>🤔</span>
+                            <span style={{ fontStyle: 'italic' }}>{msg.agentName || 'AI Agent'} thinking...</span>
+                            <span style={{ fontSize: '10px' }}>{msg.isExpanded ? '▼' : '▶'}</span>
+                          </div>
+                          {msg.isExpanded && (
+                            <div style={{
+                              backgroundColor: '#f6f8fa',
+                              padding: '10px 14px',
+                              borderRadius: '4px',
+                              border: '1px solid #e1e4e8',
+                              maxWidth: '70%',
+                              wordBreak: 'break-word',
+                              fontSize: '13px',
+                              fontStyle: 'italic',
+                              color: '#555',
+                              lineHeight: '1.6',
+                            }}>
+                              {msg.content}
+                            </div>
+                          )}
+                        </div>
+                      ) : msg.type === 'tool_call' ? (
+                        <div style={{
+                          backgroundColor: '#fff3e0',
+                          padding: '8px 12px',
+                          borderRadius: '4px',
+                          maxWidth: '70%',
+                          fontSize: '13px',
+                          borderLeft: '3px solid #ff9800',
+                        }}>
+                          <div style={{ fontWeight: 500, color: '#e65100', marginBottom: '4px' }}>
+                            🔧 {msg.agentName} 调用工具: <code style={{ 
+                              backgroundColor: 'rgba(0,0,0,0.05)',
+                              padding: '1px 4px',
+                              borderRadius: '2px',
+                              fontSize: '12px'
+                            }}>{msg.toolName}</code>
+                          </div>
+                          {msg.arguments && Object.keys(msg.arguments).length > 0 && (
+                            <pre style={{ 
+                              margin: '4px 0 0', 
+                              fontSize: '11px', 
+                              color: '#666',
+                              backgroundColor: 'rgba(0,0,0,0.02)',
+                              padding: '6px',
+                              borderRadius: '3px',
+                              overflow: 'auto',
+                              maxHeight: '100px',
+                            }}>
+                              {JSON.stringify(msg.arguments, null, 2)}
+                            </pre>
+                          )}
+                        </div>
+                      ) : msg.type === 'tool_result' ? (
+                        <div style={{
+                          backgroundColor: msg.success ? '#e8f5e9' : '#ffebee',
+                          padding: '6px 12px',
+                          borderRadius: '4px',
+                          maxWidth: '70%',
+                          fontSize: '12px',
+                          borderLeft: msg.success ? '3px solid #4caf50' : '3px solid #f44336',
+                        }}>
+                          <span>
+                            {msg.success ? '✓' : '✗'} 工具 <code style={{
+                              backgroundColor: 'rgba(0,0,0,0.05)',
+                              padding: '1px 4px',
+                              borderRadius: '2px',
+                              fontSize: '11px'
+                            }}>{msg.toolName}</code> 执行{msg.success ? '成功' : '失败'}
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>
+                            {msg.agentName || 'AI Agent'}
+                          </div>
+                          <div style={{
+                            backgroundColor: '#fff',
+                            padding: '12px 16px',
+                            borderRadius: '4px',
+                            border: '1px solid #e8e8e8',
+                            maxWidth: '70%',
+                            wordBreak: 'break-word',
+                          }}>
+                            <MarkdownMessage content={msg.content} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )
               )}
             </div>
 
-            {inputRequest && (
-              <div style={{ 
-                padding: '16px', 
-                backgroundColor: '#fff7e6', 
-                border: '1px solid #ffd591', 
-                borderRadius: '4px',
-                marginBottom: '16px'
-              }}>
-                <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
-                  {inputRequest.isArtifactConfirmation 
-                    ? `Confirm ${inputRequest.artifactType}`
-                    : 'Input Required'}
-                </div>
-                <div style={{ marginBottom: '12px', color: '#666' }}>
-                  {inputRequest.isFeedbackMode ? inputRequest.feedbackPrompt : inputRequest.prompt}
-                </div>
-                {inputRequest.options && !inputRequest.isFeedbackMode && (
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    {inputRequest.options.map((option) => (
-                      <Button 
-                        key={option.id} 
-                        onClick={() => handleSelectOption(option)}
-                        block
-                      >
-                        {option.label}
-                      </Button>
-                    ))}
-                  </Space>
-                )}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <Input
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                onPressEnter={handleSendUserMessage}
-                placeholder={inputRequest ? 'Type your response...' : 'Type a message...'}
-                disabled={isProcessing && !inputRequest}
-              />
-              {inputRequest ? (
+            {/* 输入区域 */}
+            {chatMode === 'pm_agent' ? (
+              /* PM Agent 输入区域 */
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <Input
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  onPressEnter={handlePMSendMessage}
+                  placeholder="Ask about the project or request changes..."
+                  disabled={pmProcessing}
+                />
                 <Button 
-                  onClick={handleSubmitFeedback} 
+                  onClick={handlePMSendMessage} 
                   type="primary"
-                  disabled={!userInput.trim()}
-                >
-                  Send Feedback
-                </Button>
-              ) : (
-                <Button 
-                  onClick={handleSendUserMessage} 
-                  type="primary"
-                  disabled={!userInput.trim()}
+                  disabled={!userInput.trim() || pmProcessing}
+                  loading={pmProcessing}
                 >
                   Send
                 </Button>
-              )}
-              {inputRequest && inputRequest.isFeedbackMode && (
-                <Button onClick={handleCancelFeedback}>
-                  Cancel
-                </Button>
-              )}
-            </div>
+              </div>
+            ) : (
+              /* Pipeline 输入区域 */
+              <>
+                {inputRequest && (
+                  <div style={{ 
+                    padding: '16px', 
+                    backgroundColor: '#fff7e6', 
+                    border: '1px solid #ffd591', 
+                    borderRadius: '4px',
+                    marginBottom: '16px'
+                  }}>
+                    <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
+                      {inputRequest.isArtifactConfirmation 
+                        ? `Confirm ${inputRequest.artifactType}`
+                        : 'Input Required'}
+                    </div>
+                    <div style={{ marginBottom: '12px', color: '#666' }}>
+                      {inputRequest.isFeedbackMode ? inputRequest.feedbackPrompt : inputRequest.prompt}
+                    </div>
+                    {inputRequest.options && !inputRequest.isFeedbackMode && (
+                      <Space direction="vertical" style={{ width: '100%' }}>
+                        {inputRequest.options.map((option) => (
+                          <Button 
+                            key={option.id} 
+                            onClick={() => handleSelectOption(option)}
+                            block
+                          >
+                            {option.label}
+                          </Button>
+                        ))}
+                      </Space>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <Input
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    onPressEnter={handleSendUserMessage}
+                    placeholder={inputRequest ? 'Type your response...' : 'Type a message...'}
+                    disabled={isProcessing && !inputRequest}
+                  />
+                  {inputRequest ? (
+                    <Button 
+                      onClick={handleSubmitFeedback} 
+                      type="primary"
+                      disabled={!userInput.trim()}
+                    >
+                      Send Feedback
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={handleSendUserMessage} 
+                      type="primary"
+                      disabled={!userInput.trim()}
+                    >
+                      Send
+                    </Button>
+                  )}
+                  {inputRequest && inputRequest.isFeedbackMode && (
+                    <Button onClick={handleCancelFeedback}>
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <Empty 

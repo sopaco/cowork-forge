@@ -134,6 +134,9 @@ pub mod memory_tools;
 // Knowledge generation tools
 pub mod knowledge_tools;
 
+// Project Manager Agent tools
+pub mod pm_tools;
+
 // Re-exports
 pub use file_tools::*;
 pub use hitl_tools::*;
@@ -149,3 +152,4 @@ pub use deployment_tools::*;
 pub use goto_stage_tool::*;
 pub use memory_tools::*;
 pub use knowledge_tools::*;
+pub use pm_tools::*;
