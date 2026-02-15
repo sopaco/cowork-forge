@@ -8,7 +8,7 @@ repository.workspace = true
 description = "AI-powered software development system - Core library with adk-rust framework"
 
 [dependencies]
-# ADK Rust framework (CRITICAL: Keep version at 0.2.1)
+# ADK Rust framework
 adk-rust = { workspace = true }
 adk-core = { workspace = true }
 adk-agent = { workspace = true }
