@@ -1,5 +1,6 @@
 // Static file server using tiny_http
 // Provides built-in HTTP server for previewing static HTML projects
+// Also manages Fullstack process instances
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -10,6 +11,7 @@ use tauri::Emitter;
 
 lazy_static::lazy_static! {
     static ref STATIC_SERVERS: Arc<Mutex<HashMap<String, StaticServerInstance>>> = Arc::new(Mutex::new(HashMap::new()));
+    static ref FULLSTACK_PROCESSES: Arc<Mutex<HashMap<String, FullstackProcessInstance>>> = Arc::new(Mutex::new(HashMap::new()));
 }
 
 /// Static server instance info
@@ -17,6 +19,59 @@ struct StaticServerInstance {
     port: u16,
     shutdown_tx: tokio::sync::oneshot::Sender<()>,
 }
+
+// ============================================================================
+// Fullstack Process Manager
+// ============================================================================
+
+/// Fullstack process instance - manages frontend and backend processes
+#[derive(Debug, Clone)]
+pub struct FullstackProcessInstance {
+    pub iteration_id: String,
+    pub frontend_pid: Option<u32>,
+    pub backend_pid: Option<u32>,
+    pub frontend_port: u16,
+    pub backend_port: u16,
+    pub frontend_url: String,
+    pub backend_url: String,
+}
+
+/// Register a fullstack process instance
+pub fn register_fullstack_process(instance: FullstackProcessInstance) {
+    let mut processes = FULLSTACK_PROCESSES.lock().unwrap();
+    processes.insert(instance.iteration_id.clone(), instance);
+}
+
+/// Get fullstack process instance
+pub fn get_fullstack_process(iteration_id: &str) -> Option<FullstackProcessInstance> {
+    let processes = FULLSTACK_PROCESSES.lock().unwrap();
+    processes.get(iteration_id).cloned()
+}
+
+/// Remove fullstack process instance
+pub fn remove_fullstack_process(iteration_id: &str) -> Option<FullstackProcessInstance> {
+    let mut processes = FULLSTACK_PROCESSES.lock().unwrap();
+    processes.remove(iteration_id)
+}
+
+/// Check if a fullstack process is registered
+pub fn is_fullstack_running(iteration_id: &str) -> bool {
+    let processes = FULLSTACK_PROCESSES.lock().unwrap();
+    processes.contains_key(iteration_id)
+}
+
+/// Generate process keys for frontend and backend
+/// Uses "::" as separator to avoid conflicts with iteration IDs that might contain "_frontend" or "_backend"
+pub fn get_fullstack_process_keys(iteration_id: &str) -> (String, String) {
+    (
+        format!("{}::frontend", iteration_id),
+        format!("{}::backend", iteration_id),
+    )
+}
+
+// ============================================================================
+// Static File Server
+// ============================================================================
 
 /// Start a static file server for the given directory
 pub fn start_static_server(

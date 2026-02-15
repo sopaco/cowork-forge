@@ -67,6 +67,28 @@ pub struct RunInfo {
     pub status: RunStatus,
     pub process_id: Option<u32>,
     pub command: Option<String>,
+    
+    // Fullstack support
+    pub frontend_pid: Option<u32>,
+    pub backend_pid: Option<u32>,
+    pub frontend_url: Option<String>,
+    pub backend_url: Option<String>,
+    pub is_fullstack: bool,
+}
+
+impl Default for RunInfo {
+    fn default() -> Self {
+        Self {
+            status: RunStatus::Stopped,
+            process_id: None,
+            command: None,
+            frontend_pid: None,
+            backend_pid: None,
+            frontend_url: None,
+            backend_url: None,
+            is_fullstack: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
