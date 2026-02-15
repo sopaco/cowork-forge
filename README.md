@@ -28,7 +28,7 @@
 
 | Full-Role Agents **COLLABORATION** | A team that works together like **HUMANS** | High-quality product solutions with **ARTIFACTS** |
 | :--- | :--- | :--- |
-|![clarify_flows](./assets/clarify_flows.jpg) | ![clarify_teams_like_human](./assets/clarify_teams_like_human.jpg) | ![Artifact Viewer](./assets/clarify_snapshot_gui.png) |
+|![clarify_flows](./assets/clarify_flows.jpg) | ![clarify_teams_like_human](./assets/clarify_teams_like_human.jpg) | ![Artifact Viewer](./assets/clarify_snapshot_gui.jpg) |
 
 <strong>Cowork Forge</strong> is a complete AI-powered development team system that simulates how real software teams collaborate. AI agents take on roles as Product Manager, Architect, Project Manager, and Engineer, working together to complete everything from ideation to delivery.
 

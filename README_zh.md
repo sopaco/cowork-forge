@@ -28,7 +28,7 @@
 
 | 产研全角色Agent团队 | 专业研发流程与人机协作规范 | 高品质产品方案与项目实施 |
 | :--- | :--- | :--- |
-|![clarify_flows](./assets/clarify_flows.jpg) | ![clarify_teams_like_human](./assets/clarify_teams_like_human.jpg) | ![Artifact Viewer](./assets/clarify_snapshot_gui.png) |
+|![clarify_flows](./assets/clarify_flows.jpg) | ![clarify_teams_like_human](./assets/clarify_teams_like_human.jpg) | ![Artifact Viewer](./assets/clarify_snapshot_gui.jpg) |
 
 <strong>Cowork Forge</strong> 是一个完整的 AI 驱动开发团队系统，它模拟真实软件团队的协作方式，让 AI 智能体分别扮演产品经理、架构师、项目经理和工程师等角色，协同完成从构思到交付的全部工作。
 
