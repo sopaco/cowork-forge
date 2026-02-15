@@ -137,7 +137,24 @@ const RunnerPanel = ({ iterationId }) => {
     
     if (result) {
       setIsRunning(true);
-      setLogs(prev => [...prev, { type: 'system', content: `> Project started (PID: ${result.process_id})\n`, timestamp: new Date() }]);
+      
+      // Display startup info based on project type
+      if (result.is_fullstack) {
+        // Fullstack project - show both frontend and backend PIDs
+        setLogs(prev => [
+          ...prev, 
+          { type: 'system', content: `> Fullstack project started\n`, timestamp: new Date() },
+          { type: 'system', content: `> Frontend PID: ${result.frontend_pid} | URL: ${result.frontend_url}\n`, timestamp: new Date() },
+          { type: 'system', content: `> Backend PID: ${result.backend_pid} | URL: ${result.backend_url}\n`, timestamp: new Date() },
+        ]);
+      } else if (result.process_id) {
+        // Single process project
+        setLogs(prev => [...prev, { type: 'system', content: `> Project started (PID: ${result.process_id})\n`, timestamp: new Date() }]);
+      } else {
+        // Built-in static server
+        setLogs(prev => [...prev, { type: 'system', content: `> Project started: ${result.command}\n`, timestamp: new Date() }]);
+      }
+      
       // Refresh runtime info after starting
       loadProjectRuntimeInfo();
     }
@@ -188,7 +205,11 @@ const RunnerPanel = ({ iterationId }) => {
   });
 
   const hasFrontend = projectRuntimeInfo?.has_frontend === true;
+  const hasBackend = projectRuntimeInfo?.has_backend === true;
+  const isFullstack = hasFrontend && hasBackend;
   const previewUrl = projectRuntimeInfo?.preview_url;
+  const frontendPort = projectRuntimeInfo?.frontend_port;
+  const backendPort = projectRuntimeInfo?.backend_port;
 
   // Render Run Tab (运行程序)
   const renderRunTab = () => (
@@ -277,6 +298,29 @@ const RunnerPanel = ({ iterationId }) => {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#f5f5f5', height: '100%', overflow: 'hidden' }}>
       {isRunning && previewUrl ? (
         <>
+          {/* Fullstack Info Banner */}
+          {isFullstack && (
+            <div style={{ 
+              padding: '8px 12px',
+              backgroundColor: '#e6f7ff',
+              borderBottom: '1px solid #91d5ff',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              flexShrink: 0
+            }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#0050b3' }}>
+                🔗 Fullstack Mode
+              </span>
+              <span style={{ fontSize: 12, color: '#666' }}>
+                Frontend: <a href={previewUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#1890ff' }}>{previewUrl}</a>
+              </span>
+              <span style={{ fontSize: 12, color: '#666' }}>
+                Backend API: <a href={`http://localhost:${backendPort}`} target="_blank" rel="noopener noreferrer" style={{ color: '#722ed1' }}>http://localhost:{backendPort}</a>
+              </span>
+            </div>
+          )}
+          
           {/* Preview Toolbar */}
           <div style={{ 
             padding: '8px 12px',
@@ -440,11 +484,20 @@ const RunnerPanel = ({ iterationId }) => {
           <Tag color={isRunning ? 'success' : 'default'}>
             {isRunning ? 'Running' : 'Stopped'}
           </Tag>
-          {hasFrontend && (
-            <Tag color="blue">Frontend</Tag>
-          )}
-          {projectRuntimeInfo?.has_backend && (
-            <Tag color="purple">Backend</Tag>
+          {isFullstack ? (
+            <>
+              <Tag color="blue">Frontend:{frontendPort}</Tag>
+              <Tag color="purple">Backend:{backendPort}</Tag>
+            </>
+          ) : (
+            <>
+              {hasFrontend && (
+                <Tag color="blue">Frontend</Tag>
+              )}
+              {hasBackend && (
+                <Tag color="purple">Backend</Tag>
+              )}
+            </>
           )}
         </div>
         

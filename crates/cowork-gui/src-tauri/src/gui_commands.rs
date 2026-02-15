@@ -1,15 +1,17 @@
 // GUI-specific commands for enhanced functionality
 use super::gui_types::FileReadResult;
 use super::gui_types::*;
+use super::static_server;
+use super::iteration_commands::gui_execute_iteration;
 use crate::AppState;
 use crate::project_runner::ProjectRunner;
 use cowork_core::llm::config::LlmConfig;
 use cowork_core::persistence::IterationStore;
-use cowork_core::{ProjectRuntimeConfig, RuntimeAnalyzer};
+use cowork_core::{ProjectRuntimeConfig, RuntimeAnalyzer, RuntimeType};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use tauri::{State, Window};
+use tauri::{Emitter, State, Window};
 
 // Global instances
 lazy_static::lazy_static! {
@@ -23,6 +25,37 @@ lazy_static::lazy_static! {
 
 pub fn init_app_handle(handle: tauri::AppHandle) {
     PROJECT_RUNNER.set_app_handle(handle);
+}
+
+// ============================================================================
+// System Locale Command
+// ============================================================================
+
+#[tauri::command]
+pub fn get_system_locale() -> String {
+    // 获取系统语言/区域设置
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        // 使用 PowerShell 获取 Windows 系统语言
+        let output = Command::new("powershell")
+            .args(["-Command", "(Get-Culture).Name"])
+            .output();
+        
+        if let Ok(output) = output {
+            let locale = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !locale.is_empty() {
+                // 存储到 cowork-core 全局配置
+                cowork_core::set_system_locale(locale.clone());
+                return locale;
+            }
+        }
+    }
+    
+    // 默认返回英语
+    let default_locale = "en-US".to_string();
+    cowork_core::set_system_locale(default_locale.clone());
+    default_locale
 }
 
 // ============================================================================
@@ -298,8 +331,32 @@ pub async fn start_iteration_preview(
     // Install dependencies if needed
     install_dependencies_if_needed(&code_dir).await?;
 
-    // Get start command and port from LLM analysis
-    let (command, port, url) = detect_start_command_with_info(&code_dir)?;
+    // Get runtime config to determine project type
+    let config_result = try_analyze_with_runtime(&code_dir);
+
+    // Check if this is a VanillaHtml project - use built-in static server
+    if let Ok(ref config) = config_result {
+        if config.runtime_type == RuntimeType::VanillaHtml {
+            println!("[GUI] Detected VanillaHtml, using built-in static server");
+            
+            let server_info = static_server::start_static_server(
+                iteration_id.clone(),
+                code_dir.clone(),
+                8000, // preferred port
+                None, // app_handle not needed here
+            )?;
+
+            return Ok(PreviewInfo {
+                url: server_info.url,
+                port: server_info.port,
+                status: PreviewStatus::Running,
+                project_type: ProjectType::Html,
+            });
+        }
+    }
+
+    // For other project types, use external commands via ProjectRunner
+    let (command, port, url) = detect_start_command_with_info_from_config(&config_result)?;
 
     println!("[GUI] Preview using command: {}, port: {}", command, port);
 
@@ -309,6 +366,8 @@ pub async fn start_iteration_preview(
             iteration_id.clone(),
             command,
             code_dir.to_string_lossy().to_string(),
+            Some(url.clone()),
+            Some(port),
         )
         .await?;
 
@@ -320,12 +379,16 @@ pub async fn start_iteration_preview(
     })
 }
 
-/// Detect start command with additional info (port, url)
-fn detect_start_command_with_info(code_dir: &Path) -> Result<(String, u16, String), String> {
-    // Use RuntimeAnalyzer (LLM分析) 获取运行配置
-    let analyzer_result = try_analyze_with_runtime(code_dir);
+/// Detect start command with additional info (port, url) from already-analyzed config
+fn detect_start_command_with_info_from_config(
+    config_result: &Result<ProjectRuntimeConfig, String>,
+) -> Result<(String, u16, String), String> {
+    if let Ok(config) = config_result {
+        // VanillaHtml should be handled separately with built-in server
+        if config.runtime_type == RuntimeType::VanillaHtml {
+            return Err("VanillaHtml should use built-in static server".to_string());
+        }
 
-    if let Ok(config) = analyzer_result {
         // Determine port and URL based on project type
         let (port, url) = if let Some(frontend) = &config.frontend {
             (
@@ -371,7 +434,19 @@ pub async fn check_preview_status(
         iteration_id
     );
 
-    // Check if process is running via ProjectRunner
+    // First check built-in static server
+    if static_server::is_server_running(&iteration_id) {
+        if let Some(server_info) = static_server::get_server_info(&iteration_id) {
+            return Ok(Some(PreviewInfo {
+                url: server_info.url,
+                port: server_info.port,
+                status: PreviewStatus::Running,
+                project_type: ProjectType::Html,
+            }));
+        }
+    }
+
+    // Then check external process via ProjectRunner
     if PROJECT_RUNNER.is_running(&iteration_id) {
         if let Some(info) = PROJECT_RUNNER.get_info(&iteration_id) {
             return Ok(Some(info));
@@ -439,6 +514,11 @@ pub async fn stop_iteration_preview(
     _state: State<'_, AppState>,
 ) -> Result<(), String> {
     println!("[GUI] Stopping preview for iteration: {}", iteration_id);
+    
+    // Stop built-in static server if running
+    static_server::stop_static_server(&iteration_id)?;
+    
+    // Stop external process if running
     PROJECT_RUNNER.stop(iteration_id).await
 }
 
@@ -461,10 +541,61 @@ pub async fn get_project_runtime_info(
 
     let (has_frontend, has_backend, preview_url, frontend_port, backend_port, start_command) =
         if let Ok(config) = config_result {
+            // Special handling for VanillaHtml - use built-in static server
+            if config.runtime_type == RuntimeType::VanillaHtml {
+                // Check if static server is already running
+                let (url, port) = if let Some(server_info) = static_server::get_server_info(&iteration_id) {
+                    (Some(server_info.url), Some(server_info.port))
+                } else {
+                    // Return default port info (will be updated when server starts)
+                    (Some("http://localhost:8000".to_string()), Some(8000))
+                };
+                
+                return Ok(ProjectRuntimeInfo {
+                    has_frontend: true,
+                    has_backend: false,
+                    preview_url: url,
+                    frontend_port: port,
+                    backend_port: None,
+                    start_command: Some("(Built-in static server)".to_string()),
+                });
+            }
+
+            // Special handling for Fullstack projects
+            if is_fullstack_type(&config.runtime_type) {
+                let fullstack = config.fullstack.as_ref();
+                let fullstack_instance = static_server::get_fullstack_process(&iteration_id);
+                
+                let (frontend_url, f_port, b_port) = if let Some(ref instance) = fullstack_instance {
+                    (Some(instance.frontend_url.clone()), Some(instance.frontend_port), Some(instance.backend_port))
+                } else if let Some(ref fs) = fullstack {
+                    let url = format!("http://localhost:{}", fs.frontend_port);
+                    (Some(url), Some(fs.frontend_port), Some(fs.backend_port))
+                } else {
+                    (None, None, None)
+                };
+                
+                let cmd = if let Some(ref fs) = fullstack {
+                    Some(format!("Frontend: {} | Backend: {}", fs.frontend_dev_command, fs.backend_dev_command))
+                } else {
+                    None
+                };
+                
+                return Ok(ProjectRuntimeInfo {
+                    has_frontend: true,
+                    has_backend: true,
+                    preview_url: frontend_url,
+                    frontend_port: f_port,
+                    backend_port: b_port,
+                    start_command: cmd,
+                });
+            }
+
             let has_frontend = config.frontend.is_some();
             let has_backend = config.backend.is_some() || config.fullstack.is_some();
 
-            let (preview_url, frontend_port) = if let Some(ref frontend) = config.frontend {
+            // Get initial port from config
+            let (mut preview_url, mut frontend_port) = if let Some(ref frontend) = config.frontend {
                 let url = format!("http://{}:{}", frontend.dev_host, frontend.dev_port);
                 (Some(url), Some(frontend.dev_port))
             } else if let Some(ref fullstack) = config.fullstack {
@@ -483,6 +614,39 @@ pub async fn get_project_runtime_info(
             };
 
             let start_command = generate_start_command_from_config(&config);
+
+            // NEW: Try to extract actual port from README if project is running and has LLM config
+            // This fixes the issue where the default port (5173) doesn't match the actual running port
+            if has_frontend && frontend_port.is_some() {
+                // Check if we have LLM config available
+                if let Ok(model_config) = cowork_core::llm::config::ModelConfig::from_file("config.toml") {
+                    // Only analyze README if project is running to avoid unnecessary LLM calls
+                    let is_project_running = PROJECT_RUNNER.is_running(&iteration_id) 
+                        || static_server::is_server_running(&iteration_id);
+                    
+                    if is_project_running {
+                        println!("[GUI] Project is running, trying to extract actual port from README...");
+                        
+                        match cowork_core::runtime_analyzer::analyze_runtime_from_readme(
+                            &code_dir,
+                            &config,
+                            &model_config.llm,
+                        ).await {
+                            Ok(Some((actual_port, actual_url))) => {
+                                println!("[GUI] Extracted actual port {} from README, updating runtime info", actual_port);
+                                preview_url = Some(actual_url);
+                                frontend_port = Some(actual_port);
+                            }
+                            Ok(None) => {
+                                println!("[GUI] No port information found in README, using default port from config");
+                            }
+                            Err(e) => {
+                                println!("[GUI] Failed to analyze README for port: {}, using default port", e);
+                            }
+                        }
+                    }
+                }
+            }
 
             (
                 has_frontend,
@@ -528,9 +692,75 @@ pub async fn start_iteration_project(
     // Install dependencies if needed
     install_dependencies_if_needed(&code_dir).await?;
 
+    // Analyze project type
+    let config_result = try_analyze_with_runtime(&code_dir);
+    
+    if let Ok(ref config) = config_result {
+        // Handle VanillaHtml - use built-in static server
+        if config.runtime_type == RuntimeType::VanillaHtml {
+            println!("[GUI] Detected VanillaHtml, using built-in static server");
+            
+            let server_info = static_server::start_static_server(
+                iteration_id.clone(),
+                code_dir.clone(),
+                8000,
+                None,
+            )?;
+
+            return Ok(RunInfo {
+                status: RunStatus::Running,
+                process_id: None,
+                command: Some(format!("Built-in static server on port {}", server_info.port)),
+                ..Default::default()
+            });
+        }
+        
+        // Handle Fullstack projects - start both frontend and backend
+        if is_fullstack_type(&config.runtime_type) {
+            println!("[GUI] Detected Fullstack project: {:?}", config.runtime_type);
+            return start_fullstack_project(iteration_id, code_dir, config).await;
+        }
+    }
+
+    // Single process projects
     let command = detect_start_command(&code_dir)?;
 
     println!("[GUI] Detected start command: {}", command);
+
+    // Try to extract actual port from README before starting
+    let (url, port) = if let Ok(ref config) = config_result {
+        if let Ok(model_config) = cowork_core::llm::config::ModelConfig::from_file("config.toml") {
+            match cowork_core::runtime_analyzer::analyze_runtime_from_readme(
+                &code_dir,
+                config,
+                &model_config.llm,
+            ).await {
+                Ok(Some((actual_port, actual_url))) => {
+                    println!("[GUI] Extracted actual port {} from README for project start", actual_port);
+                    (Some(actual_url), Some(actual_port))
+                }
+                _ => {
+                    // Fallback to config default
+                    let default_port = config.frontend.as_ref()
+                        .map(|f| f.dev_port)
+                        .or_else(|| config.backend.as_ref().map(|b| b.port))
+                        .unwrap_or(3000);
+                    let default_url = format!("http://localhost:{}", default_port);
+                    (Some(default_url), Some(default_port))
+                }
+            }
+        } else {
+            let default_port = config.frontend.as_ref()
+                .map(|f| f.dev_port)
+                .or_else(|| config.backend.as_ref().map(|b| b.port))
+                .unwrap_or(3000);
+            let default_url = format!("http://localhost:{}", default_port);
+            (Some(default_url), Some(default_port))
+        }
+    } else {
+        // Fallback to default port 3000
+        (Some("http://localhost:3000".to_string()), Some(3000))
+    };
 
     let command_clone = command.clone();
     let pid = PROJECT_RUNNER
@@ -538,6 +768,8 @@ pub async fn start_iteration_project(
             iteration_id.clone(),
             command,
             code_dir.to_string_lossy().to_string(),
+            url.clone(),
+            port,
         )
         .await?;
 
@@ -545,6 +777,137 @@ pub async fn start_iteration_project(
         status: RunStatus::Running,
         process_id: Some(pid),
         command: Some(command_clone),
+        ..Default::default()
+    })
+}
+
+/// Check if runtime type is a fullstack type
+fn is_fullstack_type(runtime_type: &RuntimeType) -> bool {
+    matches!(runtime_type, 
+        RuntimeType::FullstackReactRust | 
+        RuntimeType::FullstackReactNode |
+        RuntimeType::FullstackVanillaRust |
+        RuntimeType::FullstackVanillaNode
+    )
+}
+
+/// Start a fullstack project (frontend + backend)
+async fn start_fullstack_project(
+    iteration_id: String,
+    code_dir: PathBuf,
+    config: &ProjectRuntimeConfig,
+) -> Result<RunInfo, String> {
+    let fullstack_config = config.fullstack.as_ref()
+        .ok_or("Fullstack config not found in project runtime config")?;
+    
+    let (frontend_key, backend_key) = static_server::get_fullstack_process_keys(&iteration_id);
+    let backend_port = fullstack_config.backend_port;
+    
+    // 1. Start backend first (frontend may depend on backend API)
+    let backend_command = &fullstack_config.backend_dev_command;
+    println!("[GUI] Starting fullstack backend: {}", backend_command);
+    
+    let backend_url = format!("http://localhost:{}", backend_port);
+    let backend_pid = match PROJECT_RUNNER
+        .start(
+            backend_key.clone(),
+            backend_command.clone(),
+            code_dir.to_string_lossy().to_string(),
+            Some(backend_url.clone()),
+            Some(backend_port),
+        )
+        .await
+    {
+        Ok(pid) => pid,
+        Err(e) => {
+            return Err(format!("Failed to start backend: {}", e));
+        }
+    };
+    
+    // 2. Wait for backend to be ready (health check with timeout)
+    println!("[GUI] Waiting for backend to be ready on port {}...", backend_port);
+    let mut backend_ready = false;
+    
+    // Try health check for up to 30 seconds
+    for attempt in 1..=30 {
+        // Check if process is still running
+        if !PROJECT_RUNNER.is_running(&backend_key) {
+            // Process already stopped, just return error
+            return Err("Backend process exited unexpectedly during startup. Check the logs for errors.".to_string());
+        }
+        
+        // Try to connect to backend
+        match attohttpc::get(&backend_url)
+            .timeout(std::time::Duration::from_secs(1))
+            .send()
+        {
+            Ok(_) => {
+                println!("[GUI] Backend is ready after {} attempts", attempt);
+                backend_ready = true;
+                break;
+            }
+            Err(_) => {
+                // Backend not ready yet, wait and retry
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
+        }
+    }
+    
+    if !backend_ready {
+        println!("[GUI] Warning: Backend health check timed out, proceeding anyway");
+    }
+    
+    // 3. Start frontend
+    let frontend_command = &fullstack_config.frontend_dev_command;
+    println!("[GUI] Starting fullstack frontend: {}", frontend_command);
+    
+    let frontend_url = format!("http://localhost:{}", fullstack_config.frontend_port);
+    let frontend_pid = match PROJECT_RUNNER
+        .start(
+            frontend_key.clone(),
+            frontend_command.clone(),
+            code_dir.to_string_lossy().to_string(),
+            Some(frontend_url.clone()),
+            Some(fullstack_config.frontend_port),
+        )
+        .await
+    {
+        Ok(pid) => pid,
+        Err(e) => {
+            // Frontend failed, cleanup backend
+            println!("[GUI] Frontend failed, cleaning up backend: {}", e);
+            let _ = PROJECT_RUNNER.stop(backend_key).await;
+            return Err(format!("Failed to start frontend: {}", e));
+        }
+    };
+    
+    // 4. Register fullstack process instance
+    let instance = static_server::FullstackProcessInstance {
+        iteration_id: iteration_id.clone(),
+        frontend_pid: Some(frontend_pid),
+        backend_pid: Some(backend_pid),
+        frontend_port: fullstack_config.frontend_port,
+        backend_port: fullstack_config.backend_port,
+        frontend_url: format!("http://localhost:{}", fullstack_config.frontend_port),
+        backend_url: format!("http://localhost:{}", fullstack_config.backend_port),
+    };
+    
+    static_server::register_fullstack_process(instance.clone());
+    
+    println!("[GUI] Fullstack project started: frontend={}, backend={}", 
+        instance.frontend_url, instance.backend_url);
+    
+    Ok(RunInfo {
+        status: RunStatus::Running,
+        process_id: None,
+        command: Some(format!("Frontend: {} | Backend: {}", 
+            fullstack_config.frontend_dev_command, 
+            fullstack_config.backend_dev_command)),
+        frontend_pid: Some(frontend_pid),
+        backend_pid: Some(backend_pid),
+        frontend_url: Some(instance.frontend_url.clone()),
+        backend_url: Some(instance.backend_url.clone()),
+        is_fullstack: true,
     })
 }
 
@@ -555,6 +918,32 @@ pub async fn stop_iteration_project(
     _state: State<'_, AppState>,
 ) -> Result<(), String> {
     println!("[GUI] Stopping project for iteration: {}", iteration_id);
+    
+    // Stop built-in static server if running
+    static_server::stop_static_server(&iteration_id)?;
+    
+    // Check if this is a fullstack process
+    if let Some(instance) = static_server::remove_fullstack_process(&iteration_id) {
+        println!("[GUI] Stopping fullstack project: frontend_pid={:?}, backend_pid={:?}", 
+            instance.frontend_pid, instance.backend_pid);
+        
+        let (frontend_key, backend_key) = static_server::get_fullstack_process_keys(&iteration_id);
+        
+        // Stop frontend
+        if let Err(e) = PROJECT_RUNNER.stop(frontend_key).await {
+            eprintln!("[GUI] Warning: Failed to stop frontend: {}", e);
+        }
+        
+        // Stop backend
+        if let Err(e) = PROJECT_RUNNER.stop(backend_key).await {
+            eprintln!("[GUI] Warning: Failed to stop backend: {}", e);
+        }
+        
+        println!("[GUI] Fullstack project stopped");
+        return Ok(());
+    }
+    
+    // Stop single external process
     PROJECT_RUNNER.stop(iteration_id).await
 }
 
@@ -564,6 +953,28 @@ pub async fn check_project_status(
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<bool, String> {
+    // Check built-in static server first
+    if static_server::is_server_running(&iteration_id) {
+        return Ok(true);
+    }
+    
+    // Check fullstack process
+    if static_server::is_fullstack_running(&iteration_id) {
+        let (frontend_key, backend_key) = static_server::get_fullstack_process_keys(&iteration_id);
+        let frontend_running = PROJECT_RUNNER.is_running(&frontend_key);
+        let backend_running = PROJECT_RUNNER.is_running(&backend_key);
+        
+        // Return true if either frontend or backend is running
+        if frontend_running || backend_running {
+            return Ok(true);
+        } else {
+            // Both stopped, clean up the instance
+            static_server::remove_fullstack_process(&iteration_id);
+            return Ok(false);
+        }
+    }
+    
+    // Check single external process
     Ok(PROJECT_RUNNER.is_running(&iteration_id))
 }
 
@@ -875,7 +1286,8 @@ fn generate_start_command_from_config(config: &ProjectRuntimeConfig) -> Option<S
         cowork_core::RuntimeType::NodeFastify => Some("node index.js".to_string()),
         cowork_core::RuntimeType::PythonFastapi => Some("uvicorn main:app --reload".to_string()),
         cowork_core::RuntimeType::PythonFlask => Some("flask run".to_string()),
-        cowork_core::RuntimeType::VanillaHtml => Some("python -m http.server 8000".to_string()),
+        // VanillaHtml uses built-in static server, handled separately
+        cowork_core::RuntimeType::VanillaHtml => None,
         cowork_core::RuntimeType::NodeTool => Some("node index.js".to_string()),
         cowork_core::RuntimeType::RustCli => Some("cargo run".to_string()),
         _ => None,
@@ -1728,4 +2140,199 @@ fn replace_template_variables(
     }
 
     result
+}
+
+// ============================================================================
+// Project Manager Agent Commands
+// ============================================================================
+
+/// PM Agent message response
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PMMessageResponse {
+    pub agent_message: String,
+    pub actions: Vec<PMActionInfo>,
+    pub needs_restart: bool,
+    pub target_stage: Option<String>,
+    pub new_iteration_id: Option<String>,
+}
+
+/// PM Action information for frontend
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PMActionInfo {
+    pub action_type: String,
+    pub description: String,
+}
+
+#[tauri::command]
+pub async fn pm_send_message(
+    iteration_id: String,
+    message: String,
+    history: Vec<serde_json::Value>,
+    window: Window,
+) -> Result<PMMessageResponse, String> {
+    println!("[GUI] PM Agent processing message for iteration: {} (history: {} messages)", iteration_id, history.len());
+
+    // Load LLM config
+    let model_config = load_model_config()?;
+    let llm_client = cowork_core::llm::config::create_llm_client(&model_config.llm)
+        .map_err(|e| format!("Failed to create LLM client: {}", e))?;
+
+    // Use the cowork-core helper to run PM agent
+    let result = cowork_core::agents::execute_pm_agent_message(
+        llm_client,
+        iteration_id.clone(),
+        message.clone(),
+        history,
+    ).await
+    .map_err(|e| format!("PM agent execution failed: {}", e))?;
+
+    // Extract response
+    let mut agent_message = result.0;
+    let _parts = result.1;
+
+    // Parse actions from embedded <!--ACTIONS:...--> marker
+    let mut actions = Vec::new();
+    let mut needs_restart = false;
+    let mut target_stage = None;
+    let new_iteration_id = None;
+
+    // Try to extract actions from the message marker
+    if let Some(start_idx) = agent_message.find("<!--ACTIONS:") {
+        if let Some(end_idx) = agent_message[start_idx..].find("-->") {
+            let actions_json = &agent_message[start_idx + 12..start_idx + end_idx];
+            
+            if let Ok(parsed_actions) = serde_json::from_str::<Vec<serde_json::Value>>(actions_json) {
+                for action in parsed_actions {
+                    let action_type = action.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                    
+                    let pm_action = PMActionInfo {
+                        action_type: action_type.to_string(),
+                        description: action.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    };
+                    
+                    // Check for specific actions
+                    if action_type == "pm_goto_stage" {
+                        needs_restart = true;
+                        target_stage = action.get("target_stage").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    }
+                    
+                    actions.push(pm_action);
+                }
+            }
+            
+            // Remove the marker from displayed message
+            agent_message = format!("{}{}", &agent_message[..start_idx], &agent_message[start_idx + end_idx + 3..]);
+        }
+    }
+
+    // Emit response event
+    let _ = window.emit("pm_message", serde_json::json!({
+        "iteration_id": iteration_id,
+        "agent_message": &agent_message,
+        "actions": &actions
+    }));
+
+    Ok(PMMessageResponse {
+        agent_message,
+        actions,
+        needs_restart,
+        target_stage,
+        new_iteration_id,
+    })
+}
+
+#[tauri::command]
+pub async fn pm_restart_iteration(
+    iteration_id: String,
+    target_stage: String,
+    window: Window,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    println!("[GUI] PM Agent restarting iteration {} from stage {}", iteration_id, target_stage);
+
+    // Load iteration
+    let iteration_store = IterationStore::new();
+    let mut iteration = iteration_store.load(&iteration_id)
+        .map_err(|e| format!("Failed to load iteration: {}", e))?;
+
+    // Update iteration status
+    iteration.status = cowork_core::domain::IterationStatus::Draft;
+    iteration.current_stage = Some(target_stage.clone());
+    iteration_store.save(&iteration)
+        .map_err(|e| format!("Failed to save iteration: {}", e))?;
+
+    // Start execution
+    gui_execute_iteration(iteration_id, window, state).await
+}
+
+#[tauri::command]
+pub async fn pm_get_iteration_context(
+    iteration_id: String,
+) -> Result<serde_json::Value, String> {
+    println!("[GUI] Getting iteration context for PM Agent: {}", iteration_id);
+
+    let iteration_store = IterationStore::new();
+    let iteration = iteration_store.load(&iteration_id)
+        .map_err(|e| format!("Failed to load iteration: {}", e))?;
+
+    // Load artifacts summary
+    let artifacts_summary = load_artifacts_summary(&iteration_id)?;
+
+    Ok(serde_json::json!({
+        "iteration_id": iteration_id,
+        "title": iteration.title,
+        "description": iteration.description,
+        "status": format!("{:?}", iteration.status),
+        "artifacts": artifacts_summary
+    }))
+}
+
+fn load_artifacts_summary(iteration_id: &str) -> Result<serde_json::Value, String> {
+    let iteration_store = IterationStore::new();
+    let iteration_dir = iteration_store.iteration_path(iteration_id)
+        .map_err(|e| format!("Failed to get iteration path: {}", e))?;
+
+    let artifacts_dir = iteration_dir.join("artifacts");
+
+    let mut summary = serde_json::Map::new();
+
+    // Check each artifact file
+    let artifact_files = [
+        ("idea", "idea.md"),
+        ("prd", "prd.md"),
+        ("design", "design.md"),
+        ("plan", "plan.md"),
+        ("delivery_report", "delivery_report.md"),
+    ];
+
+    for (key, filename) in artifact_files {
+        let path = artifacts_dir.join(filename);
+        if path.exists() {
+            if let Ok(content) = fs::read_to_string(&path) {
+                summary.insert(key.to_string(), serde_json::json!({
+                    "exists": true,
+                    "size": content.len(),
+                    "preview": content.chars().take(200).collect::<String>()
+                }));
+            }
+        }
+    }
+
+    Ok(serde_json::Value::Object(summary))
+}
+
+fn load_model_config() -> Result<cowork_core::llm::config::ModelConfig, String> {
+    // Try to load from config.toml
+    let config_path = std::env::current_dir()
+        .map_err(|e| format!("Failed to get current dir: {}", e))?
+        .join("config.toml");
+
+    if config_path.exists() {
+        cowork_core::llm::config::ModelConfig::from_file(config_path.to_str().unwrap())
+            .map_err(|e| format!("Failed to load config: {}", e))
+    } else {
+        // Fall back to environment variables
+        cowork_core::llm::config::ModelConfig::from_env()
+            .map_err(|e| format!("Failed to load config from env: {}", e))
+    }
 }

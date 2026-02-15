@@ -11,6 +11,7 @@
 
 use crate::instructions::*;
 use crate::tools::*;
+use crate::IterationStore;
 use adk_agent::{LlmAgentBuilder, LoopAgent};
 use adk_core::{Llm, IncludeContents};
 use anyhow::Result;
@@ -528,4 +529,264 @@ pub fn create_knowledge_generation_agent(
     let agent = builder.build()?;
 
     Ok(Arc::new(agent))
+}
+
+// ============================================================================
+// Project Manager Agent - Post-delivery chat agent
+// ============================================================================
+
+pub fn create_project_manager_agent(model: Arc<dyn Llm>, iteration_id: String) -> Result<Arc<dyn adk_core::Agent>> {
+    let instruction = PROJECT_MANAGER_AGENT_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
+
+    let agent = LlmAgentBuilder::new("project_manager_agent")
+        .instruction(&instruction)
+        .model(model)
+        .tool(Arc::new(PMGotoStageTool))
+        .tool(Arc::new(PMCreateIterationTool::new(iteration_id.clone())))
+        .tool(Arc::new(PMRespondTool))
+        .tool(Arc::new(PMSaveDecisionTool::new(iteration_id.clone())))
+        .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
+        .tool(Arc::new(ListFilesTool))  // Allow PM to see project files
+        .tool(Arc::new(ReadFileTool))   // Allow PM to read files
+        .include_contents(IncludeContents::None)
+        .build()?;
+
+    Ok(Arc::new(agent))
+}
+
+/// Load artifacts summary for a given iteration
+fn load_artifacts_summary_for_pm(iteration_store: &IterationStore, iteration_id: &str) -> Result<String, String> {
+    use std::fs;
+    
+    let iteration_dir = iteration_store.iteration_path(iteration_id)
+        .map_err(|e| format!("Failed to get iteration path: {}", e))?;
+    
+    let mut summary = String::new();
+    
+    // Load key artifacts
+    let artifacts_to_load = [
+        ("idea", "idea.md"),
+        ("prd", "prd.md"),
+        ("design", "design.md"),
+        ("plan", "plan.md"),
+    ];
+    
+    for (name, filename) in artifacts_to_load.iter() {
+        let path = iteration_dir.join("artifacts").join(filename);
+        if path.exists() {
+            if let Ok(content) = fs::read_to_string(&path) {
+                // Only include first 500 chars of each artifact
+                let truncated = if content.len() > 500 {
+                    format!("{}...[truncated]", &content[..500])
+                } else {
+                    content
+                };
+                summary.push_str(&format!("\n\n## {} ({}):\n{}", name.to_uppercase(), filename, truncated));
+            }
+        }
+    }
+    
+    // Add code structure info
+    let code_dir = iteration_dir.join("workspace");
+    if code_dir.exists() {
+        summary.push_str("\n\n## Project Files:\n");
+        if let Ok(entries) = fs::read_dir(&code_dir) {
+            for entry in entries.flatten().take(20) {
+                if let Ok(name) = entry.file_name().into_string() {
+                    summary.push_str(&format!("- {}\n", name));
+                }
+            }
+        }
+    }
+    
+    Ok(summary)
+}
+
+/// Execute a PM agent message and return the response and function calls
+pub async fn execute_pm_agent_message(
+    model: Arc<dyn Llm>,
+    iteration_id: String,
+    message: String,
+    history: Vec<serde_json::Value>,
+) -> Result<(String, Vec<adk_core::Part>), String> {
+    use adk_core::Content;
+    use futures::StreamExt;
+    use crate::pipeline::stage_executor::{SimpleInvocationContext, extract_text_from_event};
+    use crate::pipeline::PipelineContext;
+    use crate::persistence::{ProjectStore, IterationStore};
+    use std::sync::Arc as StdArc;
+
+    // Load project and iteration
+    let project_store = ProjectStore::new();
+    let project = project_store.load()
+        .map_err(|e| format!("Failed to load project: {}", e))?
+        .ok_or_else(|| "No project found".to_string())?;
+
+    let iteration_store = IterationStore::new();
+    let iteration = iteration_store.load(&iteration_id)
+        .map_err(|e| format!("Failed to load iteration: {}", e))?;
+
+    // Get workspace path
+    let workspace_path = iteration_store.workspace_path(&iteration_id)
+        .map_err(|e| format!("Failed to get workspace path: {}", e))?;
+
+    // Load artifacts summary for context
+    let artifacts_summary = load_artifacts_summary_for_pm(&iteration_store, &iteration_id)
+        .unwrap_or_else(|e| {
+            eprintln!("[PM Agent] Warning: Failed to load artifacts: {}", e);
+            String::new()
+        });
+
+    // Load memory/decisions
+    let memory_store = crate::persistence::MemoryStore::new();
+    let project_memory = memory_store.load_project_memory()
+        .map_err(|e| format!("Failed to load memory: {}", e))
+        .unwrap_or_default();
+    
+    let decisions_summary = if !project_memory.decisions.is_empty() {
+        let mut summary = String::from("\n\n## Previous Decisions:\n");
+        for decision in project_memory.decisions.iter().take(10) {
+            summary.push_str(&format!("- {}: {}\n", decision.title, decision.decision));
+        }
+        summary
+    } else {
+        String::new()
+    };
+
+    // Create PM Agent
+    let pm_agent = create_project_manager_agent(model, iteration_id.clone())
+        .map_err(|e| format!("Failed to create PM agent: {}", e))?;
+
+    // Build conversation history string
+    let conversation_history = if !history.is_empty() {
+        let mut history_str = String::from("\n\n## Conversation History:\n");
+        for msg in history.iter() {
+            let msg_type = msg.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let content = msg.get("content").and_then(|v| v.as_str()).unwrap_or("");
+            let role = if msg_type == "user" { "User" } else { "Assistant" };
+            history_str.push_str(&format!("{}: {}\n", role, content));
+        }
+        history_str
+    } else {
+        String::new()
+    };
+
+    // Build language instruction from global config
+    let language_instruction = crate::config::get_language_instruction();
+
+    // Build prompt with context
+    let prompt = format!(
+        "User message: {}\n\n\
+        ## Current Iteration Info:\n\
+        - Title: {}\n\
+        - Description: {}\n\
+        - Status: {}\n\
+        - Current Stage: {}\n\
+        {}\
+        {}\
+        {}\
+        \n\nPlease analyze the user's request and respond appropriately. \
+        If the user wants to fix a bug or make changes, use the appropriate tool (pm_goto_stage or pm_create_iteration). \
+        If you need more information, use pm_respond to ask for clarification.\n\n{}",
+        message,
+        iteration.title,
+        iteration.description,
+        format!("{:?}", iteration.status),
+        iteration.current_stage.clone().unwrap_or_default(),
+        artifacts_summary,
+        decisions_summary,
+        conversation_history,
+        language_instruction
+    );
+
+    // Create content
+    let content = Content::new("user").with_text(prompt);
+
+    // Create context
+    let ctx = PipelineContext::new(project, iteration, workspace_path);
+
+    // Create invocation context
+    let invocation_ctx = StdArc::new(SimpleInvocationContext::new(
+        &ctx,
+        &content,
+        pm_agent.clone(),
+    ));
+
+    // Execute agent
+    let mut stream = pm_agent.run(invocation_ctx)
+        .await
+        .map_err(|e| format!("Agent execution failed: {}", e))?;
+
+    // Collect response and detect actions
+    let mut agent_message = String::new();
+    let mut all_parts: Vec<adk_core::Part> = Vec::new();
+    let mut suggested_actions: Vec<serde_json::Value> = Vec::new();
+
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(event) => {
+                // Extract text content
+                if let Some(text) = extract_text_from_event(&event) {
+                    if !text.trim().is_empty() {
+                        agent_message.push_str(&text);
+                    }
+                }
+                
+                // Collect all parts (includes function calls)
+                if let Some(content) = event.content() {
+                    for part in &content.parts {
+                        all_parts.push(part.clone());
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("[PM Agent] Event error: {}", e);
+            }
+        }
+    }
+
+    // After execution, check if any tools were called by examining the response
+    // The agent should have called tools if user requested actions
+    let msg_lower = agent_message.to_lowercase();
+    
+    // Detect actions based on response content
+    if msg_lower.contains("pm_goto_stage") || msg_lower.contains("goto_stage") {
+        let mut action = serde_json::json!({
+            "type": "pm_goto_stage",
+            "description": "Tool called: pm_goto_stage"
+        });
+        
+        // Try to extract stage from message
+        for stage in &["idea", "prd", "design", "plan", "coding"] {
+            if msg_lower.contains(stage) {
+                action["target_stage"] = serde_json::json!(stage);
+                break;
+            }
+        }
+        suggested_actions.push(action);
+    }
+    
+    if msg_lower.contains("pm_create_iteration") || msg_lower.contains("create_iteration") {
+        suggested_actions.push(serde_json::json!({
+            "type": "pm_create_iteration",
+            "description": "Tool called: pm_create_iteration"
+        }));
+    }
+
+    if agent_message.is_empty() {
+        agent_message = "处理完成".to_string();
+    }
+
+    // Append action suggestions to message if detected
+    if !suggested_actions.is_empty() {
+        let actions_json = serde_json::to_string(&suggested_actions)
+            .unwrap_or_else(|_| "[]".to_string());
+        agent_message = format!(
+            "{}\n\n<!--ACTIONS:{}-->",
+            agent_message,
+            actions_json
+        );
+    }
+
+    Ok((agent_message, all_parts))
 }

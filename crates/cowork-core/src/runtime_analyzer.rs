@@ -742,3 +742,198 @@ pub fn has_runtime_config(workspace: &Path) -> bool {
         .join("runtime_config.json")
         .exists()
 }
+
+/// Analyze README to extract actual runtime information
+/// This uses LLM to read the README and extract the actual port information
+/// Uses caching based on README content hash to avoid repeated LLM calls
+pub async fn analyze_runtime_from_readme(
+    workspace: &Path,
+    _config: &ProjectRuntimeConfig,
+    llm_config: &LlmConfig,
+) -> Result<Option<(u16, String)>, String> {
+    // Read README.md
+    let readme_path = workspace.join("README.md");
+    let readme_content = match fs::read_to_string(&readme_path) {
+        Ok(content) => content,
+        Err(_) => return Ok(None), // No README, return None
+    };
+
+    // Calculate README content hash for caching
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    readme_content.hash(&mut hasher);
+    let readme_hash = hasher.finish();
+
+    // Check cache
+    let cache_dir = workspace.join(".cowork-v2");
+    let cache_file = cache_dir.join("readme_runtime_cache.json");
+    
+    // Try to load from cache
+    if cache_file.exists() {
+        if let Ok(cache_content) = fs::read_to_string(&cache_file) {
+            if let Ok(cache_json) = serde_json::from_str::<serde_json::Value>(&cache_content) {
+                if let Some(cached_hash) = cache_json.get("readme_hash").and_then(|v| v.as_u64()) {
+                    if cached_hash == readme_hash {
+                        // Cache hit - README hasn't changed
+                        if let (Some(port), Some(url)) = (
+                            cache_json.get("port").and_then(|v| v.as_u64()).map(|v| v as u16),
+                            cache_json.get("url").and_then(|v| v.as_str())
+                        ) {
+                            println!("[RuntimeAnalyzer] Cache hit for README, using cached port: {}", port);
+                            return Ok(Some((port, url.to_string())));
+                        }
+                    } else {
+                        println!("[RuntimeAnalyzer] README content changed (hash: {} -> {}), cache invalid", cached_hash, readme_hash);
+                    }
+                }
+            }
+        }
+    }
+
+    // Cache miss or invalid - need to analyze with LLM
+    println!("[RuntimeAnalyzer] Cache miss for README, analyzing with LLM...");
+
+    // Build prompt for LLM
+    let prompt = format!(
+        r#"# Extract Runtime Information from README
+
+You are a software project analyzer. Read the following README.md file and extract the actual runtime port information.
+
+## README.md Content
+```
+{}
+```
+
+## Task
+Extract the ACTUAL port number mentioned in the README for running the project. Look for:
+- URLs like "http://localhost:XXXX" or "http://127.0.0.1:XXXX"
+- Port configurations like "port: XXXX"
+- Running instructions that mention ports
+
+## Output Format
+Return ONLY a JSON object with this exact format:
+```json
+{{
+  "port": <port_number>,
+  "url": "http://localhost:<port_number>",
+  "confidence": "high|medium|low"
+}}
+```
+
+## Important Notes
+- If the README mentions a specific port (like 5173, 3000, 8000, etc.), use that port
+- If the README mentions port ranges or dynamic ports, use the first mentioned port
+- If no port is mentioned at all, return null
+- Only extract the port for the MAIN application (not database, cache, etc.)
+- If the project has both frontend and backend, extract the frontend port
+
+## Example Outputs
+For "Open http://localhost:5173 in your browser":
+```json
+{{"port": 5173, "url": "http://localhost:5173", "confidence": "high"}}
+```
+
+For "The app runs on port 3000":
+```json
+{{"port": 3000, "url": "http://localhost:3000", "confidence": "high"}}
+```
+
+If no port is mentioned:
+```json
+null
+```
+
+Now extract the port information from the README above."#,
+        readme_content
+    );
+
+    // Call LLM
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&llm_config.api_base_url)
+        .header("Authorization", format!("Bearer {}", llm_config.api_key))
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "model": llm_config.model_name,
+            "messages": [
+                {"role": "system", "content": "You are a software project analyzer. Extract ONLY JSON, no other text."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.1,
+            "max_tokens": 500
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("LLM request failed: {}", e))?;
+
+    let response_json: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse LLM response: {}", e))?;
+
+    let content = response_json
+        .get("choices")
+        .and_then(|c| c.as_array())
+        .and_then(|a| a.first())
+        .and_then(|c| c.get("message"))
+        .and_then(|m| m.get("content"))
+        .and_then(|c| c.as_str())
+        .ok_or("Invalid LLM response format")?;
+
+    // Parse JSON from response (might be wrapped in markdown)
+    let json_str = content
+        .trim()
+        .trim_start_matches("```json")
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim();
+
+    if json_str == "null" || json_str.to_lowercase() == "null" {
+        return Ok(None);
+    }
+
+    let parsed: serde_json::Value = serde_json::from_str(json_str)
+        .map_err(|e| format!("Failed to parse LLM output: {}\nOutput: {}", e, json_str))?;
+
+    let port = parsed
+        .get("port")
+        .and_then(|v| v.as_u64())
+        .ok_or("Missing port in LLM response")? as u16;
+
+    let url = parsed
+        .get("url")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&format!("http://localhost:{}", port))
+        .to_string();
+
+    let _confidence = parsed
+        .get("confidence")
+        .and_then(|v| v.as_str())
+        .unwrap_or("medium");
+
+    println!("[RuntimeAnalyzer] Extracted port {} from README", port);
+
+    // Save to cache
+    let cache_data = serde_json::json!({
+        "readme_hash": readme_hash,
+        "port": port,
+        "url": url,
+        "analyzed_at": chrono::Utc::now().to_rfc3339()
+    });
+
+    let cache_dir = workspace.join(".cowork-v2");
+    let cache_file = cache_dir.join("readme_runtime_cache.json");
+    
+    if let Err(e) = fs::create_dir_all(&cache_dir) {
+        eprintln!("[RuntimeAnalyzer] Failed to create cache directory: {}", e);
+    } else {
+        if let Err(e) = fs::write(&cache_file, serde_json::to_string_pretty(&cache_data).unwrap()) {
+            eprintln!("[RuntimeAnalyzer] Failed to write cache: {}", e);
+        } else {
+            println!("[RuntimeAnalyzer] Cached README analysis: port={}, hash={}", port, readme_hash);
+        }
+    }
+
+    Ok(Some((port, url)))
+}

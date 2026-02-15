@@ -137,6 +137,8 @@ The domain employs a centralized state management pattern with React's native ho
 - `currentSession`: Active project/iteration context
 - `activeView`: Current visible panel (projects, iterations, chat, code, run, memory, knowledge)
 - `messages[]`: Real-time AI agent message buffer with type differentiation (user, agent, thinking, tool_call, tool_result)
+- `pmMessages[]`: Project Manager Agent chat message buffer (user, pm_agent)
+- `chatMode`: Chat mode identifier (pipeline, pm_agent, disabled), automatically switches based on iteration status
 - `isProcessing`: Global execution state for pipeline operations
 - `inputRequest`: HITL modal state management
 - `refreshTriggers`: Counter-based cache invalidation for memory/knowledge panels

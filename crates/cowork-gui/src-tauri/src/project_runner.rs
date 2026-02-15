@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::Emitter;
-use tokio::process::{Child, Command};
+use tokio::process::Child;
 use tokio::sync::mpsc;
 
 // Import PreviewInfo from gui_types
@@ -20,6 +20,8 @@ struct ProjectProcess {
     child: Child,
     #[allow(dead_code)]
     output_tx: mpsc::UnboundedSender<String>,
+    url: Option<String>,
+    port: Option<u16>,
 }
 
 impl ProjectRunner {
@@ -45,6 +47,8 @@ impl ProjectRunner {
         iteration_id: String,
         command: String,
         code_dir: String,
+        url: Option<String>,
+        port: Option<u16>,
     ) -> Result<u32, String> {
         // Stop existing process if any
         if let Ok(()) = self.stop(iteration_id.clone()).await {
@@ -65,19 +69,14 @@ impl ProjectRunner {
 
         #[cfg(target_os = "windows")]
         let mut child = {
-            let mut cmd = std::process::Command::new("cmd");
+            let mut cmd = tokio::process::Command::new("cmd");
             cmd.args(["/C", &command])
                 .current_dir(&code_path)
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::piped())
                 .creation_flags(0x08000000); // CREATE_NO_WINDOW
 
-            // Convert std::process::Command to tokio::process::Command
-            let std_child = cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?;
-
-            // Convert to tokio child
-            let pid = std_child.id();
-            tokio::process::Child::from(std_child)
+            cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
         };
 
         #[cfg(not(target_os = "windows"))]
@@ -112,6 +111,27 @@ impl ProjectRunner {
 
         // Clone for stdout task
         let iteration_id_stdout = iteration_id_clone.clone();
+        
+        // Check if process exited immediately (command error detection)
+        // Give it a brief moment to potentially fail
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                // Process already exited - command likely failed
+                println!("[Runner] Process exited immediately with status: {:?}", status);
+                return Err(format!(
+                    "Command failed immediately. Exit status: {}. Check if the command is correct.",
+                    status
+                ));
+            }
+            Ok(None) => {
+                // Process is still running - good
+            }
+            Err(e) => {
+                eprintln!("[Runner] Error checking process status: {}", e);
+            }
+        }
 
         // Spawn task to read stdout and emit events
         tokio::spawn(async move {
@@ -224,39 +244,74 @@ impl ProjectRunner {
             ProjectProcess {
                 child,
                 output_tx: stdout_tx,
+                url,
+                port,
             },
         );
         drop(processes);
 
         // Spawn task to wait for process exit and emit stopped event
+        // Note: We DON'T remove the process here - we keep it in the map so is_running() works correctly
+        // The process will be removed when:
+        // 1. stop() is called explicitly, or
+        // 2. The process exits naturally (we'll detect this by checking child.try_wait())
         let iteration_id_exit = iteration_id.clone();
         let processes_ref = Arc::clone(&self.processes);
+        let app_handle_for_cleanup = app_handle_exit.clone();
 
         tokio::spawn(async move {
-            // First get the child from processes, then release the lock before waiting
-            let child = {
-                let mut procs = processes_ref.lock().unwrap();
-                procs.remove(&iteration_id_exit).map(|p| p.child)
-            };
-
-            // Wait for process to exit (without holding the lock)
-            let exit_status = if let Some(mut child) = child {
-                child.wait().await.ok()
-            } else {
-                None
-            };
-
-            println!("[Runner] Process exited with status: {:?}", exit_status);
-
-            // Emit stopped event
-            if let Some(ref handle) = app_handle_exit {
-                let _ = handle.emit(
-                    "project_stopped",
-                    serde_json::json!({
-                        "iteration_id": iteration_id_exit,
-                        "session_id": iteration_id_exit
-                    }),
-                );
+            // Periodically check if process has exited
+            loop {
+                // Check if process still exists in map
+                let should_check = {
+                    let procs = processes_ref.lock().unwrap();
+                    procs.contains_key(&iteration_id_exit)
+                };
+                
+                if !should_check {
+                    // Process was removed by stop(), exit the loop
+                    break;
+                }
+                
+                // Try to check if process has exited (non-blocking)
+                let exited = {
+                    let mut procs = processes_ref.lock().unwrap();
+                    if let Some(proc) = procs.get_mut(&iteration_id_exit) {
+                        // Try non-blocking wait to check if process has exited
+                        match proc.child.try_wait() {
+                            Ok(Some(status)) => {
+                                // Process has exited, remove it
+                                println!("[Runner] Process {} exited with status: {:?}", iteration_id_exit, status);
+                                procs.remove(&iteration_id_exit);
+                                true
+                            }
+                            Ok(None) => false, // Still running
+                            Err(e) => {
+                                eprintln!("[Runner] Error checking process status: {}", e);
+                                false
+                            }
+                        }
+                    } else {
+                        true // Process not in map
+                    }
+                };
+                
+                if exited {
+                    // Emit stopped event
+                    if let Some(ref handle) = app_handle_for_cleanup {
+                        let _ = handle.emit(
+                            "project_stopped",
+                            serde_json::json!({
+                                "iteration_id": iteration_id_exit,
+                                "session_id": iteration_id_exit
+                            }),
+                        );
+                    }
+                    break;
+                }
+                
+                // Wait a bit before next check
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
         });
 
@@ -300,13 +355,20 @@ impl ProjectRunner {
     }
 
     pub fn get_info(&self, iteration_id: &str) -> Option<PreviewInfo> {
-        // This is a stub implementation - ProjectRunner doesn't track URLs/ports
-        // The actual URL/port info should come from the start_iteration_preview command
-        // For now, return None to indicate we don't have the info
         let processes = self.processes.lock().unwrap();
-        if processes.contains_key(iteration_id) {
-            // Return a basic PreviewInfo - the actual URL should be stored elsewhere
-            None
+        if let Some(process) = processes.get(iteration_id) {
+            // Return the actual URL and port stored in the process
+            if let (Some(url), Some(port)) = (&process.url, process.port) {
+                Some(PreviewInfo {
+                    url: url.clone(),
+                    port,
+                    status: super::gui_types::PreviewStatus::Running,
+                    project_type: super::gui_types::ProjectType::Unknown,
+                })
+            } else {
+                // Fallback to default if URL/port not set
+                None
+            }
         } else {
             None
         }
