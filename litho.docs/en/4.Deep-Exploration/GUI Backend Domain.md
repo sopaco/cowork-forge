@@ -82,6 +82,9 @@ The command handlers serve as the API surface for the React frontend, implementi
 | `query_memory_index` | Memory domain search | Direct async/await |
 | `create_project` | Project aggregate initialization | Transactional creation |
 | `start_iteration_preview` | ProcessRunner activation | Child process management |
+| `pm_send_message` | Project Manager Agent message processing | Context-aware with history |
+| `pm_restart_iteration` | Re-execute from specified stage | Pipeline jump |
+| `get_system_locale` | Get system language setting | Synchronous return |
 
 **Implementation Pattern:**
 ```rust

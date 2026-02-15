@@ -108,6 +108,15 @@ The domain organizes 30+ tools into six functional categories, each addressing s
 - **PromoteToDecisionTool**: Elevate insights to architectural decisions
 - **PromoteToPatternTool**: Elevate insights to reusable design patterns
 
+### 3.7 PM Tools (`pm_tools.rs`)
+**Purpose**: Project Manager Agent operational tools, supporting post-delivery user interaction
+- **PMGotoStageTool**: Allows user to return to previous stages (idea, prd, design, plan, coding) for re-execution
+- **PMCreateIterationTool**: Create new iteration for handling new requirements or modifications
+- **PMRespondTool**: Send text response to user
+- **PMSaveDecisionTool**: Save user decisions to project memory
+
+> **Note**: PM tools are only available when iteration status is `Completed` (after Delivery stage), used for post-delivery project maintenance and requirement change scenarios.
+
 ---
 
 ## 4. Core Implementation Patterns
