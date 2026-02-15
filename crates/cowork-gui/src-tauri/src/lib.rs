@@ -16,6 +16,7 @@ mod gui_commands;
 mod project_runner;
 mod project_manager;
 mod iteration_commands;
+mod static_server;
 use project_manager::*;
 
 

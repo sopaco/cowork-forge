@@ -1,11 +1,12 @@
 // GUI-specific commands for enhanced functionality
 use super::gui_types::FileReadResult;
 use super::gui_types::*;
+use super::static_server;
 use crate::AppState;
 use crate::project_runner::ProjectRunner;
 use cowork_core::llm::config::LlmConfig;
 use cowork_core::persistence::IterationStore;
-use cowork_core::{ProjectRuntimeConfig, RuntimeAnalyzer};
+use cowork_core::{ProjectRuntimeConfig, RuntimeAnalyzer, RuntimeType};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -298,8 +299,32 @@ pub async fn start_iteration_preview(
     // Install dependencies if needed
     install_dependencies_if_needed(&code_dir).await?;
 
-    // Get start command and port from LLM analysis
-    let (command, port, url) = detect_start_command_with_info(&code_dir)?;
+    // Get runtime config to determine project type
+    let config_result = try_analyze_with_runtime(&code_dir);
+
+    // Check if this is a VanillaHtml project - use built-in static server
+    if let Ok(ref config) = config_result {
+        if config.runtime_type == RuntimeType::VanillaHtml {
+            println!("[GUI] Detected VanillaHtml, using built-in static server");
+            
+            let server_info = static_server::start_static_server(
+                iteration_id.clone(),
+                code_dir.clone(),
+                8000, // preferred port
+                None, // app_handle not needed here
+            )?;
+
+            return Ok(PreviewInfo {
+                url: server_info.url,
+                port: server_info.port,
+                status: PreviewStatus::Running,
+                project_type: ProjectType::Html,
+            });
+        }
+    }
+
+    // For other project types, use external commands via ProjectRunner
+    let (command, port, url) = detect_start_command_with_info_from_config(&config_result)?;
 
     println!("[GUI] Preview using command: {}, port: {}", command, port);
 
@@ -320,12 +345,16 @@ pub async fn start_iteration_preview(
     })
 }
 
-/// Detect start command with additional info (port, url)
-fn detect_start_command_with_info(code_dir: &Path) -> Result<(String, u16, String), String> {
-    // Use RuntimeAnalyzer (LLM分析) 获取运行配置
-    let analyzer_result = try_analyze_with_runtime(code_dir);
+/// Detect start command with additional info (port, url) from already-analyzed config
+fn detect_start_command_with_info_from_config(
+    config_result: &Result<ProjectRuntimeConfig, String>,
+) -> Result<(String, u16, String), String> {
+    if let Ok(config) = config_result {
+        // VanillaHtml should be handled separately with built-in server
+        if config.runtime_type == RuntimeType::VanillaHtml {
+            return Err("VanillaHtml should use built-in static server".to_string());
+        }
 
-    if let Ok(config) = analyzer_result {
         // Determine port and URL based on project type
         let (port, url) = if let Some(frontend) = &config.frontend {
             (
@@ -371,7 +400,19 @@ pub async fn check_preview_status(
         iteration_id
     );
 
-    // Check if process is running via ProjectRunner
+    // First check built-in static server
+    if static_server::is_server_running(&iteration_id) {
+        if let Some(server_info) = static_server::get_server_info(&iteration_id) {
+            return Ok(Some(PreviewInfo {
+                url: server_info.url,
+                port: server_info.port,
+                status: PreviewStatus::Running,
+                project_type: ProjectType::Html,
+            }));
+        }
+    }
+
+    // Then check external process via ProjectRunner
     if PROJECT_RUNNER.is_running(&iteration_id) {
         if let Some(info) = PROJECT_RUNNER.get_info(&iteration_id) {
             return Ok(Some(info));
@@ -439,6 +480,11 @@ pub async fn stop_iteration_preview(
     _state: State<'_, AppState>,
 ) -> Result<(), String> {
     println!("[GUI] Stopping preview for iteration: {}", iteration_id);
+    
+    // Stop built-in static server if running
+    static_server::stop_static_server(&iteration_id)?;
+    
+    // Stop external process if running
     PROJECT_RUNNER.stop(iteration_id).await
 }
 
@@ -461,6 +507,26 @@ pub async fn get_project_runtime_info(
 
     let (has_frontend, has_backend, preview_url, frontend_port, backend_port, start_command) =
         if let Ok(config) = config_result {
+            // Special handling for VanillaHtml - use built-in static server
+            if config.runtime_type == RuntimeType::VanillaHtml {
+                // Check if static server is already running
+                let (url, port) = if let Some(server_info) = static_server::get_server_info(&iteration_id) {
+                    (Some(server_info.url), Some(server_info.port))
+                } else {
+                    // Return default port info (will be updated when server starts)
+                    (Some("http://localhost:8000".to_string()), Some(8000))
+                };
+                
+                return Ok(ProjectRuntimeInfo {
+                    has_frontend: true,
+                    has_backend: false,
+                    preview_url: url,
+                    frontend_port: port,
+                    backend_port: None,
+                    start_command: Some("(Built-in static server)".to_string()),
+                });
+            }
+
             let has_frontend = config.frontend.is_some();
             let has_backend = config.backend.is_some() || config.fullstack.is_some();
 
@@ -528,6 +594,27 @@ pub async fn start_iteration_project(
     // Install dependencies if needed
     install_dependencies_if_needed(&code_dir).await?;
 
+    // Check if this is a VanillaHtml project - use built-in static server
+    let config_result = try_analyze_with_runtime(&code_dir);
+    if let Ok(ref config) = config_result {
+        if config.runtime_type == RuntimeType::VanillaHtml {
+            println!("[GUI] Detected VanillaHtml, using built-in static server");
+            
+            let server_info = static_server::start_static_server(
+                iteration_id.clone(),
+                code_dir.clone(),
+                8000,
+                None,
+            )?;
+
+            return Ok(RunInfo {
+                status: RunStatus::Running,
+                process_id: None, // No external process for built-in server
+                command: Some(format!("Built-in static server on port {}", server_info.port)),
+            });
+        }
+    }
+
     let command = detect_start_command(&code_dir)?;
 
     println!("[GUI] Detected start command: {}", command);
@@ -555,6 +642,11 @@ pub async fn stop_iteration_project(
     _state: State<'_, AppState>,
 ) -> Result<(), String> {
     println!("[GUI] Stopping project for iteration: {}", iteration_id);
+    
+    // Stop built-in static server if running
+    static_server::stop_static_server(&iteration_id)?;
+    
+    // Stop external process if running
     PROJECT_RUNNER.stop(iteration_id).await
 }
 
@@ -564,6 +656,12 @@ pub async fn check_project_status(
     _window: Window,
     _state: State<'_, AppState>,
 ) -> Result<bool, String> {
+    // Check built-in static server first
+    if static_server::is_server_running(&iteration_id) {
+        return Ok(true);
+    }
+    
+    // Then check external process
     Ok(PROJECT_RUNNER.is_running(&iteration_id))
 }
 
@@ -875,7 +973,8 @@ fn generate_start_command_from_config(config: &ProjectRuntimeConfig) -> Option<S
         cowork_core::RuntimeType::NodeFastify => Some("node index.js".to_string()),
         cowork_core::RuntimeType::PythonFastapi => Some("uvicorn main:app --reload".to_string()),
         cowork_core::RuntimeType::PythonFlask => Some("flask run".to_string()),
-        cowork_core::RuntimeType::VanillaHtml => Some("python -m http.server 8000".to_string()),
+        // VanillaHtml uses built-in static server, handled separately
+        cowork_core::RuntimeType::VanillaHtml => None,
         cowork_core::RuntimeType::NodeTool => Some("node index.js".to_string()),
         cowork_core::RuntimeType::RustCli => Some("cargo run".to_string()),
         _ => None,

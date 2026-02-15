@@ -410,14 +410,14 @@ pub fn get_preset_configs() -> HashMap<RuntimeType, ProjectRuntimeConfig> {
         raw_analysis: None,
     });
     
-    // Vanilla HTML
+    // Vanilla HTML - uses built-in static server (no Python dependency)
     configs.insert(RuntimeType::VanillaHtml, ProjectRuntimeConfig {
         runtime_type: RuntimeType::VanillaHtml,
         frontend: Some(FrontendRuntime {
             framework: FrontendFramework::Vanilla,
             dev_port: 8000,
             dev_host: "localhost".to_string(),
-            dev_command: "python -m http.server 8000".to_string(),
+            dev_command: "(built-in static server)".to_string(), // Handled by GUI, not external command
             build_command: "".to_string(),
             output_dir: ".".to_string(),
             has_hmr: false,
