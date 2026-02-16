@@ -3,6 +3,9 @@
 // Global configuration
 pub mod config;
 
+// ACP (Agent Client Protocol) for external coding agent integration
+pub mod acp;
+
 // Domain-driven modules
 pub mod domain;
 pub mod persistence;
@@ -33,6 +36,7 @@ pub use persistence::*;
 pub use data::*;
 pub use storage::*;
 pub use llm::*;
+pub use agents::*;
 pub use tech_stack::*;
 
 // Explicit exports for new modules (to avoid glob re-export conflicts)
@@ -49,6 +53,9 @@ pub use runtime_analyzer::{
 
 // Re-exports for config
 pub use config::{get_system_locale, set_system_locale, get_language_instruction};
+
+// Re-exports for ACP module
+pub use acp::{AcpClient, AcpTaskResult};
 
 // Version info
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -13,10 +13,54 @@ pub struct LlmConfig {
     pub model_name: String,
 }
 
+/// External Coding Agent configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExternalAgentConfig {
+    /// Enable external agent for coding stage
+    pub enabled: bool,
+    /// Agent type: "iflow", "codex", "gemini", "claude", "opencode"
+    pub agent_type: String,
+    /// Command to launch the agent
+    pub command: String,
+    /// Arguments for the command (e.g., ["acp"] for opencode)
+    pub args: Vec<String>,
+    /// Working directory for the agent
+    pub workspace_path: Option<String>,
+    /// Environment variables
+    pub env: Option<std::collections::HashMap<String, String>>,
+    /// Transport mode: "stdio" or "websocket" (default: "stdio")
+    #[serde(default = "default_transport")]
+    pub transport: String,
+}
+
+fn default_transport() -> String {
+    "stdio".to_string()
+}
+
+/// Alias for ExternalAgentConfig (for backward compatibility)
+pub type CodingAgentConfig = ExternalAgentConfig;
+
+impl Default for ExternalAgentConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            agent_type: "iflow".to_string(),
+            command: "iflow".to_string(),
+            args: vec!["--experimental-acp".to_string()],
+            workspace_path: None,
+            env: None,
+            transport: "stdio".to_string(),
+        }
+    }
+}
+
 /// Configuration for the entire model setup
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelConfig {
     pub llm: LlmConfig,
+    /// Optional external coding agent configuration
+    #[serde(default)]
+    pub coding_agent: ExternalAgentConfig,
 }
 
 impl ModelConfig {
@@ -40,8 +84,71 @@ impl ModelConfig {
                 model_name: std::env::var("LLM_MODEL_NAME")
                     .with_context(|| "LLM_MODEL_NAME not set")?,
             },
+            coding_agent: ExternalAgentConfig::default(),
         })
     }
+
+    /// Check if external coding agent is enabled
+    pub fn is_external_coding_agent_enabled(&self) -> bool {
+        self.coding_agent.enabled
+    }
+
+    /// Get external coding agent configuration
+    pub fn get_external_coding_agent_config(&self) -> Option<&ExternalAgentConfig> {
+        if self.coding_agent.enabled {
+            Some(&self.coding_agent)
+        } else {
+            None
+        }
+    }
+}
+
+/// Load config from file or environment
+/// 
+/// This function looks for config.toml in the following locations:
+/// 1. Current working directory
+/// 2. Directory containing the executable
+/// 3. Project root (heuristic: look for Cargo.toml in parent dirs)
+/// 4. Environment variables (as fallback)
+pub fn load_config() -> Result<ModelConfig, anyhow::Error> {
+    use std::path::Path;
+
+    // Try current directory first
+    if Path::new("config.toml").exists() {
+        tracing::info!("Loading config from current directory");
+        return ModelConfig::from_file("config.toml")
+            .context("Failed to load config from file");
+    }
+
+    // Try executable directory
+    if let Ok(exe_path) = std::env::current_exe() {
+        let config_path = exe_path.parent().unwrap_or(&exe_path).join("config.toml");
+        if config_path.exists() {
+            tracing::info!("Loading config from exe directory: {}", config_path.display());
+            return ModelConfig::from_file(config_path.to_str().unwrap())
+                .context("Failed to load config from exe directory");
+        }
+        
+        // Try project root (look for Cargo.toml in parent dirs)
+        let mut path = exe_path.parent().unwrap_or(&exe_path).to_path_buf();
+        for _ in 0..5 {
+            if path.join("Cargo.toml").exists() {
+                let config_path = path.join("config.toml");
+                if config_path.exists() {
+                    tracing::info!("Loading config from project root: {}", config_path.display());
+                    return ModelConfig::from_file(config_path.to_str().unwrap())
+                        .context("Failed to load config from project root");
+                }
+            }
+            if !path.pop() {
+                break;
+            }
+        }
+    }
+
+    // Fallback to environment variables
+    tracing::warn!("config.toml not found, falling back to environment variables");
+    ModelConfig::from_env().context("Failed to load config from environment")
 }
 
 /// Create an LLM client using adk-rust's OpenAI client with custom base URL
@@ -87,11 +194,33 @@ mod tests {
 api_base_url = "http://localhost:8000/v1"
 api_key = "test-key"
 model_name = "gpt-4"
+
+[coding_agent]
+enabled = true
+agent_type = "iflow"
+command = "iflow"
+args = ["--experimental-acp"]
         "#;
 
         let config: ModelConfig = toml::from_str(toml_content).unwrap();
         assert_eq!(config.llm.api_base_url, "http://localhost:8000/v1");
         assert_eq!(config.llm.api_key, "test-key");
         assert_eq!(config.llm.model_name, "gpt-4");
+        assert!(config.coding_agent.enabled);
+        assert_eq!(config.coding_agent.agent_type, "iflow");
+        assert_eq!(config.coding_agent.command, "iflow");
+    }
+
+    #[test]
+    fn test_default_coding_agent() {
+        let toml_content = r#"
+[llm]
+api_base_url = "http://localhost:8000/v1"
+api_key = "test-key"
+model_name = "gpt-4"
+        "#;
+
+        let config: ModelConfig = toml::from_str(toml_content).unwrap();
+        assert!(!config.coding_agent.enabled);
     }
 }

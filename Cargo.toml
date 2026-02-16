@@ -56,3 +56,9 @@ futures = "0.3"
 
 # Testing
 tempfile = "3"
+
+# ACP (Agent Client Protocol) for external agent integration
+agent-client-protocol = "0.9"
+tokio-util = { version = "0.7", features = ["compat"] }
+tokio-tungstenite = "0.26"
+futures-util = "0.3"
