@@ -4,8 +4,9 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use tokio::sync::mpsc;
 
-use crate::acp::{AcpClient, AcpTaskResult};
+use crate::acp::{AcpClient, AcpTaskResult, AgentMessage};
 use crate::instructions::coding::CODING_ACTOR_INSTRUCTION;
 use crate::llm::config::{load_config, CodingAgentConfig};
 
@@ -17,14 +18,20 @@ use crate::llm::config::{load_config, CodingAgentConfig};
 /// The adapter communicates with the external agent via ACP (Agent Client Protocol),
 /// either through stdio or WebSocket.
 pub struct ExternalCodingAgent {
-    /// ACP client for communication
-    client: AcpClient,
     /// Configuration
     config: CodingAgentConfig,
     /// Workspace path
     workspace: PathBuf,
     /// Whether the agent is ready
     ready: bool,
+}
+
+/// Result of starting a streaming task
+pub struct StreamingTask {
+    /// Receiver for real-time agent messages
+    pub messages: mpsc::UnboundedReceiver<AgentMessage>,
+    /// The result future - outer Result is from channel, inner Result is from ACP
+    pub result: std::pin::Pin<Box<dyn std::future::Future<Output = Result<Result<String>>> + Send>>,
 }
 
 impl ExternalCodingAgent {
@@ -41,15 +48,7 @@ impl ExternalCodingAgent {
             anyhow::bail!("External coding agent is not enabled in config");
         }
 
-        eprintln!("DEBUG: Creating ACP client with command: {} {:?}", config.coding_agent.command, config.coding_agent.args);
-        
-        let client = AcpClient::from_config(&config.coding_agent, workspace).await
-            .context("Failed to create ACP client")?;
-
-        eprintln!("DEBUG: ACP client created successfully");
-
         Ok(Self {
-            client,
             config: config.coding_agent,
             workspace: workspace.clone(),
             ready: false,
@@ -63,7 +62,31 @@ impl ExternalCodingAgent {
         Ok(config.coding_agent.enabled)
     }
 
-    /// Execute a coding task
+    /// Execute a coding task with streaming messages
+    /// 
+    /// Returns a StreamingTask with a message receiver for real-time updates
+    /// and a result future for the final output.
+    pub fn execute_task_stream(
+        self,
+        task_description: &str,
+        project_context: &str,
+    ) -> StreamingTask {
+        let prompt = self.build_prompt(task_description, project_context);
+        
+        // Use the execute_with_external_agent directly to avoid async issues
+        let (messages, result) = crate::acp::execute_with_external_agent(
+            self.config,
+            self.workspace,
+            prompt,
+        );
+
+        StreamingTask {
+            messages,
+            result: Box::pin(result),
+        }
+    }
+
+    /// Execute a coding task (simpler API)
     /// 
     /// This method sends the task to the external agent and returns the result.
     /// It builds a comprehensive prompt including:
@@ -80,8 +103,11 @@ impl ExternalCodingAgent {
 
         tracing::info!("Executing coding task via external agent: {}", &prompt[..prompt.len().min(200)]);
 
+        // Create client and execute
+        let mut client = AcpClient::from_config(&self.config, &self.workspace).await?;
+        
         // Execute the task
-        match self.client.execute_task(&prompt).await {
+        match client.execute_task(&prompt).await {
             Ok(result) => {
                 self.ready = true;
                 Ok(AcpTaskResult::new(result, true))
@@ -132,79 +158,5 @@ Please start implementing the task."#,
     /// Get the agent type
     pub fn agent_type(&self) -> &str {
         &self.config.agent_type
-    }
-}
-
-/// Builder for External Coding Agent
-pub struct ExternalCodingAgentBuilder {
-    workspace: Option<PathBuf>,
-    config: Option<CodingAgentConfig>,
-}
-
-impl ExternalCodingAgentBuilder {
-    pub fn new() -> Self {
-        Self {
-            workspace: None,
-            config: None,
-        }
-    }
-
-    pub fn workspace(mut self, path: PathBuf) -> Self {
-        self.workspace = Some(path);
-        self
-    }
-
-    pub fn config(mut self, config: CodingAgentConfig) -> Self {
-        self.config = Some(config);
-        self
-    }
-
-    pub async fn build(self) -> Result<ExternalCodingAgent> {
-        let workspace = self.workspace
-            .context("Workspace not specified")?;
-
-        // If config not provided, load from file
-        let config = if let Some(config) = self.config {
-            config
-        } else {
-            load_config()
-                .context("Failed to load config")?
-                .coding_agent
-                .clone()
-        };
-
-        if !config.enabled {
-            anyhow::bail!("External coding agent is not enabled");
-        }
-
-        let client = AcpClient::from_config(&config, &workspace).await
-            .context("Failed to create ACP client")?;
-
-        Ok(ExternalCodingAgent {
-            client,
-            config,
-            workspace,
-            ready: false,
-        })
-    }
-}
-
-impl Default for ExternalCodingAgentBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_builder() {
-        let builder = ExternalCodingAgentBuilder::new()
-            .workspace(PathBuf::from("/tmp/test"));
-        
-        // This would fail without proper config
-        // let agent = tokio::runtime::Runtime::new().unwrap().block_on(builder.build());
     }
 }

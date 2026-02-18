@@ -58,9 +58,9 @@ regex = "1"
 
 # ACP (Agent Client Protocol) for external agent integration
 agent-client-protocol = { workspace = true }
+
+# Async utilities
 tokio-util = { workspace = true }
-tokio-tungstenite = { workspace = true }
-futures-util = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
@@ -70,4 +70,3 @@ schemars = "1.0"
 
 # ACP (Agent Client Protocol) for external agent integration
 agent-client-protocol = { workspace = true }
-tokio-util = { workspace = true }

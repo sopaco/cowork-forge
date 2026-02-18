@@ -12,13 +12,30 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use agent_client_protocol::{self as acp, Agent};
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
+use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 use crate::llm::config::CodingAgentConfig;
+
+/// Message types from the agent
+#[derive(Debug, Clone)]
+pub enum AgentMessage {
+    /// Agent thinking/reasoning
+    Thinking(String),
+    /// Agent output text
+    Output(String),
+    /// Status update
+    Status(String),
+    /// Error message
+    Error(String),
+    /// Task completed
+    Completed,
+}
 
 /// A simple client implementation that handles notifications
 struct CoworkClient {
     output: Arc<std::sync::Mutex<String>>,
+    message_tx: mpsc::UnboundedSender<AgentMessage>,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -86,7 +103,10 @@ impl acp::Client for CoworkClient {
         match args.update {
             acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk { content, .. }) => {
                 if let acp::ContentBlock::Text(text_content) = content {
-                    eprintln!("AGENT: {}", text_content.text);
+                    let text = text_content.text.clone();
+                    eprintln!("AGENT: {}", text);
+                    // Send to GUI
+                    let _ = self.message_tx.send(AgentMessage::Output(text));
                     // Also store in output
                     if let Ok(mut out) = self.output.lock() {
                         out.push_str(&text_content.text);
@@ -95,9 +115,13 @@ impl acp::Client for CoworkClient {
             }
             acp::SessionUpdate::AgentThoughtChunk(acp::ContentChunk { content, .. }) => {
                 if let acp::ContentBlock::Text(text_content) = content {
-                    eprintln!("AGENT THINKING: {}", text_content.text);
+                    let text = text_content.text.clone();
+                    eprintln!("AGENT THINKING: {}", text);
+                    // Send thinking to GUI
+                    let _ = self.message_tx.send(AgentMessage::Thinking(text));
                 }
             }
+            // Ignore other updates (different protocol versions may have different variants)
             _ => {}
         }
         Ok(())
@@ -144,25 +168,33 @@ impl AcpTaskResult {
 /// Execute a task using an external agent via ACP
 /// 
 /// This function runs the ACP client in a dedicated thread with its own
-/// tokio runtime and LocalSet, communicating results via a oneshot channel.
-pub async fn execute_with_external_agent(
+/// tokio runtime and LocalSet, communicating results via channels.
+/// 
+/// Returns a receiver for real-time agent messages.
+pub fn execute_with_external_agent(
     config: CodingAgentConfig,
     workspace: PathBuf,
     task: String,
-) -> Result<String> {
+) -> (mpsc::UnboundedReceiver<AgentMessage>, impl std::future::Future<Output = Result<Result<String>>>) {
     eprintln!("DEBUG: Starting external agent with {} {:?}", config.command, config.args);
 
-    // Create channel for result
+    // Create channel for real-time messages
+    let (message_tx, message_rx) = mpsc::unbounded_channel();
+
+    // Create channel for final result
     let (tx, rx) = oneshot::channel();
 
     // Spawn a dedicated thread for the non-Send operations
     std::thread::spawn(move || {
-        let result = run_acp_in_thread(config, workspace, task);
+        let result = run_acp_in_thread(config, workspace, task, message_tx);
         let _ = tx.send(result);
     });
 
-    // Wait for result from the dedicated thread
-    rx.await.context("ACP thread disconnected")?
+    // Return both the message receiver and the result future
+    // Note: rx.await returns Result<String>, the outer Result is from the channel
+    (message_rx, async move {
+        rx.await.context("ACP thread disconnected")
+    })
 }
 
 /// Run ACP operations in a dedicated thread with its own runtime
@@ -170,6 +202,7 @@ fn run_acp_in_thread(
     config: CodingAgentConfig,
     workspace: PathBuf,
     task: String,
+    message_tx: mpsc::UnboundedSender<AgentMessage>,
 ) -> Result<String> {
     // Create a new tokio runtime for this thread
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -179,7 +212,9 @@ fn run_acp_in_thread(
 
     rt.block_on(async {
         use tokio::process::Command;
-        use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
+
+        // Send status update
+        let _ = message_tx.send(AgentMessage::Status("Starting agent process...".to_string()));
 
         // Spawn the agent process
         let mut child = Command::new(&config.command)
@@ -199,11 +234,14 @@ fn run_acp_in_thread(
 
         // Handle stderr for debugging
         if let Some(stderr) = child.stderr.take() {
+            let tx = message_tx.clone();
             tokio::spawn(async move {
                 use tokio::io::{AsyncBufReadExt, BufReader};
                 let mut stderr = BufReader::new(stderr).lines();
                 while let Ok(Some(line)) = stderr.next_line().await {
                     eprintln!("AGENT STDERR: {}", line);
+                    // Send stderr as status (for debugging info)
+                    let _ = tx.send(AgentMessage::Status(format!("[stderr] {}", line)));
                 }
             });
         }
@@ -215,7 +253,10 @@ fn run_acp_in_thread(
 
         local_set.run_until(async move {
             let (conn, handle_io) = acp::ClientSideConnection::new(
-                CoworkClient { output: output_clone },
+                CoworkClient { 
+                    output: output_clone,
+                    message_tx,
+                },
                 outgoing,
                 incoming,
                 |fut| {
@@ -284,8 +325,22 @@ impl AcpClient {
         })
     }
 
-    /// Execute a coding task
+    /// Execute a coding task, returning message receiver and result future
+    pub fn execute_task_stream(
+        self,
+        task: String,
+    ) -> (mpsc::UnboundedReceiver<AgentMessage>, impl std::future::Future<Output = Result<Result<String>>>) {
+        execute_with_external_agent(self.config, self.workspace, task)
+    }
+
+    /// Execute a coding task (simpler API for backward compatibility)
     pub async fn execute_task(&mut self, task: &str) -> Result<String> {
-        execute_with_external_agent(self.config.clone(), self.workspace.clone(), task.to_string()).await
+        let (_, result) = execute_with_external_agent(
+            self.config.clone(),
+            self.workspace.clone(),
+            task.to_string(),
+        );
+        // Flatten the nested Result: Result<Result<String>> -> Result<String>
+        result.await?
     }
 }
