@@ -5,7 +5,7 @@ use super::static_server;
 use super::iteration_commands::gui_execute_iteration;
 use crate::AppState;
 use crate::project_runner::ProjectRunner;
-use cowork_core::llm::config::LlmConfig;
+use cowork_core::llm::config::{LlmConfig, load_config};
 use cowork_core::persistence::IterationStore;
 use cowork_core::{ProjectRuntimeConfig, RuntimeAnalyzer, RuntimeType};
 use std::fs;
@@ -420,7 +420,7 @@ fn detect_start_command_with_info_from_config(
     }
 
     // LLM 分析失败，返回错误
-    Err("无法通过大模型分析获取运行命令，请确保 config.toml 中配置了有效的 LLM".to_string())
+    Err("无法通过大模型分析获取运行命令，请确保在设置中配置了有效的 LLM".to_string())
 }
 
 #[tauri::command]
@@ -618,8 +618,7 @@ pub async fn get_project_runtime_info(
             // NEW: Try to extract actual port from README if project is running and has LLM config
             // This fixes the issue where the default port (5173) doesn't match the actual running port
             if has_frontend && frontend_port.is_some() {
-                // Check if we have LLM config available
-                if let Ok(model_config) = cowork_core::llm::config::ModelConfig::from_file("config.toml") {
+                if let Ok(model_config) = load_config() {
                     // Only analyze README if project is running to avoid unnecessary LLM calls
                     let is_project_running = PROJECT_RUNNER.is_running(&iteration_id) 
                         || static_server::is_server_running(&iteration_id);
@@ -729,7 +728,7 @@ pub async fn start_iteration_project(
 
     // Try to extract actual port from README before starting
     let (url, port) = if let Ok(ref config) = config_result {
-        if let Ok(model_config) = cowork_core::llm::config::ModelConfig::from_file("config.toml") {
+        if let Ok(model_config) = load_config() {
             match cowork_core::runtime_analyzer::analyze_runtime_from_readme(
                 &code_dir,
                 config,
@@ -1189,7 +1188,7 @@ fn detect_start_command(code_dir: &Path) -> Result<String, String> {
     }
 
     // LLM 分析失败，返回错误
-    Err("无法通过大模型分析获取运行命令，请确保 config.toml 中配置了有效的 LLM".to_string())
+    Err("无法通过大模型分析获取运行命令，请确保在设置中配置了有效的 LLM".to_string())
 }
 
 /// Try to analyze project using RuntimeAnalyzer
@@ -1229,27 +1228,16 @@ fn init_runtime_analyzer() {
         return; // Already initialized
     }
 
-    // Try to load config.toml from project root
-    let config_path = std::env::current_dir().ok().and_then(|dir| {
-        dir.join("config.toml")
-            .exists()
-            .then_some(dir.join("config.toml"))
-    });
-
-    if let Some(path) = config_path {
-        if let Ok(config) =
-            cowork_core::llm::config::ModelConfig::from_file(path.to_str().unwrap_or("config.toml"))
-        {
-            let llm_config = LlmConfig {
-                api_base_url: config.llm.api_base_url,
-                api_key: config.llm.api_key,
-                model_name: config.llm.model_name,
-            };
-            let analyzer = RuntimeAnalyzer::new().with_llm_config(llm_config);
-            *guard = Some(analyzer);
-            println!("[GUI] RuntimeAnalyzer initialized with LLM config");
-            return;
-        }
+    if let Ok(config) = load_config() {
+        let llm_config = LlmConfig {
+            api_base_url: config.llm.api_base_url,
+            api_key: config.llm.api_key,
+            model_name: config.llm.model_name,
+        };
+        let analyzer = RuntimeAnalyzer::new().with_llm_config(llm_config);
+        *guard = Some(analyzer);
+        println!("[GUI] RuntimeAnalyzer initialized with LLM config");
+        return;
     }
 
     // No config found, use heuristic-only analyzer
@@ -2322,17 +2310,5 @@ fn load_artifacts_summary(iteration_id: &str) -> Result<serde_json::Value, Strin
 }
 
 fn load_model_config() -> Result<cowork_core::llm::config::ModelConfig, String> {
-    // Try to load from config.toml
-    let config_path = std::env::current_dir()
-        .map_err(|e| format!("Failed to get current dir: {}", e))?
-        .join("config.toml");
-
-    if config_path.exists() {
-        cowork_core::llm::config::ModelConfig::from_file(config_path.to_str().unwrap())
-            .map_err(|e| format!("Failed to load config: {}", e))
-    } else {
-        // Fall back to environment variables
-        cowork_core::llm::config::ModelConfig::from_env()
-            .map_err(|e| format!("Failed to load config from env: {}", e))
-    }
+    load_config().map_err(|e| format!("Failed to load config: {}", e))
 }

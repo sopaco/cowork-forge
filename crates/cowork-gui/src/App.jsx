@@ -31,6 +31,7 @@ import {
   CloseCircleOutlined,
   BookOutlined,
   TeamOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -45,6 +46,7 @@ import MemoryPanel from "./components/MemoryPanel";
 import KnowledgePanel from "./components/KnowledgePanel";
 import CommandPalette from "./components/CommandPalette";
 import IterationsPanel from "./components/IterationsPanel";
+import SettingsPanel from "./components/SettingsPanel";
 
 const { Sider, Content, Header, Footer } = Layout;
 
@@ -1078,6 +1080,16 @@ function App() {
         <div
           style={{
             height: "100%",
+            display: activeView === "settings" ? "block" : "none",
+            overflow: "auto",
+          }}
+        >
+          <SettingsPanel />
+        </div>
+
+        <div
+          style={{
+            height: "100%",
             display: activeView === "chat" ? "block" : "none",
           }}
         >
@@ -1757,6 +1769,12 @@ function App() {
                 icon: <BookOutlined />,
                 label: "Knowledge",
               },
+              { type: "divider" },
+              {
+                key: "settings",
+                icon: <SettingOutlined />,
+                label: "Settings",
+              },
             ]}
           />
         </Sider>
@@ -1840,6 +1858,9 @@ function App() {
               break;
             case "view-projects":
               setActiveView("projects");
+              break;
+            case "view-settings":
+              setActiveView("settings");
               break;
           }
         }}

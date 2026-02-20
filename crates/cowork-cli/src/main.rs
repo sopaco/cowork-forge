@@ -1,11 +1,9 @@
-// Cowork Forge - CLI Entry Point (Iteration Architecture)
-
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use cowork_core::domain::IterationStatus;
 use cowork_core::interaction::CliBackend;
 use cowork_core::llm::create_llm_client;
-use cowork_core::llm::config::ModelConfig;
+use cowork_core::llm::config::{load_config, ModelConfig};
 use cowork_core::persistence::{IterationStore, ProjectStore};
 use cowork_core::pipeline::IterationExecutor;
 use std::sync::Arc;
@@ -17,10 +15,6 @@ use tracing::{info, error, warn};
 struct Cli {
     #[command(subcommand)]
     command: Commands,
-
-    /// Path to config file (default: config.toml)
-    #[arg(short, long, global = true)]
-    config: Option<String>,
 
     /// Enable verbose logging
     #[arg(short, long, global = true)]
@@ -87,13 +81,15 @@ enum Commands {
         /// Iteration ID
         iteration_id: String,
     },
+
+    /// Configure LLM settings
+    Config,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Setup logging
     let log_filter = if cli.verbose {
         "debug".to_string()
     } else {
@@ -105,10 +101,9 @@ async fn main() -> Result<()> {
         .with_env_filter(log_filter)
         .init();
 
-    // Execute command
     match cli.command {
         Commands::Iter { title, description, base, inherit } => {
-            cmd_iter(title, description, base, inherit, cli.config.clone()).await?
+            cmd_iter(title, description, base, inherit).await?
         }
         Commands::List { all } => cmd_list(all).await?,
         Commands::Show { iteration_id } => cmd_show(iteration_id).await?,
@@ -117,25 +112,23 @@ async fn main() -> Result<()> {
         Commands::Status => cmd_status().await?,
         Commands::Delete { iteration_id } => cmd_delete(iteration_id).await?,
         Commands::RegenerateKnowledge { iteration_id } => {
-            cmd_regenerate_knowledge(iteration_id, cli.config.clone()).await?
+            cmd_regenerate_knowledge(iteration_id).await?
         }
+        Commands::Config => cmd_config().await?,
     }
 
     Ok(())
 }
 
-/// Create and execute a new iteration
 async fn cmd_iter(
     title: String,
     description: Option<String>,
     base: Option<String>,
     inherit: String,
-    config: Option<String>,
 ) -> Result<()> {
     let project_store = ProjectStore::new();
     let iteration_store = IterationStore::new();
 
-    // Check if project exists
     let mut project = match project_store.load()? {
         Some(p) => p,
         None => {
@@ -146,31 +139,24 @@ async fn cmd_iter(
 
     let description = description.unwrap_or_else(|| title.clone());
 
-    // Create interaction backend (V2 - no event_bus)
     let interaction = Arc::new(CliBackend::new());
 
-    // Create executor
     let executor = IterationExecutor::new(interaction);
 
-    // Create iteration based on whether it's genesis or evolution
     let iteration = if let Some(base_id) = base {
-        // Evolution iteration
         info!("Creating evolution iteration based on: {}", base_id);
 
-        // Verify base iteration exists
         if !iteration_store.exists(&base_id) {
             error!("Base iteration '{}' not found", base_id);
             anyhow::bail!("Base iteration not found");
         }
 
-        // Parse inheritance mode
         let inheritance = match inherit.as_str() {
             "none" => cowork_core::domain::InheritanceMode::None,
             "full" => cowork_core::domain::InheritanceMode::Full,
-            _ => cowork_core::domain::InheritanceMode::Partial, // Default to Partial for incremental development
+            _ => cowork_core::domain::InheritanceMode::Partial,
         };
 
-        // Create evolution iteration
         cowork_core::domain::Iteration::create_evolution(
             &project,
             title.clone(),
@@ -179,7 +165,6 @@ async fn cmd_iter(
             inheritance,
         )
     } else {
-        // Genesis iteration
         info!("Creating genesis iteration");
         cowork_core::domain::Iteration::create_genesis(
             &project,
@@ -188,7 +173,6 @@ async fn cmd_iter(
         )
     };
 
-    // Save iteration
     iteration_store.save(&iteration)?;
     project_store.add_iteration(&mut project, iteration.to_summary())?;
 
@@ -202,15 +186,11 @@ async fn cmd_iter(
     println!("   Start Stage: {}", iteration.determine_start_stage());
     println!();
 
-    // Execute iteration
     println!("🚀 Starting iteration execution...");
     println!();
 
-    // Create LLM client
-    let config_path = config.as_deref().unwrap_or("config.toml");
-    let model_config = ModelConfig::from_file(config_path)
-        .or_else(|_| ModelConfig::from_env())
-        .context("Failed to load LLM configuration")?;
+    let model_config = load_config()
+        .context("Failed to load LLM configuration. Run 'cowork config' to set up.")?;
 
     let model = create_llm_client(&model_config.llm)
         .context("Failed to create LLM client")?;
@@ -228,12 +208,10 @@ async fn cmd_iter(
     }
 }
 
-/// List all iterations
 async fn cmd_list(all: bool) -> Result<()> {
     let project_store = ProjectStore::new();
     let iteration_store = IterationStore::new();
 
-    // Check if project exists
     match project_store.load()? {
         Some(project) => {
             println!("📊 Project: {}\n", project.name);
@@ -245,7 +223,6 @@ async fn cmd_list(all: bool) -> Result<()> {
                 return Ok(());
             }
 
-            // Filter iterations if not showing all
             let filtered: Vec<_> = if all {
                 iterations
             } else {
@@ -260,19 +237,17 @@ async fn cmd_list(all: bool) -> Result<()> {
                 return Ok(());
             }
 
-            // Print header
             println!("{:<12} {:<30} {:<12} {:<15} {}",
                 "Number", "Title", "Status", "Current Stage", "ID");
             println!("{:-<100}", "");
 
-            // Print iterations
             for iter in filtered {
                 let status_str = format!("{:?}", iter.status);
                 let status_colored = match iter.status {
-                    IterationStatus::Completed => format!("\x1b[32m{}\x1b[0m", status_str), // Green
-                    IterationStatus::Running => format!("\x1b[33m{}\x1b[0m", status_str),   // Yellow
-                    IterationStatus::Paused => format!("\x1b[36m{}\x1b[0m", status_str),    // Cyan
-                    IterationStatus::Failed => format!("\x1b[31m{}\x1b[0m", status_str),    // Red
+                    IterationStatus::Completed => format!("\x1b[32m{}\x1b[0m", status_str),
+                    IterationStatus::Running => format!("\x1b[33m{}\x1b[0m", status_str),
+                    IterationStatus::Paused => format!("\x1b[36m{}\x1b[0m", status_str),
+                    IterationStatus::Failed => format!("\x1b[31m{}\x1b[0m", status_str),
                     IterationStatus::Draft => status_str,
                 };
 
@@ -300,16 +275,13 @@ async fn cmd_list(all: bool) -> Result<()> {
     Ok(())
 }
 
-/// Show iteration details
 async fn cmd_show(iteration_id: Option<String>) -> Result<()> {
     let project_store = ProjectStore::new();
     let iteration_store = IterationStore::new();
 
-    // Determine which iteration to show
     let iteration_id = match iteration_id {
         Some(id) => id,
         None => {
-            // Use current iteration from project
             match project_store.load()? {
                 Some(project) => {
                     match project.current_iteration_id {
@@ -326,7 +298,6 @@ async fn cmd_show(iteration_id: Option<String>) -> Result<()> {
         }
     };
 
-    // Load iteration
     let iteration = iteration_store.load(&iteration_id)?;
 
     println!("📋 Iteration Details\n");
@@ -354,7 +325,6 @@ async fn cmd_show(iteration_id: Option<String>) -> Result<()> {
         println!("  Completed:   {}", iteration.completed_stages.join(", "));
     }
 
-    // Show artifacts
     println!("\n  Artifacts:");
     if iteration.artifacts.idea.is_some() {
         println!("    ✓ Idea");
@@ -375,16 +345,13 @@ async fn cmd_show(iteration_id: Option<String>) -> Result<()> {
     Ok(())
 }
 
-/// Continue a paused iteration
 async fn cmd_continue(iteration_id: Option<String>) -> Result<()> {
     let project_store = ProjectStore::new();
     let iteration_store = IterationStore::new();
 
-    // Determine which iteration to continue
     let iteration_id = match iteration_id {
         Some(id) => id,
         None => {
-            // Find a paused iteration
             let iterations = iteration_store.load_all()?;
             let paused: Vec<_> = iterations
                 .into_iter()
@@ -407,7 +374,6 @@ async fn cmd_continue(iteration_id: Option<String>) -> Result<()> {
         }
     };
 
-    // Load project and iteration
     let mut project = match project_store.load()? {
         Some(p) => p,
         None => {
@@ -425,14 +391,11 @@ async fn cmd_continue(iteration_id: Option<String>) -> Result<()> {
     println!("   Current stage: {:?}", iteration.current_stage);
     println!();
 
-    // Create executor (V2 - no event_bus)
     let interaction = Arc::new(CliBackend::new());
     let executor = IterationExecutor::new(interaction);
 
-    // Create LLM client
-    let model_config = ModelConfig::from_file("config.toml")
-        .or_else(|_| ModelConfig::from_env())
-        .context("Failed to load LLM configuration")?;
+    let model_config = load_config()
+        .context("Failed to load LLM configuration. Run 'cowork config' to set up.")?;
 
     let model = create_llm_client(&model_config.llm)
         .context("Failed to create LLM client")?;
@@ -449,7 +412,6 @@ async fn cmd_continue(iteration_id: Option<String>) -> Result<()> {
     }
 }
 
-/// Initialize a new project
 async fn cmd_init(name: Option<String>) -> Result<()> {
     let project_store = ProjectStore::new();
 
@@ -461,11 +423,9 @@ async fn cmd_init(name: Option<String>) -> Result<()> {
         return Ok(());
     }
 
-    // Get project name
     let name = match name {
         Some(n) => n,
         None => {
-            // Try to infer from current directory
             std::env::current_dir()?
                 .file_name()
                 .and_then(|n| n.to_str())
@@ -474,7 +434,6 @@ async fn cmd_init(name: Option<String>) -> Result<()> {
         }
     };
 
-    // Create project
     let project = project_store.create(&name)?;
 
     println!("✅ Created project: {}", project.name);
@@ -482,13 +441,12 @@ async fn cmd_init(name: Option<String>) -> Result<()> {
     println!("   Working directory: .cowork-v2/");
     println!();
     println!("Next steps:");
-    println!("  1. Run 'cowork iter \"<title>\"' to create your first iteration");
-    println!("  2. Or configure LLM settings in config.toml");
+    println!("  1. Run 'cowork config' to configure your LLM settings");
+    println!("  2. Run 'cowork iter \"<title>\"' to create your first iteration");
 
     Ok(())
 }
 
-/// Show project status
 async fn cmd_status() -> Result<()> {
     let project_store = ProjectStore::new();
     let iteration_store = IterationStore::new();
@@ -505,7 +463,6 @@ async fn cmd_status() -> Result<()> {
                 println!("  Current:     {}", current_id);
             }
 
-            // Load iterations
             let iterations = iteration_store.load_all()?;
 
             let completed = iterations.iter()
@@ -528,7 +485,6 @@ async fn cmd_status() -> Result<()> {
             println!("    Paused:     {}", paused);
             println!("    Failed:     {}", failed);
 
-            // Show latest completed iteration
             if let Some(latest) = project.get_latest_completed_iteration() {
                 println!("\n  Latest Completed:");
                 println!("    #{} - {}", latest.number, latest.title);
@@ -544,17 +500,14 @@ async fn cmd_status() -> Result<()> {
     Ok(())
 }
 
-/// Delete an iteration
 async fn cmd_delete(iteration_id: String) -> Result<()> {
     let project_store = ProjectStore::new();
     let iteration_store = IterationStore::new();
 
-    // Verify iteration exists
     if !iteration_store.exists(&iteration_id) {
         anyhow::bail!("Iteration '{}' not found", iteration_id);
     }
 
-    // Load iteration to show details
     let iteration = iteration_store.load(&iteration_id)?;
 
     println!("⚠️  You are about to delete iteration:");
@@ -562,7 +515,6 @@ async fn cmd_delete(iteration_id: String) -> Result<()> {
     println!("   ID: {}", iteration_id);
     println!();
 
-    // Confirm deletion
     print!("Are you sure? [y/N]: ");
     std::io::Write::flush(&mut std::io::stdout())?;
 
@@ -574,10 +526,8 @@ async fn cmd_delete(iteration_id: String) -> Result<()> {
         return Ok(());
     }
 
-    // Delete iteration
     iteration_store.delete(&iteration_id)?;
 
-    // Update project (remove from iterations list)
     if let Ok(Some(mut project)) = project_store.load() {
         project.iterations.retain(|i| i.id != iteration_id);
         project_store.save(&project)?;
@@ -588,7 +538,6 @@ async fn cmd_delete(iteration_id: String) -> Result<()> {
     Ok(())
 }
 
-/// Helper function to truncate string
 fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
@@ -597,38 +546,30 @@ fn truncate(s: &str, max_len: usize) -> String {
     }
 }
 
-/// Regenerate knowledge for a completed iteration
-async fn cmd_regenerate_knowledge(iteration_id: String, config: Option<String>) -> Result<()> {
+async fn cmd_regenerate_knowledge(iteration_id: String) -> Result<()> {
     println!("🔄 Regenerating knowledge for iteration: {}", iteration_id);
     println!();
 
     let iteration_store = IterationStore::new();
 
-    // Load iteration
     let iteration = iteration_store.load(&iteration_id)
         .context("Failed to load iteration")?;
 
-    // Check if iteration is completed
     if iteration.status != IterationStatus::Completed {
         println!("❌ Iteration is not completed (status: {:?})", iteration.status);
         println!("   Knowledge can only be regenerated for completed iterations.");
         return Ok(());
     }
 
-    // Create executor
     let interaction = Arc::new(CliBackend::new());
     let executor = IterationExecutor::new(interaction);
 
-    // Create LLM client
-    let config_path = config.as_deref().unwrap_or("config.toml");
-    let model_config = ModelConfig::from_file(config_path)
-        .or_else(|_| ModelConfig::from_env())
-        .context("Failed to load LLM configuration")?;
+    let model_config = load_config()
+        .context("Failed to load LLM configuration. Run 'cowork config' to set up.")?;
 
     let model = create_llm_client(&model_config.llm)
         .context("Failed to create LLM client")?;
 
-    // Regenerate knowledge
     match executor.regenerate_iteration_knowledge(&iteration_id, model).await {
         Ok(_) => {
             println!("\n✅ Knowledge regenerated successfully for iteration {}", iteration_id);
@@ -639,4 +580,42 @@ async fn cmd_regenerate_knowledge(iteration_id: String, config: Option<String>) 
             Err(e)
         }
     }
+}
+
+async fn cmd_config() -> Result<()> {
+    use cowork_core::llm::config::{get_config_path, save_config};
+    
+    println!("⚙️  Cowork Configuration\n");
+    
+    let config_path = get_config_path()
+        .context("Failed to get config path")?;
+    
+    println!("Config file location: {}", config_path.display());
+    
+    let existing_config = load_config().ok();
+    
+    if let Some(ref config) = existing_config {
+        println!("\nCurrent LLM Configuration:");
+        println!("  API Base URL: {}", config.llm.api_base_url);
+        println!("  Model Name:   {}", config.llm.model_name);
+        println!("  API Key:      {}...", &config.llm.api_key.chars().take(8).collect::<String>());
+        
+        if config.coding_agent.enabled {
+            println!("\n  Coding Agent: enabled ({})", config.coding_agent.agent_type);
+        }
+    } else {
+        println!("\nNo configuration found. Creating default config...");
+    }
+    
+    println!("\nTo edit the configuration, open the file in your editor:");
+    println!("  {}", config_path.display());
+    
+    if existing_config.is_none() {
+        let default_config = ModelConfig::default();
+        save_config(&default_config)?;
+        println!("\n✅ Created default config file at: {}", config_path.display());
+        println!("   Please edit the file to add your LLM API settings.");
+    }
+    
+    Ok(())
 }

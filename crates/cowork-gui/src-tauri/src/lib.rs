@@ -17,6 +17,7 @@ mod project_runner;
 mod project_manager;
 mod iteration_commands;
 mod static_server;
+mod config_commands;
 use project_manager::*;
 
 
@@ -142,7 +143,7 @@ impl InteractiveBackend for TauriBackend {
                     },
                 }
             }
-            _ = tokio::time::sleep(Duration::from_secs(3000)) => { // 5 minute timeout
+            _ = tokio::time::sleep(Duration::from_secs(3000)) => {
                 println!("[HITL] Request timeout after 3000 seconds");
                 anyhow::bail!("Request timeout")
             }
@@ -670,6 +671,14 @@ pub fn run() {
             gui_commands::pm_restart_iteration,
             gui_commands::get_system_locale,
             gui_commands::pm_get_iteration_context,
+            // Config commands
+            config_commands::get_app_config,
+            config_commands::save_app_config,
+            config_commands::get_config_path,
+            config_commands::get_default_config,
+            config_commands::open_config_folder,
+            config_commands::test_llm_connection,
+            config_commands::has_valid_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

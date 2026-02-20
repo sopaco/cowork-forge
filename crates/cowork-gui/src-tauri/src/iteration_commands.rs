@@ -4,7 +4,7 @@ use crate::AppState;
 use crate::TauriBackend;
 use cowork_core::domain::{Iteration, InheritanceMode, Project, IterationStatus};
 use cowork_core::llm::create_llm_client;
-use cowork_core::llm::config::ModelConfig;
+use cowork_core::llm::config::load_config;
 use cowork_core::persistence::{IterationStore, ProjectStore, MemoryStore};
 use cowork_core::pipeline::IterationExecutor;
 use tauri::{Emitter, Manager, State, Window};
@@ -188,9 +188,7 @@ pub async fn gui_execute_iteration(
 
     let executor = IterationExecutor::new(interaction);
 
-    // Create LLM client
-    let model_config = ModelConfig::from_file("config.toml")
-        .or_else(|_| ModelConfig::from_env())
+    let model_config = load_config()
         .map_err(|e| format!("Failed to load LLM configuration: {}", e))?;
 
     let model = create_llm_client(&model_config.llm)
@@ -236,9 +234,7 @@ pub async fn gui_continue_iteration(
 
     let executor = IterationExecutor::new(interaction);
 
-    // Create LLM client
-    let model_config = ModelConfig::from_file("config.toml")
-        .or_else(|_| ModelConfig::from_env())
+    let model_config = load_config()
         .map_err(|e| format!("Failed to load LLM configuration: {}", e))?;
 
     let model = create_llm_client(&model_config.llm)
@@ -287,9 +283,7 @@ pub async fn gui_retry_iteration(
 
     let executor = IterationExecutor::new(interaction);
 
-    // Create LLM client
-    let model_config = ModelConfig::from_file("config.toml")
-        .or_else(|_| ModelConfig::from_env())
+    let model_config = load_config()
         .map_err(|e| format!("Failed to load LLM configuration: {}", e))?;
 
     let _model = create_llm_client(&model_config.llm)
@@ -406,9 +400,7 @@ pub async fn gui_regenerate_knowledge(
         ));
     }
 
-    // Create LLM client
-    let model_config = ModelConfig::from_file("config.toml")
-        .or_else(|_| ModelConfig::from_env())
+    let model_config = load_config()
         .map_err(|e| format!("Failed to load LLM configuration: {}", e))?;
 
     let model = create_llm_client(&model_config.llm)
