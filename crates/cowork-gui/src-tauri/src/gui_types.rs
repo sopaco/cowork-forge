@@ -67,7 +67,7 @@ pub struct RunInfo {
     pub status: RunStatus,
     pub process_id: Option<u32>,
     pub command: Option<String>,
-    
+
     // Fullstack support
     pub frontend_pid: Option<u32>,
     pub backend_pid: Option<u32>,
@@ -165,7 +165,8 @@ pub struct ProjectTemplate {
 pub struct TemplateFile {
     pub path: String,
     pub content: String,
-    pub is_template: bool,
+    #[serde(default)]
+    pub is_binary: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

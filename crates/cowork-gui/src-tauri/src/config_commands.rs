@@ -1,4 +1,4 @@
-use cowork_core::llm::config::{self, ModelConfig, LlmConfig, EmbeddingConfig, ExternalAgentConfig};
+use cowork_core::llm::config::{self, ModelConfig, LlmConfig};
 
 #[tauri::command]
 pub async fn get_app_config() -> Result<ModelConfig, String> {
@@ -40,7 +40,7 @@ pub async fn open_config_folder() -> Result<(), String> {
 pub async fn test_llm_connection(llm_config: LlmConfig) -> Result<bool, String> {
     use cowork_core::llm::create_llm_client;
     
-    let client = create_llm_client(&llm_config)
+    let _client = create_llm_client(&llm_config)
         .map_err(|e| format!("Failed to create LLM client: {}", e))?;
     
     Ok(true)

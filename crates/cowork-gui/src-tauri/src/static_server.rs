@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::net::{TcpListener, SocketAddr};
+use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::Emitter;
@@ -26,6 +26,7 @@ struct StaticServerInstance {
 
 /// Fullstack process instance - manages frontend and backend processes
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct FullstackProcessInstance {
     pub iteration_id: String,
     pub frontend_pid: Option<u32>,
@@ -43,6 +44,7 @@ pub fn register_fullstack_process(instance: FullstackProcessInstance) {
 }
 
 /// Get fullstack process instance
+#[allow(dead_code)]
 pub fn get_fullstack_process(iteration_id: &str) -> Option<FullstackProcessInstance> {
     let processes = FULLSTACK_PROCESSES.lock().unwrap();
     processes.get(iteration_id).cloned()
@@ -84,14 +86,21 @@ pub fn start_static_server(
     {
         let servers = STATIC_SERVERS.lock().unwrap();
         if servers.contains_key(&iteration_id) {
-            return Err(format!("Server already running for iteration: {}", iteration_id));
+            return Err(format!(
+                "Server already running for iteration: {}",
+                iteration_id
+            ));
         }
     }
 
     // Find an available port
     let port = find_available_port(preferred_port)?;
 
-    println!("[StaticServer] Starting server on port {} for {}", port, serve_dir.display());
+    println!(
+        "[StaticServer] Starting server on port {} for {}",
+        port,
+        serve_dir.display()
+    );
 
     // Create shutdown channel
     let (shutdown_tx, _shutdown_rx) = tokio::sync::oneshot::channel::<()>();
@@ -106,10 +115,10 @@ pub fn start_static_server(
     // Store instance
     {
         let mut servers = STATIC_SERVERS.lock().unwrap();
-        servers.insert(iteration_id.clone(), StaticServerInstance {
-            port,
-            shutdown_tx,
-        });
+        servers.insert(
+            iteration_id.clone(),
+            StaticServerInstance { port, shutdown_tx },
+        );
     }
 
     let serve_dir_clone = serve_dir.clone();
@@ -136,7 +145,10 @@ pub fn start_static_server(
                 }
             }
         }
-        println!("[StaticServer] Server stopped for iteration: {}", iteration_id_clone);
+        println!(
+            "[StaticServer] Server stopped for iteration: {}",
+            iteration_id_clone
+        );
     });
 
     Ok(StaticServerInfo {
@@ -152,7 +164,10 @@ pub fn stop_static_server(iteration_id: &str) -> Result<(), String> {
     if let Some(instance) = servers.remove(iteration_id) {
         // The shutdown_tx will be dropped, signaling the server to stop
         drop(instance.shutdown_tx);
-        println!("[StaticServer] Stopped server for iteration: {}", iteration_id);
+        println!(
+            "[StaticServer] Stopped server for iteration: {}",
+            iteration_id
+        );
     }
 
     Ok(())
@@ -193,7 +208,8 @@ fn handle_request(
 
     // Security: prevent directory traversal
     if path.contains("..") {
-        let _ = request.respond(tiny_http::Response::from_string("Forbidden").with_status_code(403));
+        let _ =
+            request.respond(tiny_http::Response::from_string("Forbidden").with_status_code(403));
         return;
     }
 
@@ -211,10 +227,13 @@ fn handle_request(
 
     // Emit log event
     if let Some(handle) = app_handle {
-        let _ = handle.emit("project_log", serde_json::json!({
-            "stream": "stdout",
-            "content": format!("[HTTP] {} {}\n", request.method(), path)
-        }));
+        let _ = handle.emit(
+            "project_log",
+            serde_json::json!({
+                "stream": "stdout",
+                "content": format!("[HTTP] {} {}\n", request.method(), path)
+            }),
+        );
     }
 
     // Serve file
@@ -227,12 +246,14 @@ fn handle_request(
                 let content_type_header = tiny_http::Header::from_bytes(
                     "Content-Type".as_bytes(),
                     content_type.as_bytes(),
-                ).unwrap();
+                )
+                .unwrap();
                 let cors_header = tiny_http::Header::from_bytes(
                     "Access-Control-Allow-Origin".as_bytes(),
                     "*".as_bytes(),
-                ).unwrap();
-                
+                )
+                .unwrap();
+
                 let response = tiny_http::Response::from_file(file)
                     .with_header(content_type_header)
                     .with_header(cors_header);
@@ -242,8 +263,7 @@ fn handle_request(
             Err(e) => {
                 eprintln!("[StaticServer] Error opening file: {}", e);
                 let _ = request.respond(
-                    tiny_http::Response::from_string("Internal Server Error")
-                        .with_status_code(500),
+                    tiny_http::Response::from_string("Internal Server Error").with_status_code(500),
                 );
             }
         }
@@ -257,10 +277,11 @@ fn handle_request(
                     let content_type_header = tiny_http::Header::from_bytes(
                         "Content-Type".as_bytes(),
                         "text/html; charset=utf-8".as_bytes(),
-                    ).unwrap();
-                    
-                    let response = tiny_http::Response::from_file(file)
-                        .with_header(content_type_header);
+                    )
+                    .unwrap();
+
+                    let response =
+                        tiny_http::Response::from_file(file).with_header(content_type_header);
                     let _ = request.respond(response);
                 }
                 Err(_) => {
@@ -270,16 +291,16 @@ fn handle_request(
                 }
             }
         } else {
-            let _ = request.respond(
-                tiny_http::Response::from_string("Not Found").with_status_code(404),
-            );
+            let _ = request
+                .respond(tiny_http::Response::from_string("Not Found").with_status_code(404));
         }
     }
 }
 
 /// Get MIME content type based on file extension
 fn get_content_type(path: &Path) -> String {
-    let ext = path.extension()
+    let ext = path
+        .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_lowercase())
         .unwrap_or_default();

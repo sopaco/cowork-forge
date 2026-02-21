@@ -12,13 +12,17 @@ use serde_json::Value;
 
 // GUI-specific modules
 mod gui_types;
-mod gui_commands;
+mod commands;
 mod project_runner;
 mod project_manager;
 mod iteration_commands;
 mod static_server;
 mod config_commands;
+
 use project_manager::*;
+
+// Re-export commands from new module structure
+use commands::{init_app_handle, file, preview, runner, memory, template, pm, system};
 
 
 
@@ -143,8 +147,8 @@ impl InteractiveBackend for TauriBackend {
                     },
                 }
             }
-            _ = tokio::time::sleep(Duration::from_secs(3000)) => {
-                println!("[HITL] Request timeout after 3000 seconds");
+            _ = tokio::time::sleep(Duration::from_secs(300)) => {
+                println!("[HITL] Request timeout after 5 minutes");
                 anyhow::bail!("Request timeout")
             }
         }
@@ -566,7 +570,7 @@ pub fn run() {
         .manage(app_state)
         .setup(move |app| {
             // Initialize app handle for project runner
-            gui_commands::init_app_handle(app.handle().clone());
+            init_app_handle(app.handle().clone());
 
             // Initialize tool notification callback
             let app_handle = app.handle().clone();
@@ -628,33 +632,35 @@ pub fn run() {
             iteration_commands::gui_delete_iteration,
             iteration_commands::gui_get_project_knowledge,
             iteration_commands::gui_regenerate_knowledge,
-            // GUI-specific commands (V2 API - Iteration based)
-            gui_commands::open_in_file_manager,
-            gui_commands::get_iteration_artifacts,
-            gui_commands::read_iteration_file,
-            gui_commands::save_iteration_file,
-            gui_commands::get_iteration_file_tree,
-            gui_commands::start_iteration_preview,
-            gui_commands::stop_iteration_preview,
-            gui_commands::check_preview_status,
-            gui_commands::start_iteration_project,
-            gui_commands::stop_iteration_project,
-            gui_commands::check_project_status,
-            gui_commands::get_project_runtime_info,
-            gui_commands::query_memory_index,
-            gui_commands::load_memory_detail,
-            gui_commands::save_session_memory,
-            gui_commands::promote_to_project_memory,
-            gui_commands::get_memory_context,
-            // Code formatting commands
-            gui_commands::format_code,
-            gui_commands::check_formatter_available,
+            // File commands
+            file::open_in_file_manager,
+            file::get_iteration_artifacts,
+            file::read_iteration_file,
+            file::save_iteration_file,
+            file::get_iteration_file_tree,
+            // Preview commands
+            preview::start_iteration_preview,
+            preview::stop_iteration_preview,
+            preview::check_preview_status,
+            preview::get_project_runtime_info,
+            // Runner commands
+            runner::start_iteration_project,
+            runner::stop_iteration_project,
+            runner::check_project_status,
+            runner::format_code,
+            runner::check_formatter_available,
+            // Memory commands
+            memory::query_memory_index,
+            memory::load_memory_detail,
+            memory::save_session_memory,
+            memory::promote_to_project_memory,
+            memory::get_memory_context,
             // Template commands
-            gui_commands::get_templates,
-            gui_commands::export_template,
-            gui_commands::import_template,
-            gui_commands::delete_template,
-            gui_commands::apply_template,
+            template::get_templates,
+            template::export_template,
+            template::import_template,
+            template::delete_template,
+            template::apply_template,
             // Project manager commands
             register_project,
             get_all_projects,
@@ -667,10 +673,11 @@ pub fn run() {
             get_workspace,
             has_open_project,
             // PM Agent commands
-            gui_commands::pm_send_message,
-            gui_commands::pm_restart_iteration,
-            gui_commands::get_system_locale,
-            gui_commands::pm_get_iteration_context,
+            pm::pm_send_message,
+            pm::pm_restart_iteration,
+            pm::pm_get_iteration_context,
+            // System commands
+            system::get_system_locale,
             // Config commands
             config_commands::get_app_config,
             config_commands::save_app_config,

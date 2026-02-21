@@ -23,6 +23,7 @@ tokio-stream = "0.1"
 async-trait = "0.1"
 chrono = "0.4"
 anyhow = "1"
+thiserror = "2"
 futures = "0.3"
 
 # Preview server
