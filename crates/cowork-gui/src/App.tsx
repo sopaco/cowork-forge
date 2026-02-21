@@ -354,21 +354,14 @@ function App() {
   }, [userInput, inputRequest, addMessage, submitInput]);
 
   const handlePMSendMessage = useCallback(async () => {
-    console.log('[PM] handlePMSendMessage called', { userInput, currentIteration: currentIteration?.id });
-    if (!userInput.trim() || !currentIteration) {
-      console.log('[PM] Early return - empty input or no iteration');
-      return;
-    }
+    if (!userInput.trim() || !currentIteration) return;
     const userMessage = userInput.trim();
     setUserInput('');
     setPmProcessing(true);
 
     try {
-      console.log('[PM] Calling sendPMMessage...');
       await sendPMMessage(currentIteration.id, userMessage);
-      console.log('[PM] sendPMMessage completed');
     } catch (error) {
-      console.error('[PM] Failed to process message:', error);
       message.error('Failed to process message: ' + error);
     } finally {
       setPmProcessing(false);

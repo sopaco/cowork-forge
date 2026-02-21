@@ -8,32 +8,17 @@ pub async fn pm_send_message(
     _history: Vec<serde_json::Value>,
     window: Window,
 ) -> Result<serde_json::Value, String> {
-    println!("[PM] pm_send_message called: iteration_id={}, message={}", iteration_id, message);
-    
     let store = IterationStore::new();
-    let iteration = store.load(&iteration_id).map_err(|e| {
-        let err = format!("Failed to load iteration: {}", e);
-        println!("[PM] Error: {}", err);
-        err
-    })?;
+    let iteration = store.load(&iteration_id).map_err(|e| format!("Failed to load iteration: {}", e))?;
 
-    let config = cowork_core::llm::config::load_config().map_err(|e| {
-        let err = format!("Failed to load config: {}", e);
-        println!("[PM] Error: {}", err);
-        err
-    })?;
+    let config = cowork_core::llm::config::load_config().map_err(|e| format!("Failed to load config: {}", e))?;
 
     let prompt = format!(
         "You are a Project Manager Agent helping with iteration: {}.\nTitle: {}\nDescription: {}\n\nUser message: {}\n\nPlease provide a helpful response.",
         iteration_id, iteration.title, iteration.description, message
     );
 
-    println!("[PM] Creating LLM client...");
-    let client = cowork_core::llm::create_llm_client(&config.llm).map_err(|e| {
-        let err = format!("Failed to create LLM client: {}", e);
-        println!("[PM] Error: {}", err);
-        err
-    })?;
+    let client = cowork_core::llm::create_llm_client(&config.llm).map_err(|e| format!("Failed to create LLM client: {}", e))?;
     
     let req = adk_core::model::LlmRequest {
         model: config.llm.model_name.clone(),
@@ -45,47 +30,24 @@ pub async fn pm_send_message(
         tools: std::collections::HashMap::new(),
     };
 
-    println!("[PM] Calling generate_content...");
-    let mut stream = client.generate_content(req, false).await.map_err(|e| {
-        let err = format!("Failed to generate content: {}", e);
-        println!("[PM] Error: {}", err);
-        err
-    })?;
+    let mut stream = client.generate_content(req, false).await.map_err(|e| format!("Failed to generate content: {}", e))?;
     
     use futures::StreamExt;
-    println!("[PM] Reading from stream...");
     
     let mut all_text = String::new();
     while let Some(chunk) = stream.next().await {
-        match chunk {
-            Ok(r) => {
-                println!("[PM] Got chunk, content: {:?}", r.content);
-                if let Some(c) = r.content {
-                    println!("[PM] Parts count: {}", c.parts.len());
-                    for (i, p) in c.parts.iter().enumerate() {
-                        println!("[PM] Part {}: {:?}", i, p);
-                        if let adk_core::Part::Text { text } = p {
-                            all_text.push_str(text);
-                        }
+        if let Ok(r) = chunk {
+            if let Some(c) = r.content {
+                for p in c.parts.iter() {
+                    if let adk_core::Part::Text { text } = p {
+                        all_text.push_str(text);
                     }
                 }
-            }
-            Err(e) => {
-                let err = format!("Stream error: {}", e);
-                println!("[PM] Error: {}", err);
-                return Err(err);
             }
         }
     }
     
-    let response = if all_text.is_empty() {
-        println!("[PM] No text found in any chunk");
-        "No response".to_string()
-    } else {
-        all_text
-    };
-
-    println!("[PM] Response: {}", response);
+    let response = if all_text.is_empty() { "No response".to_string() } else { all_text };
     
     let result = serde_json::json!({
         "agent_message": response,
@@ -93,13 +55,7 @@ pub async fn pm_send_message(
         "needs_restart": false
     });
 
-    window.emit("pm_message", &result).map_err(|e| {
-        let err = format!("Failed to emit event: {}", e);
-        println!("[PM] Error: {}", err);
-        err
-    })?;
-    
-    println!("[PM] Success!");
+    let _ = window.emit("pm_message", &result);
     Ok(result)
 }
 
