@@ -120,6 +120,13 @@ export interface ProjectTemplate {
   config: TemplateConfig;
 }
 
+export interface PMAction {
+  action_type: 'pm_goto_stage' | 'pm_create_iteration' | 'pm_start_app' | 'pm_open_folder' | 'pm_view_knowledge' | 'pm_view_artifacts' | 'pm_view_code';
+  target_stage?: string;
+  description?: string;
+  label: string;
+}
+
 export interface TemplateFile {
   path: string;
   content: string;
@@ -216,6 +223,8 @@ const API = {
       invoke('pm_send_message', { iterationId, message, history }),
     restart: (iterationId: string, targetStage: string): Promise<void> => 
       invoke('pm_restart_iteration', { iterationId, targetStage }),
+    getWelcome: (iterationId: string): Promise<{ agent_message: string; actions: PMAction[] }> => 
+      invoke('pm_get_welcome_message', { iterationId }),
   },
   
   input: {

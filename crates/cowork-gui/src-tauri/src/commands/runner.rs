@@ -5,6 +5,7 @@ use cowork_core::persistence::IterationStore;
 use cowork_core::RuntimeType;
 use std::path::PathBuf;
 use std::fs;
+use tauri::{Emitter, Window};
 
 fn get_code_directory(iteration_id: &str) -> Result<PathBuf, String> {
     let iteration_store = IterationStore::new();
@@ -126,8 +127,39 @@ fn detect_npm_start_command(dir: &std::path::Path) -> Option<String> {
 }
 
 #[tauri::command]
-pub async fn start_iteration_project(iteration_id: String) -> Result<RunInfo, String> {
+pub async fn start_iteration_project(iteration_id: String, window: Window) -> Result<RunInfo, String> {
     println!("[Runner] ========== Starting project for iteration: {} ==========", iteration_id);
+    
+    // Check if already running
+    if static_server::is_server_running(&iteration_id) {
+        println!("[Runner] Server already running for iteration: {}", iteration_id);
+        // Emit event to notify frontend
+        let _ = window.emit("project_started", serde_json::json!({
+            "iteration_id": iteration_id,
+            "already_running": true
+        }));
+        return Ok(RunInfo { 
+            status: RunStatus::Running, 
+            process_id: None, 
+            command: Some("Already running".to_string()), 
+            ..Default::default() 
+        });
+    }
+    
+    if static_server::is_fullstack_running(&iteration_id) {
+        println!("[Runner] Fullstack process already running for iteration: {}", iteration_id);
+        let _ = window.emit("project_started", serde_json::json!({
+            "iteration_id": iteration_id,
+            "already_running": true
+        }));
+        return Ok(RunInfo { 
+            status: RunStatus::Running, 
+            process_id: None, 
+            command: Some("Already running".to_string()), 
+            ..Default::default() 
+        });
+    }
+    
     let code_dir = get_code_directory(&iteration_id)?;
     
     if !code_dir.exists() {
@@ -160,6 +192,12 @@ pub async fn start_iteration_project(iteration_id: String) -> Result<RunInfo, St
         if config.runtime_type == RuntimeType::VanillaHtml || is_vanilla_html {
             println!("[Runner] Starting static server for HTML project");
             let srv = static_server::start_static_server(iteration_id.clone(), code_dir.clone(), 8000, None)?;
+            let url = format!("http://localhost:{}", srv.port);
+            let _ = window.emit("project_started", serde_json::json!({
+                "iteration_id": iteration_id,
+                "port": srv.port,
+                "url": url
+            }));
             return Ok(RunInfo { 
                 status: RunStatus::Running, 
                 process_id: None, 
@@ -186,6 +224,12 @@ pub async fn start_iteration_project(iteration_id: String) -> Result<RunInfo, St
     if is_vanilla_html || has_html_files(&code_dir) {
         println!("[Runner] Fallback: starting static server for HTML files");
         let srv = static_server::start_static_server(iteration_id.clone(), code_dir.clone(), 8000, None)?;
+        let url = format!("http://localhost:{}", srv.port);
+        let _ = window.emit("project_started", serde_json::json!({
+            "iteration_id": iteration_id,
+            "port": srv.port,
+            "url": url
+        }));
         return Ok(RunInfo { 
             status: RunStatus::Running, 
             process_id: None, 

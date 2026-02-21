@@ -5,16 +5,42 @@ use tauri::{Emitter, Window};
 pub async fn pm_send_message(
     iteration_id: String,
     message: String,
-    _history: Vec<serde_json::Value>,
+    history: Vec<serde_json::Value>,
     window: Window,
 ) -> Result<serde_json::Value, String> {
     let store = IterationStore::new();
     let iteration = store.load(&iteration_id).map_err(|e| format!("Failed to load iteration: {}", e))?;
-
+    
+    let is_first_message = history.is_empty();
+    
+    if is_first_message {
+        let welcome_msg = format!(
+            "👋 你好！我是项目经理助手。\n\n项目 **{}** 已经完成开发！\n\n接下来你可以：",
+            iteration.title
+        );
+        
+        let actions = vec![
+            serde_json::json!({ "action_type": "pm_start_app", "label": "🚀 启动应用" }),
+            serde_json::json!({ "action_type": "pm_open_folder", "label": "📁 打开项目文件夹" }),
+            serde_json::json!({ "action_type": "pm_view_artifacts", "label": "📄 查看设计文档" }),
+            serde_json::json!({ "action_type": "pm_view_code", "label": "💻 查看源代码" }),
+            serde_json::json!({ "action_type": "pm_view_knowledge", "label": "📚 查看项目知识库" }),
+        ];
+        
+        let result = serde_json::json!({
+            "agent_message": welcome_msg,
+            "actions": actions,
+            "needs_restart": false
+        });
+        
+        let _ = window.emit("pm_message", &result);
+        return Ok(result);
+    }
+    
     let config = cowork_core::llm::config::load_config().map_err(|e| format!("Failed to load config: {}", e))?;
 
     let prompt = format!(
-        "You are a Project Manager Agent helping with iteration: {}.\nTitle: {}\nDescription: {}\n\nUser message: {}\n\nPlease provide a helpful response.",
+        "You are a Project Manager Agent helping with iteration: {}.\nTitle: {}\nDescription: {}\n\nUser message: {}\n\nPlease provide a helpful response in Chinese.",
         iteration_id, iteration.title, iteration.description, message
     );
 
@@ -54,7 +80,7 @@ pub async fn pm_send_message(
         "actions": [],
         "needs_restart": false
     });
-
+    
     let _ = window.emit("pm_message", &result);
     Ok(result)
 }
@@ -82,5 +108,29 @@ pub async fn pm_get_iteration_context(iteration_id: String) -> Result<serde_json
         "status": format!("{:?}", iter.status),
         "current_stage": iter.current_stage,
         "completed_stages": iter.completed_stages,
+    }))
+}
+
+#[tauri::command]
+pub async fn pm_get_welcome_message(iteration_id: String) -> Result<serde_json::Value, String> {
+    let store = IterationStore::new();
+    let iteration = store.load(&iteration_id).map_err(|e| format!("Failed to load iteration: {}", e))?;
+    
+    let welcome_msg = format!(
+        "👋 你好！我是项目经理助手。\n\n项目 **{}** 已经完成开发！\n\n接下来你可以：",
+        iteration.title
+    );
+    
+    let actions = vec![
+        serde_json::json!({ "action_type": "pm_start_app", "label": "🚀 启动应用" }),
+        serde_json::json!({ "action_type": "pm_open_folder", "label": "📁 打开项目文件夹" }),
+        serde_json::json!({ "action_type": "pm_view_artifacts", "label": "📄 查看设计文档" }),
+        serde_json::json!({ "action_type": "pm_view_code", "label": "💻 查看源代码" }),
+        serde_json::json!({ "action_type": "pm_view_knowledge", "label": "📚 查看项目知识库" }),
+    ];
+    
+    Ok(serde_json::json!({
+        "agent_message": welcome_msg,
+        "actions": actions
     }))
 }

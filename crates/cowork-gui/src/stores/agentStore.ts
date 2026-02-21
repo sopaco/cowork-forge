@@ -41,9 +41,10 @@ export interface PMAgentMessage {
 }
 
 export interface PMAction {
-  action_type: 'pm_goto_stage' | 'pm_create_iteration';
+  action_type: 'pm_goto_stage' | 'pm_create_iteration' | 'pm_start_app' | 'pm_open_folder' | 'pm_view_knowledge' | 'pm_view_artifacts' | 'pm_view_code';
   target_stage?: string;
   description?: string;
+  label: string;
 }
 
 export interface InputRequest {
@@ -89,6 +90,7 @@ interface AgentState {
   
   submitInput: (response: string, responseType: string) => Promise<void>;
   sendPMMessage: (iterationId: string, message: string) => Promise<void>;
+  loadPMWelcomeMessage: (iterationId: string) => Promise<void>;
 }
 
 export const useAgentStore = create<AgentState>((set, get) => ({
@@ -193,6 +195,25 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       console.error('PM Agent error:', error);
       set({ pmProcessing: false });
       throw error;
+    }
+  },
+  
+  loadPMWelcomeMessage: async (iterationId: string) => {
+    try {
+      const response = await API.pm.getWelcome(iterationId);
+      
+      if (response) {
+        const agentMsg: PMAgentMessage = {
+          type: 'pm_agent',
+          content: response.agent_message,
+          actions: response.actions,
+          timestamp: new Date().toISOString(),
+        };
+        
+        set({ pmMessages: [agentMsg] });
+      }
+    } catch (error) {
+      console.error('Failed to load welcome message:', error);
     }
   },
 }));

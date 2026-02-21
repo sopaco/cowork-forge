@@ -17,6 +17,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons';
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 
 import { useProjectStore, useAgentStore, useUIStore } from './stores';
 import { LoadingScreen, StatusBadge } from './components/common';
@@ -74,6 +75,7 @@ function App() {
     setPmProcessing,
     submitInput,
     sendPMMessage,
+    loadPMWelcomeMessage,
   } = useAgentStore();
   
   const {
@@ -104,6 +106,16 @@ function App() {
     if (isProcessing || currentIteration.status === 'Running') return 'pipeline';
     return 'pipeline';
   }, [currentIteration, isProcessing]);
+
+  // Load PM welcome message when entering PM agent mode (only once)
+  useEffect(() => {
+    if (chatMode === 'pm_agent' && currentIteration) {
+      const pmMessages = useAgentStore.getState().pmMessages;
+      if (pmMessages.length === 0) {
+        loadPMWelcomeMessage(currentIteration.id);
+      }
+    }
+  }, [chatMode, currentIteration?.id, loadPMWelcomeMessage]);
 
   // Load initial data
   useEffect(() => {
@@ -325,7 +337,9 @@ function App() {
   const handleSelectIteration = useCallback((iterationId: string) => {
     const iteration = iterations.find((i) => i.id === iterationId);
     if (iteration) {
-      API.iteration.get(iterationId).then((full) => setCurrentIteration(full));
+      API.iteration.get(iterationId).then((full) => {
+        setCurrentIteration(full);
+      });
       setActiveView('chat');
     }
   }, [iterations, setCurrentIteration, setActiveView]);
@@ -421,22 +435,69 @@ function App() {
   const handlePMAction = useCallback(async (action: PMAction) => {
     if (!currentIteration) return;
     
-    if (action.action_type === 'pm_goto_stage' && action.target_stage) {
-      Modal.confirm({
-        title: 'Confirm Stage Return',
-        content: `Return to ${action.target_stage} stage?`,
-        onOk: async () => {
-          try {
-            await API.pm.restart(currentIteration.id, action.target_stage!);
-            message.success(`Restarted from ${action.target_stage}`);
-            loadProject();
-          } catch (err) {
-            message.error('Failed: ' + err);
+    switch (action.action_type) {
+      case 'pm_start_app':
+        setActiveView('run');
+        message.info('Starting application...');
+        // Check if already running first
+        try {
+          const isRunning = await invoke<boolean>('check_project_status', { iterationId: currentIteration.id });
+          if (isRunning) {
+            message.info('Application is already running');
+            return;
           }
-        },
-      });
+        } catch {}
+        
+        try {
+          await invoke('start_iteration_project', { iterationId: currentIteration.id });
+        } catch (err) {
+          message.error('Failed to start app: ' + err);
+        }
+        break;
+        
+      case 'pm_open_folder':
+        try {
+          await invoke('open_in_file_manager', { path: `workspace_${currentIteration.id}` });
+        } catch (err) {
+          message.error('Failed to open folder: ' + err);
+        }
+        break;
+        
+      case 'pm_view_knowledge':
+        setActiveView('project-knowledge');
+        break;
+        
+      case 'pm_view_artifacts':
+        setActiveView('artifacts');
+        setActiveArtifactTab('design');
+        break;
+        
+      case 'pm_view_code':
+        setActiveView('code');
+        break;
+        
+      case 'pm_goto_stage':
+        if (action.target_stage) {
+          Modal.confirm({
+            title: 'Confirm Stage Return',
+            content: `Return to ${action.target_stage} stage?`,
+            onOk: async () => {
+              try {
+                await API.pm.restart(currentIteration.id, action.target_stage!);
+                message.success(`Restarted from ${action.target_stage}`);
+                loadProject();
+              } catch (err) {
+                message.error('Failed: ' + err);
+              }
+            },
+          });
+        }
+        break;
+        
+      default:
+        console.log('Unknown PM action:', action);
     }
-  }, [currentIteration, loadProject]);
+  }, [currentIteration, loadProject, setActiveView, setActiveArtifactTab]);
 
   const handleOpenProjectFolder = useCallback(async () => {
     try {

@@ -676,6 +676,7 @@ pub fn run() {
             pm::pm_send_message,
             pm::pm_restart_iteration,
             pm::pm_get_iteration_context,
+            pm::pm_get_welcome_message,
             // System commands
             system::get_system_locale,
             // Config commands

@@ -116,6 +116,22 @@ const RunnerPanel: React.FC<RunnerPanelProps> = ({ iterationId }) => {
       if (targetId === iterationId) setIsRunning(false);
     }).then(unlisten => cleanupFunctions.push(unlisten));
 
+    // Listen for project started event
+    listen<{ iteration_id?: string; session_id?: string; port?: number; url?: string }>('project_started', (event) => {
+      const { iteration_id: startedIterationId, session_id: startedSessionId, port, url } = event.payload;
+      const targetId = startedIterationId || startedSessionId;
+      if (targetId === iterationId) {
+        setIsRunning(true);
+        if (port || url) {
+          const msg = url 
+            ? `> Project started at ${url}\n` 
+            : `> Project started on port ${port}\n`;
+          setLogs(prev => [...prev, { type: 'system', content: msg, timestamp: new Date() }]);
+        }
+        loadProjectRuntimeInfo();
+      }
+    }).then(unlisten => cleanupFunctions.push(unlisten));
+
     return () => {
       cleanupFunctions.forEach(unlisten => { try { unlisten(); } catch {} });
       listenersRegistered.current = false;
