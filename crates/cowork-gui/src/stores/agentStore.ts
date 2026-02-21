@@ -157,8 +157,14 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   },
   
   sendPMMessage: async (iterationId, message) => {
+    console.log('[AgentStore] sendPMMessage called', { iterationId, message });
     const { pmMessages, pmProcessing } = get();
-    if (pmProcessing) return;
+    console.log('[AgentStore] Current state:', { pmProcessing, pmMessagesCount: pmMessages.length });
+    
+    if (pmProcessing) {
+      console.log('[AgentStore] Already processing - resetting state and continuing');
+      set({ pmProcessing: false });
+    }
     
     const userMsg: UserMessage = {
       type: 'user',
@@ -166,14 +172,18 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       timestamp: new Date().toISOString(),
     };
     
+    console.log('[AgentStore] Setting state with user message');
     set({ pmProcessing: true, pmMessages: [...pmMessages, userMsg] });
     
     try {
+      console.log('[AgentStore] Calling API.pm.sendMessage...');
       const response = await API.pm.sendMessage(
         iterationId, 
         message, 
         [...pmMessages, userMsg]
       ) as { agent_message: string; actions?: PMAction[] };
+      
+      console.log('[AgentStore] API response:', response);
       
       const agentMsg: PMAgentMessage = {
         type: 'pm_agent',
@@ -184,12 +194,13 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       
       set((state) => ({
         pmMessages: [...state.pmMessages, agentMsg],
+        pmProcessing: false,
       }));
+      console.log('[AgentStore] Agent message added to state');
     } catch (error) {
-      console.error('PM Agent error:', error);
-      throw error;
-    } finally {
+      console.error('[AgentStore] PM Agent error:', error);
       set({ pmProcessing: false });
+      throw error;
     }
   },
 }));

@@ -8,20 +8,35 @@ pub async fn pm_send_message(
     _history: Vec<serde_json::Value>,
     window: Window,
 ) -> Result<serde_json::Value, String> {
+    println!("[PM] pm_send_message called: iteration_id={}, message={}", iteration_id, message);
+    
     let store = IterationStore::new();
-    let iteration = store.load(&iteration_id).map_err(|e| e.to_string())?;
+    let iteration = store.load(&iteration_id).map_err(|e| {
+        let err = format!("Failed to load iteration: {}", e);
+        println!("[PM] Error: {}", err);
+        err
+    })?;
 
-    let config = cowork_core::llm::config::load_config().map_err(|e| e.to_string())?;
+    let config = cowork_core::llm::config::load_config().map_err(|e| {
+        let err = format!("Failed to load config: {}", e);
+        println!("[PM] Error: {}", err);
+        err
+    })?;
 
     let prompt = format!(
         "You are a Project Manager Agent helping with iteration: {}.\nTitle: {}\nDescription: {}\n\nUser message: {}\n\nPlease provide a helpful response.",
         iteration_id, iteration.title, iteration.description, message
     );
 
-    let client = cowork_core::llm::create_llm_client(&config.llm).map_err(|e| e.to_string())?;
+    println!("[PM] Creating LLM client...");
+    let client = cowork_core::llm::create_llm_client(&config.llm).map_err(|e| {
+        let err = format!("Failed to create LLM client: {}", e);
+        println!("[PM] Error: {}", err);
+        err
+    })?;
     
     let req = adk_core::model::LlmRequest {
-        model: String::new(),
+        model: config.llm.model_name.clone(),
         contents: vec![adk_core::Content {
             role: "user".to_string(),
             parts: vec![adk_core::Part::Text { text: prompt }],
@@ -30,37 +45,61 @@ pub async fn pm_send_message(
         tools: std::collections::HashMap::new(),
     };
 
-    let mut stream = client.generate_content(req, false).await.map_err(|e| e.to_string())?;
+    println!("[PM] Calling generate_content...");
+    let mut stream = client.generate_content(req, false).await.map_err(|e| {
+        let err = format!("Failed to generate content: {}", e);
+        println!("[PM] Error: {}", err);
+        err
+    })?;
     
     use futures::StreamExt;
-    let response = if let Some(chunk) = stream.next().await {
+    println!("[PM] Reading from stream...");
+    
+    let mut all_text = String::new();
+    while let Some(chunk) = stream.next().await {
         match chunk {
             Ok(r) => {
-                // Extract text from response
-                r.content
-                    .map(|c| {
-                        c.parts.first()
-                            .map(|p| match p {
-                                adk_core::Part::Text { text } => text.clone(),
-                                _ => "No text response".to_string(),
-                            })
-                            .unwrap_or_else(|| "Empty parts".to_string())
-                    })
-                    .unwrap_or_else(|| "Empty response".to_string())
+                println!("[PM] Got chunk, content: {:?}", r.content);
+                if let Some(c) = r.content {
+                    println!("[PM] Parts count: {}", c.parts.len());
+                    for (i, p) in c.parts.iter().enumerate() {
+                        println!("[PM] Part {}: {:?}", i, p);
+                        if let adk_core::Part::Text { text } = p {
+                            all_text.push_str(text);
+                        }
+                    }
+                }
             }
-            Err(e) => return Err(e.to_string()),
+            Err(e) => {
+                let err = format!("Stream error: {}", e);
+                println!("[PM] Error: {}", err);
+                return Err(err);
+            }
         }
-    } else {
+    }
+    
+    let response = if all_text.is_empty() {
+        println!("[PM] No text found in any chunk");
         "No response".to_string()
+    } else {
+        all_text
     };
 
+    println!("[PM] Response: {}", response);
+    
     let result = serde_json::json!({
         "agent_message": response,
         "actions": [],
         "needs_restart": false
     });
 
-    window.emit("pm_message", &result).map_err(|e| e.to_string())?;
+    window.emit("pm_message", &result).map_err(|e| {
+        let err = format!("Failed to emit event: {}", e);
+        println!("[PM] Error: {}", err);
+        err
+    })?;
+    
+    println!("[PM] Success!");
     Ok(result)
 }
 

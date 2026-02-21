@@ -25,17 +25,22 @@ export const InputArea: React.FC<InputAreaProps> = ({
   disabled,
   mode,
 }) => {
+  const handleSendClick = () => {
+    console.log('[InputArea] Send button clicked', { mode, userInput, disabled });
+    onSend();
+  };
+
   if (mode === 'pm_agent') {
     return (
       <div style={{ display: 'flex', gap: '8px' }}>
         <Input
           value={userInput}
           onChange={(e) => onUserInputChange(e.target.value)}
-          onPressEnter={onSend}
+          onPressEnter={handleSendClick}
           placeholder="Ask about the project or request changes..."
           disabled={disabled}
         />
-        <Button onClick={onSend} type="primary" disabled={!userInput.trim() || disabled}>
+        <Button onClick={handleSendClick} type="primary" disabled={!userInput.trim() || disabled}>
           Send
         </Button>
       </div>
