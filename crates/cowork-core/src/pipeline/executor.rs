@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use crate::domain::{Iteration, IterationStatus, Project};
 use crate::interaction::{InteractiveBackend, MessageContext};
+use crate::llm::{create_llm_client, load_config};
 use crate::persistence::{IterationStore, ProjectStore};
 use adk_core::Content;
 
@@ -1015,6 +1016,38 @@ impl IterationExecutor {
         // Complete iteration
         iteration.complete();
         self.iteration_store.save(&iteration)?;
+
+        // Generate iteration knowledge (V2 architecture)
+        let llm_config = load_config().map_err(|e| anyhow::anyhow!("Failed to load config: {}", e))?;
+        let model = create_llm_client(&llm_config.llm)
+            .map_err(|e| anyhow::anyhow!("Failed to create LLM client: {}", e))?;
+        
+        self.interaction
+            .show_message_with_context(
+                crate::interaction::MessageLevel::Info,
+                "Generating iteration knowledge...".to_string(),
+                MessageContext::new("Knowledge System"),
+            )
+            .await;
+        
+        if let Err(e) = self.generate_iteration_knowledge(&iteration, model).await {
+            println!("[Executor] Warning: Failed to generate iteration knowledge: {}", e);
+            self.interaction
+                .show_message_with_context(
+                    crate::interaction::MessageLevel::Warning,
+                    format!("Knowledge generation failed: {}", e),
+                    MessageContext::new("Knowledge System"),
+                )
+                .await;
+        } else {
+            self.interaction
+                .show_message_with_context(
+                    crate::interaction::MessageLevel::Success,
+                    "Iteration knowledge generated successfully".to_string(),
+                    MessageContext::new("Knowledge System"),
+                )
+                .await;
+        }
 
         // Promote insights to decisions (V2 architecture - memory elevation)
         let memory_store = crate::persistence::MemoryStore::new();

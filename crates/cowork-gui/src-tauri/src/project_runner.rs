@@ -374,4 +374,21 @@ impl ProjectRunner {
             None
         }
     }
+
+    pub async fn stop_all(&self) -> Vec<String> {
+        let stopped: Vec<String> = {
+            let processes = self.processes.lock().unwrap();
+            processes.keys().cloned().collect()
+        };
+
+        let mut result = Vec::new();
+        for iteration_id in stopped {
+            if let Ok(()) = self.stop(iteration_id.clone()).await {
+                result.push(iteration_id);
+            }
+        }
+        
+        println!("[Runner] Stopped {} processes", result.len());
+        result
+    }
 }

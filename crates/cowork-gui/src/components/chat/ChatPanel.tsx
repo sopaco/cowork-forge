@@ -61,18 +61,42 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '16px' }}>
       {mode === 'pm_agent' ? (
-        <div style={{ marginBottom: '16px' }}>
-          <h3 style={{ margin: 0 }}>
-            <TeamOutlined style={{ marginRight: '8px' }} />
-            Project Manager Agent
-          </h3>
-          <p style={{ margin: '4px 0 0 0', color: '#888', fontSize: '12px' }}>
-            {iterationTitle} - Ask questions, request changes, or discuss next steps
-          </p>
-          <Tag color="green" style={{ marginTop: '8px' }}>
-            Post-Delivery Chat
-          </Tag>
-        </div>
+        <>
+          <div style={{ marginBottom: '16px' }}>
+            <h3 style={{ margin: 0 }}>
+              <TeamOutlined style={{ marginRight: '8px' }} />
+              Project Manager Agent
+            </h3>
+            <p style={{ margin: '4px 0 0 0', color: '#888', fontSize: '12px' }}>
+              {iterationTitle} - Ask questions, request changes, or discuss next steps
+            </p>
+            <Tag color="green" style={{ marginTop: '8px' }}>
+              Post-Delivery Chat
+            </Tag>
+          </div>
+          
+          {pmProcessing && (
+            <div
+              style={{
+                padding: '12px 16px',
+                backgroundColor: '#f6ffed',
+                border: '1px solid #b7eb8f',
+                borderRadius: '6px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}
+            >
+              <Spin size="small" />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '14px', fontWeight: 500, color: '#52c41a', marginBottom: '4px' }}>
+                  Project Manager Agent is thinking...
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       ) : (
         <>
           <div style={{ marginBottom: '16px' }}>

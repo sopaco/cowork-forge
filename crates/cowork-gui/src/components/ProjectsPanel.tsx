@@ -175,8 +175,8 @@ const ProjectsPanel: React.FC = () => {
           loadProjects();
 
           if (isCurrentWindowProject) {
-            message.info("Project was open in current window. Workspace cleared.");
-            window.location.reload();
+            message.info("Project was open. Reloading...");
+            setTimeout(() => window.location.reload(), 500);
           }
         } catch (error) {
           message.error("Failed to delete project: " + error);
@@ -192,8 +192,8 @@ const ProjectsPanel: React.FC = () => {
           loadProjects();
 
           if (isCurrentWindowProject) {
-            message.info("Project was open in current window. Workspace cleared.");
-            window.location.reload();
+            message.info("Project was open. Reloading...");
+            setTimeout(() => window.location.reload(), 500);
           }
         } catch (error) {
           message.error("Failed to delete project: " + error);
