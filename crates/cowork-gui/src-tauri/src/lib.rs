@@ -514,6 +514,68 @@ async fn get_workspace(
     Ok(workspace.clone())
 }
 
+#[tauri::command]
+async fn path_exists(path: String) -> Result<bool, String> {
+    use std::path::Path;
+    Ok(Path::new(&path).exists())
+}
+
+#[derive(serde::Serialize)]
+struct CreateProjectResult {
+    project_id: String,
+    created_dir: bool,
+}
+
+#[tauri::command]
+async fn create_project_at_path(
+    path: String,
+    name: String,
+    description: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<CreateProjectResult, String> {
+    use std::path::Path;
+
+    let project_path = Path::new(&path);
+    let created_dir = if !project_path.exists() {
+        fs::create_dir_all(project_path)
+            .map_err(|e| format!("Failed to create directory: {}", e))?;
+        true
+    } else {
+        false
+    };
+
+    let cowork_v2_path = project_path.join(".cowork-v2");
+    if !cowork_v2_path.exists() {
+        fs::create_dir_all(&cowork_v2_path)
+            .map_err(|e| format!("Failed to create .cowork-v2 directory: {}", e))?;
+
+        let project_file = cowork_v2_path.join("project.json");
+        let iterations_dir = cowork_v2_path.join("iterations");
+        fs::create_dir_all(&iterations_dir)
+            .map_err(|e| format!("Failed to create iterations directory: {}", e))?;
+
+        let project = cowork_core::domain::Project::new(&name);
+        let project_json = serde_json::to_string_pretty(&project)
+            .map_err(|e| format!("Failed to serialize project: {}", e))?;
+        fs::write(&project_file, project_json)
+            .map_err(|e| format!("Failed to write project.json: {}", e))?;
+    }
+
+    let mut registry = state.project_registry_manager.lock()
+        .map_err(|e| format!("Failed to acquire lock: {}", e))?;
+
+    let project_record = registry.register_project(
+        path.clone(),
+        name,
+        description,
+    ).map_err(|e| format!("Failed to register project: {}", e))?;
+
+    Ok(CreateProjectResult {
+        project_id: project_record.project_id,
+        created_dir,
+    })
+}
+
 
 
 
@@ -687,6 +749,9 @@ pub fn run() {
             config_commands::open_config_folder,
             config_commands::test_llm_connection,
             config_commands::has_valid_config,
+            // Project creation commands
+            path_exists,
+            create_project_at_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

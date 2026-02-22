@@ -210,6 +210,9 @@ const API = {
     open: (projectId: string): Promise<void> => invoke('open_project', { projectId }),
     openInCurrentWindow: (projectId: string): Promise<void> => 
       invoke('open_project_in_current_window', { projectId }),
+    pathExists: (path: string): Promise<boolean> => invoke('path_exists', { path }),
+    createAtPath: (path: string, name: string, description?: string): Promise<{ project_id: string; created_dir: boolean }> => 
+      invoke('create_project_at_path', { path, name, description }),
   },
   
   workspace: {

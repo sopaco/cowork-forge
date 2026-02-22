@@ -13,6 +13,9 @@ import {
   Spin,
   Space,
   Tooltip,
+  Divider,
+  Alert,
+  Typography,
 } from "antd";
 import {
   FolderOpenOutlined,
@@ -22,7 +25,12 @@ import {
   ClockCircleOutlined,
   PlusOutlined,
   FolderOutlined,
+  InfoCircleOutlined,
+  RocketOutlined,
+  FolderAddOutlined,
 } from "@ant-design/icons";
+
+const { Text, Paragraph } = Typography;
 
 interface ProjectMetadata {
   session_count: number;
@@ -45,13 +53,18 @@ const ProjectsPanel: React.FC = () => {
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [loading, setLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showOpenDirModal, setShowOpenDirModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectData | null>(null);
-  const [openDirPath, setOpenDirPath] = useState("");
   const [editProjectName, setEditProjectName] = useState("");
   const [editProjectDescription, setEditProjectDescription] = useState("");
+  
+  // Create project modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newProjectPath, setNewProjectPath] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectDescription, setNewProjectDescription] = useState("");
+  const [createLoading, setCreateLoading] = useState(false);
+  const [pathExists, setPathExists] = useState<boolean | null>(null);
+  const [checkingPath, setCheckingPath] = useState(false);
 
   const loadProjects = async () => {
     setLoading(true);
@@ -74,20 +87,52 @@ const ProjectsPanel: React.FC = () => {
     loadProjects();
 
     const unlistenProjectLoaded = listen("project_loaded", () => {
-      console.log("[ProjectsPanel] Project loaded event received, reloading projects...");
       loadProjects();
     });
 
     const unlistenProjectCreated = listen("project_created", () => {
-      console.log("[ProjectsPanel] Project created event received, reloading projects...");
       loadProjects();
     });
 
     return () => {
-      unlistenProjectLoaded.then((fn) => fn()).catch((e) => console.error("[ProjectsPanel] Failed to unlisten project_loaded:", e));
-      unlistenProjectCreated.then((fn) => fn()).catch((e) => console.error("[ProjectsPanel] Failed to unlisten project_created:", e));
+      unlistenProjectLoaded.then((fn) => fn()).catch(() => {});
+      unlistenProjectCreated.then((fn) => fn()).catch(() => {});
     };
   }, []);
+
+  // Check if path exists when path changes
+  useEffect(() => {
+    if (!newProjectPath.trim()) {
+      setPathExists(null);
+      return;
+    }
+
+    const checkPath = async () => {
+      setCheckingPath(true);
+      try {
+        const exists = await invoke<boolean>("path_exists", { path: newProjectPath });
+        setPathExists(exists);
+      } catch {
+        setPathExists(false);
+      } finally {
+        setCheckingPath(false);
+      }
+    };
+
+    const timer = setTimeout(checkPath, 300);
+    return () => clearTimeout(timer);
+  }, [newProjectPath]);
+
+  // Auto-fill project name from path
+  useEffect(() => {
+    if (newProjectPath && !newProjectName) {
+      const parts = newProjectPath.split(/[/\\]/);
+      const folderName = parts[parts.length - 1] || parts[parts.length - 2] || "";
+      if (folderName) {
+        setNewProjectName(folderName);
+      }
+    }
+  }, [newProjectPath]);
 
   const handleEditProject = async () => {
     if (!editProjectName.trim()) {
@@ -180,74 +225,81 @@ const ProjectsPanel: React.FC = () => {
     setShowEditModal(true);
   };
 
-  const handleOpenDirectory = async () => {
-    if (!openDirPath.trim()) {
-      message.warning("Please enter a directory path");
-      return;
-    }
-
-    try {
-      const hasProject = await invoke<boolean>("has_open_project");
-
-      if (hasProject) {
-        const projectName = openDirPath.split(/[/\\]/).pop() || openDirPath;
-        await invoke("register_project", {
-          workspacePath: openDirPath,
-          name: projectName,
-          description: `Project at ${openDirPath}`,
-        });
-
-        const allProjects = await invoke<ProjectData[]>("get_all_projects", { status: null, search: null, limit: null });
-        const newProject = allProjects.find((p) => p.workspacePath === openDirPath || p.workspace_path === openDirPath);
-
-        if (newProject) {
-          await invoke("open_project", { projectId: newProject.project_id });
-          message.success("Opening project in new window...");
-        } else {
-          message.error("Failed to find newly registered project");
-        }
-
-        setShowOpenDirModal(false);
-        setOpenDirPath("");
-        loadProjects();
-      } else {
-        await invoke("set_workspace", { workspacePath: openDirPath });
-        message.success("Workspace set successfully");
-        setShowOpenDirModal(false);
-        setOpenDirPath("");
-      }
-    } catch (error) {
-      message.error("Failed to open directory: " + error);
-    }
-  };
-
-  const handleCreateProject = async () => {
-    if (!newProjectName.trim()) {
-      message.warning("Please enter a project name");
-      return;
-    }
-
-    try {
-      const project = await invoke<{ name: string }>("gui_init_project", { name: newProjectName });
-      message.success(`Project created: ${project.name}`);
-      setShowCreateModal(false);
-      setNewProjectName("");
-      loadProjects();
-    } catch (error) {
-      message.error("Failed to create project: " + error);
-    }
-  };
-
   const handleSelectDirectory = async () => {
     try {
-      const selected = await open({ directory: true, multiple: false, title: "Select Directory" });
+      const selected = await open({ directory: true, multiple: false, title: "Select Project Directory" });
       if (selected && typeof selected === "string") {
-        setOpenDirPath(selected);
+        setNewProjectPath(selected);
       }
     } catch (error) {
       console.error("Failed to open directory dialog:", error);
       message.error("Failed to open directory dialog: " + error);
     }
+  };
+
+  const handleCreateProject = async () => {
+    if (!newProjectPath.trim()) {
+      message.warning("Please select or enter a project directory");
+      return;
+    }
+
+    if (!newProjectName.trim()) {
+      message.warning("Please enter a project name");
+      return;
+    }
+
+    setCreateLoading(true);
+    try {
+      // Create project with the specified path
+      const result = await invoke<{ project_id: string; created_dir: boolean }>("create_project_at_path", {
+        path: newProjectPath,
+        name: newProjectName,
+        description: newProjectDescription || null,
+      });
+
+      if (result.created_dir) {
+        message.success(`Project created and directory initialized: ${newProjectName}`);
+      } else {
+        message.success(`Project created: ${newProjectName}`);
+      }
+
+      setShowCreateModal(false);
+      resetCreateForm();
+      loadProjects();
+
+      // Ask if user wants to open the project
+      Modal.confirm({
+        title: "Open Project?",
+        content: `Would you like to open "${newProjectName}" now?`,
+        okText: "Open Project",
+        cancelText: "Later",
+        onOk: async () => {
+          try {
+            const hasProject = await invoke<boolean>("has_open_project");
+            if (hasProject) {
+              await invoke("open_project", { projectId: result.project_id });
+              message.info("Opening project in new window...");
+            } else {
+              await invoke("open_project_in_current_window", { projectId: result.project_id });
+              message.success("Project opened successfully");
+            }
+          } catch (error) {
+            message.error("Failed to open project: " + error);
+          }
+        },
+      });
+    } catch (error) {
+      message.error("Failed to create project: " + error);
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  const resetCreateForm = () => {
+    setNewProjectPath("");
+    setNewProjectName("");
+    setNewProjectDescription("");
+    setPathExists(null);
   };
 
   const formatDate = (dateString?: string): string => {
@@ -278,10 +330,7 @@ const ProjectsPanel: React.FC = () => {
     <div style={{ padding: "24px" }}>
       <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{ margin: 0 }}>Projects</h2>
-        <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>Create Project</Button>
-          <Button icon={<FolderOpenOutlined />} onClick={() => setShowOpenDirModal(true)}>Open Directory</Button>
-        </Space>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>New Project</Button>
       </div>
 
       {loading ? (
@@ -291,7 +340,7 @@ const ProjectsPanel: React.FC = () => {
         </div>
       ) : projects.length === 0 ? (
         <Empty description="No projects yet" image={Empty.PRESENTED_IMAGE_SIMPLE}>
-          <Button type="primary" icon={<FolderOpenOutlined />} onClick={() => setShowOpenDirModal(true)}>Open Directory to Start</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>Create Your First Project</Button>
         </Empty>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))", gap: "20px" }}>
@@ -334,10 +383,10 @@ const ProjectsPanel: React.FC = () => {
                     {project.metadata?.technology_stack?.length > 0 && (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
                         {project.metadata.technology_stack.slice(0, 4).map((tech, idx) => (
-                          <Tag key={idx}  color="blue">{tech}</Tag>
+                          <Tag key={idx} color="blue">{tech}</Tag>
                         ))}
                         {project.metadata.technology_stack.length > 4 && (
-                          <Tag  color="default">+{project.metadata.technology_stack.length - 4}</Tag>
+                          <Tag color="default">+{project.metadata.technology_stack.length - 4}</Tag>
                         )}
                       </div>
                     )}
@@ -349,18 +398,111 @@ const ProjectsPanel: React.FC = () => {
         </div>
       )}
 
-      <Modal title="Create New Project" open={showCreateModal} onOk={handleCreateProject} onCancel={() => { setShowCreateModal(false); setNewProjectName(""); }} okText="Create" cancelText="Cancel">
-        <div>
-          <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold" }}>Project Name:</label>
-          <Input value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} placeholder="Enter project name" autoFocus onPressEnter={handleCreateProject} />
-          <div style={{ marginTop: "8px", fontSize: "12px", color: "#888" }}>
-            <FolderOutlined style={{ marginRight: "4px" }} />
-            Project will be created in the current workspace directory
+      {/* Create Project Modal */}
+      <Modal
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <FolderAddOutlined />
+            <span>Create New Project</span>
           </div>
+        }
+        open={showCreateModal}
+        onOk={handleCreateProject}
+        onCancel={() => { setShowCreateModal(false); resetCreateForm(); }}
+        okText="Create Project"
+        cancelText="Cancel"
+        confirmLoading={createLoading}
+        width={600}
+        okButtonProps={{ disabled: !newProjectPath.trim() || !newProjectName.trim() }}
+      >
+        <div style={{ marginBottom: "16px" }}>
+          <Alert
+            type="info"
+            showIcon
+            icon={<RocketOutlined />}
+            message="Quick Start Guide"
+            description={
+              <div style={{ fontSize: "13px" }}>
+                <Paragraph style={{ margin: 0, marginBottom: "8px" }}>
+                  1. <strong>Select a folder</strong> - Choose where your project will live
+                </Paragraph>
+                <Paragraph style={{ margin: 0, marginBottom: "8px" }}>
+                  2. <strong>Name your project</strong> - Give it a meaningful name
+                </Paragraph>
+                <Paragraph style={{ margin: 0 }}>
+                  3. <strong>Start building</strong> - The folder will be created if it doesn't exist
+                </Paragraph>
+              </div>
+            }
+          />
+        </div>
+
+        <Divider style={{ margin: "12px 0" }} />
+
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ display: "block", marginBottom: "8px", fontWeight: 500 }}>
+            <FolderOutlined style={{ marginRight: "6px" }} />
+            Project Directory <Text type="danger">*</Text>
+          </label>
+          <Space.Compact style={{ width: "100%" }}>
+            <Input
+              value={newProjectPath}
+              onChange={(e) => setNewProjectPath(e.target.value)}
+              placeholder="e.g., D:\Projects\my-awesome-project"
+              autoFocus
+            />
+            <Button icon={<FolderOpenOutlined />} onClick={handleSelectDirectory}>Browse</Button>
+          </Space.Compact>
+          <div style={{ marginTop: "6px", minHeight: "22px" }}>
+            {checkingPath && <Spin size="small" />}
+            {!checkingPath && pathExists === true && (
+              <Text type="success">
+                <CheckCircleOutlined style={{ marginRight: "4px" }} />
+                Directory exists - will use existing folder
+              </Text>
+            )}
+            {!checkingPath && pathExists === false && newProjectPath.trim() && (
+              <Text type="warning">
+                <FolderAddOutlined style={{ marginRight: "4px" }} />
+                Directory doesn't exist - will be created automatically
+              </Text>
+            )}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ display: "block", marginBottom: "8px", fontWeight: 500 }}>
+            Project Name <Text type="danger">*</Text>
+          </label>
+          <Input
+            value={newProjectName}
+            onChange={(e) => setNewProjectName(e.target.value)}
+            placeholder="My Awesome Project"
+          />
+        </div>
+
+        <div>
+          <label style={{ display: "block", marginBottom: "8px", fontWeight: 500 }}>
+            Description <Text type="secondary">(Optional)</Text>
+          </label>
+          <Input.TextArea
+            value={newProjectDescription}
+            onChange={(e) => setNewProjectDescription(e.target.value)}
+            placeholder="Brief description of what this project is about..."
+            rows={2}
+          />
         </div>
       </Modal>
 
-      <Modal title="Edit Project" open={showEditModal} onOk={handleEditProject} onCancel={() => { setShowEditModal(false); setSelectedProject(null); setEditProjectName(""); setEditProjectDescription(""); }} okText="Save" cancelText="Cancel">
+      {/* Edit Project Modal */}
+      <Modal
+        title="Edit Project"
+        open={showEditModal}
+        onOk={handleEditProject}
+        onCancel={() => { setShowEditModal(false); setSelectedProject(null); setEditProjectName(""); setEditProjectDescription(""); }}
+        okText="Save"
+        cancelText="Cancel"
+      >
         <div style={{ marginBottom: "16px" }}>
           <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold" }}>Project Name:</label>
           <Input value={editProjectName} onChange={(e) => setEditProjectName(e.target.value)} placeholder="Project name" autoFocus />
@@ -368,19 +510,6 @@ const ProjectsPanel: React.FC = () => {
         <div>
           <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold" }}>Description:</label>
           <Input.TextArea value={editProjectDescription} onChange={(e) => setEditProjectDescription(e.target.value)} placeholder="Project description" rows={4} />
-        </div>
-      </Modal>
-
-      <Modal title="Open Directory" open={showOpenDirModal} onOk={handleOpenDirectory} onCancel={() => { setShowOpenDirModal(false); setOpenDirPath(""); }} okText="Open" cancelText="Cancel">
-        <div>
-          <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold" }}>Directory Path:</label>
-          <Space.Compact style={{ width: "100%" }}>
-            <Input value={openDirPath} onChange={(e) => setOpenDirPath(e.target.value)} placeholder="e.g., D:\\Workspace\\tmp\\cowork_workspace" autoFocus />
-            <Button icon={<FolderOpenOutlined />} onClick={handleSelectDirectory}>Browse</Button>
-          </Space.Compact>
-          <div style={{ marginTop: "8px", fontSize: "12px", color: "#999" }}>
-            Path to any directory (with or without .cowork folder). This will open the directory in a new workspace context.
-          </div>
         </div>
       </Modal>
     </div>
