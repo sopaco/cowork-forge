@@ -40,11 +40,13 @@ interface ProjectState {
   iterations: IterationInfo[];
   currentIteration: Iteration | null;
   loading: boolean;
+  isExecuting: boolean;
   
   loadProject: () => Promise<void>;
   loadIterations: () => Promise<void>;
   setCurrentIteration: (iteration: Iteration | null) => void;
   updateCurrentIterationStatus: (status: string) => void;
+  setIsExecuting: (executing: boolean) => void;
   clearProject: () => void;
 }
 
@@ -53,6 +55,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   iterations: [],
   currentIteration: null,
   loading: false,
+  isExecuting: false,
   
   loadProject: async () => {
     try {
@@ -64,12 +67,16 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         const iterations = await API.iteration.list();
         set({ iterations: iterations || [] });
         
-        const { currentIteration } = get();
+        const { currentIteration, isExecuting } = get();
         if (currentIteration) {
           const updated = iterations?.find(i => i.id === currentIteration.id);
           if (updated) {
             const fullIteration = await API.iteration.get(updated.id);
-            set({ currentIteration: fullIteration });
+            if (isExecuting) {
+              set({ currentIteration: { ...fullIteration, status: currentIteration.status } });
+            } else {
+              set({ currentIteration: fullIteration });
+            }
           }
         } else if (project.current_iteration_id) {
           const iteration = iterations?.find(i => i.id === project.current_iteration_id);
@@ -105,11 +112,16 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
   
+  setIsExecuting: (executing) => {
+    set({ isExecuting: executing });
+  },
+  
   clearProject: () => {
     set({
       project: null,
       iterations: [],
       currentIteration: null,
+      isExecuting: false,
     });
   },
 }));

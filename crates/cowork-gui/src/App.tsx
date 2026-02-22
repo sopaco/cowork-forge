@@ -54,6 +54,7 @@ function App() {
     loadProject, 
     setCurrentIteration,
     updateCurrentIterationStatus,
+    setIsExecuting,
     clearProject,
   } = useProjectStore();
   
@@ -131,13 +132,35 @@ function App() {
       });
 
       await listen('iteration_started', (event) => {
+        const iterationId = event.payload as string;
         setProcessing(true);
+        setIsExecuting(true);
         updateCurrentIterationStatus('Running');
+        setActiveView('chat');
         message.info('Iteration started');
+      });
+
+      await listen('iteration_continued', (event) => {
+        const iterationId = event.payload as string;
+        setProcessing(true);
+        setIsExecuting(true);
+        updateCurrentIterationStatus('Running');
+        setActiveView('chat');
+        message.info('Iteration continued');
+      });
+
+      await listen('iteration_retrying', (event) => {
+        const iterationId = event.payload as string;
+        setProcessing(true);
+        setIsExecuting(true);
+        updateCurrentIterationStatus('Running');
+        setActiveView('chat');
+        message.info('Retrying iteration...');
       });
 
       await listen('iteration_completed', () => {
         setProcessing(false);
+        setIsExecuting(false);
         setCurrentAgent(null);
         setInputRequest(null);
         updateCurrentIterationStatus('Completed');
@@ -150,6 +173,7 @@ function App() {
       await listen('iteration_failed', (event) => {
         const [, error] = event.payload as [string, string];
         setProcessing(false);
+        setIsExecuting(false);
         setCurrentAgent(null);
         setInputRequest(null);
         updateCurrentIterationStatus('Failed');
@@ -263,6 +287,9 @@ function App() {
 
       await listen('input_request', (event) => {
         const [requestId, prompt, options] = event.payload as [string, string, InputOption[]];
+        
+        updateCurrentIterationStatus('Paused');
+        
         const artifactMatch = prompt.match(/\[ARTIFACT_TYPE:(\w+)\]$/);
         if (artifactMatch) {
           const artifactType = artifactMatch[1];
@@ -337,8 +364,13 @@ function App() {
   const handleSelectIteration = useCallback((iterationId: string) => {
     const iteration = iterations.find((i) => i.id === iterationId);
     if (iteration) {
+      const { currentIteration, isExecuting } = useProjectStore.getState();
       API.iteration.get(iterationId).then((full) => {
-        setCurrentIteration(full);
+        if (isExecuting && currentIteration?.id === iterationId) {
+          setCurrentIteration({ ...full, status: currentIteration.status });
+        } else {
+          setCurrentIteration(full);
+        }
       });
       setActiveView('chat');
     }
@@ -412,8 +444,13 @@ function App() {
 
     addMessage({ type: 'user', content: option.label, timestamp: new Date().toISOString() } as ChatMessage);
     await submitInput(option.id, 'selection');
+    
+    if (option.id === 'yes') {
+      updateCurrentIterationStatus('Running');
+    }
+    
     setUserInput('');
-  }, [inputRequest, addMessage, submitInput, setActiveView, setActiveArtifactTab, triggerCodeRefresh, triggerArtifactsRefresh, setInputRequest]);
+  }, [inputRequest, addMessage, submitInput, setActiveView, setActiveArtifactTab, triggerCodeRefresh, triggerArtifactsRefresh, setInputRequest, updateCurrentIterationStatus]);
 
   const handleSubmitFeedback = useCallback(async () => {
     if (!inputRequest || !userInput.trim()) return;
@@ -421,8 +458,9 @@ function App() {
     addMessage({ type: 'agent', content: '📝 Feedback received. Regenerating...', agentName: 'System', timestamp: new Date().toISOString() } as ChatMessage);
     addMessage({ type: 'user', content: `💬 Feedback:\n${feedback}`, timestamp: new Date().toISOString() } as ChatMessage);
     await submitInput(feedback, 'text');
+    updateCurrentIterationStatus('Running');
     setUserInput('');
-  }, [inputRequest, userInput, addMessage, submitInput]);
+  }, [inputRequest, userInput, addMessage, submitInput, updateCurrentIterationStatus]);
 
   const handleToggleThinking = useCallback((index: number) => {
     setMessages((prev) => prev.map((m, i) => 

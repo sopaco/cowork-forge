@@ -197,7 +197,6 @@ const IterationsPanel: React.FC<IterationsPanelProps> = ({
     try {
       setExecutingId(iterationId);
       onExecuteStatusChange?.(iterationId, "running");
-      onSelectIteration?.(iterationId);
       await invoke("gui_continue_iteration", { iterationId });
       message.info("Iteration continued");
     } catch (error) {
@@ -211,7 +210,6 @@ const IterationsPanel: React.FC<IterationsPanelProps> = ({
     try {
       setExecutingId(iterationId);
       onExecuteStatusChange?.(iterationId, "running");
-      onSelectIteration?.(iterationId);
       await invoke("gui_retry_iteration", { iterationId });
       message.info("Retrying iteration...");
     } catch (error) {
