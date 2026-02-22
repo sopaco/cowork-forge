@@ -39,9 +39,47 @@ pub async fn open_config_folder() -> Result<(), String> {
 #[tauri::command]
 pub async fn test_llm_connection(llm_config: LlmConfig) -> Result<bool, String> {
     use cowork_core::llm::create_llm_client;
-    
-    let _client = create_llm_client(&llm_config)
+    use adk_core::{Content, Part, LlmRequest};
+    use futures::StreamExt;
+
+    if llm_config.api_base_url.is_empty() || llm_config.api_key.is_empty() || llm_config.model_name.is_empty() {
+        return Err("Please fill in all LLM settings (API URL, API Key, and Model Name)".to_string());
+    }
+
+    let client = create_llm_client(&llm_config)
         .map_err(|e| format!("Failed to create LLM client: {}", e))?;
+    
+    let contents = vec![Content {
+        role: "user".to_string(),
+        parts: vec![Part::Text { text: "Hello, this is a connection test. Please respond with 'OK'.".to_string() }],
+    }];
+    
+    let test_request = LlmRequest {
+        model: llm_config.model_name.clone(),
+        contents,
+        config: None,
+        tools: Default::default(),
+    };
+    
+    let mut stream = client.generate_content(test_request, false).await
+        .map_err(|e| format!("Connection test failed: {}", e))?;
+    
+    let mut response_text = String::new();
+    while let Some(chunk) = stream.next().await {
+        if let Ok(r) = chunk {
+            if let Some(c) = r.content {
+                for p in c.parts.iter() {
+                    if let Part::Text { text } = p {
+                        response_text.push_str(text);
+                    }
+                }
+            }
+        }
+    }
+    
+    if response_text.is_empty() {
+        return Err("Connection test failed: Empty response from API".to_string());
+    }
     
     Ok(true)
 }
