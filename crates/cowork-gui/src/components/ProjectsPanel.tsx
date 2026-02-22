@@ -161,40 +161,14 @@ const ProjectsPanel: React.FC = () => {
   const handleDeleteProject = async (project: ProjectData) => {
     Modal.confirm({
       title: "Delete Project",
-      content: `Are you sure you want to delete "${project.name}"?`,
-      okText: "Delete Record Only",
-      okType: "default",
-      cancelText: "Delete All (Files & Record)",
+      content: `Remove "${project.name}" from project list? The project files will remain on disk.`,
+      okText: "Delete",
+      okType: "danger",
       onOk: async () => {
         try {
-          const currentWorkspace = await invoke<string | null>("get_workspace");
-          const isCurrentWindowProject = currentWorkspace === (project.workspacePath || project.workspace_path);
-
-          await invoke("delete_project", { projectId: project.project_id, deleteFiles: false });
-          message.success("Project record deleted");
+          await invoke("delete_project", { projectId: project.project_id });
+          message.success("Project removed from list");
           loadProjects();
-
-          if (isCurrentWindowProject) {
-            message.info("Project was open. Reloading...");
-            setTimeout(() => window.location.reload(), 500);
-          }
-        } catch (error) {
-          message.error("Failed to delete project: " + error);
-        }
-      },
-      onCancel: async () => {
-        try {
-          const currentWorkspace = await invoke<string | null>("get_workspace");
-          const isCurrentWindowProject = currentWorkspace === (project.workspacePath || project.workspace_path);
-
-          await invoke("delete_project", { projectId: project.project_id, deleteFiles: true });
-          message.success("Project deleted (files and record)");
-          loadProjects();
-
-          if (isCurrentWindowProject) {
-            message.info("Project was open. Reloading...");
-            setTimeout(() => window.location.reload(), 500);
-          }
         } catch (error) {
           message.error("Failed to delete project: " + error);
         }

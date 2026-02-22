@@ -296,8 +296,8 @@ impl ProjectRegistryManager {
             .cloned()
     }
 
-    /// Delete a project
-    pub fn delete_project(&mut self, project_id: &str, delete_files: bool) -> Result<()> {
+    /// Delete a project record from registry
+    pub fn delete_project(&mut self, project_id: &str) -> Result<()> {
         let index = self
             .registry
             .projects
@@ -305,72 +305,8 @@ impl ProjectRegistryManager {
             .position(|p| p.project_id == project_id)
             .ok_or_else(|| anyhow::anyhow!("Project not found: {}", project_id))?;
 
-        let project = self.registry.projects[index].clone();
-
-        // Delete files if requested
-        if delete_files {
-            let workspace = Path::new(&project.workspace_path);
-
-            eprintln!(
-                "[ProjectManager] Attempting to delete project files at: {}",
-                workspace.display()
-            );
-
-            if workspace.exists() {
-                // Try multiple times with delays
-                let mut last_error = None;
-                for attempt in 1..=3 {
-                    eprintln!("[ProjectManager] Delete attempt {}/3", attempt);
-
-                    match fs::remove_dir_all(workspace) {
-                        Ok(_) => {
-                            eprintln!("[ProjectManager] Successfully deleted project files");
-                            last_error = None;
-                            break;
-                        }
-                        Err(e) => {
-                            eprintln!("[ProjectManager] Attempt {} failed: {}", attempt, e);
-                            last_error = Some(e);
-
-                            if attempt < 3 {
-                                // Wait before retry
-                                std::thread::sleep(std::time::Duration::from_millis(
-                                    500 * attempt as u64,
-                                ));
-                            }
-                        }
-                    }
-                }
-
-                if let Some(e) = last_error {
-                    return Err(anyhow::anyhow!(
-                        "无法删除项目文件（目录被占用）。可能原因：\n\
-                        1. 正在运行的迭代进程（ACP Agent）\n\
-                        2. 编辑器或终端占用目录\n\
-                        3. Windows 搜索索引服务\n\n\
-                        建议：\n\
-                        - 关闭 Cowork GUI 后手动删除目录\n\
-                        - 或选择「仅删除记录」跳过文件删除\n\n\
-                        错误详情: {}",
-                        e
-                    ));
-                }
-            } else {
-                eprintln!(
-                    "[ProjectManager] Workspace path does not exist: {}",
-                    workspace.display()
-                );
-            }
-        }
-
-        // Remove from registry
         self.registry.projects.remove(index);
         self.save_registry_to_file()?;
-
-        eprintln!(
-            "[ProjectManager] Project {} removed from registry",
-            project_id
-        );
 
         Ok(())
     }

@@ -232,60 +232,12 @@ async fn get_all_projects(
 #[tauri::command]
 async fn delete_project(
     project_id: String,
-    delete_files: bool,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    eprintln!("[delete_project] Called with project_id={}, delete_files={}", project_id, delete_files);
-    
-    // First, get the project's workspace path
-    let workspace_path = {
-        let registry = state.project_registry_manager.lock()
-            .map_err(|e| format!("Failed to acquire lock: {}", e))?;
-        
-        let project = registry.get_project(&project_id)
-            .ok_or_else(|| format!("Project not found: {}", project_id))?;
-        
-        project.workspace_path.clone()
-    };
-    
-    // Check if this is the currently open project
-    let is_current_project = {
-        let current_workspace = state.workspace_path.lock()
-            .map_err(|e| format!("Failed to acquire workspace lock: {}", e))?;
-        current_workspace.as_ref() == Some(&workspace_path)
-    };
-
-    if is_current_project {
-        eprintln!("[delete_project] This is the current project, stopping all processes...");
-        
-        // Stop all running processes first
-        crate::commands::PROJECT_RUNNER.stop_all().await;
-        
-        // Give processes time to clean up
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        
-        // Clear workspace state
-        {
-            let mut ws = state.workspace_path.lock()
-                .map_err(|e| format!("Failed to acquire workspace lock: {}", e))?;
-            *ws = None;
-        }
-        
-        // Change current directory to temp to release file locks
-        if let Ok(temp) = std::env::temp_dir().canonicalize() {
-            let _ = std::env::set_current_dir(&temp);
-            eprintln!("[delete_project] Changed working directory to: {}", temp.display());
-        }
-        
-        // Give OS time to release file handles
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-    }
-    
-    // Now delete the project
     let mut registry = state.project_registry_manager.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
 
-    registry.delete_project(&project_id, delete_files)
+    registry.delete_project(&project_id)
         .map_err(|e| format!("Failed to delete project: {}", e))
 }
 

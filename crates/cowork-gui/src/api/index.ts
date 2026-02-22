@@ -205,8 +205,8 @@ const API = {
       invoke('get_all_projects', options || {}),
     register: (workspacePath: string, name: string, description?: string) => 
       invoke('register_project', { workspacePath, name, description }),
-    delete: (projectId: string, deleteFiles: boolean): Promise<void> => 
-      invoke('delete_project', { projectId, deleteFiles }),
+    delete: (projectId: string): Promise<void> => 
+      invoke('delete_project', { projectId }),
     open: (projectId: string): Promise<void> => invoke('open_project', { projectId }),
     openInCurrentWindow: (projectId: string): Promise<void> => 
       invoke('open_project_in_current_window', { projectId }),
