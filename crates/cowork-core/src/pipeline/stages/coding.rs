@@ -50,7 +50,7 @@ impl CodingStage {
         } else {
             // Load plan artifact to get tasks
             let iteration_dir = workspace.parent().unwrap_or(&workspace);
-            let plan_artifact = format!("{}/artifacts/plan.md", iteration_dir.display());
+            let plan_artifact = iteration_dir.join("artifacts").join("plan.md");
             
             if let Ok(content) = std::fs::read_to_string(&plan_artifact) {
                 format!("Implement the tasks from the plan:\n\n{}", content)
@@ -111,8 +111,9 @@ impl CodingStage {
                                 // Accumulate thinking for display
                                 thinking_buffer.push_str(&text);
                                 // Show thinking as it comes (truncated for UI)
-                                if thinking_buffer.len() > 100 {
-                                    let display = format!("💭 Thinking: {}...", &thinking_buffer[..100]);
+                                if thinking_buffer.chars().count() > 100 {
+                                    let truncated: String = thinking_buffer.chars().take(100).collect();
+                                    let display = format!("💭 Thinking: {}...", truncated);
                                     interaction_clone.show_message_with_context(MessageLevel::Info, display, ctx_external.clone()).await;
                                     thinking_buffer.clear();
                                 }
@@ -120,8 +121,9 @@ impl CodingStage {
                             Some(AgentMessage::Output(text)) => {
                                 output_buffer.push_str(&text);
                                 // Show significant output chunks
-                                if output_buffer.len() > 200 {
-                                    let display = format!("📝 Output: {}...", &output_buffer[..200.min(output_buffer.len())]);
+                                if output_buffer.chars().count() > 200 {
+                                    let truncated: String = output_buffer.chars().take(200).collect();
+                                    let display = format!("📝 Output: {}...", truncated);
                                     interaction_clone.show_message_with_context(MessageLevel::Info, display, ctx_external.clone()).await;
                                     output_buffer.clear();
                                 }

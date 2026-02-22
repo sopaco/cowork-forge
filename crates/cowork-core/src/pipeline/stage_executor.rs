@@ -95,14 +95,14 @@ pub async fn execute_stage_with_instruction(
         // artifacts should be in .cowork-v2/iterations/{id}/artifacts
         let iteration_dir = ctx.workspace_path.parent().unwrap_or(&ctx.workspace_path);
 
-        // Prepare artifact path - V2 architecture: .cowork-v2/iterations/{iteration_id}/artifacts/{stage_name}.md
-        let artifact_path = format!("{}/artifacts/{}.md", iteration_dir.display(), stage_name);
-
-        // Ensure artifacts directory exists
-        let artifacts_dir = format!("{}/artifacts", iteration_dir.display());
+        // Ensure artifacts directory exists - use PathBuf for proper path handling
+        let artifacts_dir = iteration_dir.join("artifacts");
         if let Err(e) = std::fs::create_dir_all(&artifacts_dir) {
             return Err(format!("Failed to create artifacts directory: {}", e));
         }
+
+        // Prepare artifact path - V2 architecture: .cowork-v2/iterations/{iteration_id}/artifacts/{stage_name}.md
+        let artifact_path = artifacts_dir.join(format!("{}.md", stage_name));
 
         // Load LLM client
         let llm_config = load_config().map_err(|e| format!("Failed to load config: {}", e))?;

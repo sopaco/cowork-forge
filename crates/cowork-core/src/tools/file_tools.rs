@@ -621,12 +621,23 @@ impl Tool for RunCommandTool {
         })?;
 
         // Execute command with timeout in workspace directory
+        #[cfg(target_os = "windows")]
+        let output = tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            tokio::process::Command::new("cmd")
+                .args(["/C", command])
+                .current_dir(&workspace_dir)
+                .output(),
+        )
+        .await;
+
+        #[cfg(not(target_os = "windows"))]
         let output = tokio::time::timeout(
             std::time::Duration::from_secs(30),
             tokio::process::Command::new("sh")
                 .arg("-c")
                 .arg(command)
-                .current_dir(&workspace_dir) // Run in workspace
+                .current_dir(&workspace_dir)
                 .output(),
         )
         .await;
