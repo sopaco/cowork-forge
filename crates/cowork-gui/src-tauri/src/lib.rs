@@ -147,8 +147,8 @@ impl InteractiveBackend for TauriBackend {
                     },
                 }
             }
-            _ = tokio::time::sleep(Duration::from_secs(300)) => {
-                println!("[HITL] Request timeout after 5 minutes");
+            _ = tokio::time::sleep(Duration::from_secs(3000)) => {
+                println!("[HITL] Request timeout after 3000 seconds");
                 anyhow::bail!("Request timeout")
             }
         }
