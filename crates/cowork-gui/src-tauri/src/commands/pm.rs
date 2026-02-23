@@ -31,6 +31,22 @@ const PM_AGENT_SYSTEM: &str = r#"
 - 用户要求修改计划 → target_stage: "plan"
 - 用户要求修改需求 → target_stage: "prd"
 
+### create_iteration
+创建新的迭代来实现新功能或进行重大变更。
+
+**参数**:
+- title: 新迭代的标题（简洁概括）
+- description: 新迭代的详细描述
+- inheritance: 继承模式（可选，默认 "partial"）
+  - "partial": 继承代码，重新生成文档（推荐用于添加新功能）
+  - "full": 继承所有代码和文档
+  - "none": 完全从头开始
+
+**使用场景**:
+- 用户想要添加全新的功能模块
+- 用户想要做重大架构变更
+- 用户明确表示要"新做一个"或"创建新项目"
+
 ### 示例对话
 
 用户: "帮我修改一下代码"
@@ -39,15 +55,19 @@ const PM_AGENT_SYSTEM: &str = r#"
 用户: "我想重新检查一下项目"
 助手: [调用 goto_stage 工具，参数 target_stage="check"]
 
+用户: "我想添加一个用户登录功能"
+助手: [调用 create_iteration 工具，参数 title="用户登录功能", description="实现用户登录认证系统，包括登录页面和后端验证"]
+
 用户: "项目标题是什么？"
 助手: 直接回答用户问题，不需要调用工具
 
 ## 规则
 
-1. 当用户明确要求修改、重新执行某个阶段时，使用 goto_stage 工具
-2. 当用户只是提问或讨论时，直接回答，不调用工具
-3. 始终用中文回复
-4. 调用工具前不需要询问确认，系统会自动处理
+1. 当用户要求修改现有功能时，使用 goto_stage 工具
+2. 当用户要求添加新功能或做大改动时，使用 create_iteration 工具
+3. 当用户只是提问或讨论时，直接回答，不调用工具
+4. 始终用中文回复
+5. 调用工具前不需要询问确认，系统会自动处理
 "#;
 
 fn get_tools() -> Vec<serde_json::Value> {
@@ -65,6 +85,29 @@ fn get_tools() -> Vec<serde_json::Value> {
                     }
                 },
                 "required": ["target_stage"]
+            }
+        }),
+        serde_json::json!({
+            "name": "create_iteration",
+            "description": "创建新的迭代来实现新功能或进行重大变更。当用户想要添加新功能模块或做重大改动时使用此工具。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "新迭代的标题，简洁概括用户需求"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "新迭代的详细描述，包括用户想要实现的具体功能"
+                    },
+                    "inheritance": {
+                        "type": "string",
+                        "enum": ["none", "partial", "full"],
+                        "description": "继承模式：partial=继承代码重新生成文档（推荐），full=继承所有，none=完全从头开始"
+                    }
+                },
+                "required": ["title", "description"]
             }
         })
     ]
@@ -215,6 +258,70 @@ pub async fn pm_send_message(
                         "action_type": "pm_goto_stage", 
                         "target_stage": target, 
                         "label": format!("🔄 跳转到 {}", stage_name) 
+                    }],
+                    "needs_restart": false
+                });
+                
+                let _ = window.emit("pm_message", &result);
+                return Ok(result);
+            }
+        }
+        
+        if func_name == "create_iteration" {
+            if let (Some(title), Some(description)) = (
+                args.get("title").and_then(|t| t.as_str()),
+                args.get("description").and_then(|d| d.as_str())
+            ) {
+                let inheritance = args.get("inheritance")
+                    .and_then(|i| i.as_str())
+                    .unwrap_or("partial");
+                
+                // Create the new iteration
+                let project_store = ProjectStore::new();
+                let project = project_store.load().map_err(|e| format!("Failed to load project: {}", e))?
+                    .ok_or_else(|| "Project not initialized".to_string())?;
+                
+                let inheritance_mode = match inheritance {
+                    "none" => cowork_core::domain::InheritanceMode::None,
+                    "full" => cowork_core::domain::InheritanceMode::Full,
+                    _ => cowork_core::domain::InheritanceMode::Partial,
+                };
+                
+                let new_iteration = cowork_core::domain::Iteration::create_evolution(
+                    &project,
+                    title.to_string(),
+                    description.to_string(),
+                    iteration_id.clone(),
+                    inheritance_mode,
+                );
+                
+                let new_iteration_id = new_iteration.id.clone();
+                let new_iteration_title = new_iteration.title.clone();
+                
+                let iteration_store = IterationStore::new();
+                iteration_store.save(&new_iteration).map_err(|e| format!("Failed to save iteration: {}", e))?;
+                
+                // Update project
+                let mut project = project;
+                project_store.add_iteration(&mut project, new_iteration.to_summary())
+                    .map_err(|e| format!("Failed to update project: {}", e))?;
+                
+                // Emit iteration_created event to notify frontend
+                let _ = window.emit("iteration_created", &new_iteration_id);
+                
+                let response_msg = if !response_text.is_empty() {
+                    format!("{}\n\n我已经创建了新迭代 **{}**。\n\n点击下方按钮启动新迭代：", response_text, title)
+                } else {
+                    format!("好的，我已经为你创建了新迭代 **{}**。\n\n点击下方按钮启动新迭代：", title)
+                };
+                
+                let result = serde_json::json!({
+                    "agent_message": response_msg,
+                    "actions": [{ 
+                        "action_type": "pm_create_iteration", 
+                        "iteration_id": new_iteration_id,
+                        "title": new_iteration_title,
+                        "label": "🚀 启动新迭代" 
                     }],
                     "needs_restart": false
                 });

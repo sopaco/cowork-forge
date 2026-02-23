@@ -533,10 +533,38 @@ function App() {
         }
         break;
         
+      case 'pm_create_iteration':
+        if (action.iteration_id) {
+          Modal.confirm({
+            title: '启动新迭代',
+            content: `是否启动新迭代「${action.title || 'Untitled'}」？`,
+            onOk: async () => {
+              try {
+                // Clear PM messages for new iteration
+                clearPMMessages();
+                // Clear pipeline messages
+                setMessages([]);
+                // Load project to refresh iterations list
+                await loadProject();
+                // Get and set the new iteration as current
+                const newIteration = await API.iteration.get(action.iteration_id!);
+                setCurrentIteration(newIteration);
+                // Execute the new iteration
+                await API.iteration.execute(action.iteration_id!);
+                message.success('新迭代已启动');
+                setActiveView('chat');
+              } catch (err) {
+                message.error('启动失败: ' + err);
+              }
+            },
+          });
+        }
+        break;
+        
       default:
         console.log('Unknown PM action:', action);
     }
-  }, [currentIteration, loadProject, setActiveView, setActiveArtifactTab]);
+  }, [currentIteration, loadProject, setActiveView, setActiveArtifactTab, clearPMMessages, setMessages, setCurrentIteration]);
 
   const handleOpenProjectFolder = useCallback(async () => {
     try {

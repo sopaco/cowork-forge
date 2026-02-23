@@ -74,7 +74,10 @@ export type ChatMessage =
 export interface PMAction {
   action_type: 'pm_goto_stage' | 'pm_create_iteration';
   target_stage?: string;
+  iteration_id?: string;
+  title?: string;
   description?: string;
+  label?: string;
 }
 
 export interface InputOption {

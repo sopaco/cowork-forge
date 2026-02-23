@@ -123,6 +123,8 @@ export interface ProjectTemplate {
 export interface PMAction {
   action_type: 'pm_goto_stage' | 'pm_create_iteration' | 'pm_start_app' | 'pm_open_folder' | 'pm_view_knowledge' | 'pm_view_artifacts' | 'pm_view_code';
   target_stage?: string;
+  iteration_id?: string;
+  title?: string;
   description?: string;
   label: string;
 }
