@@ -3,13 +3,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
+  App,
   Card,
   Button,
   Modal,
   Input,
   Tag,
   Empty,
-  message,
   Spin,
   Space,
   Tooltip,
@@ -50,6 +50,7 @@ interface ProjectData {
 }
 
 const ProjectsPanel: React.FC = () => {
+  const { message } = App.useApp();
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [loading, setLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { Layout, Menu, Button, Empty, message, Modal, Tag, Spin } from 'antd';
+import { Layout, Menu, Button, Empty, App as AntApp, Modal, Tag, Spin } from 'antd';
 import {
   FolderOutlined,
   FileTextOutlined,
@@ -46,6 +46,7 @@ import SettingsPanel from './components/SettingsPanel';
 const { Sider, Content, Header, Footer } = Layout;
 
 function App() {
+  const { message } = AntApp.useApp();
   const { 
     project, 
     iterations, 

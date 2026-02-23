@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Form, Input, Button, Switch, Select, Card, message, Spin, Typography, Space, Tag } from "antd";
+import { Form, Input, Button, Switch, Select, Card, App, Spin, Typography, Space, Tag } from "antd";
 import { SaveOutlined, FolderOpenOutlined, ApiOutlined, RobotOutlined, CloudOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 
 const { Title, Text, Paragraph } = Typography;
@@ -49,6 +49,7 @@ interface AppConfig {
 }
 
 const SettingsPanel: React.FC = () => {
+  const { message } = App.useApp();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

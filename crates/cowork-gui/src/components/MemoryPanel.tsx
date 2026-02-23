@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Card, Input, Select, Button, Tag, Empty, Spin, Modal, Tabs, Typography, Space, Divider, message } from "antd";
+import { App, Card, Input, Select, Button, Tag, Empty, Spin, Modal, Tabs, Typography, Space, Divider } from "antd";
 import { SearchOutlined, EyeOutlined, DatabaseOutlined, ClockCircleOutlined } from "@ant-design/icons";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -38,6 +38,7 @@ interface MemoryPanelProps {
 }
 
 const MemoryPanel: React.FC<MemoryPanelProps> = ({ currentSession, refreshTrigger }) => {
+  const { message } = App.useApp();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(false);
   const [queryType, setQueryType] = useState("all");

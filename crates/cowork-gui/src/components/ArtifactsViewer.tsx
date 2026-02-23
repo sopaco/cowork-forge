@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import JsonView from 'react-json-view';
-import { Tabs, Spin, Alert, Empty, Button, Space, Tooltip, message } from 'antd';
+import { App, Tabs, Spin, Alert, Empty, Button, Space, Tooltip } from 'antd';
 import { FileTextOutlined, ProjectOutlined, DatabaseOutlined, BuildOutlined, CheckCircleOutlined, FileMarkdownOutlined, FolderOpenOutlined, ReloadOutlined } from '@ant-design/icons';
 import 'highlight.js/styles/atom-one-dark.css';
 
@@ -39,6 +39,7 @@ interface ArtifactsViewerProps {
 }
 
 const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTab: externalActiveTab, onTabChange, refreshTrigger }) => {
+  const { message } = App.useApp();
   const [artifacts, setArtifacts] = useState<ArtifactsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

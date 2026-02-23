@@ -2,13 +2,13 @@ import { useState, useEffect, ReactElement } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
+  App,
   Card,
   Button,
   Modal,
   Input,
   Tag,
   Empty,
-  message,
   Spin,
   Space,
   Tooltip,
@@ -87,6 +87,7 @@ const IterationsPanel: React.FC<IterationsPanelProps> = ({
   selectedIterationId,
   onExecuteStatusChange,
 }) => {
+  const { message } = App.useApp();
   const [iterations, setIterations] = useState<IterationInfo[]>([]);
   const [project, setProject] = useState<ProjectInfo | null>(null);
   const [loading, setLoading] = useState(false);

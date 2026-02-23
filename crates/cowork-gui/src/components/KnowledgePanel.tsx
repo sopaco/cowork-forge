@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Card, Input, Button, Tag, Empty, Spin, Modal, Tabs, Typography, Space, Divider, Timeline, message } from "antd";
+import { App, Card, Input, Button, Tag, Empty, Spin, Modal, Tabs, Typography, Space, Divider, Timeline } from "antd";
 import { SearchOutlined, EyeOutlined, BookOutlined, ClockCircleOutlined, ReloadOutlined, RocketOutlined, FileTextOutlined, CodeOutlined, CheckCircleOutlined, CloseCircleOutlined } from "@ant-design/icons";
 
 const { Text, Paragraph, Title } = Typography;
@@ -29,6 +29,7 @@ interface KnowledgePanelProps {
 }
 
 const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, refreshTrigger }) => {
+  const { message } = App.useApp();
   const [knowledgeList, setKnowledgeList] = useState<Knowledge[]>([]);
   const [loading, setLoading] = useState(false);
   const [regenerating, setRegenerating] = useState<string | null>(null);
