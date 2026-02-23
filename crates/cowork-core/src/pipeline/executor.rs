@@ -1022,6 +1022,35 @@ impl IterationExecutor {
         let model = create_llm_client(&llm_config.llm)
             .map_err(|e| anyhow::anyhow!("Failed to create LLM client: {}", e))?;
         
+        // Step 1: Generate document summaries first
+        self.interaction
+            .show_message_with_context(
+                crate::interaction::MessageLevel::Info,
+                "Generating document summaries...".to_string(),
+                MessageContext::new("Knowledge System"),
+            )
+            .await;
+        
+        if let Err(e) = self.generate_document_summaries(&iteration, model.clone()).await {
+            println!("[Executor] Warning: Failed to generate document summaries: {}", e);
+            self.interaction
+                .show_message_with_context(
+                    crate::interaction::MessageLevel::Warning,
+                    format!("Document summary generation failed: {}", e),
+                    MessageContext::new("Knowledge System"),
+                )
+                .await;
+        } else {
+            self.interaction
+                .show_message_with_context(
+                    crate::interaction::MessageLevel::Success,
+                    "Document summaries generated successfully".to_string(),
+                    MessageContext::new("Knowledge System"),
+                )
+                .await;
+        }
+        
+        // Step 2: Generate iteration knowledge using the summaries
         self.interaction
             .show_message_with_context(
                 crate::interaction::MessageLevel::Info,
