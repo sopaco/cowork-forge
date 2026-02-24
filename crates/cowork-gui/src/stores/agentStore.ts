@@ -165,11 +165,9 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   },
   
   sendPMMessage: async (iterationId, message) => {
-    const { pmMessages, pmProcessing } = get();
+    const { pmMessages } = get();
     
-    if (pmProcessing) {
-      set({ pmProcessing: false });
-    }
+    console.log('[PM] Sending message:', { iterationId, message, pmMessagesLength: pmMessages.length });
     
     const userMsg: UserMessage = {
       type: 'user',
@@ -177,30 +175,51 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       timestamp: new Date().toISOString(),
     };
     
+    // Add user message and set processing state
     set({ pmProcessing: true, pmMessages: [...pmMessages, userMsg] });
     
     try {
+      console.log('[PM] Calling API...');
+      // Call API - the response will be streamed via agent_streaming events
+      // We don't need to wait for the full response or add the message here
       const response = await API.pm.sendMessage(
         iterationId, 
         message, 
         [...pmMessages, userMsg]
-      ) as { agent_message: string; actions?: PMAction[] };
+      ) as { agent_message?: string; actions?: PMAction[] };
       
-      const agentMsg: PMAgentMessage = {
-        type: 'pm_agent',
-        content: response.agent_message,
-        actions: response.actions,
-        timestamp: new Date().toISOString(),
-      };
+      console.log('[PM] API response:', response);
       
-      set((state) => ({
-        pmMessages: [...state.pmMessages, agentMsg],
-        pmProcessing: false,
-      }));
+      // If there are actions from the response, find the last pm_agent message and add actions to it
+      // Note: The streaming message is added by the event listener, not here
+      if (response.actions && response.actions.length > 0) {
+        set((state) => {
+          const msgs = [...state.pmMessages];
+          // Find the last pm_agent message (not the user message)
+          let lastPmAgentIdx = -1;
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].type === 'pm_agent') {
+              lastPmAgentIdx = i;
+              break;
+            }
+          }
+          
+          if (lastPmAgentIdx >= 0) {
+            const lastMsg = msgs[lastPmAgentIdx] as PMAgentMessage;
+            // Only add actions if not already present
+            if (!lastMsg.actions || lastMsg.actions.length === 0) {
+              msgs[lastPmAgentIdx] = { ...lastMsg, actions: response.actions };
+            }
+          }
+          return { pmMessages: msgs, pmProcessing: false };
+        });
+      } else {
+        set({ pmProcessing: false });
+      }
     } catch (error) {
       console.error('PM Agent error:', error);
       set({ pmProcessing: false });
-      throw error;
+      // Optionally add error message
     }
   },
   

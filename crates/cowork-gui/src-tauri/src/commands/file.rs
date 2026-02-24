@@ -38,6 +38,8 @@ pub async fn open_in_file_manager(path: String) -> Result<(), String> {
 pub async fn get_iteration_artifacts(
     iteration_id: String,
 ) -> Result<IterationArtifacts, String> {
+    eprintln!("[Artifacts] get_iteration_artifacts called with iteration_id: {}", iteration_id);
+    
     let iteration_store = cowork_core::persistence::IterationStore::new();
     iteration_store.load(&iteration_id).map_err(|e| e.to_string())?;
 
@@ -45,8 +47,12 @@ pub async fn get_iteration_artifacts(
         .iteration_path(&iteration_id)
         .map_err(|e| e.to_string())?;
     let artifacts_dir = iteration_dir.join("artifacts");
+    
+    eprintln!("[Artifacts] Looking in artifacts_dir: {:?}", artifacts_dir);
+    eprintln!("[Artifacts] artifacts_dir exists: {}", artifacts_dir.exists());
 
     let idea = fs::read_to_string(artifacts_dir.join("idea.md")).ok();
+    eprintln!("[Artifacts] idea.md found: {}, content length: {}", idea.is_some(), idea.as_ref().map(|s| s.len()).unwrap_or(0));
     let prd = fs::read_to_string(artifacts_dir.join("prd.md")).ok();
     let design = fs::read_to_string(artifacts_dir.join("design.md")).ok();
     let plan = fs::read_to_string(artifacts_dir.join("plan.md")).ok();

@@ -120,6 +120,9 @@ pub async fn pm_send_message(
     history: Vec<serde_json::Value>,
     window: Window,
 ) -> Result<serde_json::Value, String> {
+    eprintln!("[PM] pm_send_message called: iteration_id={}, message={}, history_len={}", 
+        iteration_id, message, history.len());
+    
     let store = IterationStore::new();
     let iteration = store.load(&iteration_id).map_err(|e| format!("Failed to load iteration: {}", e))?;
     

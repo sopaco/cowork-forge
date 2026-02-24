@@ -54,6 +54,7 @@ function App() {
     currentIteration, 
     loading, 
     loadProject, 
+    loadIterations,
     setCurrentIteration,
     updateCurrentIterationStatus,
     setIsExecuting,
@@ -249,6 +250,8 @@ function App() {
               }
               return prev;
             });
+            // Reset processing state when stream ends
+            setPmProcessing(false);
             return;
           }
           
@@ -345,7 +348,7 @@ function App() {
         });
       });
 
-      await listen('input_request', (event) => {
+      await listen('input_request', async (event) => {
         const [requestId, prompt, options] = event.payload as [string, string, InputOption[]];
         
         updateCurrentIterationStatus('Paused');
@@ -354,6 +357,15 @@ function App() {
         if (artifactMatch) {
           const artifactType = artifactMatch[1];
           const cleanPrompt = prompt.replace(/\[ARTIFACT_TYPE:\w+\]$/, '').trim();
+          
+          // Refresh iterations and set current to latest (for new iteration created by PM Agent)
+          await loadIterations();
+          const latestIterations = useProjectStore.getState().iterations;
+          if (latestIterations && latestIterations.length > 0) {
+            const latestIteration = latestIterations[latestIterations.length - 1];
+            setCurrentIteration(latestIteration);
+          }
+          
           setInputRequest({
             requestId,
             prompt: cleanPrompt,
@@ -460,7 +472,11 @@ function App() {
   }, [userInput, inputRequest, addMessage, submitInput]);
 
   const handlePMSendMessage = useCallback(async () => {
-    if (!userInput.trim() || !currentIteration) return;
+    console.log('[App] handlePMSendMessage called, userInput:', userInput, 'currentIteration:', currentIteration?.id);
+    if (!userInput.trim() || !currentIteration) {
+      console.log('[App] handlePMSendMessage early return: no input or no iteration');
+      return;
+    }
     const userMessage = userInput.trim();
     setUserInput('');
     setPmProcessing(true);
