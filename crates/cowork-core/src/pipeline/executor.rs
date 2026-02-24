@@ -3,7 +3,7 @@
 use futures::StreamExt;
 use std::sync::Arc;
 
-use crate::domain::{Iteration, IterationStatus, Project};
+use crate::domain::{InheritanceMode, Iteration, IterationStatus, Project};
 use crate::interaction::{InteractiveBackend, MessageContext};
 use crate::llm::{create_llm_client, load_config};
 use crate::persistence::{IterationStore, ProjectStore};
@@ -81,7 +81,7 @@ impl IterationExecutor {
 
         // If evolution, copy base iteration workspace
         if let Some(base_id) = &iteration.base_iteration_id {
-            self.inherit_from_base(&workspace, base_id).await?;
+            self.inherit_from_base(&workspace, base_id, iteration.inheritance).await?;
         }
 
         Ok(workspace)
@@ -92,13 +92,9 @@ impl IterationExecutor {
         &self,
         workspace: &std::path::PathBuf,
         base_iteration_id: &str,
+        inheritance_mode: InheritanceMode,
     ) -> anyhow::Result<()> {
-        use crate::domain::InheritanceMode;
-
-        // Load base iteration
-        let base = self.iteration_store.load(base_iteration_id)?;
-
-        match base.inheritance {
+        match inheritance_mode {
             InheritanceMode::None => {
                 // No inheritance - start fresh
                 println!("[Executor] No inheritance (Genesis iteration)");
