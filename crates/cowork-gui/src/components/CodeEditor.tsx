@@ -3,23 +3,46 @@ import { invoke } from '@tauri-apps/api/core';
 import Editor from '@monaco-editor/react';
 import { Tabs, Spin, Alert, Empty, Dropdown, Button, Space } from 'antd';
 import { FolderOutlined, FileOutlined, ReloadOutlined, CaretRightOutlined, CaretDownOutlined, CodeOutlined, DownOutlined } from '@ant-design/icons';
-import { showError, showSuccess, tryExecute } from '../utils/errorHandler.jsx';
+import { showError, showSuccess, showWarning, tryExecute } from '../utils/errorHandler';
 
-// Try to import react-window if available
-let FixedSizeList = null;
-try {
-  FixedSizeList = require('react-window').FixedSizeList;
-} catch (e) {
-  console.warn('react-window not installed. Install it with: npm install react-window');
+interface FileTreeNode {
+  name: string;
+  path: string;
+  is_dir: boolean;
+  children?: FileTreeNode[];
+  is_expanded?: boolean;
+  language?: string;
 }
 
-const CodeEditor = ({ iterationId, refreshTrigger }) => {
-  const [fileTree, setFileTree] = useState(null);
-  const [openFiles, setOpenFiles] = useState([]);
-  const [activeFile, setActiveFile] = useState(null);
-  const [fileContents, setFileContents] = useState({});
+interface FlatFileTreeNode extends FileTreeNode {
+  depth: number;
+  key: string;
+}
+
+interface FileReadResult {
+  content: string;
+  is_partial: boolean;
+  offset: number;
+  total_size: number;
+}
+
+interface FormatResult {
+  success: boolean;
+  formatted_files: string[];
+}
+
+interface CodeEditorProps {
+  iterationId: string;
+  refreshTrigger?: number;
+}
+
+const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) => {
+  const [fileTree, setFileTree] = useState<FileTreeNode | null>(null);
+  const [openFiles, setOpenFiles] = useState<string[]>([]);
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+  const [fileContents, setFileContents] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [formatting, setFormatting] = useState(false);
   const prevRefreshTriggerRef = useRef(0);
 
@@ -29,29 +52,22 @@ const CodeEditor = ({ iterationId, refreshTrigger }) => {
     }
   }, [iterationId]);
 
-  // Listen for refresh trigger changes
   useEffect(() => {
     if (refreshTrigger !== undefined && refreshTrigger !== prevRefreshTriggerRef.current) {
       prevRefreshTriggerRef.current = refreshTrigger;
       console.log('[CodeEditor] Refresh trigger changed, reloading file tree...');
       loadFileTree();
-      // Also reload all open files
       openFiles.forEach(filePath => loadFileContent(filePath));
     }
   }, [refreshTrigger, openFiles]);
 
-  // Flatten file tree for virtual scrolling
-  const flatFileTree = useMemo(() => {
+  const flatFileTree = useMemo((): FlatFileTreeNode[] => {
     if (!fileTree) return [];
     
-    const flatten = (node, depth = 0, result = []) => {
+    const flatten = (node: FileTreeNode, depth = 0, result: FlatFileTreeNode[] = []): FlatFileTreeNode[] => {
       if (!node) return result;
       
-      result.push({
-        ...node,
-        depth,
-        key: node.path,
-      });
+      result.push({ ...node, depth, key: node.path });
       
       if (node.children && node.is_expanded) {
         node.children.forEach(child => flatten(child, depth + 1, result));
@@ -67,12 +83,11 @@ const CodeEditor = ({ iterationId, refreshTrigger }) => {
     setLoading(true);
     setError(null);
     try {
-      // Try new V2 API first, fall back to legacy API
-      const tree = await invoke('get_iteration_file_tree', { iterationId })
-        .catch(() => invoke('get_file_tree', { sessionId: iterationId }));
+      const tree = await invoke<FileTreeNode>('get_iteration_file_tree', { iterationId })
+        .catch(() => invoke<FileTreeNode>('get_file_tree', { sessionId: iterationId }));
       setFileTree(tree);
     } catch (err) {
-      setError(err.toString());
+      setError(String(err));
     } finally {
       setLoading(false);
     }
@@ -81,15 +96,14 @@ const CodeEditor = ({ iterationId, refreshTrigger }) => {
   const formatAllCode = async () => {
     setFormatting(true);
     const result = await tryExecute(async () => {
-      return await invoke('format_code', { iterationId, filePath: null })
-        .catch(() => invoke('format_code', { sessionId: iterationId, filePath: null }));
+      return await invoke<FormatResult>('format_code', { iterationId, filePath: null })
+        .catch(() => invoke<FormatResult>('format_code', { sessionId: iterationId, filePath: null }));
     }, 'Failed to format code');
     
     setFormatting(false);
     
     if (result && result.success) {
       showSuccess(`Formatted ${result.formatted_files.length} file(s)`);
-      // Reload all open files to show formatted content
       for (const filePath of openFiles) {
         await loadFileContent(filePath);
       }
@@ -101,40 +115,34 @@ const CodeEditor = ({ iterationId, refreshTrigger }) => {
     
     setFormatting(true);
     const result = await tryExecute(async () => {
-      return await invoke('format_code', { iterationId, filePath: activeFile })
-        .catch(() => invoke('format_code', { sessionId: iterationId, filePath: activeFile }));
+      return await invoke<FormatResult>('format_code', { iterationId, filePath: activeFile })
+        .catch(() => invoke<FormatResult>('format_code', { sessionId: iterationId, filePath: activeFile }));
     }, 'Failed to format file');
     
     setFormatting(false);
     
     if (result && result.success) {
       showSuccess(`Formatted ${result.formatted_files.length} file(s)`);
-      // Reload active file to show formatted content
       await loadFileContent(activeFile);
     }
   };
 
-  const loadFileContent = async (filePath) => {
+  const loadFileContent = async (filePath: string) => {
     const result = await tryExecute(async () => {
-      const result = await invoke('read_iteration_file', { 
-        iterationId, 
-        filePath,
-        offset: null,
-        limit: null
-      }).catch(() => invoke('read_file_content', { 
-        sessionId: iterationId, 
-        filePath,
-        offset: null,
-        limit: null
+      const res = await invoke<string | FileReadResult>('read_iteration_file', { 
+        iterationId, filePath, offset: null, limit: null
+      }).catch(() => invoke<string | FileReadResult>('read_file_content', { 
+        sessionId: iterationId, filePath, offset: null, limit: null
       }));
       
-      // Handle both old format (string) and new format (FileReadResult)
-      let content = result;
-      if (typeof result === 'object' && result.content !== undefined) {
-        content = result.content;
-        if (result.is_partial) {
-          showWarning(`Large file loaded partially (${result.offset / 1024}KB - ${(result.offset + content.length) / 1024}KB of ${result.total_size / 1024}KB)`);
+      let content: string;
+      if (typeof res === 'object' && 'content' in res) {
+        content = res.content;
+        if (res.is_partial) {
+          showWarning(`Large file loaded partially (${res.offset / 1024}KB - ${(res.offset + content.length) / 1024}KB of ${res.total_size / 1024}KB)`);
         }
+      } else {
+        content = res;
       }
       
       setFileContents(prev => ({ ...prev, [filePath]: content }));
@@ -144,7 +152,7 @@ const CodeEditor = ({ iterationId, refreshTrigger }) => {
     return result;
   };
 
-  const saveFileContent = async (filePath, content) => {
+  const saveFileContent = async (filePath: string, content: string) => {
     const success = await tryExecute(async () => {
       await invoke('save_iteration_file', { iterationId, filePath, content })
         .catch(() => invoke('save_file_content', { sessionId: iterationId, filePath, content }));
@@ -156,7 +164,7 @@ const CodeEditor = ({ iterationId, refreshTrigger }) => {
     }
   };
 
-  const handleFileSelect = useCallback(async (filePath) => {
+  const handleFileSelect = useCallback(async (filePath: string) => {
     if (!openFiles.includes(filePath)) {
       setOpenFiles(prev => [...prev, filePath]);
       await loadFileContent(filePath);
@@ -164,23 +172,20 @@ const CodeEditor = ({ iterationId, refreshTrigger }) => {
     setActiveFile(filePath);
   }, [openFiles]);
 
-  const handleToggleFolder = useCallback((path) => {
-    const toggleNode = (node) => {
+  const handleToggleFolder = useCallback((path: string) => {
+    const toggleNode = (node: FileTreeNode): FileTreeNode => {
       if (node.path === path) {
         return { ...node, is_expanded: !node.is_expanded };
       }
       if (node.children) {
-        return {
-          ...node,
-          children: node.children.map(toggleNode)
-        };
+        return { ...node, children: node.children.map(toggleNode) };
       }
       return node;
     };
-    setFileTree(toggleNode(fileTree));
-  }, [fileTree]);
+    setFileTree(prev => prev ? toggleNode(prev) : null);
+  }, []);
 
-  const handleCloseFile = (targetKey) => {
+  const handleCloseFile = (targetKey: string) => {
     const newOpenFiles = openFiles.filter(key => key !== targetKey);
     setOpenFiles(newOpenFiles);
     if (activeFile === targetKey) {
@@ -188,34 +193,23 @@ const CodeEditor = ({ iterationId, refreshTrigger }) => {
     }
   };
 
-  const handleEditorChange = (value) => {
-    if (activeFile) {
+  const handleEditorChange = (value: string | undefined) => {
+    if (activeFile && value !== undefined) {
       setFileContents(prev => ({ ...prev, [activeFile]: value }));
     }
   };
 
-  const getLanguageFromPath = (filePath) => {
-    const ext = filePath.split('.').pop().toLowerCase();
-    const langMap = {
-      'rs': 'rust',
-      'js': 'javascript',
-      'jsx': 'javascript',
-      'ts': 'typescript',
-      'tsx': 'typescript',
-      'py': 'python',
-      'html': 'html',
-      'css': 'css',
-      'json': 'json',
-      'md': 'markdown',
-      'toml': 'toml',
-      'yaml': 'yaml',
-      'yml': 'yaml',
+  const getLanguageFromPath = (filePath: string): string => {
+    const ext = filePath.split('.').pop()?.toLowerCase() || '';
+    const langMap: Record<string, string> = {
+      'rs': 'rust', 'js': 'javascript', 'jsx': 'javascript', 'ts': 'typescript',
+      'tsx': 'typescript', 'py': 'python', 'html': 'html', 'css': 'css',
+      'json': 'json', 'md': 'markdown', 'toml': 'toml', 'yaml': 'yaml', 'yml': 'yaml',
     };
     return langMap[ext] || 'plaintext';
   };
 
-  // Render single file tree row for virtual scrolling
-  const renderFileTreeRow = useCallback(({ index, style }) => {
+  const renderFileTreeRow = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
     const node = flatFileTree[index];
     if (!node) return null;
 
@@ -274,9 +268,7 @@ const CodeEditor = ({ iterationId, refreshTrigger }) => {
         description={error}
         type="error"
         showIcon
-        action={
-          <button onClick={loadFileTree}>Retry</button>
-        }
+        action={<button onClick={loadFileTree}>Retry</button>}
       />
     );
   }
@@ -293,7 +285,7 @@ const CodeEditor = ({ iterationId, refreshTrigger }) => {
               height="100%"
               language={getLanguageFromPath(filePath)}
               value={fileContents[filePath] || ''}
-              onChange={(value) => handleEditorChange(value)}
+              onChange={handleEditorChange}
               theme="vs-dark"
               options={{
                 minimap: { enabled: true },
@@ -305,15 +297,11 @@ const CodeEditor = ({ iterationId, refreshTrigger }) => {
               }}
               saveViewState={true}
               onMount={(editor) => {
-                editor.addCommand(
-                  0,
-                  () => {
-                    if (activeFile) {
-                      saveFileContent(activeFile, editor.getValue());
-                    }
-                  },
-                  'save'
-                );
+                editor.addCommand(0, () => {
+                  if (activeFile) {
+                    saveFileContent(activeFile, editor.getValue());
+                  }
+                }, 'save');
               }}
             />
           ) : null}
@@ -324,108 +312,56 @@ const CodeEditor = ({ iterationId, refreshTrigger }) => {
 
   return (
     <div className="code-editor-container" style={{ display: 'flex', height: '100%' }}>
-      {/* File Tree */}
-      <div style={{ 
-        width: '250px', 
-        borderRight: '1px solid var(--border-color)', 
-        background: 'var(--bg-container)',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
+      <div style={{ width: '250px', borderRight: '1px solid var(--border-color)', background: 'var(--bg-container)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '10px', borderBottom: '1px solid var(--border-color)' }}>
           <h3 style={{ color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FolderOutlined /> Files
             <Dropdown menu={{
               items: [
-                {
-                  key: 'format-all',
-                  label: <span><CodeOutlined /> Format All Files</span>,
-                  onClick: formatAllCode,
-                },
-                {
-                  key: 'format-active',
-                  label: <span><CodeOutlined /> Format Active File</span>,
-                  onClick: formatActiveFile,
-                  disabled: !activeFile,
-                },
+                { key: 'format-all', label: <span><CodeOutlined /> Format All Files</span>, onClick: formatAllCode },
+                { key: 'format-active', label: <span><CodeOutlined /> Format Active File</span>, onClick: formatActiveFile, disabled: !activeFile },
               ]
             }}>
-              <Button
-                size="small"
-                icon={<CodeOutlined />}
-                loading={formatting}
-                disabled={!openFiles.length}
-              >
+              <Button size="small" icon={<CodeOutlined />} loading={formatting} disabled={!openFiles.length}>
                 Format <DownOutlined />
               </Button>
             </Dropdown>
-            <button
-              onClick={loadFileTree}
-              style={{ float: 'right', border: 'none', background: 'none', color: 'var(--primary)', cursor: 'pointer' }}
-            >
+            <button onClick={loadFileTree} style={{ float: 'right', border: 'none', background: 'none', color: 'var(--primary)', cursor: 'pointer' }}>
               <ReloadOutlined />
             </button>
           </h3>
         </div>
-        {/* File Tree Content with Virtual Scrolling */}
         <div style={{ flex: 1, overflow: 'hidden' }}>
-          {FixedSizeList && flatFileTree.length > 50 ? (
-            // Use virtual scrolling for large file trees
-            <FixedSizeList
-              height={600}
-              itemCount={flatFileTree.length}
-              itemSize={32}
-              width="100%"
-            >
-              {renderFileTreeRow}
-            </FixedSizeList>
-          ) : (
-            // Fallback to regular rendering for small file trees
-            <div style={{ overflow: 'auto', height: '100%' }}>
-              {flatFileTree.map((node, index) => (
-                <div key={node.path || index}>
-                  {renderFileTreeRow({ index, style: {} })}
-                </div>
-              ))}
-            </div>
-          )}
+          <div style={{ overflow: 'auto', height: '100%' }}>
+            {flatFileTree.map((node, index) => (
+              <div key={node.path || index}>
+                {renderFileTreeRow({ index, style: {} })}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Editor */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
         <Tabs
           type="editable-card"
           activeKey={activeFile}
           onChange={handleFileSelect}
           onEdit={(targetKey, action) => {
-            if (action === 'remove') {
+            if (action === 'remove' && typeof targetKey === 'string') {
               handleCloseFile(targetKey);
             }
           }}
           hideAdd
           items={tabItems}
           animated={false}
-          style={{ 
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column'
-          }}
-          tabBarStyle={{ 
-            margin: 0, 
-            background: 'var(--bg-container)'
-          }}
+          style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+          tabBarStyle={{ margin: 0, background: 'var(--bg-container)' }}
           className="code-editor-tabs"
         />
         
         {openFiles.length === 0 && (
-          <div style={{ 
-            flex: 1, 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            color: 'var(--text-secondary)'
-          }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
             <Empty description="Select a file from the tree to start editing" />
           </div>
         )}

@@ -61,7 +61,7 @@ flowchart TB
 
 ## 3. Tool Taxonomy
 
-The domain organizes 30+ tools into six functional categories, each addressing specific operational concerns within the AI-driven development lifecycle.
+The domain organizes tools into eight functional categories, each addressing specific operational concerns within the AI-driven development lifecycle.
 
 ### 3.1 File Tools (`file_tools.rs`)
 **Purpose**: Secure filesystem operations within workspace boundaries
@@ -116,6 +116,28 @@ The domain organizes 30+ tools into six functional categories, each addressing s
 - **PMSaveDecisionTool**: Save user decisions to project memory
 
 > **Note**: PM tools are only available when iteration status is `Completed` (after Delivery stage), used for post-delivery project maintenance and requirement change scenarios.
+
+### 3.8 Test & Lint Tools (`test_lint_tools.rs`)
+**Purpose**: Code quality verification and testing automation
+- **ExecuteShellCommandTool**: Run shell commands for testing and linting with timeout control
+
+### 3.9 Control Tools (`control_tools.rs`)
+**Purpose**: Pipeline flow control and stage management
+- **GotoStageTool**: Control flow for jumping to specific pipeline stages
+
+### 3.10 Artifact Tools (`artifact_tools.rs`)
+**Purpose**: Artifact loading and management
+- **LoadArtifactSummaryTool**: Load summaries of generated artifacts
+- **LoadArtifactTool**: Load full artifact content
+
+### 3.11 Load Artifacts Tools (`load_artifacts.rs`)
+**Purpose**: Document and artifact loading utilities
+- **LoadDocumentSummaryTool**: Load compressed stage summaries (idea, PRD, design, plan)
+- **LoadBaseKnowledgeTool**: Load historical knowledge from base iterations
+
+### 3.12 Goto Stage Tool (`goto_stage_tool.rs`)
+**Purpose**: Stage navigation for PM Agent
+- **PMGotoStageTool**: Navigate to specific stages for re-execution
 
 ---
 

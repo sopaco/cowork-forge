@@ -17,6 +17,10 @@ use adk_core::{Llm, IncludeContents};
 use anyhow::Result;
 use std::sync::Arc;
 
+// External Coding Agent (ACP-based)
+pub mod external_coding_agent;
+pub use external_coding_agent::{ExternalCodingAgent, StreamingTask};
+
 // ============================================================================
 // IdeaAgent - Simple agent to capture initial idea
 // ============================================================================

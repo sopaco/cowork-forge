@@ -9,6 +9,7 @@ use tokio::sync::mpsc;
 use super::gui_types::PreviewInfo;
 
 #[cfg(target_os = "windows")]
+#[allow(unused_imports)]
 use std::os::windows::process::CommandExt;
 
 pub struct ProjectRunner {

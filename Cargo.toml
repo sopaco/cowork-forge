@@ -25,6 +25,7 @@ adk-session = "0.3.0"
 
 # Core dependencies
 tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["compat"] }
 anyhow = "1"
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
@@ -56,3 +57,6 @@ futures = "0.3"
 
 # Testing
 tempfile = "3"
+
+# ACP (Agent Client Protocol) for external agent integration
+agent-client-protocol = "0.9"

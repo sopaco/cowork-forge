@@ -10,7 +10,8 @@
 use crate::agents::*;
 use crate::config::{get_language_instruction};
 use crate::interaction::{InteractiveBackend, MessageContext};
-use crate::llm::{ModelConfig, create_llm_client};
+use crate::llm::{create_llm_client};
+use crate::llm::config::load_config;
 use crate::pipeline::{PipelineContext, StageResult};
 use crate::storage::set_iteration_id;
 use adk_core::{Content, Event};
@@ -94,14 +95,14 @@ pub async fn execute_stage_with_instruction(
         // artifacts should be in .cowork-v2/iterations/{id}/artifacts
         let iteration_dir = ctx.workspace_path.parent().unwrap_or(&ctx.workspace_path);
 
-        // Prepare artifact path - V2 architecture: .cowork-v2/iterations/{iteration_id}/artifacts/{stage_name}.md
-        let artifact_path = format!("{}/artifacts/{}.md", iteration_dir.display(), stage_name);
-
-        // Ensure artifacts directory exists
-        let artifacts_dir = format!("{}/artifacts", iteration_dir.display());
+        // Ensure artifacts directory exists - use PathBuf for proper path handling
+        let artifacts_dir = iteration_dir.join("artifacts");
         if let Err(e) = std::fs::create_dir_all(&artifacts_dir) {
             return Err(format!("Failed to create artifacts directory: {}", e));
         }
+
+        // Prepare artifact path - V2 architecture: .cowork-v2/iterations/{iteration_id}/artifacts/{stage_name}.md
+        let artifact_path = artifacts_dir.join(format!("{}.md", stage_name));
 
         // Load LLM client
         let llm_config = load_config().map_err(|e| format!("Failed to load config: {}", e))?;
@@ -220,6 +221,31 @@ pub async fn execute_stage_with_instruction(
                 }
             }
             Err(e) => {
+                let err_msg = format!("{}", e);
+                // Check if this is a goto_stage signal from a tool
+                if err_msg.contains("GOTO_STAGE:") {
+                    // Extract the GOTO_STAGE message - format: "Tool execution failed: GOTO_STAGE:stage:reason"
+                    // or just "GOTO_STAGE:stage:reason"
+                    if let Some(goto_msg) = err_msg.split("GOTO_STAGE:").nth(1) {
+                        let parts: Vec<&str> = goto_msg.splitn(2, ':').collect();
+                        if parts.len() == 2 {
+                            let target_stage = parts[0].to_string();
+                            let reason = parts[1].to_string();
+                            
+                            interaction
+                                .show_message_with_context(
+                                    crate::interaction::MessageLevel::Warning,
+                                    format!("🔄 Stage jump requested: {} → {}", stage_name, target_stage),
+                                    MessageContext::new(&display_name).with_stage(stage_name),
+                                )
+                                .await;
+                            
+                            // Return immediately to trigger stage jump
+                            return StageResult::GotoStage(target_stage, reason);
+                        }
+                    }
+                }
+                
                 interaction
                     .show_message_with_context(
                         crate::interaction::MessageLevel::Error,
@@ -367,27 +393,6 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
     prompt
 }
 
-/// Load config from file or environment
-fn load_config() -> Result<ModelConfig, String> {
-    use std::path::Path;
-
-    // Try loading from config.toml
-    if Path::new("config.toml").exists() {
-        ModelConfig::from_file("config.toml").map_err(|e| format!("Failed to load config: {}", e))
-    } else if let Ok(exe_path) = std::env::current_exe() {
-        let exe_dir = exe_path.parent().unwrap_or(&exe_path);
-        let config_path = exe_dir.join("config.toml");
-        if config_path.exists() {
-            ModelConfig::from_file(config_path.to_str().unwrap())
-                .map_err(|e| format!("Failed to load config: {}", e))
-        } else {
-            ModelConfig::from_env().map_err(|e| format!("Failed to load config from env: {}", e))
-        }
-    } else {
-        ModelConfig::from_env().map_err(|e| format!("Failed to load config from env: {}", e))
-    }
-}
-
 /// Simple InvocationContext implementation
 pub struct SimpleInvocationContext {
     invocation_id: String,
@@ -419,7 +424,7 @@ impl SimpleInvocationContext {
             memory: None, // TODO: implement memory
             session: Box::new(SimpleSession::new(&ctx.iteration.id, content.clone())),
             run_config: adk_core::RunConfig {
-                streaming_mode: adk_core::StreamingMode::None,
+                streaming_mode: adk_core::StreamingMode::SSE,
                 tool_confirmation_decisions: HashMap::new(),
             },
             ended: std::sync::atomic::AtomicBool::new(false),

@@ -3,8 +3,9 @@
 use futures::StreamExt;
 use std::sync::Arc;
 
-use crate::domain::{Iteration, IterationStatus, Project};
+use crate::domain::{InheritanceMode, Iteration, IterationStatus, Project};
 use crate::interaction::{InteractiveBackend, MessageContext};
+use crate::llm::{create_llm_client, load_config};
 use crate::persistence::{IterationStore, ProjectStore};
 use adk_core::Content;
 
@@ -80,7 +81,7 @@ impl IterationExecutor {
 
         // If evolution, copy base iteration workspace
         if let Some(base_id) = &iteration.base_iteration_id {
-            self.inherit_from_base(&workspace, base_id).await?;
+            self.inherit_from_base(&workspace, base_id, iteration.inheritance).await?;
         }
 
         Ok(workspace)
@@ -91,13 +92,9 @@ impl IterationExecutor {
         &self,
         workspace: &std::path::PathBuf,
         base_iteration_id: &str,
+        inheritance_mode: InheritanceMode,
     ) -> anyhow::Result<()> {
-        use crate::domain::InheritanceMode;
-
-        // Load base iteration
-        let base = self.iteration_store.load(base_iteration_id)?;
-
-        match base.inheritance {
+        match inheritance_mode {
             InheritanceMode::None => {
                 // No inheritance - start fresh
                 println!("[Executor] No inheritance (Genesis iteration)");
@@ -1015,6 +1012,67 @@ impl IterationExecutor {
         // Complete iteration
         iteration.complete();
         self.iteration_store.save(&iteration)?;
+
+        // Generate iteration knowledge (V2 architecture)
+        let llm_config = load_config().map_err(|e| anyhow::anyhow!("Failed to load config: {}", e))?;
+        let model = create_llm_client(&llm_config.llm)
+            .map_err(|e| anyhow::anyhow!("Failed to create LLM client: {}", e))?;
+        
+        // Step 1: Generate document summaries first
+        self.interaction
+            .show_message_with_context(
+                crate::interaction::MessageLevel::Info,
+                "Generating document summaries...".to_string(),
+                MessageContext::new("Knowledge System"),
+            )
+            .await;
+        
+        if let Err(e) = self.generate_document_summaries(&iteration, model.clone()).await {
+            println!("[Executor] Warning: Failed to generate document summaries: {}", e);
+            self.interaction
+                .show_message_with_context(
+                    crate::interaction::MessageLevel::Warning,
+                    format!("Document summary generation failed: {}", e),
+                    MessageContext::new("Knowledge System"),
+                )
+                .await;
+        } else {
+            self.interaction
+                .show_message_with_context(
+                    crate::interaction::MessageLevel::Success,
+                    "Document summaries generated successfully".to_string(),
+                    MessageContext::new("Knowledge System"),
+                )
+                .await;
+        }
+        
+        // Step 2: Generate iteration knowledge using the summaries
+        self.interaction
+            .show_message_with_context(
+                crate::interaction::MessageLevel::Info,
+                "Generating iteration knowledge...".to_string(),
+                MessageContext::new("Knowledge System"),
+            )
+            .await;
+        
+        if let Err(e) = self.generate_iteration_knowledge(&iteration, model).await {
+            println!("[Executor] Warning: Failed to generate iteration knowledge: {}", e);
+            self.interaction
+                .show_message_with_context(
+                    crate::interaction::MessageLevel::Warning,
+                    format!("Knowledge generation failed: {}", e),
+                    MessageContext::new("Knowledge System"),
+                )
+                .await;
+        } else {
+            self.interaction
+                .show_message_with_context(
+                    crate::interaction::MessageLevel::Success,
+                    "Iteration knowledge generated successfully".to_string(),
+                    MessageContext::new("Knowledge System"),
+                )
+                .await;
+        }
 
         // Promote insights to decisions (V2 architecture - memory elevation)
         let memory_store = crate::persistence::MemoryStore::new();

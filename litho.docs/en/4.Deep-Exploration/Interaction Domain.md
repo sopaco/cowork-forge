@@ -235,7 +235,7 @@ Tools in the `hitl_content_tools.rs` and `hitl_file_tools.rs` modules use the ba
 - Show tool execution confirmations
 
 ### 7.3 Frontend Integration (GUI)
-The React frontend (`crates/cowork-gui/src/App.jsx`) establishes event listeners before triggering execution:
+The React frontend (`crates/cowork-gui/src/App.tsx`) establishes event listeners before triggering execution:
 
 ```javascript
 // Event listeners setup

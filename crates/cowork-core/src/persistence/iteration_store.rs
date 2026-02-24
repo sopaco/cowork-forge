@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::domain::{Iteration, IterationSummary};
 
-use super::get_cowork_dir;
+use super::{get_cowork_dir, COWORK_DIR};
 
 /// Iteration store for persistence
 pub struct IterationStore;
@@ -54,7 +54,12 @@ impl IterationStore {
         let mut iterations = Vec::new();
         for entry in std::fs::read_dir(&dir)? {
             let entry = entry?;
-            if entry.path().extension().map(|e| e == "json").unwrap_or(false) {
+            if entry
+                .path()
+                .extension()
+                .map(|e| e == "json")
+                .unwrap_or(false)
+            {
                 if let Ok(content) = std::fs::read_to_string(entry.path()) {
                     if let Ok(iteration) = serde_json::from_str::<Iteration>(&content) {
                         iterations.push(iteration);
@@ -75,8 +80,32 @@ impl IterationStore {
     }
 
     /// Get workspace path for iteration (V2 architecture: iteration-specific workspace)
+    /// Returns ABSOLUTE path to avoid path confusion with external agents
     pub fn workspace_path(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
-        Ok(get_cowork_dir()?.join("iterations").join(iteration_id).join("workspace"))
+        let relative = PathBuf::from(COWORK_DIR)
+            .join("iterations")
+            .join(iteration_id)
+            .join("workspace");
+
+        // Convert to absolute path
+        // First try canonicalize (works if path exists)
+        if let Ok(absolute) = relative.canonicalize() {
+            return Ok(absolute);
+        }
+
+        // If path doesn't exist, canonicalize .cowork-v2 parent if it exists
+        let cowork_dir = PathBuf::from(COWORK_DIR);
+        if let Ok(cowork_absolute) = cowork_dir.canonicalize() {
+            return Ok(cowork_absolute
+                .join("iterations")
+                .join(iteration_id)
+                .join("workspace"));
+        }
+
+        // Fallback: use current directory
+        let cwd = std::env::current_dir()
+            .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
+        Ok(cwd.join(&relative))
     }
 
     /// Ensure workspace exists for iteration (V2 architecture: iteration-specific workspace)
@@ -92,12 +121,35 @@ impl IterationStore {
     }
 
     /// Get iteration directory path (contains artifacts subdirectory)
+    /// Returns ABSOLUTE path for consistency
     pub fn iteration_path(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
-        Ok(get_cowork_dir()?.join("iterations").join(iteration_id))
+        let relative = PathBuf::from(COWORK_DIR)
+            .join("iterations")
+            .join(iteration_id);
+
+        // Convert to absolute path
+        if let Ok(absolute) = relative.canonicalize() {
+            return Ok(absolute);
+        }
+
+        let cowork_dir = PathBuf::from(COWORK_DIR);
+        if let Ok(cowork_absolute) = cowork_dir.canonicalize() {
+            return Ok(cowork_absolute.join("iterations").join(iteration_id));
+        }
+
+        let cwd = std::env::current_dir()
+            .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
+        Ok(cwd.join(&relative))
     }
 
     fn iteration_file_path(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
-        Ok(get_cowork_dir()?.join("iterations").join(format!("{}.json", iteration_id)))
+        let relative = PathBuf::from(COWORK_DIR)
+            .join("iterations")
+            .join(format!("{}.json", iteration_id));
+
+        // For file path, we need the parent to exist, so just return the path
+        // The parent directory should already exist from iteration creation
+        Ok(relative)
     }
 }
 
