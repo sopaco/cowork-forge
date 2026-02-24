@@ -81,7 +81,7 @@ interface AgentState {
   clearMessages: () => void;
   
   addPMMessage: (message: UserMessage | PMAgentMessage) => void;
-  setPMMessages: (messages: (UserMessage | PMAgentMessage)[]) => void;
+  setPMMessages: (messages: (UserMessage | PMAgentMessage)[] | ((prev: (UserMessage | PMAgentMessage)[]) => (UserMessage | PMAgentMessage)[])) => void;
   clearPMMessages: () => void;
   
   setProcessing: (isProcessing: boolean) => void;
@@ -124,8 +124,12 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     set((state) => ({ pmMessages: [...state.pmMessages, message] }));
   },
   
-  setPMMessages: (messages) => {
-    set({ pmMessages: messages });
+  setPMMessages: (messagesOrUpdater) => {
+    if (typeof messagesOrUpdater === 'function') {
+      set((state) => ({ pmMessages: messagesOrUpdater(state.pmMessages) }));
+    } else {
+      set({ pmMessages: messagesOrUpdater });
+    }
   },
   
   clearPMMessages: () => {

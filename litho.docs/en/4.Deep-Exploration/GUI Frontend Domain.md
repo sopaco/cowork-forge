@@ -61,25 +61,27 @@ The frontend implements a layered component hierarchy with clear separation of c
 ```mermaid
 flowchart TB
     subgraph EntryLayer["Entry Layer"]
-        Main[main.jsx<br/>Theme & React Root]
+        Main[main.tsx<br/>Theme & React Root]
         IndexCSS[Index Styling<br/>Ant Design Theme]
     end
     
     subgraph OrchestrationLayer["Core Orchestration"]
-        App[App.jsx<br/>State Management Hub]
+        App[App.tsx<br/>State Management Hub + Zustand Stores]
         EventManager[Event Listener Manager<br/>agent_event, tool_call, input_request]
         InputModal[HITL Input Modal<br/>Confirmation & Feedback]
     end
     
     subgraph PanelLayer["Panel Registry"]
-        Projects[ProjectsPanel<br/>CRUD & Multi-window]
+        Projects[ProjectsPanel<br/>Project Management]
         Iterations[IterationsPanel<br/>7-Stage Lifecycle]
-        Chat[ArtifactsViewer<br/>Streaming Chat]
+        Chat[ChatPanel<br/>Pipeline & PM Agent Chat]
+        Artifacts[ArtifactsViewer<br/>Markdown Viewer]
         Editor[CodeEditor<br/>Monaco + Virtual Tree]
         Runner[RunnerPanel<br/>Process Logs]
         Preview[PreviewPanel<br/>Dev Server IFrame]
         Memory[MemoryPanel<br/>Query & Browse]
         Knowledge[KnowledgePanel<br/>Knowledge Repository]
+        Settings[SettingsPanel<br/>Configuration]
     end
     
     subgraph Communication["IPC Layer"]
@@ -119,23 +121,28 @@ flowchart TB
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| **UI Framework** | React 18 | Component-based declarative UI with concurrent features |
+| **UI Framework** | React 18 + TypeScript | Component-based declarative UI with type safety |
 | **Component Library** | Ant Design 5.x | Enterprise-grade UI components (Tables, Modals, Tabs) |
 | **Desktop Shell** | Tauri 1.x+ | Rust-based desktop runtime with native OS integration |
 | **Code Editor** | Monaco Editor | VS Code-powered editing with syntax highlighting and IntelliSense |
 | **Virtualization** | react-window | Performance optimization for large file trees and lists |
 | **Content Rendering** | ReactMarkdown + remark-gfm | Markdown parsing for AI-generated artifacts |
 | **Styling** | CSS Modules + Ant Design Tokens | Scoped component styles with theme consistency |
-| **State Management** | React Hooks (useState/useEffect) | Centralized state in App.jsx with prop drilling |
+| **State Management** | Zustand | Lightweight state management with stores (project, agent, UI) |
 | **Icons** | @ant-design/icons | Consistent iconography across interface |
 
 ### 3.2 State Management Architecture
 
-The domain employs a centralized state management pattern with React's native hook system:
+The domain employs a **Zustand-based centralized state management** pattern with three dedicated stores:
 
-**Central State Hub (App.jsx):**
+**Store Architecture:**
+- **Project Store** (`useProjectStore`): Project and iteration state, current session context
+- **Agent Store** (`useAgentStore`): Chat messages, PM messages, processing state, input requests
+- **UI Store** (`useUIStore`): Active view, refresh triggers, command palette state
+
+**Central State Hub (App.tsx):**
 - `currentSession`: Active project/iteration context
-- `activeView`: Current visible panel (projects, iterations, chat, code, run, memory, knowledge)
+- `activeView`: Current visible panel (projects, iterations, chat, code, run, memory, knowledge, settings)
 - `messages[]`: Real-time AI agent message buffer with type differentiation (user, agent, thinking, tool_call, tool_result)
 - `pmMessages[]`: Project Manager Agent chat message buffer (user, pm_agent)
 - `chatMode`: Chat mode identifier (pipeline, pm_agent, disabled), automatically switches based on iteration status
@@ -237,7 +244,7 @@ The system implements 13+ event types for real-time streaming:
 
 **Implementation Pattern:**
 ```javascript
-// Event subscription in App.jsx
+// Event subscription in App.tsx
 useEffect(() => {
   const unlisten = listen('agent_event', (event) => {
     const { payload } = event;
@@ -256,7 +263,7 @@ useEffect(() => {
 
 ## 5. Functional Components
 
-### 5.1 Projects Panel (`ProjectsPanel.jsx`)
+### 5.1 Projects Panel (`ProjectsPanel.tsx`)
 
 **Responsibilities:**
 - Project lifecycle management (CRUD operations)
@@ -275,7 +282,7 @@ useEffect(() => {
 - Triggers `activeView` transition to 'iterations'
 - Manages `currentSession` context for child components
 
-### 5.2 Iterations Panel (`IterationsPanel.jsx`)
+### 5.2 Iterations Panel (`IterationsPanel.tsx`)
 
 **Responsibilities:**
 - 7-stage pipeline visualization (Idea → PRD → Design → Plan → Coding → Check → Delivery)
@@ -294,7 +301,7 @@ useEffect(() => {
 - Auto-switches view to appropriate panel (Artifacts/Code) based on confirmation type
 - Manages execution blocking during human validation phases
 
-### 5.3 Code Editor (`CodeEditor.jsx`)
+### 5.3 Code Editor (`CodeEditor.tsx`)
 
 **Responsibilities:**
 - File tree navigation with virtualized rendering
@@ -313,7 +320,7 @@ useEffect(() => {
 - Change tracking: Dirty state management for unsaved changes
 - Cross-panel integration: File selection from Chat/Artifacts panel opens in editor
 
-### 5.4 Runner & Preview Panels (`RunnerPanel.jsx`, `PreviewPanel.jsx`)
+### 5.4 Runner & Preview Panels (`RunnerPanel.tsx`, `PreviewPanel.tsx`)
 
 **Responsibilities:**
 - Development server process management
@@ -327,7 +334,7 @@ useEffect(() => {
 - **Dual-Tab Interface**: "Run Program" (logs) and "Page Preview" (iframe) modes
 - **Safety Controls**: Graceful process termination and port conflict detection
 
-### 5.5 Memory & Knowledge Panels (`MemoryPanel.jsx`, `KnowledgePanel.jsx`)
+### 5.5 Memory & Knowledge Panels (`MemoryPanel.tsx`, `KnowledgePanel.tsx`)
 
 **Responsibilities:**
 - Project memory querying and browsing
@@ -447,7 +454,7 @@ The `InputModal` component handles three interaction modes:
 // Counter-based invalidation pattern
 const [memoryRefreshTrigger, setMemoryRefreshTrigger] = useState(0);
 
-// Trigger from App.jsx when iteration completes
+// Trigger from App.tsx when iteration completes
 useEffect(() => {
   if (iterationCompleted) {
     setMemoryRefreshTrigger(prev => prev + 1);
@@ -487,14 +494,14 @@ useEffect(() => {
 ## 10. Known Limitations & Technical Debt
 
 **Current Issues:**
-1. **Component Nesting Bug**: `main.jsx` contains `<App><App /></App>` causing double mounting (requires immediate fix)
-2. **Tight Coupling**: `App.jsx` exceeds 200 LOC with complex prop drilling; candidate for Context API or Zustand migration
-3. **Memory Leaks**: Event listeners in early returns may not cleanup properly if component unmounts during async operations
+1. **Large Component**: `App.tsx` exceeds 800 LOC with complex state management; candidate for component splitting
+2. **Memory Leaks**: Event listeners in early returns may not cleanup properly if component unmounts during async operations
+3. **Chat History Performance**: Long-running iterations may accumulate large message arrays without virtualization
 
 **Future Improvements:**
-- Migration to TypeScript for type-safe IPC communication
-- Implementation of virtualized chat history for long-running iterations (>10k messages)
-- WebSocket fallback for Tauri IPC in potential web deployment scenarios
+- Component splitting: Extract chat logic, iteration management, and panel rendering into separate modules
+- Optimize message handling for very long-running iterations
+- Consider WebSocket fallback for Tauri IPC in potential web deployment scenarios
 
 ---
 
@@ -502,10 +509,11 @@ useEffect(() => {
 
 **Adding New Panels:**
 1. Create component in `src/components/`
-2. Add panel key to `activeView` state enum in `App.jsx`
-3. Implement in `PANELS` mapping object with icon and title
-4. Add necessary IPC commands to Tauri backend
-5. Register event listeners in panel's `useEffect`
+2. Add panel key to `activeView` state in UI store (`src/stores/uiStore.ts`)
+3. Add menu item in `App.tsx` Sider menu with icon and label
+4. Add rendering logic in `App.tsx` renderContent function
+5. Add necessary IPC commands to Tauri backend
+6. Register event listeners in panel's `useEffect`
 
 **Event Listener Best Practices:**
 ```javascript

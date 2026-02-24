@@ -424,7 +424,7 @@ impl SimpleInvocationContext {
             memory: None, // TODO: implement memory
             session: Box::new(SimpleSession::new(&ctx.iteration.id, content.clone())),
             run_config: adk_core::RunConfig {
-                streaming_mode: adk_core::StreamingMode::None,
+                streaming_mode: adk_core::StreamingMode::SSE,
                 tool_confirmation_decisions: HashMap::new(),
             },
             ended: std::sync::atomic::AtomicBool::new(false),

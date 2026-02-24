@@ -31,6 +31,7 @@ import type {
   InputOption, 
   ChatMode,
   PMAction,
+  PMAgentMessage,
 } from './stores';
 
 import ArtifactsViewer from './components/ArtifactsViewer';
@@ -229,25 +230,65 @@ function App() {
       });
 
       await listen('agent_streaming', (event) => {
-        const { content, agent_name, is_thinking } = event.payload as {
+        const { content, agent_name, is_thinking, is_first, is_last } = event.payload as {
           content?: string;
           agent_name?: string;
           is_thinking?: boolean;
+          is_first?: boolean;
+          is_last?: boolean;
         };
         
+        // Handle PM Agent streaming messages separately
+        if (agent_name === 'PM Agent') {
+          // is_last signal without content means stream ended
+          if (is_last && !content) {
+            setPMMessages((prev) => {
+              const lastMsg = prev[prev.length - 1];
+              if (lastMsg?.type === 'pm_agent') {
+                return [...prev.slice(0, -1), { ...lastMsg } as PMAgentMessage];
+              }
+              return prev;
+            });
+            return;
+          }
+          
+          if (!content) return;
+          
+          setPMMessages((prev) => {
+            const lastMsg = prev[prev.length - 1];
+            // Create new message if is_first or no existing streaming message
+            if (is_first || !lastMsg || lastMsg.type !== 'pm_agent' || !(lastMsg as PMAgentMessage & { isStreaming?: boolean }).isStreaming) {
+              return [...prev, {
+                type: 'pm_agent' as const,
+                content,
+                isStreaming: !is_last,
+                timestamp: new Date().toISOString(),
+              } as PMAgentMessage & { isStreaming?: boolean }];
+            }
+            // Append to existing streaming message
+            return [...prev.slice(0, -1), { 
+              ...lastMsg, 
+              content: (lastMsg as PMAgentMessage).content + content,
+              isStreaming: !is_last,
+            } as PMAgentMessage & { isStreaming?: boolean }];
+          });
+          return;
+        }
+        
+        // Handle Pipeline Agent streaming messages
         if (!content) return;
         const msgType = is_thinking ? 'thinking' : 'agent';
 
         setMessages((prev) => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg?.type === msgType && (lastMsg as { isStreaming?: boolean }).isStreaming && (lastMsg as { agentName?: string }).agentName === agent_name) {
-            return [...prev.slice(0, -1), { ...lastMsg, content: (lastMsg as { content: string }).content + content } as ChatMessage];
+            return [...prev.slice(0, -1), { ...lastMsg, content: (lastMsg as { content: string }).content + content, isStreaming: !is_last } as ChatMessage];
           }
           return [...prev, {
             type: msgType,
             content,
             agentName: agent_name || 'AI Agent',
-            isStreaming: true,
+            isStreaming: !is_last,
             isExpanded: false,
             timestamp: new Date().toISOString(),
           } as ChatMessage];
@@ -284,6 +325,24 @@ function App() {
           agentName: agent_name || 'AI Agent',
           timestamp: new Date().toISOString(),
         } as ChatMessage);
+      });
+
+      await listen('pm_actions', (event) => {
+        const { actions } = event.payload as {
+          actions: PMAction[];
+        };
+        
+        // Add actions to the last PM Agent message
+        setPMMessages((prev) => {
+          const lastMsg = prev[prev.length - 1];
+          if (lastMsg?.type === 'pm_agent') {
+            return [...prev.slice(0, -1), { 
+              ...lastMsg, 
+              actions: [...((lastMsg as PMAgentMessage).actions || []), ...actions] 
+            } as PMAgentMessage];
+          }
+          return prev;
+        });
       });
 
       await listen('input_request', (event) => {

@@ -206,19 +206,32 @@ pub async fn pm_send_message(
         tools: tools_map,
     };
 
-    let mut stream = client.generate_content(req, false).await.map_err(|e| format!("Failed to generate content: {}", e))?;
+    let mut stream = client.generate_content(req, true).await.map_err(|e| format!("Failed to generate content: {}", e))?;
     
     use futures::StreamExt;
     
     let mut response_text = String::new();
     let mut function_calls: Vec<(String, serde_json::Value)> = Vec::new();
+    let mut is_first_chunk = true;
     
+    // Stream LLM response in real-time, similar to ChatGPT
     while let Some(chunk) = stream.next().await {
         if let Ok(r) = chunk {
             if let Some(c) = r.content {
                 for p in c.parts.iter() {
                     match p {
-                        Part::Text { text } => response_text.push_str(text),
+                        Part::Text { text } => {
+                            response_text.push_str(text);
+                            // Emit each chunk in real-time for streaming display
+                            let _ = window.emit("agent_streaming", serde_json::json!({
+                                "content": text,
+                                "agent_name": "PM Agent",
+                                "is_thinking": false,
+                                "is_first": is_first_chunk,
+                                "is_last": false
+                            }));
+                            is_first_chunk = false;
+                        }
                         Part::FunctionCall { name, args, .. } => {
                             function_calls.push((name.clone(), args.clone()));
                         }
@@ -228,8 +241,19 @@ pub async fn pm_send_message(
             }
         }
     }
+    
+    // Send streaming end signal
+    if !response_text.is_empty() || !is_first_chunk {
+        let _ = window.emit("agent_streaming", serde_json::json!({
+            "content": "",
+            "agent_name": "PM Agent",
+            "is_thinking": false,
+            "is_first": false,
+            "is_last": true
+        }));
+    }
 
-    // Process function calls
+    // Process function calls - these add actions to the streaming message
     for (func_name, args) in &function_calls {
         if func_name == "goto_stage" {
             if let Some(target) = args.get("target_stage").and_then(|t| t.as_str()) {
@@ -246,24 +270,44 @@ pub async fn pm_send_message(
                 };
                 
                 let stage_name = stage_names.get(target).unwrap_or(&target);
-                let response_msg = if !response_text.is_empty() {
-                    format!("{}\n\n点击下方按钮确认跳转到 **{}**：", response_text, stage_name)
-                } else {
-                    format!("好的，我将帮你跳转到 **{}** 重新执行。\n\n点击下方按钮确认：", stage_name)
-                };
                 
-                let result = serde_json::json!({
-                    "agent_message": response_msg,
+                // Append action prompt to streaming message
+                let action_prompt = format!("\n\n点击下方按钮确认跳转到 **{}**：", stage_name);
+                let _ = window.emit("agent_streaming", serde_json::json!({
+                    "content": action_prompt,
+                    "agent_name": "PM Agent",
+                    "is_thinking": false,
+                    "is_first": false,
+                    "is_last": false
+                }));
+                
+                // Send actions to be appended
+                let _ = window.emit("pm_actions", serde_json::json!({
+                    "actions": [{ 
+                        "action_type": "pm_goto_stage", 
+                        "target_stage": target, 
+                        "label": format!("🔄 跳转到 {}", stage_name) 
+                    }]
+                }));
+                
+                // Send stream end signal
+                let _ = window.emit("agent_streaming", serde_json::json!({
+                    "content": "",
+                    "agent_name": "PM Agent",
+                    "is_thinking": false,
+                    "is_first": false,
+                    "is_last": true
+                }));
+                
+                return Ok(serde_json::json!({
+                    "agent_message": response_text,
                     "actions": [{ 
                         "action_type": "pm_goto_stage", 
                         "target_stage": target, 
                         "label": format!("🔄 跳转到 {}", stage_name) 
                     }],
                     "needs_restart": false
-                });
-                
-                let _ = window.emit("pm_message", &result);
-                return Ok(result);
+                }));
             }
         }
         
@@ -309,14 +353,37 @@ pub async fn pm_send_message(
                 // Emit iteration_created event to notify frontend
                 let _ = window.emit("iteration_created", &new_iteration_id);
                 
-                let response_msg = if !response_text.is_empty() {
-                    format!("{}\n\n我已经创建了新迭代 **{}**。\n\n点击下方按钮启动新迭代：", response_text, title)
-                } else {
-                    format!("好的，我已经为你创建了新迭代 **{}**。\n\n点击下方按钮启动新迭代：", title)
-                };
+                // Append action prompt to streaming message
+                let action_prompt = format!("\n\n我已经创建了新迭代 **{}**。\n\n点击下方按钮启动新迭代：", title);
+                let _ = window.emit("agent_streaming", serde_json::json!({
+                    "content": action_prompt,
+                    "agent_name": "PM Agent",
+                    "is_thinking": false,
+                    "is_first": false,
+                    "is_last": false
+                }));
                 
-                let result = serde_json::json!({
-                    "agent_message": response_msg,
+                // Send actions to be appended
+                let _ = window.emit("pm_actions", serde_json::json!({
+                    "actions": [{ 
+                        "action_type": "pm_create_iteration", 
+                        "iteration_id": new_iteration_id,
+                        "title": new_iteration_title,
+                        "label": "🚀 启动新迭代" 
+                    }]
+                }));
+                
+                // Send stream end signal
+                let _ = window.emit("agent_streaming", serde_json::json!({
+                    "content": "",
+                    "agent_name": "PM Agent",
+                    "is_thinking": false,
+                    "is_first": false,
+                    "is_last": true
+                }));
+                
+                return Ok(serde_json::json!({
+                    "agent_message": response_text,
                     "actions": [{ 
                         "action_type": "pm_create_iteration", 
                         "iteration_id": new_iteration_id,
@@ -324,29 +391,37 @@ pub async fn pm_send_message(
                         "label": "🚀 启动新迭代" 
                     }],
                     "needs_restart": false
-                });
-                
-                let _ = window.emit("pm_message", &result);
-                return Ok(result);
+                }));
             }
         }
     }
 
-    // No function call, return text response
-    let response = if response_text.is_empty() { 
-        "抱歉，我没有理解你的请求。你可以尝试告诉我想做什么，比如「帮我修改代码」或「重新检查项目」。".to_string() 
-    } else { 
-        response_text 
-    };
+    // No function call - just signal stream complete
+    // The content was already streamed via agent_streaming events
+    if response_text.is_empty() { 
+        // Send a fallback message if no content was streamed
+        let fallback = "抱歉，我没有理解你的请求。你可以尝试告诉我想做什么，比如「帮我修改代码」或「重新检查项目」。";
+        let _ = window.emit("agent_streaming", serde_json::json!({
+            "content": fallback,
+            "agent_name": "PM Agent",
+            "is_thinking": false,
+            "is_first": true,
+            "is_last": false
+        }));
+        let _ = window.emit("agent_streaming", serde_json::json!({
+            "content": "",
+            "agent_name": "PM Agent",
+            "is_thinking": false,
+            "is_first": false,
+            "is_last": true
+        }));
+    }
     
-    let result = serde_json::json!({
-        "agent_message": response,
+    Ok(serde_json::json!({
+        "agent_message": if response_text.is_empty() { "抱歉，我没有理解你的请求。".to_string() } else { response_text.clone() },
         "actions": [],
         "needs_restart": false
-    });
-    
-    let _ = window.emit("pm_message", &result);
-    Ok(result)
+    }))
 }
 
 #[tauri::command]
