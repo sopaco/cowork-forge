@@ -221,6 +221,31 @@ pub async fn execute_stage_with_instruction(
                 }
             }
             Err(e) => {
+                let err_msg = format!("{}", e);
+                // Check if this is a goto_stage signal from a tool
+                if err_msg.contains("GOTO_STAGE:") {
+                    // Extract the GOTO_STAGE message - format: "Tool execution failed: GOTO_STAGE:stage:reason"
+                    // or just "GOTO_STAGE:stage:reason"
+                    if let Some(goto_msg) = err_msg.split("GOTO_STAGE:").nth(1) {
+                        let parts: Vec<&str> = goto_msg.splitn(2, ':').collect();
+                        if parts.len() == 2 {
+                            let target_stage = parts[0].to_string();
+                            let reason = parts[1].to_string();
+                            
+                            interaction
+                                .show_message_with_context(
+                                    crate::interaction::MessageLevel::Warning,
+                                    format!("🔄 Stage jump requested: {} → {}", stage_name, target_stage),
+                                    MessageContext::new(&display_name).with_stage(stage_name),
+                                )
+                                .await;
+                            
+                            // Return immediately to trigger stage jump
+                            return StageResult::GotoStage(target_stage, reason);
+                        }
+                    }
+                }
+                
                 interaction
                     .show_message_with_context(
                         crate::interaction::MessageLevel::Error,
