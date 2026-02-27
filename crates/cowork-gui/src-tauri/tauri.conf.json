@@ -16,6 +16,7 @@
         "title": "Cowork Forge",
         "width": 1200,
         "height": 720,
+        "center": true,
         "minWidth": 800,
         "minHeight": 600
       }

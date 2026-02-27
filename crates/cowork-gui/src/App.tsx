@@ -363,7 +363,8 @@ function App() {
           const latestIterations = useProjectStore.getState().iterations;
           if (latestIterations && latestIterations.length > 0) {
             const latestIteration = latestIterations[latestIterations.length - 1];
-            setCurrentIteration(latestIteration);
+            const fullIteration = await API.iteration.get(latestIteration.id);
+            setCurrentIteration(fullIteration);
           }
           
           setInputRequest({
