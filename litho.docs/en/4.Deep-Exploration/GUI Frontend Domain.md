@@ -540,3 +540,111 @@ useEffect(() => {
 ---
 
 **Conclusion:** The GUI Frontend Domain successfully abstracts the complexity of the AI agent pipeline into an intuitive desktop interface. Its event-driven architecture enables real-time collaboration between human developers and AI agents, while the modular panel structure supports diverse workflows from project initialization to code deployment. The domain maintains strict separation from core business logic through the Tauri IPC boundary, ensuring architectural integrity while delivering responsive user experiences.
+
+---
+
+## 12. Project Manager Agent (PM Agent) Interface
+
+The GUI provides a dedicated interface for post-delivery interactions through the Project Manager Agent.
+
+### 12.1 PM Agent Activation
+
+The PM Agent becomes available when an iteration reaches `Completed` status:
+- Chat mode automatically switches from `pipeline` to `pm_agent`
+- A welcome message is displayed with quick action buttons
+- The chat interface becomes available for natural language interaction
+
+### 12.2 PM Agent Features
+
+**Welcome Actions**:
+- 🚀 **Start Application**: Launch the generated application
+- 📁 **Open Project Folder**: Open workspace in file explorer
+- 📄 **View Artifacts**: Navigate to artifacts viewer
+- 💻 **View Source Code**: Navigate to code editor
+- 📚 **View Knowledge Base**: Navigate to knowledge panel
+
+**Conversational Interactions**:
+- Ask questions about the project (technology stack, architecture, etc.)
+- Request code modifications → Triggers `goto_stage` to Coding
+- Request new features → Triggers `create_iteration` with inheritance
+- Save decisions to project memory
+
+### 12.3 PM Agent State Management
+
+**State Variables** (in `useAgentStore`):
+- `pmMessages[]`: Message history for PM Agent chat
+- `pmProcessing`: Boolean indicating PM Agent is processing a request
+- `chatMode`: Current chat mode (`pipeline` | `pm_agent` | `disabled`)
+
+**Events**:
+| Event | Purpose |
+|-------|---------|
+| `pm_message` | PM Agent response message |
+| `pm_actions` | Actionable buttons for user |
+| `agent_streaming` | Real-time streaming from PM Agent |
+| `iteration_created` | New iteration created via PM Agent |
+
+### 12.4 PM Agent Commands
+
+| Command | Parameters | Description |
+|---------|------------|-------------|
+| `pm_send_message` | `iteration_id`, `message`, `history` | Send message to PM Agent |
+| `pm_restart_iteration` | `iteration_id`, `target_stage` | Restart from specific stage |
+| `pm_get_welcome_message` | `iteration_id` | Get welcome message with actions |
+
+---
+
+## 13. Settings Panel: External Coding Agent Configuration
+
+The Settings Panel (`SettingsPanel.tsx`) provides configuration for external coding agents:
+
+### 13.1 Configuration Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `enabled` | Boolean | Enable/disable external agent |
+| `agent_type` | Select | Agent type (opencode, iflow, codex, gemini, claude) |
+| `command` | String | Command to execute (e.g., "bun") |
+| `args` | String[] | Command arguments |
+| `transport` | Select | Communication transport (stdio, websocket) |
+| `workspace_path` | String | Optional workspace path override |
+
+### 13.2 Agent Types
+
+```
+OpenCode  → bun x opencode-ai acp
+iFlow     → iflow acp
+Codex     → codex
+Gemini    → gemini
+Claude    → claude
+```
+
+### 13.3 UI Components
+
+- **Enable Switch**: Toggle for external agent activation
+- **Agent Type Selector**: Dropdown with supported agent types
+- **Command Input**: Text input for the executable command
+- **Arguments Input**: Tag-style multi-value input for arguments
+- **Transport Selector**: stdio or websocket options
+- **Test Connection Button**: Validates LLM configuration
+
+---
+
+## 14. Technology Stack Updates
+
+### 14.1 Current Stack (Updated)
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **UI Framework** | React 18 + TypeScript | Component-based declarative UI with type safety |
+| **State Management** | Zustand | Lightweight centralized state with stores |
+| **Component Library** | Ant Design 5.x | Enterprise-grade UI components |
+| **Desktop Shell** | Tauri 1.x+ | Rust-based desktop runtime |
+| **Code Editor** | Monaco Editor | VS Code-powered editing |
+| **Virtualization** | react-window | Performance optimization |
+
+### 14.2 Zustand Stores
+
+**useProjectStore**: Project and iteration state management
+**useAgentStore**: Chat messages, PM messages, processing states
+**useUIStore**: Active view, refresh triggers, UI preferences

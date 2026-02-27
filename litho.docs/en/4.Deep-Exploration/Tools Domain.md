@@ -368,3 +368,88 @@ impl Tool for MyNewTool {
 ---
 
 **End of Documentation**
+---
+
+## 11. PM Tools (Project Manager Agent Tools)
+
+**Purpose**: Support post-delivery interactions through the Project Manager Agent, enabling users to continue working with completed projects.
+
+**Available Tools**:
+
+### 11.1 PMGotoStageTool
+Restarts the pipeline from a specific stage. Used when users want to fix bugs, modify requirements, or make changes after delivery.
+
+**Parameters**:
+- `stage` (required): Target stage - one of `idea`, `prd`, `design`, `plan`, `coding`
+- `reason` (required): Why the restart is needed (user's request summary)
+
+**Use Cases**:
+- User: "Fix the login bug" → Jump to `coding` stage
+- User: "Change the database schema" → Jump to `design` stage
+- User: "Add a new requirement" → Jump to `prd` stage
+
+### 11.2 PMCreateIterationTool
+Creates a new iteration for implementing new features or major changes.
+
+**Parameters**:
+- `title` (required): Title for the new iteration
+- `description` (required): Detailed description of what to implement
+- `inheritance` (optional): Inheritance mode - `none`, `full`, or `partial` (default: `partial`)
+
+**Inheritance Modes**:
+| Mode | Description |
+|------|-------------|
+| `none` | Fresh start, no inheritance from current iteration |
+| `full` | Copy all artifacts and code from current iteration |
+| `partial` | Copy code only, regenerate documentation (recommended) |
+
+### 11.3 PMRespondTool
+Responds to the user without taking any action. Used for answering questions or asking for clarification.
+
+**Parameters**:
+- `response` (required): The response message to the user
+- `ask_clarification` (optional): Whether this response is asking for clarification
+
+### 11.4 PMSaveDecisionTool
+Saves important decisions or preferences to project memory for future reference.
+
+**Parameters**:
+- `title` (required): Title of the decision
+- `context` (required): Background context of the decision
+- `decision` (required): The actual decision made
+- `impact` (optional): Impact analysis of this decision
+
+> **Note**: PM Tools are only available when iteration status is `Completed` (after Delivery stage). They enable a conversational interface for post-delivery project maintenance and requirement changes.
+
+---
+
+## 12. ACP Integration
+
+The Tools Domain includes support for external coding agents via the Agent Communication Protocol (ACP):
+
+**Configuration** (in `config.toml`):
+```toml
+[coding_agent]
+enabled = true
+agent_type = "opencode"       # opencode, iflow, codex, gemini, claude
+command = "bun"
+args = ["x", "opencode-ai", "acp"]
+transport = "stdio"           # stdio or websocket
+workspace_path = ""           # optional
+```
+
+**Supported External Agents**:
+- **OpenCode**: OpenCode AI agent via `bun x opencode-ai acp`
+- **iFlow**: iFlow CLI agent
+- **Codex**: OpenAI Codex CLI
+- **Gemini CLI**: Google's Gemini command-line agent
+- **Claude CLI**: Anthropic's Claude command-line agent
+
+**Integration Flow**:
+1. During Coding stage, if external agent is enabled, the system spawns the configured agent process
+2. Communication occurs via stdio or WebSocket using ACP protocol
+3. The external agent receives the coding task with full project context
+4. Streaming responses are forwarded to the GUI for real-time display
+5. On completion, results are integrated back into the pipeline
+
+This allows users to leverage specialized coding agents while maintaining the full 7-stage workflow orchestration.

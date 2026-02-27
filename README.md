@@ -1,4 +1,4 @@
-<p align="center">
+﻿<p align="center">
   <img height="200" src="./assets/blend_banner.png">
 </p>
 
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-    <strong>🤖 Full-Stack AI Development Team - Complete Collaboration from Idea to Delivery 🤖</strong>
+    <strong>🚀 Full-Stack AI Development Team - Complete Collaboration from Idea to Delivery 🚀</strong>
 </p>
 <p align="center">Cowork Forge is not just a code generator, but a complete virtual development team. It includes professional roles like Product Manager, Architect, Project Manager, and Engineer, working together through AI agent collaboration to transform your ideas into production-ready software systems.</p>
 
@@ -43,7 +43,6 @@ Each role uses Actor-Critic patterns for self-review and optimization, with huma
 <p align="center">
   <strong>One person can have a complete development team - Cowork Forge makes AI agents work for you like a real team.</strong>
 </p>
-
 <div style="text-align: center; margin: 30px 0;">
   <table style="width: 100%; border-collapse: collapse; margin: 0 auto;">
     <tr>
@@ -78,7 +77,7 @@ Each role uses Actor-Critic patterns for self-review and optimization, with huma
 <hr />
 
 ## ✨ Visual Walkthrough
-> Cowork Forge is an intelligent development engine that can be called by various technology stacks (Python/Java/NodeJS) through FFI as the high-performance cowork-core library; easily integrated into workflows through cowork-cli; also includes a locally deployable GUI project that provides a friendly interactive interface. Using Cowork Forge GUI as an example, we can intuitively experience the complete lifecycle of software development through its interface.
+> Cowork Forge is an intelligent development engine that can be called by various technology stacks (Python/Java/NodeJS) through FFI as the high-performance cowork-core library; easily integrated into workflows through cowork-cli; also includes a locally deployable GUI project that provides a friendly interactive interface.
 
 |  |  |
 | :--- | :--- |
@@ -88,37 +87,51 @@ Each role uses Actor-Critic patterns for self-review and optimization, with huma
 
 ---
 
-## 🔄 Development Workflow
+## 🛠️ Development Workflow
 
 Cowork Forge GUI guides you through the standard **7-Stage Development Lifecycle**:
 
 1.  **💡 Idea Intake**: Chat with the agent to define your concept.
-2.  **📋 PRD Generation**: Review the generated Product Requirements Document.
+2.  **📄 PRD Generation**: Review the generated Product Requirements Document.
 3.  **🏗️ Architecture Design**: Approve the technical design and system boundaries.
-4.  **📅 Implementation Planning**: See the task breakdown and timeline.
+4.  **📐 Implementation Planning**: See the task breakdown and timeline.
 5.  **💻 Coding & Testing**: Watch code being written and tests passing.
 6.  **✅ Quality Check**: Verify the implementation against requirements.
 7.  **📦 Delivery**: Receive the final project report and artifacts.
 
-# 🏆 Cowork Forge vs. Competitors
+## 🔄 Post-Delivery Support
 
-Cowork Forge stands out in the AI development tools landscape through its unique multi-agent architecture and comprehensive workflow coverage.
+After an iteration completes, the **Project Manager Agent** becomes available for continued interaction:
+
+- **💬 Natural Language Chat**: Ask questions about your project, request modifications, or discuss next steps
+- **🔀 Stage Navigation**: Jump back to any stage (Idea, PRD, Design, Plan, Coding) to make changes
+- **➕ Create New Iterations**: Start new iterations for new features with inheritance support
+
+```
+Iteration Completed
+        ↓
+[PM Agent Activated]
+        ↓
+User: "Fix the login bug" → PM Agent: Jumps to Coding stage
+User: "Add payment feature" → PM Agent: Creates new iteration
+User: "What tech stack?" → PM Agent: Answers directly
+```
+
+
+# 🏆 Cowork Forge vs. Competitors
 
 ## Core Capabilities Comparison
 
 | Capability | Cowork Forge | GitHub Copilot | Cursor AI | Aider |
 |------------|------------------------|----------------|-----------|-------|
 | **End-to-End Workflow** | ✅ Complete (Idea→Delivery) | ❌ Code completion only | ❌ Code editing focus | ❌ Code assistance only |
-| **Multi-Agent Architecture** | ✅ 8 specialized agents | ❌ Single model | ❌ Single model | ❌ Single model |
+| **Multi-Agent Architecture** | ✅ 10+ specialized agents | ❌ Single model | ❌ Single model | ❌ Single model |
 | **PRD Generation** | ✅ Automated | ❌ N/A | ❌ N/A | ❌ N/A |
 | **Technical Design** | ✅ C4 architecture docs | ❌ N/A | ❌ N/A | ❌ N/A |
-| **Implementation Planning** | ✅ Task breakdown & milestones | ❌ N/A | ❌ N/A | ❌ N/A |
+| **Post-Delivery Support** | ✅ PM Agent chat interface | ❌ N/A | ❌ N/A | ❌ N/A |
+| **External Agent Integration** | ✅ ACP-compatible agents | ❌ N/A | ❌ N/A | ❌ N/A |
 | **Incremental Updates** | ✅ Smart delta analysis | ❌ N/A | ❌ Limited | ❌ Limited |
-| **Multi-Language Support** | ✅ Rust, Python, JS/TS | ✅ Many languages | ✅ Many languages | ✅ Many languages |
 | **Human-in-the-Loop** | ✅ Critical decision points | ❌ N/A | ❌ Limited | ❌ Limited |
-| **Automated Verification** | ✅ Build/test integration | ❌ N/A | ❌ N/A | ❌ N/A |
-| **Safety Checks** | ✅ Multi-layer security | ❌ N/A | ❌ Basic | ❌ Basic |
-| **Artifact Storage** | ✅ Versioned artifacts | ❌ N/A | ❌ N/A | ❌ N/A |
 | **Open Source** | ✅ MIT License | ❌ Proprietary | ❌ Proprietary | ✅ MIT License |
 | **Self-Hosted** | ✅ Local execution | ❌ Cloud only | ❌ Cloud only | ✅ Local execution |
 
@@ -132,8 +145,6 @@ Unlike tools that only assist with writing code, Cowork Forge provides complete 
 - **Project Manager Role**: Breaks down tasks, plans dependencies, and implementation paths
 - **Engineer Role**: Implements code and performs quality verification
 
-This full-role coverage ensures end-to-end continuity and professionalism from requirements analysis to code implementation.
-
 ### 2. Multi-Agent Collaboration
 Cowork Forge's specialized agents work together like a real development team:
 - <strong>Idea Agent</strong>: Captures and structures user requirements
@@ -143,9 +154,9 @@ Cowork Forge's specialized agents work together like a real development team:
 - <strong>Coding Loop Agent</strong>: Plans and executes code changes with actor-critic refinement
 - <strong>Check Agent</strong>: Verifies code quality and completeness
 - <strong>Delivery Agent</strong>: Generates comprehensive delivery reports
+- <strong>Project Manager Agent</strong>: Post-delivery assistant for modifications and new iterations
 - <strong>Change Triage Agent</strong>: Analyzes and triages incremental change requests
 - <strong>Code Patch Agent</strong>: Implements precise code patches for modifications
-- <strong>Modify Delivery Agent</strong>: Generates modification delivery reports
 
 ### 3. Human-in-the-Loop Validation
 Critical outputs require human confirmation before proceeding, ensuring:
@@ -154,10 +165,8 @@ Critical outputs require human confirmation before proceeding, ensuring:
 - Feasible implementation plans
 - Safe code changes
 
-This balance of automation and human control sets Cowork Forge apart from fully autonomous tools.
-
 ### 4. Incremental Code Updates
-When requirements or designs change, Cowork Forge intelligently identifies affected files and updates only what's necessary—preserving your customizations and avoiding full regeneration.
+When requirements or designs change, Cowork Forge intelligently identifies affected files and updates only what's necessary.
 
 ### 5. Built-in Safety
 Multi-layer security checks prevent:
@@ -166,12 +175,15 @@ Multi-layer security checks prevent:
 - Malicious code injection
 - Resource exhaustion
 
-❤️ Like <strong>Cowork Forge</strong>? Star it 🌟 or [Sponsor Me](https://github.com/sponsors/sopaco)! ❤️
+❤️ Like <strong>Cowork Forge</strong>? Star it ⭐ or [Sponsor Me](https://github.com/sponsors/sopaco)! ❤️
 
-# 🌠 Features & Capabilities
 
-- <strong>7-Stage Development Workflow:</strong> Comprehensive workflow covering Idea Intake → PRD Generation → Technical Design → Implementation Plan → Coding → Quality Check → Delivery, corresponding to the complete process of a real development team.
-- <strong>Specialized AI Agents:</strong> Each stage handled by a dedicated agent with domain expertise. Four critical stages (PRD, Design, Plan, Coding) use actor-critic loops for iterative refinement, ensuring output quality meets professional standards.
+# 🌟 Features & Capabilities
+
+- <strong>7-Stage Development Workflow:</strong> Comprehensive workflow covering Idea Intake → PRD Generation → Technical Design → Implementation Plan → Coding → Quality Check → Delivery.
+- <strong>Specialized AI Agents:</strong> Each stage handled by a dedicated agent with domain expertise. Four critical stages (PRD, Design, Plan, Coding) use actor-critic loops for iterative refinement.
+- <strong>Project Manager Agent:</strong> Post-delivery chat interface for continued project interaction. Request modifications, create new iterations, or ask questions about your completed project.
+- <strong>External Coding Agent Support:</strong> Optionally integrate external ACP-compatible coding agents (OpenCode, iFlow, Codex, Gemini CLI, Claude CLI) for specialized coding tasks.
 - <strong>Intelligent Code Planning:</strong> Analyzes project structure, dependencies, and generates precise code change plans.
 - <strong>Incremental Code Updates:</strong> Smart delta analysis updates only affected files, preserving existing modifications.
 - <strong>Automated Quality Verification:</strong> Multi-language build/test integration with comprehensive error analysis and reporting.
@@ -185,83 +197,23 @@ Multi-layer security checks prevent:
 
 Cowork Forge is built as a Rust workspace with modular, hexagonal architecture based on the adk-rust framework:
 
-```mermaid
-graph TB
-    subgraph "CLI Layer"
-        CLI[cowork-cli]
-    end
-    
-    subgraph "GUI Layer"
-        GUI[cowork-gui<br/>Tauri + React]
-    end
-    
-    subgraph "cowork-core"
-        subgraph "Application Layer"
-            PIPELINE[Pipeline Domain<br/>7-Stage Orchestration]
-            INTERACTION[Interaction Domain<br/>Backend Abstraction]
-        end
-        
-        subgraph "Domain Layer"
-            DOMAIN[Domain Logic<br/>Project/Iteration/Memory]
-        end
-        
-        subgraph "Infrastructure Layer"
-            PERSISTENCE[Persistence<br/>JSON Stores]
-            LLM_INTEGRATION[LLM Integration<br/>Rate-Limited]
-            TOOLS[Tools Domain<br/>30+ ADK Tools]
-            SECURITY[Security<br/>Path Validation]
-        end
-    end
-    
-    subgraph "ADK Framework"
-        ADK[adk-rust]
-        AGENTS[Agent System]
-    end
-    
-    subgraph "External"
-        OPENAI[OpenAI Compatible<br/>LLM API]
-        FS[File System]
-    end
-    
-    CLI --> INTERACTION
-    GUI --> INTERACTION
-    INTERACTION --> PIPELINE
-    PIPELINE --> DOMAIN
-    DOMAIN --> PERSISTENCE
-    TOOLS --> PERSISTENCE
-    AGENTS --> ADK
-    ADK --> LLM_INTEGRATION
-    LLM_INTEGRATION --> OPENAI
-    TOOLS --> FS
-```
-
 ## Key Components
 
 ### Rust Workspace Structure
-The project is organized as a Rust workspace with multiple crates:
 - `cowork-core`: Core library with domain logic, pipeline orchestration, and tools
 - `cowork-cli`: Command-line interface for interacting with the system
-- `cowork-gui`: Optional graphical user interface (Tauri + React based)
+- `cowork-gui`: Optional graphical user interface (Tauri + React + TypeScript)
 
 ### Hexagonal Architecture
-Cowork Forge implements a hexagonal (ports and adapters) architecture:
 - **Domain Layer**: Pure business logic (Project, Iteration, Memory aggregates)
 - **Application Layer**: Pipeline orchestration, stage execution
-- **Infrastructure Layer**: Persistence, LLM integration, tools
+- **Infrastructure Layer**: Persistence, LLM integration, tools, ACP client
 - **Ports**: InteractiveBackend trait for CLI/GUI abstraction
 
 ### Iteration Architecture
-Core concept that manages complete development cycles as independent, inheritable units:
 - **Genesis Iterations**: Start new projects from scratch
 - **Evolution Iterations**: Build upon existing iterations with inheritance modes
 - **Inheritance Modes**: None (fresh start), Full (complete code + artifacts copy), Partial (artifacts only, regenerate code)
-
-### ADK Framework Integration
-Built on the adk-rust framework providing:
-- Agent orchestration and lifecycle management
-- LLM integration with OpenAI and compatible providers
-- Tool system for safe code operations
-- Session management for stateful interactions
 
 ### Pipeline Domain
 Seven-stage development workflow with Actor-Critic pattern:
@@ -278,60 +230,17 @@ Secure tool execution with workspace validation:
 - File operations within project boundaries
 - Command execution with safety checks
 - Interactive tools for human-in-the-loop validation
+- **PM tools** for post-delivery interactions
 - 30+ ADK tools for file, data, validation, and memory operations
 
-### Persistence Layer
-Data management and storage:
-- Iteration storage and retrieval
-- Artifact management with versioning
-- Project memory system for cross-iteration knowledge retention
+### ACP Integration
+Agent Communication Protocol support:
+- External coding agent integration via stdio or WebSocket
+- Compatible with OpenCode, iFlow, Codex, Gemini CLI, Claude CLI
+- Seamless fallback to built-in adk-rust agent
 
-# 🧠 How It Works
 
-Cowork Forge uses a sophisticated multi-stage workflow orchestrated by the `Pipeline Controller`:
-
-```mermaid
-sequenceDiagram
-    participant User as User
-    participant CLI as Cowork Forge CLI
-    participant Pipeline as Pipeline Controller
-    participant Stage as Stage Executor
-    participant Agents as AI Agents
-    participant LLM as LLM API
-    participant Store as Iteration Store
-
-    User->>CLI: Provide idea/requirement
-    CLI->>Pipeline: Initialize pipeline context
-    Pipeline->>Store: Create genesis/evolution iteration
-    
-    loop For each stage (7 stages)
-        Pipeline->>Stage: Execute stage with context
-        Stage->>Agents: Create agent with instructions
-        Agents->>LLM: Generate content
-        LLM-->>Agents: Stream response
-        
-        alt Critical stage (PRD/Design/Plan/Coding)
-            Agents->>User: HITL validation
-            User-->>Agents: Confirm/Edit/Feedback
-        end
-        
-        alt Coding stage
-            Agents->>Store: Read project files
-            Agents->>LLM: Generate code changes
-            LLM-->>Agents: Return code
-            Agents->>Store: Write code files
-            Agents->>Store: Run build/test commands
-        end
-        
-        Stage->>Store: Persist stage artifacts
-        Pipeline->>Pipeline: Transition to next stage
-    end
-    
-    Pipeline->>Store: Update iteration status (Completed)
-    Pipeline->>Store: Generate knowledge snapshot
-```
-
-# 🖥 Getting Started
+# 📋 Getting Started
 
 ### Prerequisites
 - [**Rust**](https://www.rust-lang.org) (edition 2024)
@@ -339,8 +248,6 @@ sequenceDiagram
 - Git and language-specific build tools (cargo, npm, pip, etc.)
 
 ### Installation
-
-Build from source:
 
 ```sh
 # Clone the repository
@@ -356,10 +263,16 @@ cargo build --release
 
 ### Configuration
 
-Cowork Forge uses a `config.toml` file for configuration. Create one in your project directory or use `--config` to specify a path:
+Cowork Forge uses a `config.toml` file stored in your system's application data directory:
+
+| Platform | Config Location |
+|----------|----------------|
+| Windows | `%APPDATA%\CoworkCreative\config.toml` |
+| macOS | `~/Library/Application Support/CoworkCreative/config.toml` |
+| Linux | `~/.config/CoworkCreative/config.toml` |
 
 ```toml
-# LLM Configuration
+# LLM Configuration (Required)
 [llm]
 api_base_url = "https://api.openai.com/v1"
 api_key = "sk-your-openai-api-key"
@@ -369,12 +282,39 @@ model_name = "gpt-4"
 [embedding]
 api_base_url = "https://your-embedding-api.com/v1"
 api_key = "your-embedding-api-key"
-model_name = "text-embedding-ada-002"
+model_name = "text-embedding-3-small"
+
+# Optional: External Coding Agent
+[coding_agent]
+enabled = false
+agent_type = "opencode"       # opencode, iflow, codex, gemini, claude
+command = "bun"
+args = ["x", "opencode-ai", "acp"]
+transport = "stdio"           # stdio or websocket
+workspace_path = ""           # optional, uses current project if empty
 ```
 
-# 🚀 Usage
+#### External Coding Agent Configuration
 
-Cowork Forge offers two ways to interact with your AI development team: the Command Line Interface (CLI) and the Graphical User Interface (GUI).
+You can configure an external ACP-compatible coding agent for the Coding stage:
+
+```toml
+[coding_agent]
+enabled = true
+agent_type = "opencode"
+command = "bun"
+args = ["x", "opencode-ai", "acp"]
+transport = "stdio"
+```
+
+Supported agent types:
+- **opencode**: OpenCode AI agent
+- **iflow**: iFlow CLI agent  
+- **codex**: OpenAI Codex CLI
+- **gemini**: Gemini CLI
+- **claude**: Claude CLI
+
+# 🚀 Usage
 
 ## 🖥️ Cowork CLI
 
@@ -403,95 +343,7 @@ cowork continue iter-1-1234567890
 cowork status
 ```
 
-### Iteration Workflow
-
-When you start an iteration, Cowork Forge guides you through the 7-stage workflow:
-
-1. **Idea**: Your concept is structured into a formal specification
-2. **PRD**: Product Requirements Document with actor-critic refinement
-3. **Technical Design**: Architecture design with component specifications and actor-critic refinement
-4. **Implementation Plan**: Task breakdown with dependencies and actor-critic refinement
-5. **Coding**: Code implementation with actor-critic refinement and human validation
-6. **Quality Check**: Verification of feature coverage and code completeness
-7. **Delivery**: Final delivery report with implementation summary
-
-At each critical stage, you'll be prompted to review and confirm the output before proceeding.
-
-### Example Session Flow
-
-```sh
-# Initialize a new project
-$ cowork init --name "My File Converter"
-
-# Create a new iteration
-$ cowork iter --title "Build a CLI tool" --description "A command-line tool for converting files between formats"
-
-[Pipeline] Starting Genesis iteration: iter-1-1770536303
-[Iteration] Stage 1/7: Idea Agent
-[Idea Agent] Processing requirement...
-[Idea Agent] Generated IdeaSpec at: .cowork-v2/iterations/iter-1-1770536303/artifacts/idea.md
-
-Review the specification and provide feedback (or 'continue' to proceed):
-
-> continue
-
-[Iteration] Stage 2/7: PRD Loop Agent
-[PRD Agent] Generating Product Requirements Document...
-[PRD Agent] Generated PRD with 12 requirements at: .cowork-v2/iterations/iter-1-1770536303/artifacts/prd.md
-
-Review the PRD and provide feedback (or 'continue' to proceed):
-
-> continue
-
-[Iteration] Stage 3/7: Design Loop Agent
-[Design Agent] Creating technical architecture...
-[Design Agent] Generated design at: .cowork-v2/iterations/iter-1-1770536303/artifacts/design.md
-
-Review the design and provide feedback (or 'continue' to proceed):
-
-> continue
-
-... (continues through all 7 stages)
-
-[Iteration] Stage 7/7: Delivery Agent
-[Delivery Agent] Generating delivery report...
-[Delivery Agent] Iteration completed successfully at: .cowork-v2/iterations/iter-1-1770536303/artifacts/delivery.md
-
-Summary:
-- 12 requirements implemented
-- 4 modules created
-- 15 test cases added
-- Build: PASSED
-- Tests: 15/15 PASSED
-
-[Pipeline] Iteration iter-1-1770536303 completed successfully
-```
-
-### Managing Iterations
-
-```sh
-# List all iterations
-$ cowork list
-ID                     Title                    Status    Created At
-iter-1-1770536303      Build a CLI tool         Completed 2023-12-01 10:30
-iter-2-1770537500      Add batch processing      Paused    2023-12-01 14:45
-
-# View iteration details
-$ cowork show iter-1-1770536303
-
-# Continue a paused iteration
-$ cowork continue iter-2-1770537500
-
-# Delete an iteration
-$ cowork delete iter-2-1770537500
-
-# Create an evolution iteration (based on existing)
-$ cowork iter --title "Add batch processing" --base iter-1-1770536303 --inherit partial
-```
-
 ### Inheritance Modes
-
-When creating evolution iterations, you can choose from three inheritance modes:
 
 | Mode        | Description                           | Use Case                          |
 |-------------|---------------------------------------|-----------------------------------|
@@ -499,83 +351,29 @@ When creating evolution iterations, you can choose from three inheritance modes:
 | `full`      | Copy workspace code + artifacts       | Bug fixes, small enhancements     |
 | `partial`   | Copy artifacts only, regenerate code  | Large features, architecture change|
 
-### Configuration Management
-
-```sh
-# Initialize configuration file
-cowork init --name "My Project"
-
-# Use custom configuration
-cowork iter --title "Your idea" --config ./custom-config.toml
-
-# List iterations with detailed status
-cowork list --all
-
-# Check current project status
-cowork status
-```
-
-## 🎨 Cowork GUI
-
-The Cowork GUI provides a rich visual experience for managing your projects, monitoring agent progress, and previewing results.
+## 🖼️ Cowork GUI
 
 ### Features
 - **Visual Dashboard**: Overview of all your projects and iterations.
 - **Real-time Monitoring**: Watch agents work in real-time with detailed logs and status updates.
 - **Interactive Chat**: Communicate with agents directly through a chat interface.
+- **Post-Delivery Chat**: Use the Project Manager Agent to continue working with completed projects.
 - **Built-in Preview**: Preview your generated web applications directly within the app.
 
 ### Running the GUI
 
-To run the GUI from source:
+```sh
+cd crates/cowork-gui
+npm install   # or: bun install
+cargo tauri dev
+```
 
-1. Ensure you have Node.js and Rust installed.
-2. Navigate to the GUI directory:
-   ```sh
-   cd crates/cowork-gui
-   ```
-3. Install frontend dependencies:
-   ```sh
-   npm install
-   # or
-   bun install
-   ```
-4. Start the application:
-   ```sh
-   cargo tauri dev
-   ```
 
 # 🌐 The Cowork Forge Ecosystem
 
-Cowork Forge is organized as a modular Rust workspace based on the adk-rust framework:
-
-```mermaid
-graph TD
-    subgraph "Workspace"
-        CLI["cowork-cli"]
-        CORE["cowork-core"]
-        GUI["cowork-gui"]
-    end
-
-    subgraph "ADK Framework"
-        ADK["adk-rust"]
-    end
-    
-    subgraph "External Services"
-        LLM[("LLM API<br/>OpenAI Compatible")]
-        FS[("File System")]
-    end
-
-    CLI --> CORE
-    GUI --> CORE
-    CORE --> ADK
-    ADK --> LLM
-    CORE --> FS
-```
-
 - <strong>`cowork-core`</strong>: Core library containing domain logic, pipeline orchestration, tools, and persistence.
 - <strong>`cowork-cli`</strong>: Command-line interface for iteration management and project interaction.
-- <strong>`cowork-gui`</strong>: Graphical user interface based on Tauri framework with React frontend.
+- <strong>`cowork-gui`</strong>: Graphical user interface based on Tauri framework with React + TypeScript frontend.
 
 ### Core Modules
 
@@ -588,9 +386,9 @@ graph TD
 - <strong>`llm`</strong>: LLM integration with rate limiting (30 req/min, concurrency=1).
 - <strong>`interaction`</strong>: InteractiveBackend trait for CLI/GUI abstraction.
 - <strong>`memory`</strong>: Project memory system for cross-iteration knowledge retention.
+- <strong>`acp`</strong>: Agent Communication Protocol client for external coding agents.
 
-
-# 🔒 Security
+# 🔐 Security
 
 Cowork Forge implements multiple layers of security:
 
@@ -603,13 +401,6 @@ Cowork Forge implements multiple layers of security:
 # 🤝 Contributing
 
 We welcome all forms of contributions! Report bugs or submit feature requests through [GitHub Issues](https://github.com/sopaco/cowork-forge/issues).
-
-### Development Process
-1. Fork this project
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Create a Pull Request
 
 ### Running Tests
 
@@ -626,15 +417,12 @@ cargo test -p cowork-core
 
 # 📚 Documentation
 
-Comprehensive documentation is available in the [docs](./docs/) directory:
+Comprehensive documentation is available in the [litho.docs](./litho.docs/) directory:
 
-- [Architecture Overview](./docs/architecture/overview.md) - System architecture and design principles
-- [Iteration Architecture](./docs/architecture/iteration-architecture.md) - The core iteration system
-- [Agent System](./docs/architecture/agent-system.md) - AI agent implementation details
-- [Pipeline Workflow](./docs/architecture/pipeline.md) - Stage execution and management
-- [Development Guide](./docs/development/) - Contributor resources and patterns
+- [English Documentation](./litho.docs/en/) - Complete system documentation
+- [中文文档](./litho.docs/zh/) - 完整系统文档
 
-# 🪪 License
+# 📄 License
 
 This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
 
@@ -644,7 +432,7 @@ This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) f
 - Powered by [OpenAI](https://openai.com/) GPT models
 - Inspired by modern software development practices and AI agent research
 
-# 📬 Contact
+# 📧 Contact
 
 - **GitHub**: [sopaco/cowork-forge](https://github.com/sopaco/cowork-forge)
 - **Issues**: [GitHub Issues](https://github.com/sopaco/cowork-forge/issues)
