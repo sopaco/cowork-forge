@@ -7,7 +7,7 @@
     "beforeDevCommand": "bun run dev",
     "beforeBuildCommand": "bun run build",
     "devUrl": "http://localhost:15173",
-    "frontendDist": "../src/dist"
+    "frontendDist": "../dist"
   },
   "app": {
     "withGlobalTauri": true,
@@ -16,6 +16,7 @@
         "title": "Cowork Forge",
         "width": 1200,
         "height": 720,
+        "center": true,
         "minWidth": 800,
         "minHeight": 600
       }
