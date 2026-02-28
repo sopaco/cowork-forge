@@ -276,7 +276,48 @@ pub async fn execute_stage_with_instruction(
     StageResult::Success(None)
 }
 
-/// Build prompt with iteration context
+/// Maximum characters for pre-injected artifacts (to avoid token limits)
+const MAX_ARTIFACT_CHARS: usize = 3000;
+
+/// Get truncated message in current language
+fn get_truncated_message() -> String {
+    let locale = crate::config::get_system_locale();
+    if locale.starts_with("zh") {
+        "...[已截断，完整内容可通过工具加载]".to_string()
+    } else if locale.starts_with("ja") {
+        "...[一部切り捨て、完全な内容はツールで読み込めます]".to_string()
+    } else {
+        "...[truncated, full content available via tool]".to_string()
+    }
+}
+
+/// Truncate content to a maximum number of characters (UTF-8 safe)
+fn truncate_content(content: &str, max_chars: usize) -> String {
+    if content.chars().count() <= max_chars {
+        content.to_string()
+    } else {
+        let truncated: String = content.chars().take(max_chars).collect();
+        format!("{}{}", truncated, get_truncated_message())
+    }
+}
+
+/// Load artifact content from the artifacts directory
+fn load_artifact_content(ctx: &PipelineContext, artifact_name: &str) -> Option<String> {
+    let iteration_dir = ctx.workspace_path.parent().unwrap_or(&ctx.workspace_path);
+    let artifact_path = iteration_dir.join("artifacts").join(artifact_name);
+    
+    if artifact_path.exists() {
+        match std::fs::read_to_string(&artifact_path) {
+            Ok(content) if !content.trim().is_empty() => {
+                return Some(content);
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Build prompt with iteration context and pre-injected artifacts
 fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>) -> String {
     let mut prompt = format!(
         "You are working on iteration #{} - '{}'.\n",
@@ -284,6 +325,86 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
     );
 
     prompt.push_str(&format!("Iteration ID: {}\n\n", ctx.iteration.id));
+
+    // Pre-inject artifacts from previous stages (Optimization: reduces tool calls)
+    let mut injected_artifacts = Vec::new();
+    
+    match stage_name {
+        "prd" => {
+            // PRD needs Idea
+            if let Some(idea) = load_artifact_content(ctx, "idea.md") {
+                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                prompt.push_str("📋 PRE-LOADED: Idea Document (from previous stage)\n");
+                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                prompt.push_str(&truncate_content(&idea, MAX_ARTIFACT_CHARS));
+                prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
+                injected_artifacts.push("idea.md");
+            }
+        }
+        "design" => {
+            // Design needs PRD
+            if let Some(prd) = load_artifact_content(ctx, "prd.md") {
+                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                prompt.push_str("📋 PRE-LOADED: PRD Document (from previous stage)\n");
+                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                prompt.push_str(&truncate_content(&prd, MAX_ARTIFACT_CHARS));
+                prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
+                injected_artifacts.push("prd.md");
+            }
+        }
+        "plan" => {
+            // Plan needs Design and PRD
+            if let Some(design) = load_artifact_content(ctx, "design.md") {
+                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                prompt.push_str("📋 PRE-LOADED: Design Document (from previous stage)\n");
+                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                prompt.push_str(&truncate_content(&design, MAX_ARTIFACT_CHARS));
+                prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
+                injected_artifacts.push("design.md");
+            }
+        }
+        "coding" => {
+            // Coding needs Plan (most important) and Design
+            if let Some(plan) = load_artifact_content(ctx, "plan.md") {
+                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                prompt.push_str("📋 PRE-LOADED: Implementation Plan (from previous stage)\n");
+                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                prompt.push_str(&truncate_content(&plan, MAX_ARTIFACT_CHARS));
+                prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
+                injected_artifacts.push("plan.md");
+            }
+            // Also include design for architecture context
+            if let Some(design) = load_artifact_content(ctx, "design.md") {
+                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                prompt.push_str("📋 PRE-LOADED: Design Document (architecture reference)\n");
+                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                prompt.push_str(&truncate_content(&design, 2000)); // Smaller for coding
+                prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
+                injected_artifacts.push("design.md");
+            }
+        }
+        "check" | "delivery" => {
+            // Check and Delivery need all artifacts
+            let artifacts = [
+                ("idea.md", "Idea Document"),
+                ("prd.md", "PRD Document"),
+                ("design.md", "Design Document"),
+                ("plan.md", "Implementation Plan"),
+            ];
+            
+            for (filename, label) in artifacts {
+                if let Some(content) = load_artifact_content(ctx, filename) {
+                    prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                    prompt.push_str(&format!("📋 PRE-LOADED: {}\n", label));
+                    prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                    prompt.push_str(&truncate_content(&content, 2000)); // Smaller for all artifacts
+                    prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
+                    injected_artifacts.push(filename);
+                }
+            }
+        }
+        _ => {}
+    }
 
     // Provide stage-specific guidance
     match stage_name {
@@ -302,8 +423,13 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             prompt.push_str("========================================\n");
             prompt.push_str("STAGE: PRD (Product Requirements Document)\n");
             prompt.push_str("========================================\n");
-            prompt.push_str("YOUR TASK:\n");
-            prompt.push_str("1. Load idea using load_idea() tool\n");
+            if injected_artifacts.is_empty() {
+                prompt.push_str("YOUR TASK:\n");
+                prompt.push_str("1. Load idea using load_idea() tool\n");
+            } else {
+                prompt.push_str("YOUR TASK:\n");
+                prompt.push_str("1. The Idea document is provided above (pre-loaded)\n");
+            }
             prompt.push_str("2. Analyze the idea and create requirements\n");
             prompt.push_str("3. SAVE PRD using save_prd_doc() tool (MANDATORY)\n\n");
             prompt.push_str(&format!(
@@ -315,8 +441,13 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             prompt.push_str("========================================\n");
             prompt.push_str("STAGE: Design (System Architecture)\n");
             prompt.push_str("========================================\n");
-            prompt.push_str("YOUR TASK:\n");
-            prompt.push_str("1. Load requirements using get_requirements() tool\n");
+            if injected_artifacts.is_empty() {
+                prompt.push_str("YOUR TASK:\n");
+                prompt.push_str("1. Load requirements using get_requirements() tool\n");
+            } else {
+                prompt.push_str("YOUR TASK:\n");
+                prompt.push_str("1. The PRD document is provided above (pre-loaded)\n");
+            }
             prompt.push_str("2. Design system architecture (2-4 components max)\n");
             prompt.push_str("3. SAVE DESIGN using save_design_doc() tool (MANDATORY)\n\n");
         }
@@ -324,8 +455,13 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             prompt.push_str("========================================\n");
             prompt.push_str("STAGE: Plan (Implementation Tasks)\n");
             prompt.push_str("========================================\n");
-            prompt.push_str("YOUR TASK:\n");
-            prompt.push_str("1. Load design using get_design() tool\n");
+            if injected_artifacts.is_empty() {
+                prompt.push_str("YOUR TASK:\n");
+                prompt.push_str("1. Load design using get_design() tool\n");
+            } else {
+                prompt.push_str("YOUR TASK:\n");
+                prompt.push_str("1. The Design document is provided above (pre-loaded)\n");
+            }
             prompt.push_str("2. Create 5-12 simple implementation tasks\n");
             prompt.push_str("3. SAVE PLAN using save_plan_doc() tool (MANDATORY)\n\n");
         }
@@ -333,8 +469,13 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             prompt.push_str("========================================\n");
             prompt.push_str("STAGE: Coding (Implementation)\n");
             prompt.push_str("========================================\n");
-            prompt.push_str("YOUR TASK:\n");
-            prompt.push_str("1. Load plan using get_plan() tool\n");
+            if injected_artifacts.is_empty() {
+                prompt.push_str("YOUR TASK:\n");
+                prompt.push_str("1. Load plan using get_plan() tool\n");
+            } else {
+                prompt.push_str("YOUR TASK:\n");
+                prompt.push_str("1. The Plan and Design documents are provided above (pre-loaded)\n");
+            }
             prompt.push_str("2. Implement tasks one by one\n");
             prompt.push_str("3. Update task status using update_task_status() tool\n\n");
         }
@@ -342,8 +483,13 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             prompt.push_str("========================================\n");
             prompt.push_str("STAGE: Check (Quality Assurance)\n");
             prompt.push_str("========================================\n");
-            prompt.push_str("YOUR TASK:\n");
-            prompt.push_str("1. Load all artifacts (requirements, design, plan)\n");
+            if injected_artifacts.is_empty() {
+                prompt.push_str("YOUR TASK:\n");
+                prompt.push_str("1. Load all artifacts (requirements, design, plan)\n");
+            } else {
+                prompt.push_str("YOUR TASK:\n");
+                prompt.push_str("1. All artifacts are provided above (pre-loaded)\n");
+            }
             prompt.push_str("2. Run quality checks\n");
             prompt.push_str("3. Use goto_stage() if issues found\n\n");
         }
@@ -351,8 +497,13 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             prompt.push_str("========================================\n");
             prompt.push_str("STAGE: Delivery (Final Report)\n");
             prompt.push_str("========================================\n");
-            prompt.push_str("YOUR TASK:\n");
-            prompt.push_str("1. Load all artifacts\n");
+            if injected_artifacts.is_empty() {
+                prompt.push_str("YOUR TASK:\n");
+                prompt.push_str("1. Load all artifacts\n");
+            } else {
+                prompt.push_str("YOUR TASK:\n");
+                prompt.push_str("1. All artifacts are provided above (pre-loaded)\n");
+            }
             prompt.push_str("2. Generate delivery report\n");
             prompt.push_str("3. SAVE using save_delivery_report() tool\n");
             prompt.push_str("4. Copy files using copy_workspace_to_project() tool\n\n");
