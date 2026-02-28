@@ -77,8 +77,8 @@ pub fn notify_tool_result(tool_name: &str, result: &Result<Value, AdkError>) {
                 format!("{:?}", keys)
             } else if v.is_string() {
                 let s = v.as_str().unwrap_or("");
-                if s.len() > 50 {
-                    format!("{}...", &s[..50])
+                if s.chars().count() > 50 {
+                    format!("{}...", s.chars().take(50).collect::<String>())
                 } else {
                     s.to_string()
                 }

@@ -699,6 +699,7 @@ pub fn run() {
             file::read_iteration_file,
             file::save_iteration_file,
             file::get_iteration_file_tree,
+            file::read_local_file,
             // Preview commands
             preview::start_iteration_preview,
             preview::stop_iteration_preview,

@@ -1,6 +1,7 @@
 import { useState, useEffect, ReactElement } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
 import {
   App,
   Card,
@@ -34,6 +35,7 @@ import {
   FileTextOutlined,
   EyeOutlined,
   ClockCircleOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 
 const { TextArea } = Input;
@@ -156,6 +158,32 @@ const IterationsPanel: React.FC<IterationsPanelProps> = ({
       unlistenFailed.then((fn) => fn()).catch(() => {});
     };
   }, []);
+
+  const handleImportMarkdown = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [
+          {
+            name: "Markdown",
+            extensions: ["md", "markdown", "txt"],
+          },
+        ],
+      });
+
+      if (selected) {
+        // selected is a string path when multiple: false
+        const filePath = typeof selected === "string" ? selected : null;
+        if (filePath) {
+          const content = await invoke<string>("read_local_file", { filePath });
+          setNewIterationDescription(content);
+          message.success("Markdown file imported successfully");
+        }
+      }
+    } catch (error) {
+      message.error("Failed to import file: " + error);
+    }
+  };
 
   const handleCreateIteration = async () => {
     if (!newIterationTitle.trim()) {
@@ -412,7 +440,16 @@ const IterationsPanel: React.FC<IterationsPanelProps> = ({
                     <Badge status={getStatusColor(iteration.status)} dot={false} text={<span>{getStatusIcon(iteration.status)}{iteration.status}</span>} />
                   </div>
 
-                  <div style={{ color: "#666", marginBottom: "12px" }}>{iteration.description}</div>
+                  <div style={{ 
+                    color: "#666", 
+                    marginBottom: "12px",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    lineHeight: "1.5",
+                  }}>{iteration.description}</div>
 
                   {iteration.base_iteration_id && (
                     <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
@@ -478,6 +515,11 @@ const IterationsPanel: React.FC<IterationsPanelProps> = ({
           </Form.Item>
           <Form.Item label="Description">
             <TextArea value={newIterationDescription} onChange={(e) => setNewIterationDescription(e.target.value)} placeholder="Describe what you want to achieve in this iteration..." rows={4} />
+            <div style={{ marginTop: "8px" }}>
+              <Button icon={<UploadOutlined />} onClick={handleImportMarkdown} size="small">
+                Import Markdown
+              </Button>
+            </div>
           </Form.Item>
           {iterations.length > 0 && (
             <>
