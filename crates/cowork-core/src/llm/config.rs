@@ -198,8 +198,9 @@ pub fn save_config(config: &ModelConfig) -> Result<PathBuf> {
 }
 
 pub fn create_llm_client(config: &LlmConfig) -> Result<Arc<dyn Llm>> {
-    use crate::llm::rate_limiter::RateLimitedLlm;
+    use crate::llm::rate_limiter::TokenBucketRateLimiter;
 
+    // Initialize rate limiter (for logging/backward compatibility)
     crate::llm::rate_limiter::init_global_rate_limiter(1);
 
     let openai_config =
@@ -208,7 +209,8 @@ pub fn create_llm_client(config: &LlmConfig) -> Result<Arc<dyn Llm>> {
     let client =
         OpenAIClient::new(openai_config).with_context(|| "Failed to create OpenAI client")?;
 
-    let rate_limited_client = RateLimitedLlm::with_default_delay(Arc::new(client));
+    // Use token bucket rate limiter: 5 burst requests, 30 req/min average
+    let rate_limited_client = TokenBucketRateLimiter::with_defaults(Arc::new(client));
 
     Ok(Arc::new(rate_limited_client))
 }

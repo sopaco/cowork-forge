@@ -180,19 +180,19 @@ impl IterationExecutor {
                 artifacts_dir.join("idea.md").exists()
             }
             "prd" => {
-                // Check prd.md or requirements.json
+                // Check prd.md MUST exist (requirements.json alone is not enough)
+                // The Design stage needs prd.md as context, not just requirements.json
                 artifacts_dir.join("prd.md").exists()
-                    || iteration_dir.join("data/requirements.json").exists()
             }
             "design" => {
-                // Check design.md or design_spec.json
+                // Check design.md MUST exist (design_spec.json alone is not enough)
+                // The Plan stage needs design.md as context
                 artifacts_dir.join("design.md").exists()
-                    || iteration_dir.join("data/design_spec.json").exists()
             }
             "plan" => {
-                // Check plan.md or implementation_plan.json
+                // Check plan.md MUST exist (implementation_plan.json alone is not enough)
+                // The Coding stage needs plan.md as context
                 artifacts_dir.join("plan.md").exists()
-                    || iteration_dir.join("data/implementation_plan.json").exists()
             }
             "coding" => {
                 // Check workspace has code files and perform quality checks
@@ -522,6 +522,9 @@ impl IterationExecutor {
         
         // Create pipeline context
         let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
+        
+        // Set iteration ID for storage operations (ensures clear_stage_feedback works)
+        crate::storage::set_iteration_id(iteration.id.clone());
 
         for (stage_idx, stage) in stages.into_iter().enumerate() {
             let stage_name = stage.name().to_string();
