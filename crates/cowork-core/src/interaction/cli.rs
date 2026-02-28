@@ -61,7 +61,11 @@ impl InteractiveBackend for CliBackend {
     async fn send_tool_result(&self, tool_name: &str, result: &str, success: bool, agent_name: &str) {
         let status = if success { "✓" } else { "✗" };
         println!("{} [{}] Tool {} completed: {}", status, agent_name, tool_name, 
-            if result.len() > 100 { &result[..100] } else { result });
+            if result.chars().count() > 100 { 
+                format!("{}...", result.chars().take(100).collect::<String>())
+            } else { 
+                result.to_string() 
+            });
     }
 
     async fn request_input(&self, prompt: &str, options: Vec<InputOption>, initial_content: Option<String>) -> Result<InputResponse> {

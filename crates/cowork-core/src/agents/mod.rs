@@ -579,9 +579,9 @@ fn load_artifacts_summary_for_pm(iteration_store: &IterationStore, iteration_id:
         let path = iteration_dir.join("artifacts").join(filename);
         if path.exists() {
             if let Ok(content) = fs::read_to_string(&path) {
-                // Only include first 500 chars of each artifact
-                let truncated = if content.len() > 500 {
-                    format!("{}...[truncated]", &content[..500])
+                // Only include first 500 chars of each artifact (UTF-8 safe)
+                let truncated = if content.chars().count() > 500 {
+                    format!("{}...[truncated]", content.chars().take(500).collect::<String>())
                 } else {
                     content
                 };

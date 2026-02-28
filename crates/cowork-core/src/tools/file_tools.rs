@@ -973,8 +973,11 @@ fn extract_code_structure(content: &str, max_chars: usize, file_ext: &str) -> St
 }
 
 /// Truncate content with context preservation
+/// Uses character-safe truncation to avoid splitting multi-byte UTF-8 characters
 fn truncate_with_context(content: &str, max_chars: usize) -> String {
-    if content.len() <= max_chars {
+    let char_count = content.chars().count();
+    
+    if char_count <= max_chars {
         return content.to_string();
     }
 
@@ -982,8 +985,9 @@ fn truncate_with_context(content: &str, max_chars: usize) -> String {
     let keep_start = max_chars / 2;
     let keep_end = max_chars - keep_start - 10; // 10 for ellipsis
 
-    let start = &content[..keep_start];
-    let end = &content[content.len().saturating_sub(keep_end)..];
+    // Use chars() iterator for UTF-8 safe truncation
+    let start: String = content.chars().take(keep_start).collect();
+    let end: String = content.chars().skip(char_count.saturating_sub(keep_end)).collect();
 
     format!("{}\n\n[... content truncated ...]\n\n{}", start, end)
 }

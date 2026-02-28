@@ -517,7 +517,7 @@ impl IterationExecutor {
     ) -> anyhow::Result<()> {
         // Execute stages with retry logic
         const MAX_STAGE_RETRIES: u32 = 3;
-        const RETRY_DELAY_MS: u64 = 2000;
+        const RETRY_DELAY_MS: u64 = 5000; // 5 seconds between stage retries
         let total_stages = stages.len();
         
         // Create pipeline context
