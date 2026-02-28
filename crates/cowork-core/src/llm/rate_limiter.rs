@@ -62,9 +62,9 @@ impl RateLimitedLlm {
         Self { inner, delay_ms, max_retries: 5 }
     }
 
-    /// Create with 2-second delay (for <30 calls per minute limit)
+    /// Create with 3-second delay (for ~20 calls per minute limit)
     pub fn with_default_delay(inner: Arc<dyn Llm>) -> Self {
-        Self::new(inner, 2000) // 2 seconds = 2000ms
+        Self::new(inner, 3000) // 3 seconds = 3000ms
     }
 
     /// Calculate exponential backoff delay

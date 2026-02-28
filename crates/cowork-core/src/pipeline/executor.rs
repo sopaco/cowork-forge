@@ -1046,6 +1046,10 @@ impl IterationExecutor {
                 .await;
         }
         
+        // Add delay between document summaries and knowledge generation to avoid rate limiting
+        println!("[Executor] Waiting 4 seconds before knowledge generation to avoid rate limiting...");
+        tokio::time::sleep(tokio::time::Duration::from_secs(4)).await;
+        
         // Step 2: Generate iteration knowledge using the summaries
         self.interaction
             .show_message_with_context(
@@ -1412,7 +1416,7 @@ impl IterationExecutor {
         // Document types to summarize
         let doc_types = vec!["idea", "prd", "design", "plan"];
 
-        for doc_type in doc_types {
+        for (idx, doc_type) in doc_types.iter().enumerate() {
             let doc_path = artifacts_dir.join(format!("{}.md", doc_type));
 
             if !doc_path.exists() {
@@ -1477,6 +1481,13 @@ impl IterationExecutor {
             std::fs::write(&summary_path, summary)?;
 
             println!("[Executor] Generated summary for {}", doc_type);
+            
+            // Add delay between document summaries to avoid rate limiting
+            // Wait 2 seconds before next document, but not after the last one
+            if idx < doc_types.len() - 1 {
+                println!("[Executor] Waiting 2 seconds before processing next document...");
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            }
         }
 
         println!("[Executor] Document summaries generation completed");
