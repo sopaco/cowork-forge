@@ -264,3 +264,24 @@ fn build_file_tree(dir: &Path, base: &Path, depth: usize) -> Result<FileTreeNode
         language: None,
     })
 }
+
+#[tauri::command]
+pub async fn read_local_file(file_path: String) -> Result<String, String> {
+    // Validate file extension (only allow markdown and text files)
+    let path = PathBuf::from(&file_path);
+    let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    
+    if !["md", "markdown", "txt"].contains(&extension.as_str()) {
+        return Err("Only .md, .markdown, and .txt files are allowed".to_string());
+    }
+    
+    // Check file size (limit to 1MB)
+    let metadata = fs::metadata(&path).map_err(|e| format!("Failed to read file metadata: {}", e))?;
+    const MAX_FILE_SIZE: u64 = 1024 * 1024; // 1MB
+    if metadata.len() > MAX_FILE_SIZE {
+        return Err(format!("File is too large (max {} bytes)", MAX_FILE_SIZE));
+    }
+    
+    // Read file content
+    fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))
+}

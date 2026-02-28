@@ -102,7 +102,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           <div style={{ marginBottom: '16px' }}>
             <h3 style={{ margin: 0 }}>Chat - {iterationTitle}</h3>
             {iterationDescription && (
-              <p style={{ margin: '4px 0 0 0', color: '#888', fontSize: '12px' }}>{iterationDescription}</p>
+              <p style={{ 
+                margin: '4px 0 0 0', 
+                color: '#888', 
+                fontSize: '12px',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                lineHeight: '1.4',
+              }}>{iterationDescription}</p>
             )}
           </div>
 

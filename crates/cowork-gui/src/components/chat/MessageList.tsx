@@ -190,6 +190,8 @@ const PMAgentMessageItem: React.FC<{ message: PMAgentMessage; onActionClick?: (a
           border: '1px solid #e8e8e8',
           maxWidth: '70%',
           wordBreak: 'break-word',
+          maxHeight: '300px',
+          overflowY: 'auto',
         }}
       >
         <MarkdownMessage content={message.content} />
@@ -265,6 +267,9 @@ export const MessageList: React.FC<MessageListProps> = ({
                     borderRadius: '4px',
                     maxWidth: '70%',
                     wordBreak: 'break-word',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    textAlign: 'left',
                   }}
                 >
                   {(msg as { content: string }).content}
@@ -306,6 +311,9 @@ export const MessageList: React.FC<MessageListProps> = ({
                   borderRadius: '4px',
                   maxWidth: '70%',
                   wordBreak: 'break-word',
+                  maxHeight: '200px',
+                  overflowY: 'auto',
+                  textAlign: 'left',
                 }}
               >
                 {(msg as { content: string }).content}
@@ -330,6 +338,8 @@ export const MessageList: React.FC<MessageListProps> = ({
                   border: '1px solid #e8e8e8',
                   maxWidth: '70%',
                   wordBreak: 'break-word',
+                  maxHeight: '300px',
+                  overflowY: 'auto',
                 }}
               >
                 <MarkdownMessage content={(msg as { content: string }).content} />
