@@ -34,6 +34,9 @@ impl CodingStage {
         interaction: Arc<dyn InteractiveBackend>,
         feedback: Option<&str>,
     ) -> StageResult {
+        // Set iteration ID for storage operations (must be set before any storage access)
+        crate::storage::set_iteration_id(ctx.iteration.id.clone());
+        
         let workspace = ctx.workspace_path.clone();
         
         interaction
