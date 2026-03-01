@@ -606,13 +606,54 @@ fn load_artifacts_summary_for_pm(iteration_store: &IterationStore, iteration_id:
     Ok(summary)
 }
 
-/// Execute a PM agent message and return the response and function calls
-pub async fn execute_pm_agent_message(
+/// PM Agent execution result containing response and detected actions
+#[derive(Debug, Clone)]
+pub struct PMAgentResult {
+    /// The agent's text response
+    pub message: String,
+    /// Actions detected from tool calls (pm_goto_stage, pm_create_iteration)
+    pub actions: Vec<PMAgentAction>,
+    /// Raw parts from the response (for debugging)
+    pub parts: Vec<adk_core::Part>,
+}
+
+/// Actions that the PM Agent can trigger
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "action_type")]
+pub enum PMAgentAction {
+    /// Jump to a specific pipeline stage
+    #[serde(rename = "pm_goto_stage")]
+    GotoStage {
+        target_stage: String,
+        reason: String,
+    },
+    /// Create a new iteration
+    #[serde(rename = "pm_create_iteration")]
+    CreateIteration {
+        iteration_id: String,
+        title: String,
+        description: String,
+        inheritance: String,
+    },
+}
+
+/// Callback trait for streaming PM agent responses
+#[async_trait::async_trait]
+pub trait PMAgentStreamCallback: Send + Sync {
+    /// Called for each text chunk during streaming
+    async fn on_text_chunk(&self, text: &str, is_first: bool, is_last: bool);
+    /// Called when a tool is invoked
+    async fn on_tool_call(&self, tool_name: &str, args: &serde_json::Value);
+}
+
+/// Execute a PM agent message with streaming support
+pub async fn execute_pm_agent_message_streaming(
     model: Arc<dyn Llm>,
     iteration_id: String,
     message: String,
     history: Vec<serde_json::Value>,
-) -> Result<(String, Vec<adk_core::Part>), String> {
+    stream_callback: Option<Arc<dyn PMAgentStreamCallback>>,
+) -> Result<PMAgentResult, String> {
     use adk_core::Content;
     use futures::StreamExt;
     use crate::pipeline::stage_executor::{SimpleInvocationContext, extract_text_from_event};
@@ -721,24 +762,63 @@ pub async fn execute_pm_agent_message(
         .await
         .map_err(|e| format!("Agent execution failed: {}", e))?;
 
-    // Collect response and detect actions
+    // Collect response with streaming
     let mut agent_message = String::new();
     let mut all_parts: Vec<adk_core::Part> = Vec::new();
-    let mut suggested_actions: Vec<serde_json::Value> = Vec::new();
+    let mut detected_actions: Vec<PMAgentAction> = Vec::new();
+    let mut is_first_chunk = true;
+    let mut pending_create_iteration: Option<(String, String, String)> = None;
 
     while let Some(result) = stream.next().await {
         match result {
             Ok(event) => {
-                // Extract text content
+                // Extract text content and stream it
                 if let Some(text) = extract_text_from_event(&event) {
                     if !text.trim().is_empty() {
                         agent_message.push_str(&text);
+                        
+                        // Call streaming callback if provided
+                        if let Some(ref callback) = stream_callback {
+                            callback.on_text_chunk(&text, is_first_chunk, false).await;
+                        }
+                        is_first_chunk = false;
                     }
                 }
                 
                 // Collect all parts (includes function calls)
                 if let Some(content) = event.content() {
                     for part in &content.parts {
+                        // Check for function calls
+                        if let adk_core::Part::FunctionCall { name, args, .. } = part {
+                            // Handle known tool calls
+                            match name.as_str() {
+                                "pm_goto_stage" => {
+                                    if let (Some(stage), Some(reason)) = (
+                                        args.get("stage").and_then(|v| v.as_str()),
+                                        args.get("reason").and_then(|v| v.as_str()),
+                                    ) {
+                                        detected_actions.push(PMAgentAction::GotoStage {
+                                            target_stage: stage.to_string(),
+                                            reason: reason.to_string(),
+                                        });
+                                    }
+                                }
+                                "pm_create_iteration" => {
+                                    // Store the parameters for later (we'll check if iteration was created)
+                                    let title = args.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                    let description = args.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                    let inheritance = args.get("inheritance").and_then(|v| v.as_str()).unwrap_or("partial").to_string();
+                                    pending_create_iteration = Some((title, description, inheritance));
+                                }
+                                _ => {}
+                            }
+                            
+                            // Notify callback about tool call
+                            if let Some(ref callback) = stream_callback {
+                                callback.on_tool_call(name, args).await;
+                            }
+                        }
+                        
                         all_parts.push(part.clone());
                     }
                 }
@@ -749,48 +829,68 @@ pub async fn execute_pm_agent_message(
         }
     }
 
-    // After execution, check if any tools were called by examining the response
-    // The agent should have called tools if user requested actions
-    let msg_lower = agent_message.to_lowercase();
-    
-    // Detect actions based on response content
-    if msg_lower.contains("pm_goto_stage") || msg_lower.contains("goto_stage") {
-        let mut action = serde_json::json!({
-            "type": "pm_goto_stage",
-            "description": "Tool called: pm_goto_stage"
-        });
-        
-        // Try to extract stage from message
-        for stage in &["idea", "prd", "design", "plan", "coding"] {
-            if msg_lower.contains(stage) {
-                action["target_stage"] = serde_json::json!(stage);
-                break;
+    // Send final streaming callback
+    if let Some(ref callback) = stream_callback {
+        callback.on_text_chunk("", false, true).await;
+    }
+
+    // Check if pm_create_iteration was called and iteration was created
+    if let Some((title, description, inheritance)) = pending_create_iteration {
+        // Check if a new iteration was created by looking for the most recent one
+        // The PMCreateIterationTool saves the iteration, so we need to find it
+        let iteration_store = crate::persistence::IterationStore::new();
+        if let Ok(iterations) = iteration_store.load_all() {
+            // Find the most recently created iteration (should be the one just created)
+            if let Some(new_iteration) = iterations.iter().max_by_key(|i| i.started_at) {
+                // Verify it's a new iteration (not the current one)
+                if new_iteration.id != iteration_id {
+                    detected_actions.push(PMAgentAction::CreateIteration {
+                        iteration_id: new_iteration.id.clone(),
+                        title: title,
+                        description: description,
+                        inheritance: inheritance,
+                    });
+                }
             }
         }
-        suggested_actions.push(action);
     }
-    
-    if msg_lower.contains("pm_create_iteration") || msg_lower.contains("create_iteration") {
-        suggested_actions.push(serde_json::json!({
-            "type": "pm_create_iteration",
-            "description": "Tool called: pm_create_iteration"
-        }));
+
+    // Fallback: if no actions detected but message contains tool references
+    if detected_actions.is_empty() {
+        let msg_lower = agent_message.to_lowercase();
+        
+        if msg_lower.contains("goto_stage") || msg_lower.contains("跳转") || msg_lower.contains("返回") {
+            // Try to extract stage from message
+            for stage in &["coding", "design", "plan", "prd", "idea"] {
+                if msg_lower.contains(stage) {
+                    detected_actions.push(PMAgentAction::GotoStage {
+                        target_stage: stage.to_string(),
+                        reason: "Detected from message".to_string(),
+                    });
+                    break;
+                }
+            }
+        }
     }
 
     if agent_message.is_empty() {
         agent_message = "处理完成".to_string();
     }
 
-    // Append action suggestions to message if detected
-    if !suggested_actions.is_empty() {
-        let actions_json = serde_json::to_string(&suggested_actions)
-            .unwrap_or_else(|_| "[]".to_string());
-        agent_message = format!(
-            "{}\n\n<!--ACTIONS:{}-->",
-            agent_message,
-            actions_json
-        );
-    }
+    Ok(PMAgentResult {
+        message: agent_message,
+        actions: detected_actions,
+        parts: all_parts,
+    })
+}
 
-    Ok((agent_message, all_parts))
+/// Execute a PM agent message and return the response and function calls (non-streaming version)
+pub async fn execute_pm_agent_message(
+    model: Arc<dyn Llm>,
+    iteration_id: String,
+    message: String,
+    history: Vec<serde_json::Value>,
+) -> Result<(String, Vec<adk_core::Part>), String> {
+    let result = execute_pm_agent_message_streaming(model, iteration_id, message, history, None).await?;
+    Ok((result.message, result.parts))
 }

@@ -36,7 +36,7 @@ pub use persistence::*;
 pub use data::*;
 pub use storage::*;
 pub use llm::*;
-pub use agents::*;
+pub use agents::{create_project_manager_agent, execute_pm_agent_message, execute_pm_agent_message_streaming, PMAgentResult, PMAgentAction, PMAgentStreamCallback};
 pub use tech_stack::*;
 
 // Explicit exports for new modules (to avoid glob re-export conflicts)
