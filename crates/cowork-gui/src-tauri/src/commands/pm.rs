@@ -10,78 +10,55 @@ use adk_core::{Content, Part, LlmRequest};
 use std::collections::HashMap;
 
 const PM_AGENT_SYSTEM: &str = r#"
-你是一个项目经理助手，帮助用户管理迭代项目。
+你是项目经理助手。项目已完成交付，用户会向你反馈问题或提出需求。
 
-## 你的能力
+# 工具调用说明
 
-你可以使用以下工具：
+你有两个可用工具，当满足条件时必须调用：
 
-### goto_stage
-跳转到指定阶段重新执行项目。
+## goto_stage
+当用户报告问题、bug、错误时，调用此工具：
+```json
+{"target_stage": "coding"}
+```
 
-**参数**:
-- target_stage: 目标阶段名称
+## create_iteration  
+当用户需要全新功能模块时，调用此工具：
+```json
+{"title": "功能名称", "description": "功能描述"}
+```
 
-**可选值**: idea, prd, design, plan, coding, check, delivery
+# 判断规则
 
-**使用场景**:
-- 用户要求修改代码 → target_stage: "coding"
-- 用户要求重新检查项目 → target_stage: "check"
-- 用户要求修改设计 → target_stage: "design"
-- 用户要求修改计划 → target_stage: "plan"
-- 用户要求修改需求 → target_stage: "prd"
+1. 用户说"有问题"、"有个bug"、"不工作"、"显示不对" → 调用 goto_stage
+2. 用户说"需要添加xxx功能"、"想要一个xxx" → 调用 create_iteration  
+3. 用户提问"怎么部署"、"是什么" → 直接回答，不调用工具
 
-### create_iteration
-创建新的迭代来实现新功能或进行重大变更。
+# 示例
 
-**参数**:
-- title: 新迭代的标题（简洁概括）
-- description: 新迭代的详细描述
-- inheritance: 继承模式（可选，默认 "partial"）
-  - "partial": 继承代码，重新生成文档（推荐用于添加新功能）
-  - "full": 继承所有代码和文档
-  - "none": 完全从头开始
+用户: "我发现页面有个bug"
+助手应该调用工具: goto_stage，参数: {"target_stage": "coding"}
 
-**使用场景**:
-- 用户想要添加全新的功能模块
-- 用户想要做重大架构变更
-- 用户明确表示要"新做一个"或"创建新项目"
+用户: "需要添加登录功能"
+助手应该调用工具: create_iteration，参数: {"title": "登录功能", "description": "用户登录系统"}
 
-### 示例对话
-
-用户: "帮我修改一下代码"
-助手: [调用 goto_stage 工具，参数 target_stage="coding"]
-
-用户: "我想重新检查一下项目"
-助手: [调用 goto_stage 工具，参数 target_stage="check"]
-
-用户: "我想添加一个用户登录功能"
-助手: [调用 create_iteration 工具，参数 title="用户登录功能", description="实现用户登录认证系统，包括登录页面和后端验证"]
-
-用户: "项目标题是什么？"
-助手: 直接回答用户问题，不需要调用工具
-
-## 规则
-
-1. 当用户要求修改现有功能时，使用 goto_stage 工具
-2. 当用户要求添加新功能或做大改动时，使用 create_iteration 工具
-3. 当用户只是提问或讨论时，直接回答，不调用工具
-4. 始终用中文回复
-5. 调用工具前不需要询问确认，系统会自动处理
+# 注意
+- 用户报告问题 = 立即调用 goto_stage，不要问确认
+- 直接调用工具，不要在文字中描述"我会帮你..."
 "#;
 
 fn get_tools() -> Vec<serde_json::Value> {
     vec![
         serde_json::json!({
             "name": "goto_stage",
-            "description": "跳转到指定阶段重新执行项目。当用户要求修改代码、重新检查、重新设计等时使用此工具。",
+            "description": "当用户报告任何问题、bug、错误、不满意时调用此工具。这是最常用的工具。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "target_stage": {
                         "type": "string",
-                        "enum": ["idea", "prd", "design", "plan", "coding", "check", "delivery"],
-                        "description": "目标阶段名称。coding=修改代码, check=重新检查, design=修改设计, plan=修改计划, prd=修改需求, idea=修改想法, delivery=重新交付"
+                        "enum": ["coding"],
+                        "description": "固定使用 coding"
                     }
                 },
                 "required": ["target_stage"]
@@ -89,22 +66,17 @@ fn get_tools() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "create_iteration",
-            "description": "创建新的迭代来实现新功能或进行重大变更。当用户想要添加新功能模块或做重大改动时使用此工具。",
+            "description": "仅当用户需要全新的、独立的功能模块时调用。如果用户只是报告现有功能的问题，必须用 goto_stage。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "title": {
                         "type": "string",
-                        "description": "新迭代的标题，简洁概括用户需求"
+                        "description": "新迭代标题"
                     },
                     "description": {
                         "type": "string",
-                        "description": "新迭代的详细描述，包括用户想要实现的具体功能"
-                    },
-                    "inheritance": {
-                        "type": "string",
-                        "enum": ["none", "partial", "full"],
-                        "description": "继承模式：partial=继承代码重新生成文档（推荐），full=继承所有，none=完全从头开始"
+                        "description": "功能详细描述"
                     }
                 },
                 "required": ["title", "description"]
@@ -196,10 +168,15 @@ pub async fn pm_send_message(
         parts: vec![Part::Text { text: message.clone() }],
     });
 
+    println!("[PM] Total contents in request: {} items", contents.len());
+    println!("[PM] Current message: {}", message);
+
     // Create request with tools
+    let tools = get_tools();
+    println!("[PM] Tools: {:?}", tools);
     let tools_map: HashMap<String, serde_json::Value> = vec![(
         "tools".to_string(),
-        serde_json::json!(get_tools())
+        serde_json::json!(tools)
     )].into_iter().collect();
 
     let req = LlmRequest {
@@ -219,31 +196,40 @@ pub async fn pm_send_message(
     
     // Stream LLM response in real-time, similar to ChatGPT
     while let Some(chunk) = stream.next().await {
-        if let Ok(r) = chunk {
-            if let Some(c) = r.content {
-                for p in c.parts.iter() {
-                    match p {
-                        Part::Text { text } => {
-                            response_text.push_str(text);
-                            // Emit each chunk in real-time for streaming display
-                            let _ = window.emit("agent_streaming", serde_json::json!({
-                                "content": text,
-                                "agent_name": "PM Agent",
-                                "is_thinking": false,
-                                "is_first": is_first_chunk,
-                                "is_last": false
-                            }));
-                            is_first_chunk = false;
+        match chunk {
+            Ok(r) => {
+                if let Some(c) = r.content {
+                    for p in c.parts.iter() {
+                        match p {
+                            Part::Text { text } => {
+                                println!("[PM] Received text chunk: {} chars", text.len());
+                                response_text.push_str(text);
+                                // Emit each chunk in real-time for streaming display
+                                let _ = window.emit("agent_streaming", serde_json::json!({
+                                    "content": text,
+                                    "agent_name": "PM Agent",
+                                    "is_thinking": false,
+                                    "is_first": is_first_chunk,
+                                    "is_last": false
+                                }));
+                                is_first_chunk = false;
+                            }
+                            Part::FunctionCall { name, args, .. } => {
+                                println!("[PM] Received function call: {} with args: {:?}", name, args);
+                                function_calls.push((name.clone(), args.clone()));
+                            }
+                            _ => {}
                         }
-                        Part::FunctionCall { name, args, .. } => {
-                            function_calls.push((name.clone(), args.clone()));
-                        }
-                        _ => {}
                     }
                 }
             }
+            Err(e) => {
+                eprintln!("[PM] Stream error: {}", e);
+            }
         }
     }
+    
+    println!("[PM] Stream complete. response_text: {} chars, function_calls: {}", response_text.len(), function_calls.len());
     
     // Send streaming end signal
     if !response_text.is_empty() || !is_first_chunk {
@@ -258,6 +244,9 @@ pub async fn pm_send_message(
 
     // Process function calls - these add actions to the streaming message
     for (func_name, args) in &function_calls {
+        println!("[PM] Processing function call: {} with args: {:?}", func_name, args);
+        
+        // Handle correct function call format
         if func_name == "goto_stage" {
             if let Some(target) = args.get("target_stage").and_then(|t| t.as_str()) {
                 let stage_names = {
@@ -311,6 +300,75 @@ pub async fn pm_send_message(
                     }],
                     "needs_restart": false
                 }));
+            }
+        }
+        
+        // FALLBACK: Handle malformed function calls where LLM puts command in args
+        // Some models return: function name="tools", args={"command": "goto_stage(coding)"}
+        if func_name == "tools" {
+            if let Some(command) = args.get("command").and_then(|c| c.as_str()) {
+                println!("[PM] Fallback: parsing command from 'tools' function: {}", command);
+                // Parse command like "goto_stage(coding)" or "goto_stage(\"coding\")"
+                if command.starts_with("goto_stage") {
+                    // Extract the stage from the command
+                    let target = if command.contains("coding") {
+                        "coding"
+                    } else if command.contains("design") {
+                        "design"
+                    } else if command.contains("plan") {
+                        "plan"
+                    } else if command.contains("prd") {
+                        "prd"
+                    } else {
+                        "coding" // default
+                    };
+                    
+                    let stage_names = {
+                        let mut map = HashMap::new();
+                        map.insert("coding", "编码阶段");
+                        map.insert("design", "设计阶段");
+                        map.insert("plan", "计划阶段");
+                        map.insert("prd", "需求分析阶段");
+                        map
+                    };
+                    
+                    let stage_name = stage_names.get(target).unwrap_or(&target);
+                    
+                    let action_prompt = format!("\n\n点击下方按钮确认跳转到 **{}**：", stage_name);
+                    let _ = window.emit("agent_streaming", serde_json::json!({
+                        "content": action_prompt,
+                        "agent_name": "PM Agent",
+                        "is_thinking": false,
+                        "is_first": false,
+                        "is_last": false
+                    }));
+                    
+                    let _ = window.emit("pm_actions", serde_json::json!({
+                        "actions": [{ 
+                            "action_type": "pm_goto_stage", 
+                            "target_stage": target, 
+                            "label": format!("🔄 跳转到 {}", stage_name) 
+                        }]
+                    }));
+                    
+                    let _ = window.emit("agent_streaming", serde_json::json!({
+                        "content": "",
+                        "agent_name": "PM Agent",
+                        "is_thinking": false,
+                        "is_first": false,
+                        "is_last": true
+                    }));
+                    
+                    return Ok(serde_json::json!({
+                        "agent_message": response_text,
+                        "actions": [{ 
+                            "action_type": "pm_goto_stage", 
+                            "target_stage": target, 
+                            "label": format!("🔄 跳转到 {}", stage_name) 
+                        }],
+                        "needs_restart": false
+                    }));
+                }
             }
         }
         
@@ -431,6 +489,7 @@ pub async fn pm_send_message(
 pub async fn pm_restart_iteration(
     iteration_id: String, 
     target_stage: String,
+    feedback: Option<String>,
     window: Window,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
@@ -441,6 +500,36 @@ pub async fn pm_restart_iteration(
     iter.status = cowork_core::domain::IterationStatus::Running;
 
     store.save(&iter).map_err(|e| e.to_string())?;
+
+    // Save feedback to storage using the existing feedback mechanism
+    // This allows the coding stage to read it via load_feedback_history
+    if let Some(ref fb) = feedback {
+        // Set iteration ID for storage operations
+        cowork_core::storage::set_iteration_id(iteration_id.clone());
+        println!("[PM] Set iteration_id for storage: {}", iteration_id);
+        
+        // Debug: print the storage path
+        if let Ok(iter_dir) = cowork_core::storage::get_iteration_dir() {
+            println!("[PM] Storage iteration dir: {}", iter_dir.display());
+        }
+        
+        let feedback_entry = cowork_core::data::Feedback {
+            stage: "pm_agent".to_string(),
+            feedback_type: cowork_core::data::FeedbackType::QualityIssue,
+            severity: cowork_core::data::Severity::Major,
+            details: fb.clone(),
+            suggested_fix: Some(format!("Restart from {} stage via PM Agent", target_stage)),
+            timestamp: chrono::Utc::now(),
+        };
+        
+        if let Err(e) = cowork_core::storage::append_feedback(&feedback_entry) {
+            eprintln!("[PM] Warning: Failed to save feedback: {}", e);
+        } else {
+            println!("[PM] Saved feedback to storage ({} chars): {}", fb.len(), fb.chars().take(50).collect::<String>());
+        }
+    } else {
+        println!("[PM] No feedback provided, skipping storage save");
+    }
 
     // Load project
     let project_store = ProjectStore::new();
@@ -463,7 +552,9 @@ pub async fn pm_restart_iteration(
     let iteration_id_clone = iteration_id.clone();
 
     tokio::spawn(async move {
-        println!("[PM] Starting goto_stage for iteration: {} from stage: {}", iteration_id_clone, target_stage);
+        println!("[PM] Starting goto_stage for iteration: {} from stage: {}", 
+            iteration_id_clone, target_stage);
+        // Use regular execute() - feedback is now in storage, coding stage will read it
         match executor.execute(&mut project, &iteration_id_clone, Some(target_stage), None).await {
             Ok(_) => {
                 println!("[PM] goto_stage completed successfully");

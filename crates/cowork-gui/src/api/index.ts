@@ -226,8 +226,8 @@ const API = {
   pm: {
     sendMessage: (iterationId: string, message: string, history: unknown[]) => 
       invoke('pm_send_message', { iterationId, message, history }),
-    restart: (iterationId: string, targetStage: string): Promise<void> => 
-      invoke('pm_restart_iteration', { iterationId, targetStage }),
+    restart: (iterationId: string, targetStage: string, feedback?: string): Promise<void> => 
+      invoke('pm_restart_iteration', { iterationId, targetStage, feedback: feedback ?? null }),
     getWelcome: (iterationId: string): Promise<{ agent_message: string; actions: PMAction[] }> => 
       invoke('pm_get_welcome_message', { iterationId }),
   },

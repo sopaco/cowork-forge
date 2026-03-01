@@ -161,7 +161,8 @@ function App() {
         message.info('Retrying iteration...');
       });
 
-      await listen('iteration_completed', () => {
+      await listen('iteration_completed', (event) => {
+        const iterationId = event.payload as string;
         setProcessing(false);
         setIsExecuting(false);
         setCurrentAgent(null);
@@ -170,6 +171,10 @@ function App() {
         loadProject();
         triggerMemoryRefresh();
         triggerKnowledgeRefresh();
+        // Clear PM messages and switch to PM Chat for post-delivery interaction
+        clearPMMessages();
+        setActiveView('pm_chat');
+        loadPMWelcomeMessage(iterationId);
         message.success('Iteration completed');
       });
 
@@ -547,6 +552,27 @@ function App() {
     ));
   }, [setMessages]);
 
+  // Build feedback text from PM Chat user messages.
+  // This will be saved to storage and loaded by the coding stage.
+  const buildPMFeedback = useCallback((
+    msgs: (ChatMessage & { type: 'user' | 'pm_agent' })[],
+    targetStage: string
+  ): string => {
+    console.log('[PM] buildPMFeedback called with', msgs.length, 'messages, targetStage:', targetStage);
+    
+    // Extract only user messages - these are the actual issues to fix
+    const userMessages = msgs
+      .filter(msg => msg.type === 'user')
+      .map(msg => (msg as { content: string }).content)
+      .filter(content => content && content.trim());
+    
+    if (userMessages.length === 0) return '';
+    
+    const result = userMessages.join('\n\n');
+    console.log('[PM] buildPMFeedback result length:', result.length);
+    return result;
+  }, []);
+
   const handlePMAction = useCallback(async (action: PMAction) => {
     if (!currentIteration) return;
     
@@ -593,12 +619,26 @@ function App() {
         
       case 'pm_goto_stage':
         if (action.target_stage) {
+          console.log('[PM] pm_goto_stage action received, target_stage:', action.target_stage);
+          console.log('[PM] Current pmMessages:', pmMessages);
+          console.log('[PM] pmMessages length:', pmMessages.length);
+          
+          // Capture the full PM conversation as feedback before showing the modal
+          const feedbackText = buildPMFeedback(
+            pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[],
+            action.target_stage
+          );
+          console.log('[PM] buildPMFeedback result:', feedbackText ? `${feedbackText.length} chars: ${feedbackText.substring(0, 100)}...` : 'empty');
           Modal.confirm({
             title: 'Confirm Stage Return',
-            content: `Return to ${action.target_stage} stage?`,
+            content: `Return to ${action.target_stage} stage? Your PM Chat conversation will be passed as feedback to the agent.`,
             onOk: async () => {
               try {
-                await API.pm.restart(currentIteration.id, action.target_stage!);
+                console.log('[PM] User confirmed, calling API.pm.restart with feedback:', feedbackText ? `${feedbackText.length} chars` : 'none');
+                // Clear PM messages so next PM Chat session starts fresh
+                clearPMMessages();
+                // Pass feedback only if it has content (don't convert empty string to undefined)
+                await API.pm.restart(currentIteration.id, action.target_stage!, feedbackText.length > 0 ? feedbackText : undefined);
                 message.success(`Restarted from ${action.target_stage}`);
                 loadProject();
               } catch (err) {
@@ -640,7 +680,7 @@ function App() {
       default:
         console.log('Unknown PM action:', action);
     }
-  }, [currentIteration, loadProject, setActiveView, setActiveArtifactTab, clearPMMessages, setMessages, setCurrentIteration]);
+  }, [currentIteration, loadProject, setActiveView, setActiveArtifactTab, clearPMMessages, setMessages, setCurrentIteration, pmMessages, buildPMFeedback]);
 
   const handleOpenProjectFolder = useCallback(async () => {
     try {
