@@ -70,9 +70,10 @@ impl Tool for PMGotoStageTool {
             }
         };
 
-        // Save feedback for the stage restart
+        // Save feedback for the target stage (not "pm_agent")
+        // This allows the target stage to find its feedback when loading from storage
         let feedback = Feedback {
-            stage: "pm_agent".to_string(),
+            stage: stage_str.to_string(),  // Use target stage name instead of "pm_agent"
             feedback_type: FeedbackType::QualityIssue,
             severity: Severity::Major,
             details: reason.to_string(),
