@@ -79,9 +79,12 @@ impl IterationExecutor {
     async fn prepare_workspace(&self, iteration: &Iteration) -> anyhow::Result<std::path::PathBuf> {
         let workspace = self.iteration_store.ensure_workspace(&iteration.id)?;
 
-        // If evolution, copy base iteration workspace
+        // Only inherit from base when iteration is first starting (Draft status)
+        // This prevents overwriting existing work when restarting stages via PM Chat
         if let Some(base_id) = &iteration.base_iteration_id {
-            self.inherit_from_base(&workspace, base_id, iteration.inheritance).await?;
+            if iteration.status == IterationStatus::Draft {
+                self.inherit_from_base(&workspace, base_id, iteration.inheritance).await?;
+            }
         }
 
         Ok(workspace)
