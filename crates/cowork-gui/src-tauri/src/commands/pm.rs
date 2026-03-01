@@ -1,117 +1,45 @@
+// PM Agent Commands - Delegates to Core layer's PM Agent implementation
+// This file is now a thin adapter that calls cowork-core's PM Agent
+
 use crate::AppState;
 use crate::TauriBackend;
 use cowork_core::persistence::IterationStore;
 use cowork_core::pipeline::IterationExecutor;
 use cowork_core::persistence::ProjectStore;
 use cowork_core::llm::{load_config, create_llm_client};
+use cowork_core::{PMAgentStreamCallback, PMAgentAction, execute_pm_agent_message_streaming};
 use std::sync::Arc;
 use tauri::{Emitter, Manager, State, Window};
-use adk_core::{Content, Part, LlmRequest};
-use std::collections::HashMap;
+use async_trait::async_trait;
 
-const PM_AGENT_SYSTEM: &str = r#"
-你是一个项目经理助手，帮助用户管理迭代项目。
+// ============================================================================
+// Streaming Callback - Bridges Core layer events to Tauri events
+// ============================================================================
 
-## 你的能力
-
-你可以使用以下工具：
-
-### goto_stage
-跳转到指定阶段重新执行项目。
-
-**参数**:
-- target_stage: 目标阶段名称
-
-**可选值**: idea, prd, design, plan, coding, check, delivery
-
-**使用场景**:
-- 用户要求修改代码 → target_stage: "coding"
-- 用户要求重新检查项目 → target_stage: "check"
-- 用户要求修改设计 → target_stage: "design"
-- 用户要求修改计划 → target_stage: "plan"
-- 用户要求修改需求 → target_stage: "prd"
-
-### create_iteration
-创建新的迭代来实现新功能或进行重大变更。
-
-**参数**:
-- title: 新迭代的标题（简洁概括）
-- description: 新迭代的详细描述
-- inheritance: 继承模式（可选，默认 "partial"）
-  - "partial": 继承代码，重新生成文档（推荐用于添加新功能）
-  - "full": 继承所有代码和文档
-  - "none": 完全从头开始
-
-**使用场景**:
-- 用户想要添加全新的功能模块
-- 用户想要做重大架构变更
-- 用户明确表示要"新做一个"或"创建新项目"
-
-### 示例对话
-
-用户: "帮我修改一下代码"
-助手: [调用 goto_stage 工具，参数 target_stage="coding"]
-
-用户: "我想重新检查一下项目"
-助手: [调用 goto_stage 工具，参数 target_stage="check"]
-
-用户: "我想添加一个用户登录功能"
-助手: [调用 create_iteration 工具，参数 title="用户登录功能", description="实现用户登录认证系统，包括登录页面和后端验证"]
-
-用户: "项目标题是什么？"
-助手: 直接回答用户问题，不需要调用工具
-
-## 规则
-
-1. 当用户要求修改现有功能时，使用 goto_stage 工具
-2. 当用户要求添加新功能或做大改动时，使用 create_iteration 工具
-3. 当用户只是提问或讨论时，直接回答，不调用工具
-4. 始终用中文回复
-5. 调用工具前不需要询问确认，系统会自动处理
-"#;
-
-fn get_tools() -> Vec<serde_json::Value> {
-    vec![
-        serde_json::json!({
-            "name": "goto_stage",
-            "description": "跳转到指定阶段重新执行项目。当用户要求修改代码、重新检查、重新设计等时使用此工具。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "target_stage": {
-                        "type": "string",
-                        "enum": ["idea", "prd", "design", "plan", "coding", "check", "delivery"],
-                        "description": "目标阶段名称。coding=修改代码, check=重新检查, design=修改设计, plan=修改计划, prd=修改需求, idea=修改想法, delivery=重新交付"
-                    }
-                },
-                "required": ["target_stage"]
-            }
-        }),
-        serde_json::json!({
-            "name": "create_iteration",
-            "description": "创建新的迭代来实现新功能或进行重大变更。当用户想要添加新功能模块或做重大改动时使用此工具。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "title": {
-                        "type": "string",
-                        "description": "新迭代的标题，简洁概括用户需求"
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "新迭代的详细描述，包括用户想要实现的具体功能"
-                    },
-                    "inheritance": {
-                        "type": "string",
-                        "enum": ["none", "partial", "full"],
-                        "description": "继承模式：partial=继承代码重新生成文档（推荐），full=继承所有，none=完全从头开始"
-                    }
-                },
-                "required": ["title", "description"]
-            }
-        })
-    ]
+struct TauriStreamCallback {
+    window: tauri::AppHandle,
 }
+
+#[async_trait]
+impl PMAgentStreamCallback for TauriStreamCallback {
+    async fn on_text_chunk(&self, text: &str, is_first: bool, is_last: bool) {
+        let _ = self.window.emit("agent_streaming", serde_json::json!({
+            "content": text,
+            "agent_name": "PM Agent",
+            "is_thinking": false,
+            "is_first": is_first,
+            "is_last": is_last
+        }));
+    }
+
+    async fn on_tool_call(&self, tool_name: &str, args: &serde_json::Value) {
+        println!("[PM GUI] Tool called: {} with args: {:?}", tool_name, args);
+    }
+}
+
+// ============================================================================
+// PM Send Message - Main entry point for PM Agent chat
+// ============================================================================
 
 #[tauri::command]
 pub async fn pm_send_message(
@@ -128,6 +56,7 @@ pub async fn pm_send_message(
     
     let is_first_message = history.is_empty();
     
+    // Handle welcome message for first interaction
     if is_first_message {
         let welcome_msg = format!(
             "👋 你好！我是项目经理助手。\n\n项目 **{}** 已经完成开发！\n\n接下来你可以：",
@@ -152,257 +81,84 @@ pub async fn pm_send_message(
         return Ok(result);
     }
     
+    // Load config and create LLM client
     let config = load_config().map_err(|e| format!("Failed to load config: {}", e))?;
-    let client = create_llm_client(&config.llm).map_err(|e| format!("Failed to create LLM client: {}", e))?;
+    let model = create_llm_client(&config.llm).map_err(|e| format!("Failed to create LLM client: {}", e))?;
     
-    // Build conversation
-    let mut contents = vec![Content {
-        role: "user".to_string(),
-        parts: vec![Part::Text { 
-            text: format!(
-                "{}\n\n当前迭代信息:\n- ID: {}\n- 标题: {}\n- 描述: {}\n- 状态: {:?}\n- 当前阶段: {:?}",
-                PM_AGENT_SYSTEM,
-                iteration_id, 
-                iteration.title, 
-                iteration.description,
-                iteration.status,
-                iteration.current_stage
-            )
-        }],
-    }];
-
-    // Add history
-    for h in history {
-        if let Some(role) = h.get("type").and_then(|t| t.as_str()) {
-            let content = h.get("content").and_then(|c| c.as_str()).unwrap_or("");
-            let content = if role == "user" {
-                Content {
-                    role: "user".to_string(),
-                    parts: vec![Part::Text { text: content.to_string() }],
-                }
-            } else {
-                Content {
-                    role: "model".to_string(),
-                    parts: vec![Part::Text { text: content.to_string() }],
-                }
-            };
-            contents.push(content);
-        }
-    }
-
-    // Add current message
-    contents.push(Content {
-        role: "user".to_string(),
-        parts: vec![Part::Text { text: message.clone() }],
+    // Create streaming callback
+    let callback = Arc::new(TauriStreamCallback {
+        window: window.app_handle().clone(),
     });
-
-    // Create request with tools
-    let tools_map: HashMap<String, serde_json::Value> = vec![(
-        "tools".to_string(),
-        serde_json::json!(get_tools())
-    )].into_iter().collect();
-
-    let req = LlmRequest {
-        model: config.llm.model_name.clone(),
-        contents,
-        config: None,
-        tools: tools_map,
-    };
-
-    let mut stream = client.generate_content(req, true).await.map_err(|e| format!("Failed to generate content: {}", e))?;
     
-    use futures::StreamExt;
+    // Execute PM Agent via Core layer
+    let result = execute_pm_agent_message_streaming(
+        model,
+        iteration_id.clone(),
+        message,
+        history,
+        Some(callback),
+    )
+    .await
+    .map_err(|e| format!("PM Agent execution failed: {}", e))?;
     
-    let mut response_text = String::new();
-    let mut function_calls: Vec<(String, serde_json::Value)> = Vec::new();
-    let mut is_first_chunk = true;
-    
-    // Stream LLM response in real-time, similar to ChatGPT
-    while let Some(chunk) = stream.next().await {
-        if let Ok(r) = chunk {
-            if let Some(c) = r.content {
-                for p in c.parts.iter() {
-                    match p {
-                        Part::Text { text } => {
-                            response_text.push_str(text);
-                            // Emit each chunk in real-time for streaming display
-                            let _ = window.emit("agent_streaming", serde_json::json!({
-                                "content": text,
-                                "agent_name": "PM Agent",
-                                "is_thinking": false,
-                                "is_first": is_first_chunk,
-                                "is_last": false
-                            }));
-                            is_first_chunk = false;
-                        }
-                        Part::FunctionCall { name, args, .. } => {
-                            function_calls.push((name.clone(), args.clone()));
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-    }
-    
-    // Send streaming end signal
-    if !response_text.is_empty() || !is_first_chunk {
-        let _ = window.emit("agent_streaming", serde_json::json!({
-            "content": "",
-            "agent_name": "PM Agent",
-            "is_thinking": false,
-            "is_first": false,
-            "is_last": true
-        }));
-    }
-
-    // Process function calls - these add actions to the streaming message
-    for (func_name, args) in &function_calls {
-        if func_name == "goto_stage" {
-            if let Some(target) = args.get("target_stage").and_then(|t| t.as_str()) {
-                let stage_names = {
-                    let mut map = HashMap::new();
-                    map.insert("idea", "想法阶段");
-                    map.insert("prd", "需求分析阶段");
-                    map.insert("design", "设计阶段");
-                    map.insert("plan", "计划阶段");
-                    map.insert("coding", "编码阶段");
-                    map.insert("check", "检查阶段");
-                    map.insert("delivery", "交付阶段");
-                    map
-                };
+    // Convert PMAgentAction to frontend-friendly format
+    let actions: Vec<serde_json::Value> = result.actions.iter().map(|action| {
+        match action {
+            PMAgentAction::GotoStage { target_stage, reason: _ } => {
+                let stage_names = get_stage_names();
+                let stage_name = stage_names.get(target_stage.as_str())
+                    .map(|s| *s)
+                    .unwrap_or(target_stage.as_str());
                 
-                let stage_name = stage_names.get(target).unwrap_or(&target);
-                
-                // Append action prompt to streaming message
-                let action_prompt = format!("\n\n点击下方按钮确认跳转到 **{}**：", stage_name);
+                // Send action prompt via streaming
                 let _ = window.emit("agent_streaming", serde_json::json!({
-                    "content": action_prompt,
+                    "content": format!("\n\n点击下方按钮确认跳转到 **{}**：", stage_name),
                     "agent_name": "PM Agent",
                     "is_thinking": false,
                     "is_first": false,
                     "is_last": false
                 }));
                 
-                // Send actions to be appended
-                let _ = window.emit("pm_actions", serde_json::json!({
-                    "actions": [{ 
-                        "action_type": "pm_goto_stage", 
-                        "target_stage": target, 
-                        "label": format!("🔄 跳转到 {}", stage_name) 
-                    }]
-                }));
-                
-                // Send stream end signal
-                let _ = window.emit("agent_streaming", serde_json::json!({
-                    "content": "",
-                    "agent_name": "PM Agent",
-                    "is_thinking": false,
-                    "is_first": false,
-                    "is_last": true
-                }));
-                
-                return Ok(serde_json::json!({
-                    "agent_message": response_text,
-                    "actions": [{ 
-                        "action_type": "pm_goto_stage", 
-                        "target_stage": target, 
-                        "label": format!("🔄 跳转到 {}", stage_name) 
-                    }],
-                    "needs_restart": false
-                }));
+                serde_json::json!({
+                    "action_type": "pm_goto_stage",
+                    "target_stage": target_stage,
+                    "label": format!("🔄 跳转到 {}", stage_name)
+                })
             }
-        }
-        
-        if func_name == "create_iteration" {
-            if let (Some(title), Some(description)) = (
-                args.get("title").and_then(|t| t.as_str()),
-                args.get("description").and_then(|d| d.as_str())
-            ) {
-                let inheritance = args.get("inheritance")
-                    .and_then(|i| i.as_str())
-                    .unwrap_or("partial");
+            PMAgentAction::CreateIteration { iteration_id, title, description: _, inheritance: _ } => {
+                // Emit iteration_created event
+                let _ = window.emit("iteration_created", iteration_id);
                 
-                // Create the new iteration
-                let project_store = ProjectStore::new();
-                let project = project_store.load().map_err(|e| format!("Failed to load project: {}", e))?
-                    .ok_or_else(|| "Project not initialized".to_string())?;
-                
-                let inheritance_mode = match inheritance {
-                    "none" => cowork_core::domain::InheritanceMode::None,
-                    "full" => cowork_core::domain::InheritanceMode::Full,
-                    _ => cowork_core::domain::InheritanceMode::Partial,
-                };
-                
-                let new_iteration = cowork_core::domain::Iteration::create_evolution(
-                    &project,
-                    title.to_string(),
-                    description.to_string(),
-                    iteration_id.clone(),
-                    inheritance_mode,
-                );
-                
-                let new_iteration_id = new_iteration.id.clone();
-                let new_iteration_title = new_iteration.title.clone();
-                
-                let iteration_store = IterationStore::new();
-                iteration_store.save(&new_iteration).map_err(|e| format!("Failed to save iteration: {}", e))?;
-                
-                // Update project
-                let mut project = project;
-                project_store.add_iteration(&mut project, new_iteration.to_summary())
-                    .map_err(|e| format!("Failed to update project: {}", e))?;
-                
-                // Emit iteration_created event to notify frontend
-                let _ = window.emit("iteration_created", &new_iteration_id);
-                
-                // Append action prompt to streaming message
-                let action_prompt = format!("\n\n我已经创建了新迭代 **{}**。\n\n点击下方按钮启动新迭代：", title);
+                // Send action prompt via streaming
                 let _ = window.emit("agent_streaming", serde_json::json!({
-                    "content": action_prompt,
+                    "content": format!("\n\n我已经创建了新迭代 **{}**。\n\n点击下方按钮启动新迭代：", title),
                     "agent_name": "PM Agent",
                     "is_thinking": false,
                     "is_first": false,
                     "is_last": false
                 }));
                 
-                // Send actions to be appended
-                let _ = window.emit("pm_actions", serde_json::json!({
-                    "actions": [{ 
-                        "action_type": "pm_create_iteration", 
-                        "iteration_id": new_iteration_id,
-                        "title": new_iteration_title,
-                        "label": "🚀 启动新迭代" 
-                    }]
-                }));
-                
-                // Send stream end signal
-                let _ = window.emit("agent_streaming", serde_json::json!({
-                    "content": "",
-                    "agent_name": "PM Agent",
-                    "is_thinking": false,
-                    "is_first": false,
-                    "is_last": true
-                }));
-                
-                return Ok(serde_json::json!({
-                    "agent_message": response_text,
-                    "actions": [{ 
-                        "action_type": "pm_create_iteration", 
-                        "iteration_id": new_iteration_id,
-                        "title": new_iteration_title,
-                        "label": "🚀 启动新迭代" 
-                    }],
-                    "needs_restart": false
-                }));
+                serde_json::json!({
+                    "action_type": "pm_create_iteration",
+                    "iteration_id": iteration_id,
+                    "title": title,
+                    "label": "🚀 启动新迭代"
+                })
             }
         }
-    }
-
-    // No function call - just signal stream complete
-    // The content was already streamed via agent_streaming events
-    if response_text.is_empty() { 
-        // Send a fallback message if no content was streamed
+    }).collect();
+    
+    // Send stream end signal
+    let _ = window.emit("agent_streaming", serde_json::json!({
+        "content": "",
+        "agent_name": "PM Agent",
+        "is_thinking": false,
+        "is_first": false,
+        "is_last": true
+    }));
+    
+    // If no content was generated, send a fallback
+    if result.message.is_empty() {
         let fallback = "抱歉，我没有理解你的请求。你可以尝试告诉我想做什么，比如「帮我修改代码」或「重新检查项目」。";
         let _ = window.emit("agent_streaming", serde_json::json!({
             "content": fallback,
@@ -420,17 +176,29 @@ pub async fn pm_send_message(
         }));
     }
     
+    // Send actions if any
+    if !actions.is_empty() {
+        let _ = window.emit("pm_actions", serde_json::json!({
+            "actions": actions
+        }));
+    }
+    
     Ok(serde_json::json!({
-        "agent_message": if response_text.is_empty() { "抱歉，我没有理解你的请求。".to_string() } else { response_text.clone() },
-        "actions": [],
+        "agent_message": if result.message.is_empty() { "抱歉，我没有理解你的请求。".to_string() } else { result.message.clone() },
+        "actions": actions,
         "needs_restart": false
     }))
 }
+
+// ============================================================================
+// PM Restart Iteration - Restart pipeline from a specific stage
+// ============================================================================
 
 #[tauri::command]
 pub async fn pm_restart_iteration(
     iteration_id: String, 
     target_stage: String,
+    feedback: Option<String>,
     window: Window,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
@@ -441,6 +209,36 @@ pub async fn pm_restart_iteration(
     iter.status = cowork_core::domain::IterationStatus::Running;
 
     store.save(&iter).map_err(|e| e.to_string())?;
+
+    // Save feedback to storage using the existing feedback mechanism
+    // This allows the coding stage to read it via load_feedback_history
+    if let Some(ref fb) = feedback {
+        // Set iteration ID for storage operations
+        cowork_core::storage::set_iteration_id(iteration_id.clone());
+        println!("[PM] Set iteration_id for storage: {}", iteration_id);
+        
+        // Debug: print the storage path
+        if let Ok(iter_dir) = cowork_core::storage::get_iteration_dir() {
+            println!("[PM] Storage iteration dir: {}", iter_dir.display());
+        }
+        
+        let feedback_entry = cowork_core::data::Feedback {
+            stage: "pm_agent".to_string(),
+            feedback_type: cowork_core::data::FeedbackType::QualityIssue,
+            severity: cowork_core::data::Severity::Major,
+            details: fb.clone(),
+            suggested_fix: Some(format!("Restart from {} stage via PM Agent", target_stage)),
+            timestamp: chrono::Utc::now(),
+        };
+        
+        if let Err(e) = cowork_core::storage::append_feedback(&feedback_entry) {
+            eprintln!("[PM] Warning: Failed to save feedback: {}", e);
+        } else {
+            println!("[PM] Saved feedback to storage ({} chars): {}", fb.len(), fb.chars().take(50).collect::<String>());
+        }
+    } else {
+        println!("[PM] No feedback provided, skipping storage save");
+    }
 
     // Load project
     let project_store = ProjectStore::new();
@@ -463,7 +261,9 @@ pub async fn pm_restart_iteration(
     let iteration_id_clone = iteration_id.clone();
 
     tokio::spawn(async move {
-        println!("[PM] Starting goto_stage for iteration: {} from stage: {}", iteration_id_clone, target_stage);
+        println!("[PM] Starting goto_stage for iteration: {} from stage: {}", 
+            iteration_id_clone, target_stage);
+        // Use regular execute() - feedback is now in storage, coding stage will read it
         match executor.execute(&mut project, &iteration_id_clone, Some(target_stage), None).await {
             Ok(_) => {
                 println!("[PM] goto_stage completed successfully");
@@ -479,6 +279,10 @@ pub async fn pm_restart_iteration(
     Ok(())
 }
 
+// ============================================================================
+// PM Get Iteration Context
+// ============================================================================
+
 #[tauri::command]
 pub async fn pm_get_iteration_context(iteration_id: String) -> Result<serde_json::Value, String> {
     let store = IterationStore::new();
@@ -493,6 +297,10 @@ pub async fn pm_get_iteration_context(iteration_id: String) -> Result<serde_json
         "completed_stages": iter.completed_stages,
     }))
 }
+
+// ============================================================================
+// PM Get Welcome Message
+// ============================================================================
 
 #[tauri::command]
 pub async fn pm_get_welcome_message(iteration_id: String) -> Result<serde_json::Value, String> {
@@ -516,4 +324,20 @@ pub async fn pm_get_welcome_message(iteration_id: String) -> Result<serde_json::
         "agent_message": welcome_msg,
         "actions": actions
     }))
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+fn get_stage_names() -> std::collections::HashMap<&'static str, &'static str> {
+    let mut map = std::collections::HashMap::new();
+    map.insert("idea", "想法阶段");
+    map.insert("prd", "需求分析阶段");
+    map.insert("design", "设计阶段");
+    map.insert("plan", "计划阶段");
+    map.insert("coding", "编码阶段");
+    map.insert("check", "检查阶段");
+    map.insert("delivery", "交付阶段");
+    map
 }

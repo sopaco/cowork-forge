@@ -48,10 +48,44 @@ impl CodingStage {
             .await;
 
         // Build task description
-        let task_description = if let Some(fb) = feedback {
+        // First, try to load feedback from storage (set by PM Agent via append_feedback)
+        println!("[Coding] Attempting to load feedback from storage...");
+        let stored_feedback = crate::storage::load_feedback_history()
+            .map_err(|e| {
+                println!("[Coding] Failed to load feedback history: {}", e);
+                e
+            })
+            .ok()
+            .and_then(|history| {
+                println!("[Coding] Loaded feedback history with {} entries", history.feedbacks.len());
+                // Get the most recent feedback for pm_agent or coding stage
+                history.feedbacks
+                    .into_iter()
+                    .filter(|f| f.stage == "pm_agent" || f.stage == "coding")
+                    .max_by_key(|f| f.timestamp)
+            });
+
+        let task_description = if let Some(ref fb) = stored_feedback {
+            // Found feedback from storage - this is a user-reported issue
+            println!("[Coding] Found feedback from storage (stage={}): {}", fb.stage, fb.details.chars().take(100).collect::<String>());
+            format!(
+                "## ⚠️ USER REPORTED ISSUE - REQUIRES FIX\n\n\
+                The user has reported the following problems with the project:\n\n\
+                \"\"\"\n{}\n\"\"\"\n\n\
+                ## Your Task\n\
+                1. Read and understand the user's issues above\n\
+                2. Find the relevant code files\n\
+                3. Fix each issue one by one\n\
+                4. Verify your fixes work correctly",
+                fb.details
+            )
+        } else if let Some(fb) = feedback {
+            // Fallback to parameter feedback (from stage review loop)
+            println!("[Coding] Using parameter feedback: {}", fb.chars().take(100).collect::<String>());
             format!("Fix issues based on feedback: {}", fb)
         } else {
             // Load plan artifact to get tasks
+            println!("[Coding] No feedback found, loading plan...");
             let iteration_dir = workspace.parent().unwrap_or(&workspace);
             let plan_artifact = iteration_dir.join("artifacts").join("plan.md");
             

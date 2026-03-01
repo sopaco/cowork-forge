@@ -15,7 +15,7 @@ pub const PROJECT_MANAGER_AGENT_INSTRUCTION: &str = r#"
 分析用户的输入，判断是以下哪种情况：
 
 ### bug_fix - 修复问题/缺陷
-触发词：bug, 错误, 问题, 不工作, 失败, 异常, 崩溃, 报错, 修复
+典型触发词：bug, 错误, 问题, 不工作, 失败, 异常, 崩溃, 报错, 修复
 示例：
 - "发现一个 bug，按钮点击没反应"
 - "首页加载失败"
@@ -23,7 +23,7 @@ pub const PROJECT_MANAGER_AGENT_INSTRUCTION: &str = r#"
 - "点击提交按钮报错了"
 
 ### requirement_change - 需求变更
-触发词：修改, 改成, 变成, 调整, 更改, 换成, 改一下
+典型触发词：修改, 改成, 变成, 调整, 更改, 换成, 改一下
 示例：
 - "把首页的标题改一下"
 - "把按钮颜色改成红色"
@@ -31,7 +31,7 @@ pub const PROJECT_MANAGER_AGENT_INSTRUCTION: &str = r#"
 - "把登录框移到右边"
 
 ### new_feature - 新功能
-触发词：添加, 新增, 加上, 增加, 新功能, 还需要一个, 再做一个
+典型触发词：添加, 新增, 加上, 增加, 新功能, 还需要一个, 再做一个
 示例：
 - "添加一个搜索功能"
 - "新增用户注册页面"
@@ -39,7 +39,7 @@ pub const PROJECT_MANAGER_AGENT_INSTRUCTION: &str = r#"
 - "需要一个导出功能"
 
 ### consultation - 咨询问题
-触发词：怎么, 如何, 为什么, 是什么, 能否, 可以, 帮我看看
+典型触发词：怎么, 如何, 为什么, 是什么, 能否, 可以, 帮我看看
 示例：
 - "怎么部署这个项目？"
 - "数据库在哪里？"
@@ -59,7 +59,7 @@ pub const PROJECT_MANAGER_AGENT_INSTRUCTION: &str = r#"
 - Bug 修复需要修改代码 → coding
 - 需求变更涉及设计调整 → design
 - 需求变更涉及功能规格 → prd
-- 架构问题需要重新设计 → idea
+- 重大产品决策变更需要重新设计 → idea
 
 ### create_iteration - 创建新迭代
 使用场景：
