@@ -79,9 +79,12 @@ impl IterationExecutor {
     async fn prepare_workspace(&self, iteration: &Iteration) -> anyhow::Result<std::path::PathBuf> {
         let workspace = self.iteration_store.ensure_workspace(&iteration.id)?;
 
-        // If evolution, copy base iteration workspace
+        // Only inherit from base when iteration is first starting (Draft status)
+        // This prevents overwriting existing work when restarting stages via PM Chat
         if let Some(base_id) = &iteration.base_iteration_id {
-            self.inherit_from_base(&workspace, base_id, iteration.inheritance).await?;
+            if iteration.status == IterationStatus::Draft {
+                self.inherit_from_base(&workspace, base_id, iteration.inheritance).await?;
+            }
         }
 
         Ok(workspace)
@@ -580,6 +583,20 @@ impl IterationExecutor {
                 let mut feedback_loop_count = 0;
                 const MAX_FEEDBACK_LOOPS: u32 = 5;
                 let mut current_feedback: Option<String> = None;
+
+                // Auto-load feedback from storage (set by PM Agent via pm_goto_stage)
+                // This allows all stages to receive feedback when restarted via PM Chat
+                if let Ok(history) = crate::storage::load_feedback_history() {
+                    if let Some(fb) = history.feedbacks
+                        .into_iter()
+                        .filter(|f| f.stage == stage_name)
+                        .max_by_key(|f| f.timestamp)
+                    {
+                        tracing::info!("[Executor] Found stored feedback for stage '{}': {}", 
+                            stage_name, fb.details.chars().take(100).collect::<String>());
+                        current_feedback = Some(fb.details);
+                    }
+                }
 
                 loop {
                     // Execute or re-execute stage
