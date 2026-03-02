@@ -19,7 +19,15 @@ use super::get_optional_string_param;
 // PM Goto Stage Tool - Restart pipeline from a specific stage
 // ============================================================================
 
-pub struct PMGotoStageTool;
+pub struct PMGotoStageTool {
+    current_iteration_id: String,
+}
+
+impl PMGotoStageTool {
+    pub fn new(current_iteration_id: String) -> Self {
+        Self { current_iteration_id }
+    }
+}
 
 #[async_trait]
 impl Tool for PMGotoStageTool {
@@ -69,6 +77,9 @@ impl Tool for PMGotoStageTool {
                 }));
             }
         };
+
+        // Set iteration ID for storage operations BEFORE saving feedback
+        crate::storage::set_iteration_id(self.current_iteration_id.clone());
 
         // Save feedback for the target stage (not "pm_agent")
         // This allows the target stage to find its feedback when loading from storage
