@@ -877,9 +877,31 @@ pub async fn execute_pm_agent_message_streaming(
         agent_message = "处理完成".to_string();
     }
 
+    // Deduplicate actions - keep only the first occurrence of each unique action
+    let mut seen_stages: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut seen_iterations: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut unique_actions: Vec<PMAgentAction> = Vec::new();
+    
+    for action in detected_actions {
+        match &action {
+            PMAgentAction::GotoStage { target_stage, .. } => {
+                if !seen_stages.contains(target_stage) {
+                    seen_stages.insert(target_stage.clone());
+                    unique_actions.push(action);
+                }
+            }
+            PMAgentAction::CreateIteration { iteration_id, .. } => {
+                if !seen_iterations.contains(iteration_id) {
+                    seen_iterations.insert(iteration_id.clone());
+                    unique_actions.push(action);
+                }
+            }
+        }
+    }
+
     Ok(PMAgentResult {
         message: agent_message,
-        actions: detected_actions,
+        actions: unique_actions,
         parts: all_parts,
     })
 }
