@@ -1484,7 +1484,7 @@ impl IterationExecutor {
                 if let Ok(event) = result {
                     if let Some(text) = extract_text_from_event(&event) {
                         if !text.trim().is_empty() {
-                            generated_text = text;
+                            generated_text.push_str(&text);
                         }
                     }
                 }
@@ -1585,6 +1585,7 @@ impl IterationExecutor {
         // Process stream
         let mut stream = std::pin::pin!(stream);
         let mut step_count = 0;
+        let mut last_error: Option<anyhow::Error> = None;
         while let Some(result) = stream.next().await {
             step_count += 1;
             if step_count % 10 == 0 {
@@ -1592,7 +1593,13 @@ impl IterationExecutor {
             }
             if let Err(e) = result {
                 eprintln!("[Executor] Stream error at step {}: {}", step_count, e);
+                last_error = Some(anyhow::anyhow!("Stream error at step {}: {}", step_count, e));
             }
+        }
+
+        // Check if there was a critical error
+        if let Some(e) = last_error {
+            return Err(e);
         }
 
         println!(

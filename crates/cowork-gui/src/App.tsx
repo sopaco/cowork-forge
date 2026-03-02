@@ -469,6 +469,12 @@ function App() {
 				triggerKnowledgeRefresh();
 				message.success('Knowledge updated');
 			});
+
+			await listen<[string, string]>('knowledge_regeneration_failed', (event) => {
+				const [iterationId, error] = event.payload;
+				console.error('[App] Knowledge regeneration failed:', iterationId, error);
+				message.error('Knowledge generation failed: ' + error);
+			});
 		};
 
 		setupListeners();
@@ -914,6 +920,7 @@ function App() {
 				<KnowledgePanel
 					key={`knowledge-${knowledgeRefreshTrigger}`}
 					currentSession={project?.id}
+					currentIterationId={currentIteration?.id}
 					refreshTrigger={knowledgeRefreshTrigger}
 				/>
 			</div>

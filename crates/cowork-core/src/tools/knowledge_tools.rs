@@ -41,8 +41,7 @@ impl Tool for LoadDocumentSummaryTool {
                 "doc_type": {
                     "type": "string",
                     "description": "Type of document to load",
-                    "enum": ["idea", "prd", "design", "plan"],
-                    "required": true
+                    "enum": ["idea", "prd", "design", "plan"]
                 }
             },
             "required": ["doc_type"]
@@ -179,8 +178,7 @@ impl Tool for SaveKnowledgeSnapshotTool {
             "properties": {
                 "knowledge_json": {
                     "type": "string",
-                    "description": "The complete knowledge snapshot as a JSON string",
-                    "required": true
+                    "description": "The complete knowledge snapshot as a JSON string"
                 }
             },
             "required": ["knowledge_json"]
