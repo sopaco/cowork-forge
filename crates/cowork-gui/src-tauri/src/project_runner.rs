@@ -81,7 +81,7 @@ impl ProjectRunner {
         };
 
         #[cfg(not(target_os = "windows"))]
-        let mut child = Command::new("sh")
+        let mut child = tokio::process::Command::new("sh")
             .args(["-c", &command])
             .current_dir(&code_path)
             .stdout(std::process::Stdio::piped())
