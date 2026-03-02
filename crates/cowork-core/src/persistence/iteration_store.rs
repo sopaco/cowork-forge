@@ -15,6 +15,9 @@ impl IterationStore {
     /// Load iteration by ID
     pub fn load(&self, iteration_id: &str) -> anyhow::Result<Iteration> {
         let path = self.iteration_file_path(iteration_id)?;
+        if !path.exists() {
+            anyhow::bail!("Iteration not found: {}", iteration_id);
+        }
         let content = std::fs::read_to_string(&path)?;
         let iteration: Iteration = serde_json::from_str(&content)?;
         Ok(iteration)
@@ -23,6 +26,12 @@ impl IterationStore {
     /// Save iteration to disk
     pub fn save(&self, iteration: &Iteration) -> anyhow::Result<()> {
         let path = self.iteration_file_path(&iteration.id)?;
+        
+        // Ensure parent directory exists before writing
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        
         let content = serde_json::to_string_pretty(iteration)?;
         std::fs::write(&path, content)?;
         Ok(())

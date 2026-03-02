@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::domain::{IterationSummary, Project};
 
-use super::get_cowork_dir;
+use super::{get_cowork_dir, is_project_initialized};
 
 const PROJECT_FILE: &str = "project.json";
 #[allow(dead_code)]
@@ -18,6 +18,11 @@ impl ProjectStore {
 
     /// Load project from disk
     pub fn load(&self) -> anyhow::Result<Option<Project>> {
+        // Check if project is initialized first
+        if !is_project_initialized() {
+            return Ok(None);
+        }
+        
         let path = self.project_file_path()?;
         if !path.exists() {
             return Ok(None);
@@ -31,6 +36,12 @@ impl ProjectStore {
     /// Save project to disk
     pub fn save(&self, project: &Project) -> anyhow::Result<()> {
         let path = self.project_file_path()?;
+        
+        // Ensure parent directory exists before writing
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        
         let content = serde_json::to_string_pretty(project)?;
         std::fs::write(&path, content)?;
         Ok(())
@@ -38,7 +49,7 @@ impl ProjectStore {
 
     /// Check if project exists
     pub fn exists(&self) -> bool {
-        self.project_file_path()
+        is_project_initialized() && self.project_file_path()
             .map(|p| p.exists())
             .unwrap_or(false)
     }
