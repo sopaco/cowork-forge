@@ -545,7 +545,7 @@ pub fn create_project_manager_agent(model: Arc<dyn Llm>, iteration_id: String) -
     let agent = LlmAgentBuilder::new("project_manager_agent")
         .instruction(&instruction)
         .model(model)
-        .tool(Arc::new(PMGotoStageTool))
+        .tool(Arc::new(PMGotoStageTool::new(iteration_id.clone())))
         .tool(Arc::new(PMCreateIterationTool::new(iteration_id.clone())))
         .tool(Arc::new(PMRespondTool))
         .tool(Arc::new(PMSaveDecisionTool::new(iteration_id.clone())))
