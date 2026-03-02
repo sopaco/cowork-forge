@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { App, Card, Input, Button, Tag, Empty, Spin, Modal, Tabs, Typography, Space, Divider, Timeline } from "antd";
-import { SearchOutlined, EyeOutlined, BookOutlined, ClockCircleOutlined, ReloadOutlined, RocketOutlined, FileTextOutlined, CodeOutlined, CheckCircleOutlined, CloseCircleOutlined } from "@ant-design/icons";
+import { listen } from "@tauri-apps/api/event";
+import { App, Card, Input, Button, Tag, Empty, Spin, Modal, Tabs, Typography, Space, Divider, Timeline, Tooltip, Badge } from "antd";
+import { SearchOutlined, EyeOutlined, BookOutlined, ClockCircleOutlined, ReloadOutlined, RocketOutlined, FileTextOutlined, CodeOutlined, CheckCircleOutlined, CloseCircleOutlined, PlusOutlined } from "@ant-design/icons";
 
 const { Text, Paragraph, Title } = Typography;
 
@@ -23,22 +24,69 @@ interface KnowledgeListResult {
   knowledge_list: Knowledge[];
 }
 
+interface IterationInfo {
+  id: string;
+  number: number;
+  title: string;
+  description: string;
+  status: string;
+  current_stage: string | null;
+  created_at: string;
+}
+
 interface KnowledgePanelProps {
   currentSession?: string;
+  currentIterationId?: string | null;
   refreshTrigger?: number;
 }
 
-const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, refreshTrigger }) => {
+const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, currentIterationId, refreshTrigger }) => {
   const { message } = App.useApp();
   const [knowledgeList, setKnowledgeList] = useState<Knowledge[]>([]);
   const [loading, setLoading] = useState(false);
   const [regenerating, setRegenerating] = useState<string | null>(null);
   const [selectedKnowledge, setSelectedKnowledge] = useState<Knowledge | null>(null);
   const [searchText, setSearchText] = useState("");
+  const [iterations, setIterations] = useState<IterationInfo[]>([]);
+  const [loadingIterations, setLoadingIterations] = useState(false);
 
   useEffect(() => {
     loadProjectKnowledge();
   }, [currentSession, refreshTrigger]);
+
+  useEffect(() => {
+    if (currentSession && knowledgeList.length === 0 && !loading) {
+      loadIterations();
+    }
+  }, [currentSession, knowledgeList.length, loading, currentIterationId]);
+
+  // Listen for knowledge regeneration events to clear regenerating state
+  useEffect(() => {
+    let unlistenCompleted: (() => void) | null = null;
+    let unlistenFailed: (() => void) | null = null;
+
+    const setupListeners = async () => {
+      unlistenCompleted = await listen<string>('knowledge_regeneration_completed', () => {
+        setRegenerating(null);
+      });
+
+      unlistenFailed = await listen<[string, string]>('knowledge_regeneration_failed', () => {
+        setRegenerating(null);
+      });
+    };
+
+    setupListeners();
+
+    return () => {
+      if (unlistenCompleted) unlistenCompleted();
+      if (unlistenFailed) unlistenFailed();
+    };
+  }, []);
+
+  // Find current iteration from iterations list
+  const currentIterationInfo = currentIterationId 
+    ? iterations.find(iter => iter.id === currentIterationId) 
+    : null;
 
   const loadProjectKnowledge = async () => {
     if (!currentSession) {
@@ -59,16 +107,49 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, refresh
     }
   };
 
+  const loadIterations = async () => {
+    if (!currentSession) {
+      setIterations([]);
+      return;
+    }
+
+    setLoadingIterations(true);
+    try {
+      const iterationsData = await invoke<IterationInfo[]>("gui_get_iterations");
+      const completedIterations = (iterationsData || []).filter(
+        (iter) => iter.status === "Completed"
+      );
+      setIterations(completedIterations);
+    } catch (error) {
+      console.error("[KnowledgePanel] Failed to load iterations:", error);
+      setIterations([]);
+    } finally {
+      setLoadingIterations(false);
+    }
+  };
+
   const handleRegenerateKnowledge = async (iterationId: string) => {
     setRegenerating(iterationId);
     try {
       await invoke("gui_regenerate_knowledge", { iterationId });
-      message.success("Knowledge regenerated");
-      loadProjectKnowledge();
+      // Don't show success message here - wait for event from backend
+      // The actual knowledge generation happens in background
     } catch (error) {
-      console.error("[KnowledgePanel] Failed to regenerate knowledge:", error);
-      message.error("Failed to regenerate: " + error);
-    } finally {
+      console.error("[KnowledgePanel] Failed to start knowledge regeneration:", error);
+      message.error("Failed to start regeneration: " + error);
+      setRegenerating(null);
+    }
+  };
+
+  const handleGenerateKnowledge = async (iterationId: string) => {
+    setRegenerating(iterationId);
+    try {
+      await invoke("gui_regenerate_knowledge", { iterationId });
+      // Don't show success message here - wait for event from backend
+      // The actual knowledge generation happens in background
+    } catch (error) {
+      console.error("[KnowledgePanel] Failed to start knowledge generation:", error);
+      message.error("Failed to start generation: " + error);
       setRegenerating(null);
     }
   };
@@ -120,7 +201,83 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, refresh
         ) : !currentSession ? (
           <Empty description="Please select a project" style={{ marginTop: "50px" }} />
         ) : filteredKnowledge.length === 0 ? (
-          <Empty description="No knowledge found" style={{ marginTop: "50px" }} />
+          loadingIterations ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}><Spin size="large" /></div>
+          ) : currentIterationInfo ? (
+            // Current iteration is selected but has no knowledge - show generate option
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div style={{ padding: "12px", backgroundColor: "#e6f7ff", borderRadius: "8px", border: "1px solid #91d5ff", marginBottom: "8px" }}>
+                <Text style={{ color: "#1890ff" }}>Current iteration has no knowledge. Generate knowledge for it:</Text>
+              </div>
+              <Card size="small" hoverable>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                      <Text strong>#{currentIterationInfo.number} {currentIterationInfo.title}</Text>
+                      <Badge status="success" text="Completed" />
+                    </div>
+                    <Paragraph ellipsis={{ rows: 2 }} style={{ margin: 0, fontSize: "13px", color: "#888" }}>
+                      {currentIterationInfo.description}
+                    </Paragraph>
+                  </div>
+                  <Tooltip title="Generate knowledge">
+                    <Button 
+                      type="primary" 
+                      icon={<PlusOutlined />} 
+                      size="small" 
+                      onClick={() => handleGenerateKnowledge(currentIterationInfo.id)} 
+                      loading={regenerating === currentIterationInfo.id}
+                      disabled={regenerating !== null}
+                    >
+                      Generate
+                    </Button>
+                  </Tooltip>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#666" }}>
+                  <Space size="small"><span><ClockCircleOutlined /> {formatDate(currentIterationInfo.created_at)}</span></Space>
+                </div>
+              </Card>
+            </div>
+          ) : iterations.length > 0 ? (
+            // No current iteration selected - show all completed iterations
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div style={{ padding: "12px", backgroundColor: "#f6ffed", borderRadius: "8px", border: "1px solid #b7eb8f", marginBottom: "8px" }}>
+                <Text style={{ color: "#52c41a" }}>No knowledge found. You can generate knowledge for completed iterations:</Text>
+              </div>
+              {iterations.map((iteration) => (
+                <Card key={iteration.id} size="small" hoverable>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                        <Text strong>#{iteration.number} {iteration.title}</Text>
+                        <Badge status="success" text="Completed" />
+                      </div>
+                      <Paragraph ellipsis={{ rows: 2 }} style={{ margin: 0, fontSize: "13px", color: "#888" }}>
+                        {iteration.description}
+                      </Paragraph>
+                    </div>
+                    <Tooltip title="Generate knowledge">
+                      <Button 
+                        type="primary" 
+                        icon={<PlusOutlined />} 
+                        size="small" 
+                        onClick={() => handleGenerateKnowledge(iteration.id)} 
+                        loading={regenerating === iteration.id}
+                        disabled={regenerating !== null}
+                      >
+                        Generate
+                      </Button>
+                    </Tooltip>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#666" }}>
+                    <Space size="small"><span><ClockCircleOutlined /> {formatDate(iteration.created_at)}</span></Space>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Empty description="No knowledge found. Complete an iteration first to generate knowledge." style={{ marginTop: "50px" }} />
+          )
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             {filteredKnowledge.map((knowledge) => (
@@ -136,8 +293,12 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, refresh
                     </Paragraph>
                   </div>
                   <Space size="small">
-                    <Button type="text" icon={<EyeOutlined />} size="small" onClick={(e) => { e.stopPropagation(); handleViewDetail(knowledge); }} />
-                    <Button type="text" icon={<ReloadOutlined />} size="small" onClick={(e) => { e.stopPropagation(); handleRegenerateKnowledge(knowledge.iteration_id); }} loading={regenerating === knowledge.iteration_id} />
+                    <Tooltip title="查看详情">
+                      <Button type="text" icon={<EyeOutlined />} size="small" onClick={(e) => { e.stopPropagation(); handleViewDetail(knowledge); }} />
+                    </Tooltip>
+                    <Tooltip title="重新生成知识">
+                      <Button type="text" icon={<ReloadOutlined />} size="small" onClick={(e) => { e.stopPropagation(); handleRegenerateKnowledge(knowledge.iteration_id); }} loading={regenerating === knowledge.iteration_id} />
+                    </Tooltip>
                   </Space>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#666" }}>
