@@ -21,6 +21,7 @@ interface Memory {
   impact?: string;
   tags?: string[];
   file?: string;
+  _ts?: number;
 }
 
 interface MemoryDetail {
@@ -81,7 +82,7 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ currentSession, refreshTrigge
     setDetailLoading(true);
     try {
       const detail = await invoke<MemoryDetail>("load_memory_detail", {
-        memoryId: memory.id, file: memory.file, iterationId: currentSession || null,
+        memoryId: memory.id, file: memory.file, iterationId: currentSession || null, ts: memory._ts,
       });
       setMemoryDetail(detail);
     } catch (error) {

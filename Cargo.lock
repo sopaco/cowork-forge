@@ -1462,6 +1462,7 @@ dependencies = [
  "tokio-stream",
  "tracing",
  "urlencoding",
+ "uuid",
  "which",
 ]
 

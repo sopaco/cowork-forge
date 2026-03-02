@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// Project-level memory (across iterations)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -153,7 +154,7 @@ impl Decision {
         let now = Utc::now();
         let iteration_id = iteration_id.into();
         Self {
-            id: format!("dec-{}-{}", iteration_id, now.timestamp()),
+            id: format!("dec-{}-{}", iteration_id, Uuid::new_v4()),
             title: title.into(),
             context: context.into(),
             decision: decision.into(),
@@ -186,7 +187,7 @@ impl Pattern {
         let now = Utc::now();
         let iteration_id = iteration_id.into();
         Self {
-            id: format!("pat-{}-{}", iteration_id, now.timestamp()),
+            id: format!("pat-{}-{}", iteration_id, Uuid::new_v4()),
             name: name.into(),
             description: description.into(),
             usage: Vec::new(),

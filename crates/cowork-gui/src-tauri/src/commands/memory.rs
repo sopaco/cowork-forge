@@ -1,4 +1,5 @@
 use cowork_core::persistence::MemoryStore;
+use uuid::Uuid;
 
 #[tauri::command]
 pub async fn query_memory_index(
@@ -50,7 +51,8 @@ pub async fn query_memory_index(
             for i in &mem.insights {
                 if matches_stage(Some(&i.stage)) {
                     results.push(serde_json::json!({
-                        "id": format!("insight-{}", i.created_at.timestamp()),
+                        "id": format!("insight-{}", Uuid::new_v4()),
+                        "_ts": i.created_at.timestamp(),
                         "title": format!("Insight from {} stage", i.stage),
                         "summary": i.content.chars().take(200).collect::<String>(),
                         "category": "decision",
@@ -68,7 +70,8 @@ pub async fn query_memory_index(
             for i in &mem.issues {
                 if matches_stage(Some(&i.stage)) {
                     results.push(serde_json::json!({
-                        "id": format!("issue-{}", i.created_at.timestamp()),
+                        "id": format!("issue-{}", Uuid::new_v4()),
+                        "_ts": i.created_at.timestamp(),
                         "title": format!("Issue from {} stage", i.stage),
                         "summary": i.content.chars().take(200).collect::<String>(),
                         "category": "experience",
@@ -85,7 +88,8 @@ pub async fn query_memory_index(
         if matches_category("pattern") || category.is_none() || category.as_deref() == Some("all") {
             for l in &mem.learnings {
                 results.push(serde_json::json!({
-                    "id": format!("learning-{}", l.created_at.timestamp()),
+                    "id": format!("learning-{}", Uuid::new_v4()),
+                    "_ts": l.created_at.timestamp(),
                     "title": "Learning",
                     "summary": l.content.chars().take(200).collect::<String>(),
                     "category": "pattern",
@@ -153,6 +157,7 @@ pub async fn load_memory_detail(
     memory_id: String,
     file: Option<String>,
     iteration_id: Option<String>,
+    ts: Option<i64>,
 ) -> Result<serde_json::Value, String> {
     let store = MemoryStore::new();
 
@@ -189,14 +194,14 @@ pub async fn load_memory_detail(
         }
     }
 
-    // Check iteration memory
+    // Check iteration memory using ts parameter for lookup
     if let Some(iter_id) = iteration_id {
         let iter_mem = store.load_iteration_memory(&iter_id).map_err(|e| e.to_string())?;
 
-        if memory_id.starts_with("insight-") {
-            if let Ok(ts) = memory_id.replace("insight-", "").parse::<i64>() {
+        if let Some(timestamp) = ts {
+            if memory_id.starts_with("insight-") {
                 for i in &iter_mem.insights {
-                    if i.created_at.timestamp() == ts {
+                    if i.created_at.timestamp() == timestamp {
                         return Ok(serde_json::json!({
                             "id": memory_id,
                             "content": i.content,
@@ -209,12 +214,10 @@ pub async fn load_memory_detail(
                     }
                 }
             }
-        }
 
-        if memory_id.starts_with("issue-") {
-            if let Ok(ts) = memory_id.replace("issue-", "").parse::<i64>() {
+            if memory_id.starts_with("issue-") {
                 for i in &iter_mem.issues {
-                    if i.created_at.timestamp() == ts {
+                    if i.created_at.timestamp() == timestamp {
                         return Ok(serde_json::json!({
                             "id": memory_id,
                             "content": i.content,
@@ -227,12 +230,10 @@ pub async fn load_memory_detail(
                     }
                 }
             }
-        }
 
-        if memory_id.starts_with("learning-") {
-            if let Ok(ts) = memory_id.replace("learning-", "").parse::<i64>() {
+            if memory_id.starts_with("learning-") {
                 for l in &iter_mem.learnings {
-                    if l.created_at.timestamp() == ts {
+                    if l.created_at.timestamp() == timestamp {
                         return Ok(serde_json::json!({
                             "id": memory_id,
                             "content": l.content,
@@ -296,14 +297,15 @@ pub async fn save_session_memory(
 pub async fn promote_to_project_memory(
     memory_id: String,
     iteration_id: String,
+    ts: Option<i64>,
 ) -> Result<serde_json::Value, String> {
     let store = MemoryStore::new();
     let iter_mem = store.load_iteration_memory(&iteration_id).map_err(|e| e.to_string())?;
 
-    if memory_id.starts_with("insight-") {
-        if let Ok(ts) = memory_id.replace("insight-", "").parse::<i64>() {
+    if let Some(timestamp) = ts {
+        if memory_id.starts_with("insight-") {
             for i in &iter_mem.insights {
-                if i.created_at.timestamp() == ts {
+                if i.created_at.timestamp() == timestamp {
                     let dec = cowork_core::domain::Decision::new(
                         "Insight",
                         "",
@@ -315,12 +317,10 @@ pub async fn promote_to_project_memory(
                 }
             }
         }
-    }
 
-    if memory_id.starts_with("learning-") {
-        if let Ok(ts) = memory_id.replace("learning-", "").parse::<i64>() {
+        if memory_id.starts_with("learning-") {
             for l in &iter_mem.learnings {
-                if l.created_at.timestamp() == ts {
+                if l.created_at.timestamp() == timestamp {
                     let pat = cowork_core::domain::Pattern::new(
                         "Learning",
                         &l.content,
