@@ -134,7 +134,7 @@ pub struct IterationMemory {
 **Decision**: Captured architectural choices with consequences
 ```rust
 pub struct Decision {
-    pub id: String,
+    pub id: String,              // Format: dec-{iteration_id}-{uuid}
     pub title: String,
     pub context: String,
     pub decision: String,
@@ -144,10 +144,12 @@ pub struct Decision {
 }
 ```
 
+**ID Generation**: Decision IDs use UUID v4 format (`dec-{iteration_id}-{uuid}`) to ensure global uniqueness. This replaced the previous timestamp-based approach to prevent ID collisions in high-concurrency or rapid-creation scenarios.
+
 **Pattern**: Reusable design solutions
 ```rust
 pub struct Pattern {
-    pub id: String,
+    pub id: String,              // Format: pat-{iteration_id}-{uuid}
     pub name: String,
     pub description: String,
     pub usage_examples: Vec<String>,
@@ -156,6 +158,8 @@ pub struct Pattern {
     pub created_at: DateTime<Utc>,
 }
 ```
+
+**ID Generation**: Pattern IDs follow the same UUID v4 format (`pat-{iteration_id}-{uuid}`) for consistent uniqueness guarantees.
 
 **Insight**: Transient observations with importance levels
 ```rust
