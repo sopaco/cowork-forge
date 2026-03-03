@@ -1,27 +1,8 @@
 import { useState, useEffect } from "react";
 import { App } from "antd";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-
-interface IterationInfo {
-  id: string;
-  number: number;
-  title: string;
-  description: string;
-  status: string;
-  current_stage: string | null;
-  created_at: string;
-  completed_at?: string;
-  completed_stages: string[];
-  base_iteration_id?: string;
-  inheritance?: string;
-}
-
-interface ProjectInfo {
-  id: string;
-  name: string;
-  current_iteration_id: string | null;
-}
+import type { IterationInfo, ProjectInfo } from '../types';
+import { useIterationEvents } from './useIterationEvents';
 
 interface UseIterationsDataResult {
   iterations: IterationInfo[];
@@ -34,7 +15,7 @@ interface UseIterationsDataResult {
 
 /**
  * Hook for managing iterations data and state
- * Extracts data loading logic from IterationsPanel.tsx
+ * Data fetching only - event handling separated to useIterationEvents
  */
 export function useIterationsData(): UseIterationsDataResult {
   const { message } = App.useApp();
@@ -62,40 +43,21 @@ export function useIterationsData(): UseIterationsDataResult {
     }
   };
 
+  // Initial data load
   useEffect(() => {
     loadData();
-
-    const unlistenCreated = listen("iteration_created", () => loadData());
-    const unlistenStarted = listen("iteration_started", () => {
-      setTimeout(() => loadData(), 500);
-    });
-    const unlistenContinued = listen("iteration_continued", () => {
-      setTimeout(() => loadData(), 500);
-    });
-    const unlistenAgentEvent = listen("agent_event", (event) => {
-      const content = (event.payload as { content?: string })?.content || "";
-      if (content.includes("Starting stage:")) {
-        setTimeout(() => loadData(), 100);
-      }
-    });
-    const unlistenCompleted = listen("iteration_completed", () => {
-      loadData();
-      setExecutingId(null);
-    });
-    const unlistenFailed = listen("iteration_failed", () => {
-      loadData();
-      setExecutingId(null);
-    });
-
-    return () => {
-      unlistenCreated.then((fn) => fn()).catch(() => {});
-      unlistenStarted.then((fn) => fn()).catch(() => {});
-      unlistenContinued.then((fn) => fn()).catch(() => {});
-      unlistenAgentEvent.then((fn) => fn()).catch(() => {});
-      unlistenCompleted.then((fn) => fn()).catch(() => {});
-      unlistenFailed.then((fn) => fn()).catch(() => {});
-    };
   }, []);
+
+  // Listen to iteration events and refresh data
+  useIterationEvents({
+    onIterationCreated: loadData,
+    onIterationStarted: loadData,
+    onIterationContinued: loadData,
+    onIterationCompleted: loadData,
+    onIterationFailed: loadData,
+    onAgentEvent: loadData,
+    onExecutingIdChange: setExecutingId,
+  });
 
   return {
     iterations,
@@ -106,5 +68,3 @@ export function useIterationsData(): UseIterationsDataResult {
     loadData
   };
 }
-
-export type { IterationInfo, ProjectInfo };

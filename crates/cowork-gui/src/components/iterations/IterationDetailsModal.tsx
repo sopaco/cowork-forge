@@ -1,36 +1,6 @@
 import { Modal, Badge, Progress, Tag } from "antd";
-import { ReactElement } from "react";
-
-interface StageDef {
-  key: string;
-  label: string;
-  icon: ReactElement;
-  color: string;
-}
-
-const STAGES: StageDef[] = [
-  { key: "idea", label: "Idea", icon: null as unknown as ReactElement, color: "#1890ff" },
-  { key: "prd", label: "PRD", icon: null as unknown as ReactElement, color: "#52c41a" },
-  { key: "design", label: "Design", icon: null as unknown as ReactElement, color: "#722ed1" },
-  { key: "plan", label: "Plan", icon: null as unknown as ReactElement, color: "#fa8c16" },
-  { key: "coding", label: "Coding", icon: null as unknown as ReactElement, color: "#13c2c2" },
-  { key: "check", label: "Check", icon: null as unknown as ReactElement, color: "#eb2f96" },
-  { key: "delivery", label: "Delivery", icon: null as unknown as ReactElement, color: "#52c41a" },
-];
-
-interface IterationInfo {
-  id: string;
-  number: number;
-  title: string;
-  description: string;
-  status: string;
-  current_stage: string | null;
-  created_at: string;
-  completed_at?: string;
-  completed_stages: string[];
-  base_iteration_id?: string;
-  inheritance?: string;
-}
+import type { IterationInfo } from '../../types';
+import { STAGES } from '../../constants';
 
 interface IterationDetailsModalProps {
   open: boolean;

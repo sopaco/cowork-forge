@@ -1,24 +1,8 @@
 import { useState, useEffect } from "react";
 import { App } from "antd";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-
-interface ProjectMetadata {
-  session_count: number;
-  technology_stack: string[];
-}
-
-interface ProjectData {
-  project_id: string;
-  projectId?: string;
-  name: string;
-  description?: string;
-  status: string;
-  workspacePath?: string;
-  workspace_path?: string;
-  last_opened_at?: string;
-  metadata: ProjectMetadata;
-}
+import type { ProjectData } from '../types';
+import { useProjectEvents } from './useProjectEvents';
 
 interface UseProjectsDataResult {
   projects: ProjectData[];
@@ -28,7 +12,7 @@ interface UseProjectsDataResult {
 
 /**
  * Hook for managing projects data and state
- * Extracts data loading logic from ProjectsPanel.tsx
+ * Data fetching only - event handling separated to useProjectEvents
  */
 export function useProjectsData(): UseProjectsDataResult {
   const { message } = App.useApp();
@@ -52,22 +36,16 @@ export function useProjectsData(): UseProjectsDataResult {
     }
   };
 
+  // Initial data load
   useEffect(() => {
     loadProjects();
-
-    const unlistenProjectLoaded = listen("project_loaded", () => {
-      loadProjects();
-    });
-
-    const unlistenProjectCreated = listen("project_created", () => {
-      loadProjects();
-    });
-
-    return () => {
-      unlistenProjectLoaded.then((fn) => fn()).catch(() => {});
-      unlistenProjectCreated.then((fn) => fn()).catch(() => {});
-    };
   }, []);
+
+  // Listen to project events and refresh data
+  useProjectEvents({
+    onProjectLoaded: loadProjects,
+    onProjectCreated: loadProjects,
+  });
 
   return {
     projects,
@@ -75,5 +53,3 @@ export function useProjectsData(): UseProjectsDataResult {
     loadProjects,
   };
 }
-
-export type { ProjectData, ProjectMetadata };

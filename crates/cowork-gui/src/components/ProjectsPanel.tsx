@@ -21,7 +21,7 @@ import {
 
 import { useProjectsData } from '../hooks';
 import { CreateProjectModal, EditProjectModal } from './projects';
-import type { ProjectData } from '../hooks/useProjectsData';
+import type { ProjectData } from '../types';
 
 const ProjectsPanel: React.FC = () => {
   const { message } = App.useApp();

@@ -3,16 +3,10 @@ import { App, Modal, Input, Button, Form, Select, Radio } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import type { IterationInfo, CreateIterationRequest } from '../../types';
 
 const { TextArea } = Input;
 const { Option } = Select;
-
-interface IterationInfo {
-  id: string;
-  number: number;
-  title: string;
-  status: string;
-}
 
 interface CreateIterationModalProps {
   open: boolean;
@@ -69,11 +63,11 @@ const CreateIterationModal: React.FC<CreateIterationModalProps> = ({
     }
 
     try {
-      const request = {
+      const request: CreateIterationRequest = {
         title: title,
         description: description || title,
         base_iteration_id: baseIteration,
-        inheritance: inheritance,
+        inheritance: inheritance as 'full' | 'partial' | 'none',
       };
 
       await invoke("gui_create_iteration", { request });

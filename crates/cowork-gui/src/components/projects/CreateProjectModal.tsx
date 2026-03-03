@@ -19,6 +19,7 @@ import {
   CheckCircleOutlined,
   RocketOutlined,
 } from "@ant-design/icons";
+import type { CreateProjectRequest, CreateProjectResponse } from '../../types';
 
 const { Text, Paragraph } = Typography;
 
@@ -108,13 +109,15 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
     setLoading(true);
     try {
-      const result = await invoke<{ project_id: string; created_dir: boolean }>(
+      const request: CreateProjectRequest = {
+        path: projectPath,
+        name: projectName,
+        description: projectDescription || null,
+      };
+
+      const result = await invoke<CreateProjectResponse>(
         "create_project_at_path",
-        {
-          path: projectPath,
-          name: projectName,
-          description: projectDescription || null,
-        }
+        { request }
       );
 
       if (result.created_dir) {

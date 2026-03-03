@@ -9,3 +9,5 @@ export { useIterationActions } from './useIterationActions';
 export { useChatInput } from './useChatInput';
 export { useIterationsData } from './useIterationsData';
 export { useProjectsData } from './useProjectsData';
+export { useIterationEvents } from './useIterationEvents';
+export { useProjectEvents } from './useProjectEvents';

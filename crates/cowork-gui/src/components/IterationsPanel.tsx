@@ -29,24 +29,8 @@ import {
 
 import { useIterationsData } from '../hooks';
 import { CreateIterationModal, IterationDetailsModal, InitProjectModal } from './iterations';
-import type { IterationInfo } from '../hooks/useIterationsData';
-
-interface StageDef {
-  key: string;
-  label: string;
-  icon: ReactElement;
-  color: string;
-}
-
-const STAGES: StageDef[] = [
-  { key: "idea", label: "Idea", icon: <RocketOutlined />, color: "#1890ff" },
-  { key: "prd", label: "PRD", icon: <FileTextOutlined />, color: "#52c41a" },
-  { key: "design", label: "Design", icon: <EyeOutlined />, color: "#722ed1" },
-  { key: "plan", label: "Plan", icon: <FileTextOutlined />, color: "#fa8c16" },
-  { key: "coding", label: "Coding", icon: <CodeOutlined />, color: "#13c2c2" },
-  { key: "check", label: "Check", icon: <CheckCircleOutlined />, color: "#eb2f96" },
-  { key: "delivery", label: "Delivery", icon: <RocketOutlined />, color: "#52c41a" },
-];
+import type { IterationInfo } from '../types';
+import { STAGES } from '../constants';
 
 interface IterationsPanelProps {
   onSelectIteration?: (iterationId: string) => void;

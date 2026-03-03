@@ -1,12 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { App, Modal, Input } from "antd";
-
-interface ProjectData {
-  project_id: string;
-  name: string;
-  description?: string;
-}
+import type { ProjectData, UpdateProjectRequest } from '../../types';
 
 interface EditProjectModalProps {
   open: boolean;
@@ -46,12 +41,14 @@ const EditProjectModal: React.FC<EditProjectModalProps> = ({
     if (!project) return;
 
     try {
-      await invoke("update_project", {
+      const request: UpdateProjectRequest = {
         projectId: project.project_id,
         name: projectName,
         description: projectDescription || null,
         status: null,
-      });
+      };
+
+      await invoke("update_project", { request });
       message.success("Project updated successfully");
       handleClose();
       onSuccess();
