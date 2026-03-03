@@ -1,0 +1,37 @@
+/* ==========================================
+   Fresh Light Theme - CSS Variables
+   ========================================== */
+:root {
+  /* Primary Colors - Fresh Blue */
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-light: #dbeafe;
+  --primary-lighter: #eff6ff;
+  
+  /* Background Colors - Pure White */
+  --bg-base: #ffffff;
+  --bg-container: #f8fafc;
+  --bg-elevated: #f1f5f9;
+  --bg-elevated-hover: #e2e8f0;
+  --bg-sidebar: #f8fafc;
+  
+  /* Border Colors - Soft Gray */
+  --border-color: #e2e8f0;
+  --border-light: #f1f5f9;
+  
+  /* Text Colors - Clear Hierarchy */
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+  --text-muted: #cbd5e1;
+  
+  /* Status Colors */
+  --success: #10b981;
+  --success-light: #d1fae5;
+  --warning: #f59e0b;
+  --warning-light: #fef3c7;
+  --error: #ef4444;
+  --error-light: #fee2e2;
+  --info: #3b82f6;
+  --info-light: #dbeafe;
+}

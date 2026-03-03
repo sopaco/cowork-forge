@@ -1,0 +1,167 @@
+/* ==========================================
+   Artifacts and Editor Components
+   ========================================== */
+
+/* Artifacts Viewer */
+.artifact-content {
+  padding: 24px;
+  background: var(--bg-container);
+  border-radius: 12px;
+  color: var(--text-primary);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.artifact-content h3 {
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  font-size: 18px;
+}
+
+.artifacts-tabs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.artifacts-tabs .ant-tabs-content-holder {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.artifacts-tabs .ant-tabs-content {
+  flex: 1;
+  overflow: auto;
+}
+
+.artifacts-tabs .ant-tabs-tabpane {
+  height: 100%;
+  overflow: auto;
+}
+
+/* Code Editor Tabs */
+.code-editor-tabs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-editor-tabs .ant-tabs-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-editor-tabs .ant-tabs-content-holder {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-editor-tabs .ant-tabs-tabpane {
+  height: 100% !important;
+  overflow: hidden !important;
+  display: none !important;
+}
+
+.code-editor-tabs .ant-tabs-tabpane-active {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.code-editor-tabs .ant-tabs-tabpane > div {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative;
+}
+
+.code-editor-tabs .ant-tabs-tabpane > div > div {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.code-editor-tabs .monaco-editor {
+  height: 100% !important;
+}
+
+/* JSON View */
+.react-json-view {
+  background: var(--bg-container) !important;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.react-json-view .string-key {
+  color: var(--primary) !important;
+  font-weight: 600;
+}
+
+.react-json-view .object-key {
+  color: var(--primary) !important;
+  font-weight: 600;
+}
+
+.react-json-view .string-value {
+  color: #059669 !important;
+}
+
+.react-json-view .variable-value {
+  color: #059669 !important;
+}
+
+.react-json-view .number-value {
+  color: #2563eb !important;
+}
+
+.react-json-view .boolean-value {
+  color: #d97706 !important;
+  font-weight: 500;
+}
+
+.react-json-view .null-value {
+  color: #dc2626 !important;
+  font-weight: 500;
+}
+
+.react-json-view .array-key {
+  color: var(--primary) !important;
+  font-weight: 600;
+}
+
+.react-json-view .string-literal {
+  color: #059669 !important;
+}
+
+.react-json-view .object-name {
+  color: var(--primary) !important;
+  font-weight: 600;
+}
+
+.react-json-view .array-name {
+  color: var(--primary) !important;
+  font-weight: 600;
+}
+
+.react-json-view .br-row,
+.react-json-view .bracket {
+  color: var(--text-tertiary) !important;
+}
+
+.react-json-view .colon {
+  color: var(--text-tertiary) !important;
+}
+
+.react-json-view .arrow-icon,
+.react-json-view .expanded-icon,
+.react-json-view .collapsed-icon {
+  fill: var(--primary) !important;
+}

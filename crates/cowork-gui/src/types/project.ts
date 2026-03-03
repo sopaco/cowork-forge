@@ -1,70 +1,47 @@
-export interface Project {
-  id: string;
-  name: string;
-  created_at: string;
-  updated_at: string;
-  current_iteration_id: string | null;
-  metadata?: Record<string, unknown>;
+/**
+ * Project related types
+ * Centralized type definitions for projects
+ */
+
+export interface ProjectMetadata {
+  session_count: number;
+  technology_stack: string[];
 }
+
+export interface ProjectData {
+  project_id: string;
+  projectId?: string;
+  name: string;
+  description?: string;
+  status: ProjectStatus;
+  workspacePath?: string;
+  workspace_path?: string;
+  last_opened_at?: string;
+  metadata: ProjectMetadata;
+}
+
+export type ProjectStatus = 'active' | 'archived' | 'deleted';
 
 export interface ProjectInfo {
   id: string;
   name: string;
-  created_at: string;
-  updated_at: string;
   current_iteration_id: string | null;
 }
 
-export type IterationStatus = 'Draft' | 'Running' | 'Paused' | 'Completed' | 'Failed';
-export type InheritanceMode = 'none' | 'full' | 'partial';
-
-export interface Iteration {
-  id: string;
-  number: number;
-  title: string;
-  description: string;
-  base_iteration_id: string | null;
-  inheritance: InheritanceMode;
-  status: IterationStatus;
-  started_at: string | null;
-  completed_at: string | null;
-  current_stage: string | null;
-  completed_stages: string[];
-  artifacts: Record<string, string>;
-  created_at: string;
+export interface CreateProjectRequest {
+  path: string;
+  name: string;
+  description?: string | null;
 }
 
-export interface IterationInfo {
-  id: string;
-  number: number;
-  title: string;
-  description: string;
-  status: IterationStatus;
-  current_stage: string | null;
-  created_at: string;
+export interface UpdateProjectRequest {
+  projectId: string;
+  name: string;
+  description?: string | null;
+  status?: string | null;
 }
 
-export interface CreateIterationRequest {
-  title: string;
-  description: string;
-  base_iteration_id: string | null;
-  inheritance: InheritanceMode;
-}
-
-export const STAGES = [
-  { key: 'idea', label: 'Idea', color: '#1890ff' },
-  { key: 'prd', label: 'PRD', color: '#52c41a' },
-  { key: 'design', label: 'Design', color: '#722ed1' },
-  { key: 'plan', label: 'Plan', color: '#fa8c16' },
-  { key: 'coding', label: 'Coding', color: '#13c2c2' },
-  { key: 'check', label: 'Check', color: '#eb2f96' },
-  { key: 'delivery', label: 'Delivery', color: '#52c41a' },
-] as const;
-
-export type StageKey = typeof STAGES[number]['key'];
-
-export interface Stage {
-  key: StageKey;
-  label: string;
-  color: string;
+export interface CreateProjectResponse {
+  project_id: string;
+  created_dir: boolean;
 }
