@@ -2,7 +2,7 @@ import { useState } from "react";
 import { App, Modal, Input, Button, Form, Select, Radio } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -39,7 +39,7 @@ const CreateIterationModal: React.FC<CreateIterationModalProps> = ({
 
   const handleImportMarkdown = async () => {
     try {
-      const selected = await open({
+      const selected = await openDialog({
         multiple: false,
         filters: [
           {

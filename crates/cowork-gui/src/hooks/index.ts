@@ -8,3 +8,4 @@ export { usePMAgent } from './usePMAgent';
 export { useIterationActions } from './useIterationActions';
 export { useChatInput } from './useChatInput';
 export { useIterationsData } from './useIterationsData';
+export { useProjectsData } from './useProjectsData';
