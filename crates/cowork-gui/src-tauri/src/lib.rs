@@ -727,6 +727,7 @@ pub fn run() {
             memory::save_session_memory,
             memory::promote_to_project_memory,
             memory::get_memory_context,
+            memory::get_available_stages,
             // Template commands
             template::get_templates,
             template::export_template,

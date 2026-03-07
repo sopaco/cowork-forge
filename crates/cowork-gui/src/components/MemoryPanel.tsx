@@ -72,6 +72,27 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({
   const [memoryDetail, setMemoryDetail] = useState<MemoryDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [total, setTotal] = useState(0);
+  const [availableStages, setAvailableStages] = useState<string[]>([]);
+
+  // Load available stages when session changes
+  useEffect(() => {
+    if (currentSession) {
+      loadAvailableStages();
+    }
+  }, [currentSession, refreshTrigger]);
+
+  const loadAvailableStages = async () => {
+    if (!currentSession) return;
+    try {
+      const result = await invoke<{ stages: string[] }>("get_available_stages", {
+        iterationId: currentSession,
+      });
+      setAvailableStages(result.stages || []);
+    } catch (error) {
+      console.error("[MemoryPanel] Failed to load available stages:", error);
+      setAvailableStages([]);
+    }
+  };
 
   useEffect(() => {
     loadMemories();
@@ -286,12 +307,22 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({
                 allowClear
                 placeholder="All"
               >
-                <Option value="idea">Idea</Option>
-                <Option value="prd">PRD</Option>
-                <Option value="design">Design</Option>
-                <Option value="plan">Plan</Option>
-                <Option value="coding">Coding</Option>
-                <Option value="check">Check</Option>
+                {availableStages.length > 0 ? (
+                  availableStages.map((s) => (
+                    <Option key={s} value={s}>
+                      {s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()}
+                    </Option>
+                  ))
+                ) : (
+                  <>
+                    <Option value="idea">Idea</Option>
+                    <Option value="prd">PRD</Option>
+                    <Option value="design">Design</Option>
+                    <Option value="plan">Plan</Option>
+                    <Option value="coding">Coding</Option>
+                    <Option value="check">Check</Option>
+                  </>
+                )}
               </Select>
             </div>
             <div

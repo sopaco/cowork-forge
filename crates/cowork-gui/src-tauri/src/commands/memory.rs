@@ -54,13 +54,19 @@ pub async fn query_memory_index(
         }
     };
 
-    // Helper to check if item matches stage filter
-    // Returns true if no stage filter, or if item's stage matches
+    // Helper to check if item matches stage filter (case-insensitive, substring match)
+    // Returns true if no stage filter, or if item's stage contains the filter string
     let matches_stage = |item_stage: Option<&str>| -> bool {
         match &stage {
             None => true,  // No filter, match all
             Some(stage_filter) => {
-                item_stage.map(|s| s == stage_filter).unwrap_or(false)
+                // Use substring match (case-insensitive) to handle variations
+                // e.g., "idea" matches "idea", "Idea", "idea_stage", etc.
+                item_stage.map(|s| {
+                    let s_lower = s.to_lowercase();
+                    let filter_lower = stage_filter.to_lowercase();
+                    s_lower.contains(&filter_lower) || filter_lower.contains(&s_lower)
+                }).unwrap_or(false)
             }
         }
     };
@@ -383,5 +389,34 @@ pub async fn get_memory_context(iteration_id: Option<String>) -> Result<serde_js
             "total_issues": m.issues.len(),
             "total_learnings": m.learnings.len()
         }))
+    }))
+}
+
+/// Get available stages from memory data
+#[tauri::command]
+pub async fn get_available_stages(iteration_id: String) -> Result<serde_json::Value, String> {
+    let store = MemoryStore::new();
+    let mut stages = std::collections::HashSet::new();
+    
+    // Collect stages from iteration memory
+    if let Ok(iter_mem) = store.load_iteration_memory(&iteration_id) {
+        for i in &iter_mem.insights {
+            if !i.stage.is_empty() {
+                stages.insert(i.stage.clone());
+            }
+        }
+        for i in &iter_mem.issues {
+            if !i.stage.is_empty() {
+                stages.insert(i.stage.clone());
+            }
+        }
+    }
+    
+    // Convert to sorted vector
+    let mut stages_vec: Vec<String> = stages.into_iter().collect();
+    stages_vec.sort();
+    
+    Ok(serde_json::json!({
+        "stages": stages_vec
     }))
 }
