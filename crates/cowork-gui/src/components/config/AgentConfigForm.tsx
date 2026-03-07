@@ -455,124 +455,154 @@ const AgentConfigForm: React.FC = () => {
                 key: 'instruction',
                 label: 'Instruction',
                 children: (
-                  <>
+                  <div style={{ maxWidth: 700 }}>
+                    <Alert
+                      message="Select an instruction type to define how the agent should behave"
+                      type="info"
+                      showIcon
+                      style={{ marginBottom: 16 }}
+                    />
+                    
                     <Form.Item label="Instruction Type">
                       <Select 
                         value={instructionType} 
                         onChange={handleInstructionTypeChange}
-                        style={{ width: 200 }}
+                        style={{ width: '100%' }}
                       >
                         <Select.Option value="builtin">
                           <Space>
                             <Tag color="blue">Built-in</Tag>
-                            <Text type="secondary">Use predefined instruction</Text>
+                            <span>Use a predefined instruction template</span>
                           </Space>
                         </Select.Option>
                         <Select.Option value="file">
                           <Space>
                             <Tag color="green">File</Tag>
-                            <Text type="secondary">Load from file</Text>
+                            <span>Load instruction from a file</span>
                           </Space>
                         </Select.Option>
                         <Select.Option value="inline">
                           <Space>
                             <Tag color="purple">Inline</Tag>
-                            <Text type="secondary">Custom content</Text>
+                            <span>Write custom instruction content</span>
                           </Space>
                         </Select.Option>
                       </Select>
                     </Form.Item>
                     
                     {instructionType === 'builtin' && (
-                      <Form.Item 
-                        label="Select Built-in Instruction"
-                        required
-                      >
-                        <Select
-                          value={selectedBuiltinId}
-                          onChange={handleBuiltinChange}
-                          placeholder="Select a built-in instruction"
-                          showSearch
-                          optionFilterProp="children"
+                      <>
+                        <Form.Item 
+                          label="Built-in Instruction"
+                          required
+                          validateStatus={!selectedBuiltinId && 'error'}
+                          help={!selectedBuiltinId && 'Please select a built-in instruction'}
                         >
-                          {builtinInstructions.map(bi => (
-                            <Select.Option key={bi.id} value={bi.id}>
-                              <Space direction="vertical" size={0}>
-                                <Text strong>{bi.name}</Text>
-                                <Text type="secondary" style={{ fontSize: 12 }}>
-                                  {bi.description}
-                                </Text>
-                              </Space>
-                            </Select.Option>
-                          ))}
-                        </Select>
+                          <Select
+                            value={selectedBuiltinId || undefined}
+                            onChange={handleBuiltinChange}
+                            placeholder="Select a built-in instruction..."
+                            showSearch
+                            optionFilterProp="label"
+                            style={{ width: '100%' }}
+                            listHeight={300}
+                          >
+                            {(builtinInstructions || []).map(bi => (
+                              <Select.Option 
+                                key={bi.id} 
+                                value={bi.id}
+                                label={bi.name}
+                              >
+                                <div style={{ padding: '4px 0' }}>
+                                  <Text strong>{bi.name}</Text>
+                                  <br />
+                                  <Text type="secondary" style={{ fontSize: 12 }}>
+                                    {bi.description}
+                                  </Text>
+                                </div>
+                              </Select.Option>
+                            ))}
+                          </Select>
+                        </Form.Item>
+                        
                         {selectedBuiltinId && (
-                          <div style={{ marginTop: 12 }}>
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              Preview:
+                          <div style={{ marginBottom: 16 }}>
+                            <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>
+                              Instruction Preview:
                             </Text>
-                            <Paragraph
-                              ellipsis={{ rows: 4, expandable: true, symbol: 'more' }}
+                            <div
                               style={{
-                                background: '#f5f5f5',
-                                padding: 8,
-                                borderRadius: 4,
-                                marginTop: 8,
+                                background: '#fafafa',
+                                border: '1px solid #d9d9d9',
+                                borderRadius: 6,
+                                padding: 12,
+                                maxHeight: 200,
+                                overflow: 'auto',
                                 fontSize: 12,
-                                maxHeight: 150,
-                                overflow: 'auto'
+                                whiteSpace: 'pre-wrap',
+                                fontFamily: 'monospace',
                               }}
                             >
-                              {builtinInstructions.find(bi => bi.id === selectedBuiltinId)?.content || ''}
-                            </Paragraph>
+                              {(builtinInstructions || []).find(bi => bi.id === selectedBuiltinId)?.content || ''}
+                            </div>
                           </div>
                         )}
-                      </Form.Item>
+                      </>
                     )}
                     
                     {instructionType === 'file' && (
-                      <Form.Item 
-                        label="Instruction File Path"
-                        required
-                      >
-                        <Space.Compact style={{ width: '100%' }}>
-                          <Input
-                            value={instructionFilePath}
-                            onChange={(e) => setInstructionFilePath(e.target.value)}
-                            placeholder="./prompts/my_instruction.md"
-                          />
-                          <Button 
-                            icon={<FolderOpenOutlined />} 
-                            onClick={handleSelectInstructionFile}
-                          >
-                            Browse
-                          </Button>
-                        </Space.Compact>
+                      <>
+                        <Form.Item 
+                          label="Instruction File"
+                          required
+                          validateStatus={!instructionFilePath && 'error'}
+                          help={!instructionFilePath && 'Please select or enter a file path'}
+                        >
+                          <Space.Compact style={{ width: '100%' }}>
+                            <Input
+                              value={instructionFilePath}
+                              onChange={(e) => setInstructionFilePath(e.target.value)}
+                              placeholder="./prompts/my_instruction.md"
+                              style={{ flex: 1 }}
+                            />
+                            <Button 
+                              icon={<FolderOpenOutlined />} 
+                              onClick={handleSelectInstructionFile}
+                            >
+                              Browse
+                            </Button>
+                          </Space.Compact>
+                        </Form.Item>
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                          Select a markdown or text file containing the instruction
+                          Select a markdown (.md) or text (.txt) file containing the instruction
                         </Text>
-                      </Form.Item>
+                      </>
                     )}
                     
                     {instructionType === 'inline' && (
-                      <Form.Item 
-                        label="Instruction Content"
-                        required
-                      >
-                        <TextArea
-                          rows={12}
-                          value={instructionInlineContent}
-                          onChange={(e) => setInstructionInlineContent(e.target.value)}
-                          placeholder="Enter your custom instruction here..."
-                        />
-                        <Space style={{ marginTop: 8 }}>
+                      <>
+                        <Form.Item 
+                          label="Instruction Content"
+                          required
+                          validateStatus={!instructionInlineContent?.trim() && 'error'}
+                          help={!instructionInlineContent?.trim() && 'Please enter instruction content'}
+                        >
+                          <TextArea
+                            rows={12}
+                            value={instructionInlineContent}
+                            onChange={(e) => setInstructionInlineContent(e.target.value)}
+                            placeholder="Enter your custom instruction here..."
+                            style={{ fontFamily: 'monospace' }}
+                          />
+                        </Form.Item>
+                        <Space>
                           <Text type="secondary" style={{ fontSize: 12 }}>
-                            Tip: You can start from a built-in instruction by selecting one above, then switch to Inline mode.
+                            Tip: Select a built-in instruction first, then switch to Inline mode to customize it.
                           </Text>
                         </Space>
-                      </Form.Item>
+                      </>
                     )}
-                  </>
+                  </div>
                 ),
               },
               {
@@ -654,18 +684,18 @@ const AgentConfigForm: React.FC = () => {
               </Descriptions.Item>
             </Descriptions>
 
-            <Title level={5}>Tools ({selectedAgentData.tools.length})</Title>
+            <Title level={5}>Tools ({selectedAgentData.tools?.length || 0})</Title>
             <Space wrap>
-              {selectedAgentData.tools.map((tool, i) => (
+              {selectedAgentData.tools?.map((tool, i) => (
                 <Tag key={i} color="blue">{tool.tool_id}</Tag>
               ))}
             </Space>
 
-            {selectedAgentData.skills.length > 0 && (
+            {(selectedAgentData.skills?.length || 0) > 0 && (
               <>
-                <Title level={5}>Skills ({selectedAgentData.skills.length})</Title>
+                <Title level={5}>Skills ({selectedAgentData.skills?.length || 0})</Title>
                 <Space wrap>
-                  {selectedAgentData.skills.map((skill, i) => (
+                  {selectedAgentData.skills?.map((skill, i) => (
                     <Tag key={i} color="purple">{skill}</Tag>
                   ))}
                 </Space>

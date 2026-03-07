@@ -118,7 +118,7 @@ const ConfigPanel: React.FC = () => {
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        <Spin size="large" tip="Loading configurations..." />
+        <Spin size="large" />
       </div>
     );
   }

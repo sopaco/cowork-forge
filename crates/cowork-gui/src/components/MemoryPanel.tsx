@@ -184,8 +184,8 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ currentSession, refreshTrigge
           <Empty description="No memories found" style={{ marginTop: "50px" }} />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {memories.map((memory) => (
-              <Card key={memory.id}  hoverable style={{ cursor: "pointer" }} onClick={() => handleViewDetail(memory)}>
+            {memories.map((memory, index) => (
+              <Card key={`${memory.id}-${index}`}  hoverable style={{ cursor: "pointer" }} onClick={() => handleViewDetail(memory)}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
