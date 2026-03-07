@@ -12,42 +12,63 @@ pub async fn query_memory_index(
     let store = MemoryStore::new();
     let limit = limit.unwrap_or(20) as usize;
     
+    // Normalize category: treat empty string or "all" as None (meaning no filter)
+    let category = category.and_then(|c| if c.is_empty() || c == "all" { None } else { Some(c) });
+    
+    // Normalize stage: treat empty string or "all" as None (meaning no filter)
+    let stage = stage.and_then(|s| if s.is_empty() || s == "all" { None } else { Some(s) });
+    
     let mut results: Vec<serde_json::Value> = Vec::new();
 
     // Load iteration memory if needed
     let iter_mem = if query_type == "all" || query_type == "session" {
-        Some(store.load_iteration_memory(&iteration_id).map_err(|e| e.to_string())?)
+        match store.load_iteration_memory(&iteration_id) {
+            Ok(mem) => Some(mem),
+            Err(e) => {
+                tracing::warn!("Failed to load iteration memory: {}", e);
+                None
+            }
+        }
     } else {
         None
     };
 
     // Load project memory if needed
     let proj_mem = if query_type == "all" || query_type == "project" {
-        Some(store.load_project_memory().map_err(|e| e.to_string())?)
+        match store.load_project_memory() {
+            Ok(mem) => Some(mem),
+            Err(e) => {
+                tracing::warn!("Failed to load project memory: {}", e);
+                None
+            }
+        }
     } else {
         None
     };
 
     // Helper to check if item matches category filter
     let matches_category = |cat: &str| -> bool {
-        match category.as_deref() {
-            Some("all") | None => true,
+        match &category {
+            None => true,  // No filter, match all
             Some(c) => c == cat,
         }
     };
 
     // Helper to check if item matches stage filter
-    let matches_stage = |s: Option<&str>| -> bool {
-        match stage.as_deref() {
-            Some("all") | None => true,
-            Some(stage_filter) => s.map(|st| st == stage_filter).unwrap_or(false),
+    // Returns true if no stage filter, or if item's stage matches
+    let matches_stage = |item_stage: Option<&str>| -> bool {
+        match &stage {
+            None => true,  // No filter, match all
+            Some(stage_filter) => {
+                item_stage.map(|s| s == stage_filter).unwrap_or(false)
+            }
         }
     };
 
     // Collect from iteration memory
     if let Some(ref mem) = iter_mem {
-        // Add insights
-        if matches_category("decision") || category.is_none() || category.as_deref() == Some("all") {
+        // Add insights (mapped to "decision" category)
+        if matches_category("decision") {
             for i in &mem.insights {
                 if matches_stage(Some(&i.stage)) {
                     results.push(serde_json::json!({
@@ -65,8 +86,8 @@ pub async fn query_memory_index(
             }
         }
 
-        // Add issues
-        if matches_category("experience") || category.is_none() || category.as_deref() == Some("all") {
+        // Add issues (mapped to "experience" category)
+        if matches_category("experience") {
             for i in &mem.issues {
                 if matches_stage(Some(&i.stage)) {
                     results.push(serde_json::json!({
@@ -84,8 +105,9 @@ pub async fn query_memory_index(
             }
         }
 
-        // Add learnings
-        if matches_category("pattern") || category.is_none() || category.as_deref() == Some("all") {
+        // Add learnings (mapped to "pattern" category)
+        // Note: learnings don't have stage, so they're shown regardless of stage filter
+        if matches_category("pattern") {
             for l in &mem.learnings {
                 results.push(serde_json::json!({
                     "id": format!("learning-{}", Uuid::new_v4()),
@@ -103,8 +125,8 @@ pub async fn query_memory_index(
 
     // Collect from project memory
     if let Some(ref mem) = proj_mem {
-        // Add decisions
-        if matches_category("decision") || category.is_none() || category.as_deref() == Some("all") {
+        // Add decisions (category: "decision")
+        if matches_category("decision") {
             for d in &mem.decisions {
                 results.push(serde_json::json!({
                     "id": d.id.clone(),
@@ -120,8 +142,8 @@ pub async fn query_memory_index(
             }
         }
 
-        // Add patterns
-        if matches_category("pattern") || category.is_none() || category.as_deref() == Some("all") {
+        // Add patterns (category: "pattern")
+        if matches_category("pattern") {
             for p in &mem.patterns {
                 results.push(serde_json::json!({
                     "id": p.id.clone(),
@@ -143,12 +165,15 @@ pub async fn query_memory_index(
         b_time.cmp(a_time)
     });
 
+    // Calculate total before truncation
+    let total = results.len();
+    
     // Truncate to limit
     results.truncate(limit);
 
     Ok(serde_json::json!({
         "results": results,
-        "total": results.len(),
+        "total": total,
     }))
 }
 
