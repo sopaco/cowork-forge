@@ -196,7 +196,7 @@ const IntegrationConfig: React.FC = () => {
       ) : (
         <List
           style={{ flex: 1, overflow: 'auto', padding: '0 16px' }}
-          dataSource={Object.values(integrations)}
+          dataSource={Object.values(integrations).sort((a, b) => a.name.localeCompare(b.name))}
           renderItem={(integration) => (
             <List.Item
               actions={[

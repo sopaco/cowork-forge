@@ -149,7 +149,7 @@ const SkillManager: React.FC = () => {
               style={{ marginBottom: 16 }}
             >
               <List
-                dataSource={categorySkills}
+                dataSource={categorySkills.sort((a, b) => a.name.localeCompare(b.name))}
                 renderItem={(skill) => (
                   <List.Item
                     actions={[

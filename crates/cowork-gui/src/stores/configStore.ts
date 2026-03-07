@@ -8,6 +8,7 @@ import type {
   IntegrationDefinition,
   ConfigRegistryState,
   ValidationResult,
+  BuiltinInstruction,
 } from '../types/config';
 
 interface ConfigState extends ConfigRegistryState {
@@ -47,6 +48,9 @@ interface ConfigState extends ConfigRegistryState {
   // Export/Import
   exportConfig: (type: 'agent' | 'stage' | 'flow', id: string) => Promise<string>;
   importConfig: (type: 'agent' | 'stage' | 'flow', jsonData: string) => Promise<void>;
+
+  // Builtin Instructions
+  getBuiltinInstructions: () => Promise<BuiltinInstruction[]>;
 }
 
 export const useConfigStore = create<ConfigState>((set, get) => ({
@@ -275,6 +279,16 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to import config' });
       throw error;
+    }
+  },
+
+  // Builtin Instructions
+  getBuiltinInstructions: async () => {
+    try {
+      return await invoke<BuiltinInstruction[]>('gui_get_builtin_instructions');
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to get builtin instructions' });
+      return [];
     }
   },
 }));

@@ -776,6 +776,7 @@ pub fn run() {
             config_commands::gui_validate_flow_config,
             config_commands::gui_export_config,
             config_commands::gui_import_config,
+            config_commands::gui_get_builtin_instructions,
             // Project creation commands
             path_exists,
             create_project_at_path,

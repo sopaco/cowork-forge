@@ -4,6 +4,7 @@ use cowork_core::config_definition::validator::ConfigValidator;
 use cowork_core::skills::SkillLoader;
 use cowork_core::config_definition::SkillDefinition;
 use cowork_core::config_definition::IntegrationDefinition;
+use cowork_core::instructions::*;
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
@@ -87,6 +88,107 @@ pub async fn gui_reset_config_registry() -> Result<ConfigRegistryState, String> 
     
     // Return the reset state
     gui_get_config_registry().await
+}
+
+/// Builtin instruction info for frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuiltinInstruction {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub content: String,
+}
+
+#[tauri::command]
+pub async fn gui_get_builtin_instructions() -> Result<Vec<BuiltinInstruction>, String> {
+    let instructions = vec![
+        BuiltinInstruction {
+            id: "idea_agent".to_string(),
+            name: "Idea Agent".to_string(),
+            description: "Captures and structures the initial project idea".to_string(),
+            content: IDEA_AGENT_INSTRUCTION.to_string(),
+        },
+        BuiltinInstruction {
+            id: "prd_actor".to_string(),
+            name: "PRD Actor".to_string(),
+            description: "Generates Product Requirements Document".to_string(),
+            content: PRD_ACTOR_INSTRUCTION.to_string(),
+        },
+        BuiltinInstruction {
+            id: "prd_critic".to_string(),
+            name: "PRD Critic".to_string(),
+            description: "Reviews and validates the PRD".to_string(),
+            content: PRD_CRITIC_INSTRUCTION.to_string(),
+        },
+        BuiltinInstruction {
+            id: "design_actor".to_string(),
+            name: "Design Actor".to_string(),
+            description: "Generates system design specification".to_string(),
+            content: DESIGN_ACTOR_INSTRUCTION.to_string(),
+        },
+        BuiltinInstruction {
+            id: "design_critic".to_string(),
+            name: "Design Critic".to_string(),
+            description: "Reviews and validates the design".to_string(),
+            content: DESIGN_CRITIC_INSTRUCTION.to_string(),
+        },
+        BuiltinInstruction {
+            id: "plan_actor".to_string(),
+            name: "Plan Actor".to_string(),
+            description: "Generates implementation plan with tasks".to_string(),
+            content: PLAN_ACTOR_INSTRUCTION.to_string(),
+        },
+        BuiltinInstruction {
+            id: "plan_critic".to_string(),
+            name: "Plan Critic".to_string(),
+            description: "Reviews and validates the plan".to_string(),
+            content: PLAN_CRITIC_INSTRUCTION.to_string(),
+        },
+        BuiltinInstruction {
+            id: "coding_actor".to_string(),
+            name: "Coding Actor".to_string(),
+            description: "Implements code based on the plan".to_string(),
+            content: CODING_ACTOR_INSTRUCTION.to_string(),
+        },
+        BuiltinInstruction {
+            id: "coding_critic".to_string(),
+            name: "Coding Critic".to_string(),
+            description: "Reviews and validates the code".to_string(),
+            content: CODING_CRITIC_INSTRUCTION.to_string(),
+        },
+        BuiltinInstruction {
+            id: "check_agent".to_string(),
+            name: "Check Agent".to_string(),
+            description: "Performs quality validation on code".to_string(),
+            content: CHECK_AGENT_INSTRUCTION.to_string(),
+        },
+        BuiltinInstruction {
+            id: "delivery_agent".to_string(),
+            name: "Delivery Agent".to_string(),
+            description: "Generates delivery report and deploys".to_string(),
+            content: DELIVERY_AGENT_INSTRUCTION.to_string(),
+        },
+        BuiltinInstruction {
+            id: "summary_agent".to_string(),
+            name: "Summary Agent".to_string(),
+            description: "Generates document summaries".to_string(),
+            content: SUMMARY_AGENT_INSTRUCTION.to_string(),
+        },
+        BuiltinInstruction {
+            id: "knowledge_gen_agent".to_string(),
+            name: "Knowledge Gen Agent".to_string(),
+            description: "Extracts knowledge from iterations".to_string(),
+            content: KNOWLEDGE_GEN_AGENT_INSTRUCTION.to_string(),
+        },
+        BuiltinInstruction {
+            id: "project_manager".to_string(),
+            name: "Project Manager".to_string(),
+            description: "Handles user interactions and project management".to_string(),
+            content: PROJECT_MANAGER_AGENT_INSTRUCTION.to_string(),
+        },
+    ];
+    
+    Ok(instructions)
 }
 
 #[tauri::command]

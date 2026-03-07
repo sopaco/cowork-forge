@@ -205,6 +205,11 @@ fn create_tool_from_reference(tool_id: &str, iteration_id: &str) -> Result<Arc<d
         
         // Design tools
         "create_design_component" => Arc::new(CreateDesignComponentTool),
+        "add_component" => Arc::new(CreateDesignComponentTool), // Alias for backward compatibility
+        
+        // Plan tools
+        "get_plan" => Arc::new(GetPlanTool),
+        "get_implementation_plan" => Arc::new(GetPlanTool), // Alias for backward compatibility
         
         // Validation tools
         "check_feature_coverage" => Arc::new(CheckFeatureCoverageTool),

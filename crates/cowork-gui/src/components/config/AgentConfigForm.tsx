@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   List,
@@ -34,9 +34,11 @@ import {
   CodeOutlined,
   SettingOutlined,
   InfoCircleOutlined,
+  FolderOpenOutlined,
 } from '@ant-design/icons';
 import { useConfigStore } from '../../stores/configStore';
-import type { AgentDefinition, ToolReference, AgentType, ModelConfig } from '../../types/config';
+import type { AgentDefinition, ToolReference, AgentType, ModelConfig, BuiltinInstruction, InstructionType } from '../../types/config';
+import { open } from '@tauri-apps/plugin-dialog';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -52,6 +54,7 @@ const AgentConfigForm: React.FC = () => {
     validateAgent,
     exportConfig,
     importConfig,
+    getBuiltinInstructions,
   } = useConfigStore();
 
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -60,6 +63,18 @@ const AgentConfigForm: React.FC = () => {
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importJson, setImportJson] = useState('');
   const [form] = Form.useForm();
+  
+  // Instruction related state
+  const [builtinInstructions, setBuiltinInstructions] = useState<BuiltinInstruction[]>([]);
+  const [instructionType, setInstructionType] = useState<InstructionType>('builtin');
+  const [selectedBuiltinId, setSelectedBuiltinId] = useState<string>('');
+  const [instructionFilePath, setInstructionFilePath] = useState<string>('');
+  const [instructionInlineContent, setInstructionInlineContent] = useState<string>('');
+  
+  // Load builtin instructions on mount
+  useEffect(() => {
+    getBuiltinInstructions().then(setBuiltinInstructions);
+  }, [getBuiltinInstructions]);
 
   const handleCreate = () => {
     setEditingAgent(null);
@@ -78,7 +93,57 @@ const AgentConfigForm: React.FC = () => {
       include_contents: 'none',
       tags: [],
     });
+    // Reset instruction state
+    setInstructionType('builtin');
+    setSelectedBuiltinId('');
+    setInstructionFilePath('');
+    setInstructionInlineContent('');
     setEditModalVisible(true);
+  };
+
+  // Parse instruction string to determine type and extract content
+  const parseInstruction = (instruction: string): { type: InstructionType; builtinId: string; filePath: string; content: string } => {
+    if (instruction.startsWith('builtin://')) {
+      return {
+        type: 'builtin',
+        builtinId: instruction.substring('builtin://'.length),
+        filePath: '',
+        content: '',
+      };
+    } else if (instruction.startsWith('file://')) {
+      return {
+        type: 'file',
+        builtinId: '',
+        filePath: instruction.substring('file://'.length),
+        content: '',
+      };
+    } else if (instruction.startsWith('inline://')) {
+      return {
+        type: 'inline',
+        builtinId: '',
+        filePath: '',
+        content: instruction.substring('inline://'.length),
+      };
+    } else {
+      // Treat as builtin name or inline content
+      // Check if it matches a builtin id
+      const matchingBuiltin = builtinInstructions.find(bi => bi.id === instruction);
+      if (matchingBuiltin) {
+        return {
+          type: 'builtin',
+          builtinId: instruction,
+          filePath: '',
+          content: '',
+        };
+      }
+      // Otherwise treat as inline
+      return {
+        type: 'inline',
+        builtinId: '',
+        filePath: '',
+        content: instruction,
+      };
+    }
   };
 
   const handleEdit = (agent: AgentDefinition) => {
@@ -90,6 +155,23 @@ const AgentConfigForm: React.FC = () => {
       agent_type: typeof agent.agent_type === 'string' ? agent.agent_type : 'loop',
       tools: toolIds,
     });
+    
+    // Parse and set instruction state
+    const parsed = parseInstruction(agent.instruction);
+    setInstructionType(parsed.type);
+    setSelectedBuiltinId(parsed.builtinId);
+    setInstructionFilePath(parsed.filePath);
+    
+    // For inline, use the content directly; for builtin being converted to inline, use builtin content
+    if (parsed.type === 'inline' && parsed.content) {
+      setInstructionInlineContent(parsed.content);
+    } else if (parsed.type === 'builtin' && parsed.builtinId) {
+      const builtin = builtinInstructions.find(bi => bi.id === parsed.builtinId);
+      setInstructionInlineContent(builtin?.content || '');
+    } else {
+      setInstructionInlineContent(parsed.content);
+    }
+    
     setEditModalVisible(true);
     selectAgent(agent.id);
   };
@@ -117,9 +199,24 @@ const AgentConfigForm: React.FC = () => {
         tool_id: toolId,
       }));
       
+      // Build instruction based on type
+      let instruction = '';
+      switch (instructionType) {
+        case 'builtin':
+          instruction = `builtin://${selectedBuiltinId}`;
+          break;
+        case 'file':
+          instruction = `file://${instructionFilePath}`;
+          break;
+        case 'inline':
+          instruction = `inline://${instructionInlineContent}`;
+          break;
+      }
+      
       const agent: AgentDefinition = {
         ...editingAgent,
         ...values,
+        instruction,
         tools,
         metadata: {},
       };
@@ -169,6 +266,42 @@ const AgentConfigForm: React.FC = () => {
     return <Tag color="purple">loop ({(type as { loop: { max_iterations?: number } }).loop?.max_iterations || 'unlimited'})</Tag>;
   };
 
+  // Handle file selection for instruction file path
+  const handleSelectInstructionFile = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: 'Markdown', extensions: ['md', 'txt'] }],
+      });
+      if (selected && typeof selected === 'string') {
+        setInstructionFilePath(selected);
+      }
+    } catch (error) {
+      console.error('Failed to select file:', error);
+    }
+  };
+
+  // Handle builtin selection - update inline content preview
+  const handleBuiltinChange = (builtinId: string) => {
+    setSelectedBuiltinId(builtinId);
+    const builtin = builtinInstructions.find(bi => bi.id === builtinId);
+    if (builtin) {
+      setInstructionInlineContent(builtin.content);
+    }
+  };
+
+  // Handle instruction type change
+  const handleInstructionTypeChange = (type: InstructionType) => {
+    setInstructionType(type);
+    // When switching to inline, pre-fill with selected builtin content if available
+    if (type === 'inline' && selectedBuiltinId) {
+      const builtin = builtinInstructions.find(bi => bi.id === selectedBuiltinId);
+      if (builtin) {
+        setInstructionInlineContent(builtin.content);
+      }
+    }
+  };
+
   const availableTools = [
     'read_file', 'write_file', 'edit_file', 'delete_file',
     'execute_command', 'search_file', 'search_content',
@@ -197,7 +330,7 @@ const AgentConfigForm: React.FC = () => {
       ) : (
         <List
           style={{ flex: 1, overflow: 'auto', padding: '0 16px' }}
-          dataSource={Object.values(agents)}
+          dataSource={Object.values(agents).sort((a, b) => a.name.localeCompare(b.name))}
           renderItem={(agent) => (
             <List.Item
               actions={[
@@ -323,15 +456,122 @@ const AgentConfigForm: React.FC = () => {
                 label: 'Instruction',
                 children: (
                   <>
-                    <Alert
-                      message="Instruction can be a builtin reference, file path, or inline content"
-                      type="info"
-                      showIcon
-                      style={{ marginBottom: 16 }}
-                    />
-                    <Form.Item name="instruction" rules={[{ required: true }]}>
-                      <TextArea rows={10} placeholder="builtin://idea_actor or file://./prompts/... or inline content" />
+                    <Form.Item label="Instruction Type">
+                      <Select 
+                        value={instructionType} 
+                        onChange={handleInstructionTypeChange}
+                        style={{ width: 200 }}
+                      >
+                        <Select.Option value="builtin">
+                          <Space>
+                            <Tag color="blue">Built-in</Tag>
+                            <Text type="secondary">Use predefined instruction</Text>
+                          </Space>
+                        </Select.Option>
+                        <Select.Option value="file">
+                          <Space>
+                            <Tag color="green">File</Tag>
+                            <Text type="secondary">Load from file</Text>
+                          </Space>
+                        </Select.Option>
+                        <Select.Option value="inline">
+                          <Space>
+                            <Tag color="purple">Inline</Tag>
+                            <Text type="secondary">Custom content</Text>
+                          </Space>
+                        </Select.Option>
+                      </Select>
                     </Form.Item>
+                    
+                    {instructionType === 'builtin' && (
+                      <Form.Item 
+                        label="Select Built-in Instruction"
+                        required
+                      >
+                        <Select
+                          value={selectedBuiltinId}
+                          onChange={handleBuiltinChange}
+                          placeholder="Select a built-in instruction"
+                          showSearch
+                          optionFilterProp="children"
+                        >
+                          {builtinInstructions.map(bi => (
+                            <Select.Option key={bi.id} value={bi.id}>
+                              <Space direction="vertical" size={0}>
+                                <Text strong>{bi.name}</Text>
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  {bi.description}
+                                </Text>
+                              </Space>
+                            </Select.Option>
+                          ))}
+                        </Select>
+                        {selectedBuiltinId && (
+                          <div style={{ marginTop: 12 }}>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              Preview:
+                            </Text>
+                            <Paragraph
+                              ellipsis={{ rows: 4, expandable: true, symbol: 'more' }}
+                              style={{
+                                background: '#f5f5f5',
+                                padding: 8,
+                                borderRadius: 4,
+                                marginTop: 8,
+                                fontSize: 12,
+                                maxHeight: 150,
+                                overflow: 'auto'
+                              }}
+                            >
+                              {builtinInstructions.find(bi => bi.id === selectedBuiltinId)?.content || ''}
+                            </Paragraph>
+                          </div>
+                        )}
+                      </Form.Item>
+                    )}
+                    
+                    {instructionType === 'file' && (
+                      <Form.Item 
+                        label="Instruction File Path"
+                        required
+                      >
+                        <Space.Compact style={{ width: '100%' }}>
+                          <Input
+                            value={instructionFilePath}
+                            onChange={(e) => setInstructionFilePath(e.target.value)}
+                            placeholder="./prompts/my_instruction.md"
+                          />
+                          <Button 
+                            icon={<FolderOpenOutlined />} 
+                            onClick={handleSelectInstructionFile}
+                          >
+                            Browse
+                          </Button>
+                        </Space.Compact>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          Select a markdown or text file containing the instruction
+                        </Text>
+                      </Form.Item>
+                    )}
+                    
+                    {instructionType === 'inline' && (
+                      <Form.Item 
+                        label="Instruction Content"
+                        required
+                      >
+                        <TextArea
+                          rows={12}
+                          value={instructionInlineContent}
+                          onChange={(e) => setInstructionInlineContent(e.target.value)}
+                          placeholder="Enter your custom instruction here..."
+                        />
+                        <Space style={{ marginTop: 8 }}>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            Tip: You can start from a built-in instruction by selecting one above, then switch to Inline mode.
+                          </Text>
+                        </Space>
+                      </Form.Item>
+                    )}
                   </>
                 ),
               },

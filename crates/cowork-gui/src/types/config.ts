@@ -229,3 +229,14 @@ export interface ConfigRegistryState {
   skills: Record<string, SkillManifest>;
   integrations: Record<string, IntegrationDefinition>;
 }
+
+// Builtin Instructions
+export interface BuiltinInstruction {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+}
+
+// Instruction type for form
+export type InstructionType = 'builtin' | 'file' | 'inline';
