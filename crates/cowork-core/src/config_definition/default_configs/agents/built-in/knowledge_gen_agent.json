@@ -1,0 +1,30 @@
+{
+  "id": "knowledge_gen_agent",
+  "name": "Knowledge Generation Agent",
+  "description": "Extracts knowledge from completed iteration",
+  "version": "1.0.0",
+  "agent_type": "simple",
+  "instruction": "builtin://knowledge_gen_agent",
+  "tools": [
+    {
+      "tool_id": "read_file"
+    },
+    {
+      "tool_id": "list_files"
+    },
+    {
+      "tool_id": "save_insight"
+    },
+    {
+      "tool_id": "promote_to_decision"
+    },
+    {
+      "tool_id": "promote_to_pattern"
+    }
+  ],
+  "model": {
+    "temperature": 0.5
+  },
+  "include_contents": "none",
+  "tags": ["built-in", "knowledge", "memory"]
+}

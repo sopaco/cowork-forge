@@ -1,0 +1,45 @@
+{
+  "id": "check_agent",
+  "name": "Check Agent",
+  "description": "Performs quality validation on the implemented code",
+  "version": "1.0.0",
+  "agent_type": "simple",
+  "instruction": "builtin://check_agent",
+  "tools": [
+    {
+      "tool_id": "get_implementation_plan"
+    },
+    {
+      "tool_id": "read_file"
+    },
+    {
+      "tool_id": "list_files"
+    },
+    {
+      "tool_id": "run_command"
+    },
+    {
+      "tool_id": "check_tests"
+    },
+    {
+      "tool_id": "check_lint"
+    },
+    {
+      "tool_id": "check_data_format"
+    },
+    {
+      "tool_id": "query_memory"
+    },
+    {
+      "tool_id": "save_insight"
+    },
+    {
+      "tool_id": "save_issue"
+    }
+  ],
+  "model": {
+    "temperature": 0.3
+  },
+  "include_contents": "none",
+  "tags": ["built-in", "quality", "validation"]
+}

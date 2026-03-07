@@ -1,0 +1,42 @@
+{
+  "id": "coding_critic",
+  "name": "Coding Critic",
+  "description": "Reviews and validates the implemented code",
+  "version": "1.0.0",
+  "agent_type": "simple",
+  "instruction": "builtin://coding_critic",
+  "tools": [
+    {
+      "tool_id": "get_implementation_plan"
+    },
+    {
+      "tool_id": "read_file"
+    },
+    {
+      "tool_id": "list_files"
+    },
+    {
+      "tool_id": "run_command"
+    },
+    {
+      "tool_id": "check_tests"
+    },
+    {
+      "tool_id": "check_lint"
+    },
+    {
+      "tool_id": "provide_feedback"
+    },
+    {
+      "tool_id": "query_memory"
+    },
+    {
+      "tool_id": "save_issue"
+    }
+  ],
+  "model": {
+    "temperature": 0.3
+  },
+  "include_contents": "none",
+  "tags": ["built-in", "coding", "critic"]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "idea",
+  "name": "Idea Stage",
+  "description": "Captures and structures the initial project idea",
+  "stage_type": "simple",
+  "agent": "idea_agent",
+  "needs_confirmation": true,
+  "artifacts": [
+    {
+      "path": "artifacts/idea.md",
+      "required": true,
+      "description": "The structured idea document"
+    }
+  ],
+  "hooks": [],
+  "tags": ["built-in", "ideation"]
+}

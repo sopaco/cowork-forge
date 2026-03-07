@@ -1,0 +1,17 @@
+{
+  "id": "delivery",
+  "name": "Delivery Stage",
+  "description": "Generates delivery report and deploys the project",
+  "stage_type": "simple",
+  "agent": "delivery_agent",
+  "needs_confirmation": false,
+  "artifacts": [
+    {
+      "path": "artifacts/delivery_report.md",
+      "required": true,
+      "description": "The delivery report"
+    }
+  ],
+  "hooks": [],
+  "tags": ["built-in", "delivery"]
+}

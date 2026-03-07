@@ -1,0 +1,17 @@
+{
+  "id": "check",
+  "name": "Check Stage",
+  "description": "Performs quality validation on the implemented code",
+  "stage_type": "simple",
+  "agent": "check_agent",
+  "needs_confirmation": false,
+  "artifacts": [
+    {
+      "path": "artifacts/check_report.md",
+      "required": false,
+      "description": "Quality check report"
+    }
+  ],
+  "hooks": [],
+  "tags": ["built-in", "quality"]
+}

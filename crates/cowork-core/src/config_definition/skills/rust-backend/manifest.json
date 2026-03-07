@@ -1,0 +1,56 @@
+{
+  "id": "rust-backend",
+  "name": "Rust Backend Development",
+  "version": "1.0.0",
+  "description": "Expert skill for building robust backend services with Rust, Tokio, and Actix-web",
+  "category": "WebBackend",
+  "author": "Cowork Forge Team",
+  "dependencies": [],
+  "tools": [
+    {
+      "tool_id": "generate_actix_route",
+      "implementation": "Builtin",
+      "description": "Generate Actix-web route handler with proper error handling",
+      "enabled": true
+    },
+    {
+      "tool_id": "create_database_model",
+      "implementation": "Builtin",
+      "description": "Create database model with SQLx or Diesel",
+      "enabled": true
+    },
+    {
+      "tool_id": "setup_telemetry",
+      "implementation": "Builtin",
+      "description": "Setup tracing and logging infrastructure",
+      "enabled": true
+    }
+  ],
+  "prompts": [
+    {
+      "prompt_type": "Inline",
+      "content": "You are an expert in Rust backend development. You have deep knowledge of async programming with Tokio, web frameworks like Actix-web and Axum, database libraries like SQLx and Diesel, and best practices for production-ready services.\n\nKey principles:\n- Use Result types for error handling\n- Leverage Rust's type system for correctness\n- Write efficient async code\n- Follow Rust idioms and patterns\n- Consider security and performance",
+      "injection_point": "Prepend",
+      "priority": 100
+    },
+    {
+      "prompt_type": "Inline",
+      "content": "When creating Rust backend services:\n- Use thiserror for error types\n- Implement proper logging with tracing\n- Add metrics and health checks\n- Write comprehensive tests\n- Document public APIs with rustdoc",
+      "injection_point": "Append",
+      "priority": 50
+    }
+  ],
+  "context_templates": [],
+  "default_config": {
+    "async_runtime": "tokio",
+    "web_framework": "actix",
+    "database": "sqlx",
+    "logging": "tracing"
+  },
+  "compatibility": {
+    "min_cowork_version": "3.0.0",
+    "platforms": ["All"]
+  },
+  "tags": ["backend", "rust", "async", "web"],
+  "source": "Local"
+}

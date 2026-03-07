@@ -1,0 +1,24 @@
+{
+  "id": "idea_agent",
+  "name": "Idea Agent",
+  "description": "Captures and structures the initial project idea into a formal idea document",
+  "version": "1.0.0",
+  "agent_type": "simple",
+  "instruction": "builtin://idea_agent",
+  "tools": [
+    {
+      "tool_id": "save_idea"
+    },
+    {
+      "tool_id": "query_memory"
+    },
+    {
+      "tool_id": "save_insight"
+    }
+  ],
+  "model": {
+    "temperature": 0.7
+  },
+  "include_contents": "none",
+  "tags": ["built-in", "ideation"]
+}

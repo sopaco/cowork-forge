@@ -1,0 +1,26 @@
+{
+  "id": "design",
+  "name": "Design Stage",
+  "description": "Creates system design specification with Actor-Critic validation",
+  "stage_type": "actor_critic",
+  "actor_critic": {
+    "actor": "design_actor",
+    "critic": "design_critic",
+    "max_iterations": 1
+  },
+  "needs_confirmation": true,
+  "artifacts": [
+    {
+      "path": "artifacts/design.md",
+      "required": true,
+      "description": "The system design specification"
+    },
+    {
+      "path": "data/design_spec.json",
+      "required": true,
+      "description": "Structured design components"
+    }
+  ],
+  "hooks": [],
+  "tags": ["built-in", "design"]
+}

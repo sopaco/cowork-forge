@@ -1,0 +1,21 @@
+{
+  "id": "coding",
+  "name": "Coding Stage",
+  "description": "Implements the code based on the plan with Actor-Critic validation",
+  "stage_type": "actor_critic",
+  "actor_critic": {
+    "actor": "coding_actor",
+    "critic": "coding_critic",
+    "max_iterations": 1
+  },
+  "needs_confirmation": true,
+  "artifacts": [
+    {
+      "path": "workspace/",
+      "required": true,
+      "description": "The implemented source code"
+    }
+  ],
+  "hooks": [],
+  "tags": ["built-in", "coding"]
+}

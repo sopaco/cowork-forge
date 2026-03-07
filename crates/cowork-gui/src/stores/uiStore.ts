@@ -9,7 +9,8 @@ type ViewType =
   | 'run' 
   | 'execution-memory' 
   | 'project-knowledge' 
-  | 'settings';
+  | 'settings'
+  | 'config';
 
 interface UIState {
   activeView: ViewType;

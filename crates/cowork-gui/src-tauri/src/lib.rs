@@ -632,6 +632,16 @@ pub fn run() {
         .setup(move |app| {
             // Initialize app handle for project runner
             init_app_handle(app.handle().clone());
+            
+            // Initialize system locale at startup
+            system::init_system_locale();
+            
+            // Initialize V3 config registry with built-in configurations
+            if let Err(e) = cowork_core::config_definition::initialize_config_registry() {
+                eprintln!("[GUI] Failed to initialize config registry: {}", e);
+            } else {
+                println!("[GUI] Config registry initialized successfully");
+            }
 
             // Initialize tool notification callback
             let app_handle = app.handle().clone();
@@ -749,6 +759,23 @@ pub fn run() {
             config_commands::open_config_folder,
             config_commands::test_llm_connection,
             config_commands::has_valid_config,
+            // V3 Config commands
+            config_commands::gui_get_config_registry,
+            config_commands::gui_reset_config_registry,
+            config_commands::gui_save_agent_config,
+            config_commands::gui_delete_agent_config,
+            config_commands::gui_save_stage_config,
+            config_commands::gui_delete_stage_config,
+            config_commands::gui_save_flow_config,
+            config_commands::gui_delete_flow_config,
+            config_commands::gui_install_skill,
+            config_commands::gui_uninstall_skill,
+            config_commands::gui_save_integration_config,
+            config_commands::gui_delete_integration_config,
+            config_commands::gui_validate_agent_config,
+            config_commands::gui_validate_flow_config,
+            config_commands::gui_export_config,
+            config_commands::gui_import_config,
             // Project creation commands
             path_exists,
             create_project_at_path,

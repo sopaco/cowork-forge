@@ -14,7 +14,8 @@ import {
 	CheckCircleOutlined,
 	RocketOutlined,
 	BookOutlined,
-	SettingOutlined
+	SettingOutlined,
+	ControlOutlined
 } from '@ant-design/icons';
 
 import { useProjectStore, useAgentStore, useUIStore } from './stores';
@@ -33,6 +34,7 @@ import KnowledgePanel from './components/KnowledgePanel';
 import CommandPalette from './components/CommandPalette';
 import IterationsPanel from './components/IterationsPanel';
 import SettingsPanel from './components/SettingsPanel';
+import { ConfigPanel } from './components/config';
 
 const { Sider, Content, Header, Footer } = Layout;
 
@@ -214,6 +216,10 @@ function App() {
 				<SettingsPanel />
 			</div>
 
+			<div style={{ height: '100%', display: activeView === 'config' ? 'block' : 'none', overflow: 'auto' }}>
+				<ConfigPanel />
+			</div>
+
 			<div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
 				{currentIteration ? (
 					<ChatPanel
@@ -315,6 +321,7 @@ function App() {
 							{ key: 'execution-memory', icon: <DatabaseOutlined />, label: 'Memory' },
 							{ key: 'project-knowledge', icon: <BookOutlined />, label: 'Knowledge' },
 							{ type: 'divider' },
+							{ key: 'config', icon: <ControlOutlined />, label: 'Config' },
 							{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' }
 						]}
 					/>

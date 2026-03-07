@@ -1,0 +1,21 @@
+{
+  "id": "summary_agent",
+  "name": "Summary Agent",
+  "description": "Generates document summaries for each stage",
+  "version": "1.0.0",
+  "agent_type": "simple",
+  "instruction": "builtin://summary_agent",
+  "tools": [
+    {
+      "tool_id": "read_file"
+    },
+    {
+      "tool_id": "write_file"
+    }
+  ],
+  "model": {
+    "temperature": 0.5
+  },
+  "include_contents": "none",
+  "tags": ["built-in", "documentation", "summary"]
+}
