@@ -17,26 +17,26 @@ pub struct FlowDefinition {
     pub description: Option<String>,
     /// Version of this definition (semver)
     pub version: Option<String>,
-    
+
     /// Ordered list of stage references
     pub stages: Vec<StageReference>,
-    
+
     /// Default starting stage (by index or ID)
     #[serde(default)]
     pub start_stage: Option<String>,
-    
+
     /// Global hooks applied to all stages in this flow
     #[serde(default)]
     pub global_hooks: Vec<GlobalHookConfig>,
-    
+
     /// Flow-level configuration
     #[serde(default)]
     pub config: FlowConfig,
-    
+
     /// Tags for categorization
     #[serde(default)]
     pub tags: Vec<String>,
-    
+
     /// Metadata for extensions
     #[serde(default)]
     pub metadata: HashMap<String, serde_json::Value>,
@@ -98,18 +98,18 @@ pub struct FlowConfig {
     /// Whether to stop on first failure
     #[serde(default = "default_stop_on_failure")]
     pub stop_on_failure: bool,
-    
+
     /// Maximum total execution time in seconds
     pub max_total_time_secs: Option<u32>,
-    
+
     /// Whether to save state on interruption
     #[serde(default = "default_save_state")]
     pub save_state_on_interrupt: bool,
-    
+
     /// Memory scope for this flow
     #[serde(default)]
     pub memory_scope: MemoryScope,
-    
+
     /// Inheritance behavior for evolution iterations
     #[serde(default)]
     pub inheritance: InheritanceConfig,
@@ -160,7 +160,7 @@ impl Default for InheritanceConfig {
         stage_mapping.insert("none".to_string(), "idea".to_string());
         stage_mapping.insert("partial".to_string(), "plan".to_string());
         stage_mapping.insert("full".to_string(), "idea".to_string());
-        
+
         Self {
             default_mode: InheritanceMode::Partial,
             stage_mapping,
@@ -197,7 +197,7 @@ impl FlowDefinition {
             metadata: HashMap::new(),
         }
     }
-    
+
     /// Add a stage to the flow
     pub fn with_stage(mut self, stage_id: impl Into<String>) -> Self {
         self.stages.push(StageReference {
@@ -210,7 +210,7 @@ impl FlowDefinition {
         });
         self
     }
-    
+
     /// Add a stage with alias
     pub fn with_stage_alias(mut self, stage_id: impl Into<String>, alias: impl Into<String>) -> Self {
         self.stages.push(StageReference {
@@ -223,14 +223,14 @@ impl FlowDefinition {
         });
         self
     }
-    
+
     /// Set the starting stage
     pub fn start_at(mut self, stage: impl Into<String>) -> Self {
         self.start_stage = Some(stage.into());
         self
     }
-    
-    /// Get the default V3 flow (matching V2 behavior)
+
+    /// Get the default flow
     pub fn default_v3() -> Self {
         Self::new("default", "Default Development Flow")
             .with_stage("idea")
@@ -247,14 +247,14 @@ impl FlowDefinition {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_flow_definition() {
         let flow = FlowDefinition::default_v3();
-        
+
         let json = serde_json::to_string_pretty(&flow).unwrap();
         println!("{}", json);
-        
+
         let parsed: FlowDefinition = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.id, "default");
         assert_eq!(parsed.stages.len(), 7);
