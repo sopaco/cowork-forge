@@ -5,6 +5,8 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use std::path::PathBuf;
+use std::fs;
 use anyhow::{Result, Context};
 
 use super::agent_definition::AgentDefinition;
@@ -12,6 +14,26 @@ use super::stage_definition::StageDefinition;
 use super::flow_definition::FlowDefinition;
 use super::skill_definition::SkillDefinition;
 use super::integration_definition::IntegrationDefinition;
+
+/// Get the user config directory for persistent storage
+fn get_user_config_dir() -> Option<PathBuf> {
+    if let Some(home) = dirs::home_dir() {
+        Some(home.join(".cowork").join("config"))
+    } else {
+        None
+    }
+}
+
+/// Ensure the user config directory exists
+fn ensure_user_config_dir() -> Result<PathBuf> {
+    let config_dir = get_user_config_dir()
+        .ok_or_else(|| anyhow::anyhow!("Could not determine user config directory"))?;
+    
+    fs::create_dir_all(&config_dir)
+        .with_context(|| format!("Failed to create config directory: {:?}", config_dir))?;
+    
+    Ok(config_dir)
+}
 
 /// Configuration registry for managing all definitions
 pub struct ConfigRegistry {
@@ -273,6 +295,249 @@ impl ConfigRegistry {
             integrations: self.integrations.read().map(|g| g.len()).unwrap_or(0),
         }
     }
+    
+    // =========================================================================
+    // Persistence Operations
+    // =========================================================================
+    
+    /// Save an agent definition to persistent storage
+    pub fn save_agent_to_file(&self, agent: &AgentDefinition) -> Result<()> {
+        let config_dir = ensure_user_config_dir()?;
+        let agents_dir = config_dir.join("agents");
+        fs::create_dir_all(&agents_dir)
+            .with_context(|| format!("Failed to create agents directory: {:?}", agents_dir))?;
+        
+        let file_path = agents_dir.join(format!("{}.json", agent.id));
+        let content = serde_json::to_string_pretty(agent)
+            .with_context(|| format!("Failed to serialize agent: {}", agent.id))?;
+        
+        fs::write(&file_path, content)
+            .with_context(|| format!("Failed to write agent file: {:?}", file_path))?;
+        
+        tracing::info!("Saved agent '{}' to {:?}", agent.id, file_path);
+        Ok(())
+    }
+    
+    /// Delete an agent file from persistent storage
+    pub fn delete_agent_file(&self, id: &str) -> Result<()> {
+        if let Some(config_dir) = get_user_config_dir() {
+            let file_path = config_dir.join("agents").join(format!("{}.json", id));
+            if file_path.exists() {
+                fs::remove_file(&file_path)
+                    .with_context(|| format!("Failed to delete agent file: {:?}", file_path))?;
+                tracing::info!("Deleted agent file: {:?}", file_path);
+            }
+        }
+        Ok(())
+    }
+    
+    /// Save a stage definition to persistent storage
+    pub fn save_stage_to_file(&self, stage: &StageDefinition) -> Result<()> {
+        let config_dir = ensure_user_config_dir()?;
+        let stages_dir = config_dir.join("stages");
+        fs::create_dir_all(&stages_dir)
+            .with_context(|| format!("Failed to create stages directory: {:?}", stages_dir))?;
+        
+        let file_path = stages_dir.join(format!("{}.json", stage.id));
+        let content = serde_json::to_string_pretty(stage)
+            .with_context(|| format!("Failed to serialize stage: {}", stage.id))?;
+        
+        fs::write(&file_path, content)
+            .with_context(|| format!("Failed to write stage file: {:?}", file_path))?;
+        
+        tracing::info!("Saved stage '{}' to {:?}", stage.id, file_path);
+        Ok(())
+    }
+    
+    /// Delete a stage file from persistent storage
+    pub fn delete_stage_file(&self, id: &str) -> Result<()> {
+        if let Some(config_dir) = get_user_config_dir() {
+            let file_path = config_dir.join("stages").join(format!("{}.json", id));
+            if file_path.exists() {
+                fs::remove_file(&file_path)
+                    .with_context(|| format!("Failed to delete stage file: {:?}", file_path))?;
+                tracing::info!("Deleted stage file: {:?}", file_path);
+            }
+        }
+        Ok(())
+    }
+    
+    /// Save a flow definition to persistent storage
+    pub fn save_flow_to_file(&self, flow: &FlowDefinition) -> Result<()> {
+        let config_dir = ensure_user_config_dir()?;
+        let flows_dir = config_dir.join("flows");
+        fs::create_dir_all(&flows_dir)
+            .with_context(|| format!("Failed to create flows directory: {:?}", flows_dir))?;
+        
+        let file_path = flows_dir.join(format!("{}.json", flow.id));
+        let content = serde_json::to_string_pretty(flow)
+            .with_context(|| format!("Failed to serialize flow: {}", flow.id))?;
+        
+        fs::write(&file_path, content)
+            .with_context(|| format!("Failed to write flow file: {:?}", file_path))?;
+        
+        tracing::info!("Saved flow '{}' to {:?}", flow.id, file_path);
+        Ok(())
+    }
+    
+    /// Delete a flow file from persistent storage
+    pub fn delete_flow_file(&self, id: &str) -> Result<()> {
+        if let Some(config_dir) = get_user_config_dir() {
+            let file_path = config_dir.join("flows").join(format!("{}.json", id));
+            if file_path.exists() {
+                fs::remove_file(&file_path)
+                    .with_context(|| format!("Failed to delete flow file: {:?}", file_path))?;
+                tracing::info!("Deleted flow file: {:?}", file_path);
+            }
+        }
+        Ok(())
+    }
+    
+    /// Save an integration definition to persistent storage
+    pub fn save_integration_to_file(&self, integration: &IntegrationDefinition) -> Result<()> {
+        let config_dir = ensure_user_config_dir()?;
+        let integrations_dir = config_dir.join("integrations");
+        fs::create_dir_all(&integrations_dir)
+            .with_context(|| format!("Failed to create integrations directory: {:?}", integrations_dir))?;
+        
+        let file_path = integrations_dir.join(format!("{}.json", integration.id));
+        let content = serde_json::to_string_pretty(integration)
+            .with_context(|| format!("Failed to serialize integration: {}", integration.id))?;
+        
+        fs::write(&file_path, content)
+            .with_context(|| format!("Failed to write integration file: {:?}", file_path))?;
+        
+        tracing::info!("Saved integration '{}' to {:?}", integration.id, file_path);
+        Ok(())
+    }
+    
+    /// Delete an integration file from persistent storage
+    pub fn delete_integration_file(&self, id: &str) -> Result<()> {
+        if let Some(config_dir) = get_user_config_dir() {
+            let file_path = config_dir.join("integrations").join(format!("{}.json", id));
+            if file_path.exists() {
+                fs::remove_file(&file_path)
+                    .with_context(|| format!("Failed to delete integration file: {:?}", file_path))?;
+                tracing::info!("Deleted integration file: {:?}", file_path);
+            }
+        }
+        Ok(())
+    }
+    
+    /// Load user configurations from persistent storage
+    pub fn load_user_configs(&self) -> Result<LoadUserReport> {
+        let mut report = LoadUserReport::default();
+        
+        if let Some(config_dir) = get_user_config_dir() {
+            if config_dir.exists() {
+                // Load agents
+                let agents_dir = config_dir.join("agents");
+                if agents_dir.exists() {
+                    for entry in fs::read_dir(&agents_dir)
+                        .with_context(|| format!("Failed to read agents directory: {:?}", agents_dir))?
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+                    {
+                        let path = entry.path();
+                        match fs::read_to_string(&path)
+                            .and_then(|content| serde_json::from_str::<AgentDefinition>(&content)
+                                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+                        {
+                            Ok(agent) => {
+                                let id = agent.id.clone();
+                                self.register_agent(agent)?;
+                                report.agents_loaded += 1;
+                                tracing::debug!("Loaded user agent: {} from {:?}", id, path);
+                            }
+                            Err(e) => {
+                                report.errors.push(format!("Failed to load agent from {:?}: {}", path, e));
+                            }
+                        }
+                    }
+                }
+                
+                // Load stages
+                let stages_dir = config_dir.join("stages");
+                if stages_dir.exists() {
+                    for entry in fs::read_dir(&stages_dir)
+                        .with_context(|| format!("Failed to read stages directory: {:?}", stages_dir))?
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+                    {
+                        let path = entry.path();
+                        match fs::read_to_string(&path)
+                            .and_then(|content| serde_json::from_str::<StageDefinition>(&content)
+                                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+                        {
+                            Ok(stage) => {
+                                let id = stage.id.clone();
+                                self.register_stage(stage)?;
+                                report.stages_loaded += 1;
+                                tracing::debug!("Loaded user stage: {} from {:?}", id, path);
+                            }
+                            Err(e) => {
+                                report.errors.push(format!("Failed to load stage from {:?}: {}", path, e));
+                            }
+                        }
+                    }
+                }
+                
+                // Load flows
+                let flows_dir = config_dir.join("flows");
+                if flows_dir.exists() {
+                    for entry in fs::read_dir(&flows_dir)
+                        .with_context(|| format!("Failed to read flows directory: {:?}", flows_dir))?
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+                    {
+                        let path = entry.path();
+                        match fs::read_to_string(&path)
+                            .and_then(|content| serde_json::from_str::<FlowDefinition>(&content)
+                                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+                        {
+                            Ok(flow) => {
+                                let id = flow.id.clone();
+                                self.register_flow(flow)?;
+                                report.flows_loaded += 1;
+                                tracing::debug!("Loaded user flow: {} from {:?}", id, path);
+                            }
+                            Err(e) => {
+                                report.errors.push(format!("Failed to load flow from {:?}: {}", path, e));
+                            }
+                        }
+                    }
+                }
+                
+                // Load integrations
+                let integrations_dir = config_dir.join("integrations");
+                if integrations_dir.exists() {
+                    for entry in fs::read_dir(&integrations_dir)
+                        .with_context(|| format!("Failed to read integrations directory: {:?}", integrations_dir))?
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+                    {
+                        let path = entry.path();
+                        match fs::read_to_string(&path)
+                            .and_then(|content| serde_json::from_str::<IntegrationDefinition>(&content)
+                                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+                        {
+                            Ok(integration) => {
+                                let id = integration.id.clone();
+                                self.register_integration(integration)?;
+                                report.integrations_loaded += 1;
+                                tracing::debug!("Loaded user integration: {} from {:?}", id, path);
+                            }
+                            Err(e) => {
+                                report.errors.push(format!("Failed to load integration from {:?}: {}", path, e));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(report)
+    }
 }
 
 /// Statistics about the registry
@@ -283,6 +548,16 @@ pub struct RegistryStats {
     pub flows: usize,
     pub skills: usize,
     pub integrations: usize,
+}
+
+/// Report of loading user configurations
+#[derive(Debug, Clone, Default)]
+pub struct LoadUserReport {
+    pub agents_loaded: usize,
+    pub stages_loaded: usize,
+    pub flows_loaded: usize,
+    pub integrations_loaded: usize,
+    pub errors: Vec<String>,
 }
 
 // Global registry instance

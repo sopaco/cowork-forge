@@ -194,47 +194,87 @@ pub async fn gui_get_builtin_instructions() -> Result<Vec<BuiltinInstruction>, S
 #[tauri::command]
 pub async fn gui_save_agent_config(agent: AgentDefinition) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
-    registry.register_agent(agent)
-        .map_err(|e| format!("Failed to save agent: {}", e))
+    
+    // Register in memory
+    registry.register_agent(agent.clone())
+        .map_err(|e| format!("Failed to save agent: {}", e))?;
+    
+    // Persist to file
+    registry.save_agent_to_file(&agent)
+        .map_err(|e| format!("Failed to persist agent to file: {}", e))?;
+    
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn gui_delete_agent_config(agent_id: String) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
+    
+    // Remove from memory
     let removed = registry.unregister_agent(&agent_id);
+    
+    // Delete from file (regardless of memory removal result)
+    registry.delete_agent_file(&agent_id)
+        .map_err(|e| format!("Failed to delete agent file: {}", e))?;
+    
     if removed {
         Ok(())
     } else {
-        Err(format!("Agent not found: {}", agent_id))
+        // Still return Ok since file was deleted
+        tracing::warn!("Agent {} was not in memory but file was deleted", agent_id);
+        Ok(())
     }
 }
 
 #[tauri::command]
 pub async fn gui_save_stage_config(stage: StageDefinition) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
-    registry.register_stage(stage)
-        .map_err(|e| format!("Failed to save stage: {}", e))
+    
+    // Register in memory
+    registry.register_stage(stage.clone())
+        .map_err(|e| format!("Failed to save stage: {}", e))?;
+    
+    // Persist to file
+    registry.save_stage_to_file(&stage)
+        .map_err(|e| format!("Failed to persist stage to file: {}", e))?;
+    
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn gui_delete_stage_config(stage_id: String) -> Result<(), String> {
-    // Note: unregister_stage not implemented, just return success
-    // The registry will be updated on next load
-    let _ = stage_id;
+    let registry = cowork_core::config_definition::global_registry();
+    
+    // Delete from file
+    registry.delete_stage_file(&stage_id)
+        .map_err(|e| format!("Failed to delete stage file: {}", e))?;
+    
     Ok(())
 }
 
 #[tauri::command]
 pub async fn gui_save_flow_config(flow: FlowDefinition) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
-    registry.register_flow(flow)
-        .map_err(|e| format!("Failed to save flow: {}", e))
+    
+    // Register in memory
+    registry.register_flow(flow.clone())
+        .map_err(|e| format!("Failed to save flow: {}", e))?;
+    
+    // Persist to file
+    registry.save_flow_to_file(&flow)
+        .map_err(|e| format!("Failed to persist flow to file: {}", e))?;
+    
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn gui_delete_flow_config(flow_id: String) -> Result<(), String> {
-    // Note: unregister_flow not implemented, just return success
-    let _ = flow_id;
+    let registry = cowork_core::config_definition::global_registry();
+    
+    // Delete from file
+    registry.delete_flow_file(&flow_id)
+        .map_err(|e| format!("Failed to delete flow file: {}", e))?;
+    
     Ok(())
 }
 
@@ -264,14 +304,26 @@ pub async fn gui_uninstall_skill(skill_id: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn gui_save_integration_config(integration: IntegrationDefinition) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
-    registry.register_integration(integration)
-        .map_err(|e| format!("Failed to save integration: {}", e))
+    
+    // Register in memory
+    registry.register_integration(integration.clone())
+        .map_err(|e| format!("Failed to save integration: {}", e))?;
+    
+    // Persist to file
+    registry.save_integration_to_file(&integration)
+        .map_err(|e| format!("Failed to persist integration to file: {}", e))?;
+    
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn gui_delete_integration_config(integration_id: String) -> Result<(), String> {
-    // Note: unregister_integration not implemented, just return success
-    let _ = integration_id;
+    let registry = cowork_core::config_definition::global_registry();
+    
+    // Delete from file
+    registry.delete_integration_file(&integration_id)
+        .map_err(|e| format!("Failed to delete integration file: {}", e))?;
+    
     Ok(())
 }
 

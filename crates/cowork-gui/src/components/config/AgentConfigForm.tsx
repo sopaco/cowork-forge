@@ -87,9 +87,7 @@ const AgentConfigForm: React.FC = () => {
       instruction: '',
       tools: [],
       skills: [],
-      model: {
-        temperature: 0.7,
-      },
+      model: {},
       include_contents: 'none',
       tags: [],
     });
@@ -432,22 +430,6 @@ const AgentConfigForm: React.FC = () => {
                         <Select.Option value="loop">Loop (Actor-Critic)</Select.Option>
                       </Select>
                     </Form.Item>
-                    <Form.Item 
-                      name={['model', 'temperature']} 
-                      label={
-                        <span>
-                          Temperature{' '}
-                          <Tooltip title="Controls randomness. Lower = more deterministic, Higher = more creative">
-                            <InfoCircleOutlined />
-                          </Tooltip>
-                        </span>
-                      }
-                    >
-                      <Slider min={0} max={2} step={0.1} />
-                    </Form.Item>
-                    <Form.Item name={['model', 'max_tokens']} label="Max Tokens">
-                      <InputNumber min={100} max={32000} style={{ width: '100%' }} />
-                    </Form.Item>
                   </>
                 ),
               },
@@ -456,13 +438,6 @@ const AgentConfigForm: React.FC = () => {
                 label: 'Instruction',
                 children: (
                   <div style={{ maxWidth: 700 }}>
-                    <Alert
-                      message="Select an instruction type to define how the agent should behave"
-                      type="info"
-                      showIcon
-                      style={{ marginBottom: 16 }}
-                    />
-                    
                     <Form.Item label="Instruction Type">
                       <Select 
                         value={instructionType} 
@@ -668,19 +643,6 @@ const AgentConfigForm: React.FC = () => {
               </Descriptions.Item>
               <Descriptions.Item label="Description">
                 {selectedAgentData.description || '-'}
-              </Descriptions.Item>
-            </Descriptions>
-
-            <Title level={5}>Model Configuration</Title>
-            <Descriptions column={1} bordered size="small">
-              <Descriptions.Item label="Model ID">
-                {selectedAgentData.model.model_id || 'Default'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Temperature">
-                {selectedAgentData.model.temperature ?? 0.7}
-              </Descriptions.Item>
-              <Descriptions.Item label="Max Tokens">
-                {selectedAgentData.model.max_tokens || 'Default'}
               </Descriptions.Item>
             </Descriptions>
 

@@ -277,21 +277,46 @@ pub fn create_agent_for_stage(
     }
 }
 
-/// Initialize the configuration registry with built-in configs
+/// Initialize the configuration registry with built-in configs and user configs
 pub fn initialize_config_registry() -> Result<()> {
     let registry = global_registry();
-    let report = crate::config_definition::load_builtin_configs(&registry)?;
+    
+    // Load built-in configs first
+    let builtin_report = crate::config_definition::load_builtin_configs(&registry)?;
     
     tracing::info!(
-        "Initialized config registry: {} agents, {} stages, {} flows",
-        report.agents_loaded, report.stages_loaded, report.flows_loaded
+        "Loaded built-in configs: {} agents, {} stages, {} flows",
+        builtin_report.agents_loaded, builtin_report.stages_loaded, builtin_report.flows_loaded
     );
     
-    if report.has_errors() {
-        for error in &report.errors {
-            tracing::warn!("Config load error: {}", error);
+    if builtin_report.has_errors() {
+        for error in &builtin_report.errors {
+            tracing::warn!("Built-in config load error: {}", error);
         }
     }
+    
+    // Load user configs (will override built-in with same ID)
+    let user_report = registry.load_user_configs()?;
+    
+    if user_report.agents_loaded > 0 || user_report.stages_loaded > 0 || user_report.flows_loaded > 0 {
+        tracing::info!(
+            "Loaded user configs: {} agents, {} stages, {} flows, {} integrations",
+            user_report.agents_loaded, user_report.stages_loaded, 
+            user_report.flows_loaded, user_report.integrations_loaded
+        );
+    }
+    
+    if !user_report.errors.is_empty() {
+        for error in &user_report.errors {
+            tracing::warn!("User config load error: {}", error);
+        }
+    }
+    
+    let stats = registry.stats();
+    tracing::info!(
+        "Config registry initialized: {} agents, {} stages, {} flows total",
+        stats.agents, stats.stages, stats.flows
+    );
     
     Ok(())
 }
