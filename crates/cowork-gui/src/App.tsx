@@ -44,43 +44,37 @@ function App() {
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
 	const pmMessagesContainerRef = useRef<HTMLDivElement>(null);
 
-	// Project store
-	const {
-		project,
-		iterations,
-		currentIteration,
-		loading,
-		loadProject,
-		setCurrentIteration,
-		updateCurrentIterationStatus
-	} = useProjectStore();
+	// Project store - use selectors to avoid unnecessary re-renders
+	const project = useProjectStore(state => state.project);
+	const iterations = useProjectStore(state => state.iterations);
+	const currentIteration = useProjectStore(state => state.currentIteration);
+	const loading = useProjectStore(state => state.loading);
+	const loadProject = useProjectStore(state => state.loadProject);
+	const setCurrentIteration = useProjectStore(state => state.setCurrentIteration);
+	const updateCurrentIterationStatus = useProjectStore(state => state.updateCurrentIterationStatus);
 
-	// Agent store
-	const {
-		messages,
-		pmMessages,
-		isProcessing,
-		currentAgent,
-		currentStage,
-		inputRequest,
-		pmProcessing,
-		setInputRequest,
-		loadPMWelcomeMessage
-	} = useAgentStore();
+	// Agent store - use selectors
+	const messages = useAgentStore(state => state.messages);
+	const pmMessages = useAgentStore(state => state.pmMessages);
+	const isProcessing = useAgentStore(state => state.isProcessing);
+	const currentAgent = useAgentStore(state => state.currentAgent);
+	const currentStage = useAgentStore(state => state.currentStage);
+	const inputRequest = useAgentStore(state => state.inputRequest);
+	const pmProcessing = useAgentStore(state => state.pmProcessing);
+	const setInputRequest = useAgentStore(state => state.setInputRequest);
+	const loadPMWelcomeMessage = useAgentStore(state => state.loadPMWelcomeMessage);
 
-	// UI store
-	const {
-		activeView,
-		commandPaletteVisible,
-		activeArtifactTab,
-		artifactsRefreshTrigger,
-		codeRefreshTrigger,
-		memoryRefreshTrigger,
-		knowledgeRefreshTrigger,
-		setActiveView,
-		setCommandPaletteVisible,
-		setActiveArtifactTab
-	} = useUIStore();
+	// UI store - use selectors
+	const activeView = useUIStore(state => state.activeView);
+	const commandPaletteVisible = useUIStore(state => state.commandPaletteVisible);
+	const activeArtifactTab = useUIStore(state => state.activeArtifactTab);
+	const artifactsRefreshTrigger = useUIStore(state => state.artifactsRefreshTrigger);
+	const codeRefreshTrigger = useUIStore(state => state.codeRefreshTrigger);
+	const memoryRefreshTrigger = useUIStore(state => state.memoryRefreshTrigger);
+	const knowledgeRefreshTrigger = useUIStore(state => state.knowledgeRefreshTrigger);
+	const setActiveView = useUIStore(state => state.setActiveView);
+	const setCommandPaletteVisible = useUIStore(state => state.setCommandPaletteVisible);
+	const setActiveArtifactTab = useUIStore(state => state.setActiveArtifactTab);
 
 	// Custom hooks
 	useAppEvents(userInput, setUserInput);
