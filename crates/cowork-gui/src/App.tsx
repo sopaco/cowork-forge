@@ -34,7 +34,7 @@ import KnowledgePanel from './components/KnowledgePanel';
 import CommandPalette from './components/CommandPalette';
 import IterationsPanel from './components/IterationsPanel';
 import SettingsPanel from './components/SettingsPanel';
-import { ConfigPanel } from './components/config';
+import { AgentsSetupPanel } from './components/config';
 
 const { Sider, Content, Header, Footer } = Layout;
 
@@ -218,7 +218,7 @@ function App() {
 			</div>
 
 			<div style={{ height: '100%', display: activeView === 'config' ? 'block' : 'none', overflow: 'auto' }}>
-				<ConfigPanel />
+				<AgentsSetupPanel />
 			</div>
 
 			<div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
@@ -322,7 +322,7 @@ function App() {
 							{ key: 'execution-memory', icon: <DatabaseOutlined />, label: 'Memory' },
 							{ key: 'project-knowledge', icon: <BookOutlined />, label: 'Knowledge' },
 							{ type: 'divider' },
-							{ key: 'config', icon: <ControlOutlined />, label: 'Config' },
+							{ key: 'config', icon: <ControlOutlined />, label: 'Agents Setup' },
 							{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' }
 						]}
 					/>

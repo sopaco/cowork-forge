@@ -31,7 +31,7 @@ const { Title, Text } = Typography;
 
 type ConfigTab = 'flows' | 'agents' | 'skills' | 'integrations';
 
-const ConfigPanel: React.FC = () => {
+const AgentsSetupPanel: React.FC = () => {
   const {
     loading,
     error,
@@ -127,8 +127,8 @@ const ConfigPanel: React.FC = () => {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '16px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <Title level={4} style={{ margin: 0 }}>Configuration Management</Title>
-          <Text type="secondary">Manage flows, agents, skills, and integrations</Text>
+          <Title level={4} style={{ margin: 0 }}>Agents Setup</Title>
+          <Text type="secondary">Configure agent workflows, roles, skills, and integrations</Text>
         </div>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
@@ -165,4 +165,4 @@ const ConfigPanel: React.FC = () => {
   );
 };
 
-export default ConfigPanel;
+export default AgentsSetupPanel;
