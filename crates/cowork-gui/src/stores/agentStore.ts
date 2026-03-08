@@ -72,6 +72,7 @@ interface AgentState {
   pmMessages: (UserMessage | PMAgentMessage)[];
   isProcessing: boolean;
   currentAgent: string | null;
+  currentStage: string | null;
   inputRequest: InputRequest | null;
   chatMode: ChatMode;
   pmProcessing: boolean;
@@ -86,6 +87,7 @@ interface AgentState {
   
   setProcessing: (isProcessing: boolean) => void;
   setCurrentAgent: (agent: string | null) => void;
+  setCurrentStage: (stage: string | null) => void;
   setInputRequest: (request: InputRequest | null) => void;
   setChatMode: (mode: ChatMode) => void;
   setPmProcessing: (processing: boolean) => void;
@@ -100,6 +102,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   pmMessages: [],
   isProcessing: false,
   currentAgent: null,
+  currentStage: null,
   inputRequest: null,
   chatMode: 'disabled',
   pmProcessing: false,
@@ -142,6 +145,10 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   
   setCurrentAgent: (agent) => {
     set({ currentAgent: agent });
+  },
+  
+  setCurrentStage: (stage) => {
+    set({ currentStage: stage });
   },
   
   setInputRequest: (request) => {

@@ -61,6 +61,7 @@ function App() {
 		pmMessages,
 		isProcessing,
 		currentAgent,
+		currentStage,
 		inputRequest,
 		pmProcessing,
 		setInputRequest,
@@ -231,7 +232,7 @@ function App() {
 						currentAgent={currentAgent}
 						iterationTitle={currentIteration.title}
 						iterationDescription={currentIteration.description}
-						currentStage={currentIteration.current_stage}
+						currentStage={currentStage}
 						inputRequest={inputRequest}
 						userInput={userInput}
 						messagesContainerRef={messagesContainerRef as React.RefObject<HTMLDivElement>}

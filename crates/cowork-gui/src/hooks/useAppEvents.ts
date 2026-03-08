@@ -36,6 +36,7 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 		clearPMMessages,
 		setProcessing,
 		setCurrentAgent,
+		setCurrentStage,
 		setInputRequest,
 		setPmProcessing,
 		submitInput,
@@ -97,6 +98,7 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 				setProcessing(false);
 				setIsExecuting(false);
 				setCurrentAgent(null);
+				setCurrentStage(null);
 				setInputRequest(null);
 				updateCurrentIterationStatus('Completed');
 				loadProject();
@@ -113,6 +115,7 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 				setProcessing(false);
 				setIsExecuting(false);
 				setCurrentAgent(null);
+				setCurrentStage(null);
 				setInputRequest(null);
 				updateCurrentIterationStatus('Failed');
 				loadProject();
@@ -130,6 +133,7 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 				};
 
 				if (agent_name) setCurrentAgent(agent_name);
+				if (stage_name) setCurrentStage(stage_name);
 				if (!content) return;
 
 				setMessages((prev) => {
