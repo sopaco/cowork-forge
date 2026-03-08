@@ -108,7 +108,9 @@ fn load_stage_from_embedded(contents: &[u8]) -> Result<super::stage_definition::
 
 fn load_flow_from_embedded(contents: &[u8]) -> Result<super::flow_definition::FlowDefinition> {
     let content = std::str::from_utf8(contents)?;
-    let flow: super::flow_definition::FlowDefinition = serde_json::from_str(content)?;
+    let mut flow: super::flow_definition::FlowDefinition = serde_json::from_str(content)?;
+    // Mark as built-in preset
+    flow.is_builtin = true;
     Ok(flow)
 }
 

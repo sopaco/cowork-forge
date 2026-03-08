@@ -129,6 +129,8 @@ export interface FlowDefinition {
   config: FlowConfig;
   tags: string[];
   metadata: Record<string, unknown>;
+  /** Whether this is a built-in preset configuration (read-only) */
+  is_builtin?: boolean;
 }
 
 // Skill Types
@@ -228,6 +230,7 @@ export interface ConfigRegistryState {
   flows: Record<string, FlowDefinition>;
   skills: Record<string, SkillManifest>;
   integrations: Record<string, IntegrationDefinition>;
+  default_flow_id?: string;
 }
 
 // Builtin Instructions

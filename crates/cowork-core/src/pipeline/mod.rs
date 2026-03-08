@@ -93,6 +93,66 @@ pub fn get_stages_from(start_stage: &str) -> Vec<Box<dyn Stage>> {
     all.into_iter().skip(start_idx).collect()
 }
 
+/// Create a stage instance by its ID
+/// This is used by Flow configuration to dynamically create stages
+pub fn create_stage_by_id(stage_id: &str) -> Option<Box<dyn Stage>> {
+    match stage_id {
+        "idea" => Some(Box::new(stages::IdeaStage)),
+        "prd" => Some(Box::new(stages::PrdStage)),
+        "design" => Some(Box::new(stages::DesignStage)),
+        "plan" => Some(Box::new(stages::PlanStage)),
+        "coding" => Some(Box::new(stages::CodingStage)),
+        "check" => Some(Box::new(stages::CheckStage)),
+        "delivery" => Some(Box::new(stages::DeliveryStage)),
+        _ => {
+            tracing::warn!("Unknown stage ID: {}, using default stages", stage_id);
+            None
+        }
+    }
+}
+
+/// Get stages from Flow configuration
+/// Returns stages defined in the flow, starting from the specified stage
+pub fn get_stages_from_flow(start_stage: &str) -> Vec<Box<dyn Stage>> {
+    use crate::config_definition::registry::global_registry;
+    
+    // Try to get stages from default flow
+    if let Some(flow) = global_registry().get_default_flow() {
+        let stage_ids: Vec<String> = flow.stages.iter()
+            .map(|s| s.stage_id.clone())
+            .collect();
+        
+        // Find start index
+        let start_idx = stage_ids.iter().position(|s| s == start_stage).unwrap_or(0);
+        
+        // Create stages dynamically
+        let mut stages = Vec::new();
+        for stage_id in stage_ids.into_iter().skip(start_idx) {
+            if let Some(stage) = create_stage_by_id(&stage_id) {
+                stages.push(stage);
+            }
+        }
+        
+        if !stages.is_empty() {
+            return stages;
+        }
+    }
+    
+    // Fallback to hardcoded stages
+    get_stages_from(start_stage)
+}
+
+/// Get Flow configuration for execution
+/// Returns the default flow's configuration or a default configuration
+pub fn get_flow_config() -> crate::config_definition::flow_definition::FlowConfig {
+    use crate::config_definition::registry::global_registry;
+    
+    global_registry()
+        .get_default_flow()
+        .map(|f| f.config)
+        .unwrap_or_default()
+}
+
 /// Determine if a stage needs human confirmation
 pub fn is_critical_stage(stage_name: &str) -> bool {
     matches!(stage_name, "idea" | "prd" | "design" | "plan" | "coding")

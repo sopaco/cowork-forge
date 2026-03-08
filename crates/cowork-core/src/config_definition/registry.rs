@@ -8,6 +8,7 @@ use std::sync::{Arc, RwLock};
 use std::path::PathBuf;
 use std::fs;
 use anyhow::{Result, Context};
+use serde::{Serialize, Deserialize};
 
 use super::agent_definition::AgentDefinition;
 use super::stage_definition::StageDefinition;
@@ -165,9 +166,19 @@ impl ConfigRegistry {
     
     /// Set the default flow
     pub fn set_default_flow(&self, id: Option<String>) -> Result<()> {
-        let mut default_flow = self.default_flow.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-        *default_flow = id;
+        {
+            let mut default_flow = self.default_flow.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+            *default_flow = id.clone();
+        }
+        // Persist the setting
+        self.save_settings()?;
         Ok(())
+    }
+    
+    /// Get the default flow ID
+    pub fn get_default_flow_id(&self) -> Option<String> {
+        let default_flow = self.default_flow.read().ok()?;
+        default_flow.clone()
     }
     
     /// Get the default flow
@@ -175,6 +186,63 @@ impl ConfigRegistry {
         let default_flow = self.default_flow.read().ok()?;
         let flow_id = default_flow.as_ref()?;
         self.get_flow(flow_id)
+    }
+    
+    // =========================================================================
+    // Settings Persistence
+    // =========================================================================
+    
+    /// Get the settings file path
+    fn get_settings_file_path() -> Option<PathBuf> {
+        get_user_config_dir().map(|dir| dir.join("settings.json"))
+    }
+    
+    /// Save settings to persistent storage
+    pub fn save_settings(&self) -> Result<()> {
+        let settings = Settings {
+            default_flow_id: self.get_default_flow_id(),
+        };
+        
+        let config_dir = ensure_user_config_dir()?;
+        let file_path = config_dir.join("settings.json");
+        let content = serde_json::to_string_pretty(&settings)
+            .with_context(|| "Failed to serialize settings")?;
+        
+        fs::write(&file_path, content)
+            .with_context(|| format!("Failed to write settings file: {:?}", file_path))?;
+        
+        tracing::debug!("Saved settings to {:?}", file_path);
+        Ok(())
+    }
+    
+    /// Load settings from persistent storage
+    pub fn load_settings(&self) -> Result<()> {
+        if let Some(file_path) = Self::get_settings_file_path() {
+            if file_path.exists() {
+                match fs::read_to_string(&file_path)
+                    .and_then(|content| serde_json::from_str::<Settings>(&content)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+                {
+                    Ok(settings) => {
+                        if let Some(flow_id) = settings.default_flow_id {
+                            // Only set if the flow exists
+                            if self.get_flow(&flow_id).is_some() {
+                                let mut default_flow = self.default_flow.write()
+                                    .map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+                                *default_flow = Some(flow_id.clone());
+                                tracing::info!("Loaded default flow setting: {}", flow_id);
+                            } else {
+                                tracing::warn!("Default flow '{}' not found, ignoring setting", flow_id);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to load settings: {}", e);
+                    }
+                }
+            }
+        }
+        Ok(())
     }
     
     // =========================================================================
@@ -533,6 +601,11 @@ impl ConfigRegistry {
                         }
                     }
                 }
+                
+                // Load settings (after flows are loaded so we can validate default_flow_id)
+                if let Err(e) = self.load_settings() {
+                    tracing::warn!("Failed to load settings: {}", e);
+                }
             }
         }
         
@@ -558,6 +631,21 @@ pub struct LoadUserReport {
     pub flows_loaded: usize,
     pub integrations_loaded: usize,
     pub errors: Vec<String>,
+}
+
+/// Settings that persist across sessions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Settings {
+    /// Default flow ID to use for iterations
+    pub default_flow_id: Option<String>,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            default_flow_id: None,
+        }
+    }
 }
 
 // Global registry instance

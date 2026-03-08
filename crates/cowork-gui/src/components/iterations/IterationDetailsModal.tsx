@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { Modal, Badge, Progress, Tag } from "antd";
-import type { IterationInfo } from '../../types';
+import type { IterationInfo, StageDef } from '../../types';
 import { STAGES } from '../../constants';
+import { useConfigStore } from '../../stores/configStore';
 
 interface IterationDetailsModalProps {
   open: boolean;
@@ -18,9 +20,23 @@ const getStatusColor = (status: string): "success" | "processing" | "warning" | 
   }
 };
 
-const calculateProgress = (completedStages?: string[]): number => {
+const getStageColor = (stageId: string): string => {
+  const colors: Record<string, string> = {
+    idea: '#1890ff',
+    prd: '#52c41a',
+    design: '#722ed1',
+    plan: '#fa8c16',
+    coding: '#13c2c2',
+    check: '#eb2f96',
+    delivery: '#52c41a',
+  };
+  return colors[stageId] || '#666';
+};
+
+const calculateProgress = (completedStages?: string[], totalStages?: number): number => {
   if (!completedStages) return 0;
-  return Math.round((completedStages.length / STAGES.length) * 100);
+  const total = totalStages || STAGES.length;
+  return Math.round((completedStages.length / total) * 100);
 };
 
 const formatDate = (dateString?: string): string => {
@@ -37,6 +53,20 @@ const IterationDetailsModal: React.FC<IterationDetailsModalProps> = ({
   onClose,
   iteration
 }) => {
+  // Get stages from current flow configuration
+  const { flows, default_flow_id } = useConfigStore();
+  const currentStages: StageDef[] = useMemo(() => {
+    if (default_flow_id && flows[default_flow_id]) {
+      const flow = flows[default_flow_id];
+      return flow.stages.map(s => ({
+        key: s.stage_id,
+        label: s.alias || s.stage_id,
+        color: getStageColor(s.stage_id),
+      }));
+    }
+    return STAGES;
+  }, [flows, default_flow_id]);
+
   if (!iteration) return null;
 
   return (
@@ -77,13 +107,13 @@ const IterationDetailsModal: React.FC<IterationDetailsModalProps> = ({
         <div style={{ marginBottom: "16px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
             <span style={{ fontSize: "13px", fontWeight: 600 }}>Progress</span>
-            <span style={{ fontSize: "13px", color: "#666" }}>{calculateProgress(iteration.completed_stages)}%</span>
+            <span style={{ fontSize: "13px", color: "#666" }}>{calculateProgress(iteration.completed_stages, currentStages.length)}%</span>
           </div>
-          <Progress percent={calculateProgress(iteration.completed_stages)} strokeColor="#52c41a" style={{ marginBottom: "12px" }} />
+          <Progress percent={calculateProgress(iteration.completed_stages, currentStages.length)} strokeColor="#52c41a" style={{ marginBottom: "12px" }} />
           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-            {STAGES.map((stage) => {
-              const currentStageIndex = STAGES.findIndex((s) => s.key === iteration.current_stage);
-              const stageIndex = STAGES.findIndex((s) => s.key === stage.key);
+            {currentStages.map((stage) => {
+              const currentStageIndex = currentStages.findIndex((s) => s.key === iteration.current_stage);
+              const stageIndex = currentStages.findIndex((s) => s.key === stage.key);
               const isCompleted = iteration.status === "Completed"
                 ? iteration.completed_stages?.includes(stage.key)
                 : currentStageIndex >= 0 && stageIndex < currentStageIndex;

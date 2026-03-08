@@ -16,6 +16,7 @@ pub struct ConfigRegistryState {
     pub flows: HashMap<String, FlowDefinition>,
     pub skills: HashMap<String, SkillDefinition>,
     pub integrations: HashMap<String, IntegrationDefinition>,
+    pub default_flow_id: Option<String>,
 }
 
 #[tauri::command]
@@ -59,12 +60,16 @@ pub async fn gui_get_config_registry() -> Result<ConfigRegistryState, String> {
         }
     }
     
+    // Get default flow ID
+    let default_flow_id = registry.get_default_flow_id();
+    
     Ok(ConfigRegistryState {
         agents,
         stages,
         flows,
         skills,
         integrations,
+        default_flow_id,
     })
 }
 
@@ -256,6 +261,17 @@ pub async fn gui_delete_stage_config(stage_id: String) -> Result<(), String> {
 pub async fn gui_save_flow_config(flow: FlowDefinition) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
     
+    // Check if trying to modify a built-in flow
+    if let Some(existing) = registry.get_flow(&flow.id) {
+        if existing.is_builtin {
+            return Err("Cannot modify built-in flow. Create a new flow instead.".to_string());
+        }
+    }
+    
+    // Ensure user flows are not marked as builtin
+    let mut flow = flow;
+    flow.is_builtin = false;
+    
     // Register in memory
     registry.register_flow(flow.clone())
         .map_err(|e| format!("Failed to save flow: {}", e))?;
@@ -271,10 +287,35 @@ pub async fn gui_save_flow_config(flow: FlowDefinition) -> Result<(), String> {
 pub async fn gui_delete_flow_config(flow_id: String) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
     
+    // Check if trying to delete a built-in flow
+    if let Some(flow) = registry.get_flow(&flow_id) {
+        if flow.is_builtin {
+            return Err("Cannot delete built-in flow.".to_string());
+        }
+    }
+    
     // Delete from file
     registry.delete_flow_file(&flow_id)
         .map_err(|e| format!("Failed to delete flow file: {}", e))?;
     
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn gui_set_default_flow(flow_id: String) -> Result<(), String> {
+    let registry = cowork_core::config_definition::global_registry();
+    
+    // Verify the flow exists
+    if registry.get_flow(&flow_id).is_none() {
+        return Err(format!("Flow not found: {}", flow_id));
+    }
+    
+    // Set as default
+    let flow_id_clone = flow_id.clone();
+    registry.set_default_flow(Some(flow_id))
+        .map_err(|e| format!("Failed to set default flow: {}", e))?;
+    
+    tracing::info!("Set default flow to: {}", flow_id_clone);
     Ok(())
 }
 

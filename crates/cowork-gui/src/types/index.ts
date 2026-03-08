@@ -58,7 +58,7 @@ export type {
   StageRetryConfig,
   StageDefinition,
   MemoryScope,
-  InheritanceMode,
+  // InheritanceMode - already exported from iteration.ts
   InheritanceConfig,
   FlowConfig,
   StageOverrides,

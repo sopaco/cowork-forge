@@ -40,6 +40,15 @@ pub struct FlowDefinition {
     /// Metadata for extensions
     #[serde(default)]
     pub metadata: HashMap<String, serde_json::Value>,
+
+    /// Whether this is a built-in preset configuration (read-only)
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub is_builtin: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 /// Reference to a stage within a flow
@@ -195,7 +204,14 @@ impl FlowDefinition {
             config: FlowConfig::default(),
             tags: Vec::new(),
             metadata: HashMap::new(),
+            is_builtin: false,
         }
+    }
+    
+    /// Mark this flow as a built-in preset
+    pub fn as_builtin(mut self) -> Self {
+        self.is_builtin = true;
+        self
     }
 
     /// Add a stage to the flow

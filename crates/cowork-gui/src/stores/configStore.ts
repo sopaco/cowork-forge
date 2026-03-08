@@ -36,6 +36,7 @@ interface ConfigState extends ConfigRegistryState {
   deleteStage: (id: string) => Promise<void>;
   saveFlow: (flow: FlowDefinition) => Promise<void>;
   deleteFlow: (id: string) => Promise<void>;
+  setDefaultFlow: (id: string) => Promise<void>;
   installSkill: (skillPath: string) => Promise<void>;
   uninstallSkill: (id: string) => Promise<void>;
   saveIntegration: (integration: IntegrationDefinition) => Promise<void>;
@@ -60,6 +61,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   flows: {},
   skills: {},
   integrations: {},
+  default_flow_id: null,
   loading: false,
   error: null,
   selectedFlow: null,
@@ -181,6 +183,16 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       set({ flows, selectedFlow: get().selectedFlow === id ? null : get().selectedFlow });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to delete flow' });
+      throw error;
+    }
+  },
+
+  setDefaultFlow: async (id) => {
+    try {
+      await invoke('gui_set_default_flow', { flowId: id });
+      set({ default_flow_id: id });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to set default flow' });
       throw error;
     }
   },

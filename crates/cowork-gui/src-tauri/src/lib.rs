@@ -769,6 +769,7 @@ pub fn run() {
             config_commands::gui_delete_stage_config,
             config_commands::gui_save_flow_config,
             config_commands::gui_delete_flow_config,
+            config_commands::gui_set_default_flow,
             config_commands::gui_install_skill,
             config_commands::gui_uninstall_skill,
             config_commands::gui_save_integration_config,

@@ -9,7 +9,7 @@ use crate::llm::{create_llm_client, load_config};
 use crate::persistence::{IterationStore, ProjectStore};
 use adk_core::Content;
 
-use super::{PipelineContext, Stage, StageResult, get_stages_from, is_critical_stage};
+use super::{PipelineContext, Stage, StageResult, get_stages_from_flow, get_flow_config, is_critical_stage};
 
 // Re-export from stage_executor
 use super::stage_executor::{SimpleInvocationContext, extract_text_from_event};
@@ -457,8 +457,17 @@ impl IterationExecutor {
             iteration.determine_start_stage()
         };
 
-        // Get stages to execute
-        let stages = get_stages_from(&start_stage);
+        // Get stages to execute from Flow configuration
+        let stages = get_stages_from_flow(&start_stage);
+        
+        // Get Flow configuration for execution control
+        let flow_config = get_flow_config();
+        
+        // Log flow configuration being used
+        println!(
+            "[Executor] Using Flow config: stop_on_failure={}, memory_scope={:?}",
+            flow_config.stop_on_failure, flow_config.memory_scope
+        );
 
         // Start iteration
         iteration.start();
@@ -506,7 +515,7 @@ impl IterationExecutor {
         println!("[Executor] Starting stage execution loop...");
 
         // Execute stages
-        self.execute_stages_from(project, &mut iteration, stages, workspace).await
+        self.execute_stages_from(project, &mut iteration, stages, workspace, flow_config).await
     }
 
     /// Execute stages starting from a given list
@@ -517,6 +526,7 @@ impl IterationExecutor {
         iteration: &mut Iteration,
         stages: Vec<Box<dyn crate::pipeline::Stage>>,
         workspace: std::path::PathBuf,
+        flow_config: crate::config_definition::flow_definition::FlowConfig,
     ) -> anyhow::Result<()> {
         // Execute stages with retry logic
         const MAX_STAGE_RETRIES: u32 = 3;
@@ -634,8 +644,8 @@ impl IterationExecutor {
                             iteration.set_stage(&target_stage);
                             self.iteration_store.save(&iteration)?;
 
-                            // Get new stages starting from target stage
-                            let new_stages = get_stages_from(&target_stage);
+                            // Get new stages starting from target stage (from Flow configuration)
+                            let new_stages = get_stages_from_flow(&target_stage);
                             
                             self.interaction
                                 .show_message_with_context(
@@ -655,6 +665,7 @@ impl IterationExecutor {
                                 iteration,
                                 new_stages,
                                 workspace.clone(),
+                                flow_config.clone(),
                             )).await;
                         }
                         StageResult::Success(artifact_path) => {
@@ -1006,25 +1017,47 @@ impl IterationExecutor {
 
                 // If still failed after self-healing attempt
                 if !success {
-                    iteration.fail();
-                    self.iteration_store.save(&iteration)?;
+                    // Check flow configuration for stop_on_failure behavior
+                    if flow_config.stop_on_failure {
+                        // Default behavior: stop the iteration on failure
+                        iteration.fail();
+                        self.iteration_store.save(&iteration)?;
 
-                    self.interaction
-                        .show_message_with_context(
-                            crate::interaction::MessageLevel::Error,
-                            format!(
-                                "Stage '{}' failed after {} attempts: {}",
-                                stage_name, MAX_STAGE_RETRIES, error
-                            ),
-                            MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-                        )
-                        .await;
+                        self.interaction
+                            .show_message_with_context(
+                                crate::interaction::MessageLevel::Error,
+                                format!(
+                                    "Stage '{}' failed after {} attempts: {}",
+                                    stage_name, MAX_STAGE_RETRIES, error
+                                ),
+                                MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+                            )
+                            .await;
 
-                    return Err(anyhow::anyhow!(
-                        "Iteration failed at stage '{}' after {} retries",
-                        stage_name,
-                        MAX_STAGE_RETRIES
-                    ));
+                        return Err(anyhow::anyhow!(
+                            "Iteration failed at stage '{}' after {} retries",
+                            stage_name,
+                            MAX_STAGE_RETRIES
+                        ));
+                    } else {
+                        // stop_on_failure = false: Log the error and continue to next stage
+                        self.interaction
+                            .show_message_with_context(
+                                crate::interaction::MessageLevel::Warning,
+                                format!(
+                                    "Stage '{}' failed but continuing (stop_on_failure=false): {}",
+                                    stage_name, error
+                                ),
+                                MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+                            )
+                            .await;
+                        
+                        // Mark stage as completed (even though it failed) to continue
+                        iteration.complete_stage(&stage_name, None);
+                        self.iteration_store.save(&iteration)?;
+                        
+                        // Continue to next stage
+                    }
                 }
             }
         } // End of for stage in stages
