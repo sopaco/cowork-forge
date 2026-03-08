@@ -1,6 +1,7 @@
 {
   "name": "cowork-gui",
   "private": true,
+  "type": "module",
   "version": "2.5.0",
   "scripts": {
     "dev": "vite --port 15173",
