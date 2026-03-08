@@ -16,31 +16,31 @@ use crate::config_definition::{
 pub enum AdapterError {
     #[error("Connection failed: {0}")]
     ConnectionFailed(String),
-    
+
     #[error("Authentication failed: {0}")]
     AuthenticationFailed(String),
-    
+
     #[error("Request failed: {0}")]
     RequestFailed(String),
-    
+
     #[error("Timeout exceeded")]
     TimeoutExceeded,
-    
+
     #[error("Invalid response: {0}")]
     InvalidResponse(String),
-    
+
     #[error("Retry limit exceeded: {0}")]
     RetryLimitExceeded(String),
-    
+
     #[error("Configuration error: {0}")]
     ConfigurationError(String),
-    
+
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
-    
+
     #[error("HTTP error: {0}")]
     HttpError(#[from] reqwest::Error),
-    
+
     #[error("JSON error: {0}")]
     JsonError(#[from] serde_json::Error),
 }
@@ -54,15 +54,16 @@ pub trait IntegrationAdapter: Send + Sync {
         integration: &IntegrationDefinition,
         event: IntegrationEvent,
     ) -> Result<IntegrationResponse>;
-    
+
     /// Test the integration connection
     async fn test_connection(&self, integration: &IntegrationDefinition) -> Result<bool>;
-    
+
     /// Get adapter type name
     fn adapter_type(&self) -> &str;
 }
 
 /// No-op adapter for testing
+#[allow(dead_code)]
 pub struct NoOpAdapter;
 
 #[async_trait]
@@ -79,11 +80,11 @@ impl IntegrationAdapter for NoOpAdapter {
             actions: vec![],
         })
     }
-    
+
     async fn test_connection(&self, _integration: &IntegrationDefinition) -> Result<bool> {
         Ok(true)
     }
-    
+
     fn adapter_type(&self) -> &str {
         "noop"
     }

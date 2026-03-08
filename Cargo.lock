@@ -1377,7 +1377,7 @@ dependencies = [
 
 [[package]]
 name = "cowork-cli"
-version = "2.0.0"
+version = "2.5.0"
 dependencies = [
  "adk-core",
  "adk-runner",
@@ -1403,7 +1403,7 @@ dependencies = [
 
 [[package]]
 name = "cowork-core"
-version = "2.0.0"
+version = "2.5.0"
 dependencies = [
  "adk-agent",
  "adk-core",
@@ -1441,7 +1441,7 @@ dependencies = [
 
 [[package]]
 name = "cowork-gui"
-version = "2.0.0"
+version = "2.5.0"
 dependencies = [
  "adk-core",
  "adk-runner",
