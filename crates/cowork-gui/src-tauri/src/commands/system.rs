@@ -1,4 +1,3 @@
-#[cfg(target_os = "windows")]
 use std::process::Command;
 
 /// Initialize system locale at application startup
@@ -29,7 +28,10 @@ fn detect_system_locale() -> String {
     #[cfg(target_os = "macos")]
     {
         let output = Command::new("sh")
-            .args(["-c", "defaults read -g AppleLocale 2>/dev/null || echo 'en-US'"])
+            .args([
+                "-c",
+                "defaults read -g AppleLocale 2>/dev/null || echo 'en-US'",
+            ])
             .output();
 
         if let Ok(output) = output {
