@@ -164,6 +164,15 @@ impl ConfigRegistry {
         flows.keys().cloned().collect()
     }
     
+    /// Remove a flow definition from memory
+    pub fn unregister_flow(&self, id: &str) -> bool {
+        let mut flows = self.flows.write().unwrap_or_else(|e| {
+            tracing::error!("Lock error: {}", e);
+            panic!("Lock error")
+        });
+        flows.remove(id).is_some()
+    }
+    
     /// Set the default flow
     pub fn set_default_flow(&self, id: Option<String>) -> Result<()> {
         {
@@ -173,6 +182,14 @@ impl ConfigRegistry {
         // Persist the setting
         self.save_settings()?;
         Ok(())
+    }
+    
+    /// Set the default flow in memory only (without persisting to disk)
+    /// Used during initialization to set a default without overwriting user settings
+    pub fn set_default_flow_without_save(&self, id: Option<String>) {
+        if let Ok(mut default_flow) = self.default_flow.write() {
+            *default_flow = id;
+        }
     }
     
     /// Get the default flow ID
@@ -550,7 +567,7 @@ impl ConfigRegistry {
                     }
                 }
                 
-                // Load flows
+                // Load flows (skip if builtin already exists with same ID)
                 let flows_dir = config_dir.join("flows");
                 if flows_dir.exists() {
                     for entry in fs::read_dir(&flows_dir)
@@ -565,6 +582,16 @@ impl ConfigRegistry {
                         {
                             Ok(flow) => {
                                 let id = flow.id.clone();
+                                // Check if a builtin flow with this ID already exists
+                                if let Some(existing) = self.get_flow(&id) {
+                                    if existing.is_builtin {
+                                        tracing::debug!(
+                                            "Skipping user flow '{}' - builtin preset with same ID exists",
+                                            id
+                                        );
+                                        continue;
+                                    }
+                                }
                                 self.register_flow(flow)?;
                                 report.flows_loaded += 1;
                                 tracing::debug!("Loaded user flow: {} from {:?}", id, path);
@@ -605,6 +632,26 @@ impl ConfigRegistry {
                 // Load settings (after flows are loaded so we can validate default_flow_id)
                 if let Err(e) = self.load_settings() {
                     tracing::warn!("Failed to load settings: {}", e);
+                }
+                
+                // If no default flow is set and the builtin "default" flow exists, set it as default
+                // This handles the case of fresh install where settings.json doesn't exist
+                if self.get_default_flow_id().is_none() {
+                    if self.get_flow("default").is_some() {
+                        if let Err(e) = self.set_default_flow(Some("default".to_string())) {
+                            tracing::warn!("Failed to set default flow: {}", e);
+                        } else {
+                            tracing::info!("Set 'default' as the default flow (first time initialization)");
+                        }
+                    }
+                }
+            }
+        } else {
+            // Config directory doesn't exist - this is a fresh install
+            // Save the default settings if we have a default flow
+            if let Some(flow_id) = self.get_default_flow_id() {
+                if let Err(e) = self.set_default_flow(Some(flow_id)) {
+                    tracing::warn!("Failed to save initial default flow setting: {}", e);
                 }
             }
         }

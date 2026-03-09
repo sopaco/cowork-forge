@@ -294,9 +294,18 @@ pub async fn gui_delete_flow_config(flow_id: String) -> Result<(), String> {
         }
     }
     
+    // Remove from memory
+    registry.unregister_flow(&flow_id);
+    
     // Delete from file
     registry.delete_flow_file(&flow_id)
         .map_err(|e| format!("Failed to delete flow file: {}", e))?;
+    
+    // If this was the default flow, clear the default setting
+    if registry.get_default_flow_id().as_deref() == Some(&flow_id) {
+        registry.set_default_flow(None)
+            .map_err(|e| format!("Failed to clear default flow: {}", e))?;
+    }
     
     Ok(())
 }

@@ -76,6 +76,7 @@ pub struct StageOverrides {
     /// Override confirmation requirement
     pub needs_confirmation: Option<bool>,
     /// Additional hooks for this stage
+    #[serde(default)]
     pub hooks: Vec<super::stage_definition::HookConfig>,
     /// Override timeout
     pub timeout_secs: Option<u32>,

@@ -85,10 +85,14 @@ pub fn load_builtin_configs(registry: &ConfigRegistry) -> Result<LoadReport> {
         }
     }
 
-    // Set default flow
+    // Set default flow in memory (don't save to avoid overwriting user settings)
+    // The actual default will be loaded from settings in load_user_configs
     if registry.get_flow("default").is_some() {
-        registry.set_default_flow(Some("default".to_string()))?;
-        report.default_flow_set = true;
+        // Only set in memory, don't persist
+        if registry.get_default_flow_id().is_none() {
+            registry.set_default_flow_without_save(Some("default".to_string()));
+            report.default_flow_set = true;
+        }
     }
 
     Ok(report)
