@@ -1,8 +1,9 @@
 // Storage layer for .cowork-v2/iterations/{iteration_id}/ directory
 use crate::data::*;
+use crate::persistence::get_cowork_dir;
 use anyhow::{Context, Result};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 // Thread-local storage for current iteration ID
@@ -31,7 +32,8 @@ pub fn get_iteration_dir() -> Result<PathBuf> {
     let iteration_id = get_iteration_id()
         .ok_or_else(|| anyhow::anyhow!("Iteration ID not set. Call set_iteration_id() first."))?;
 
-    let path = PathBuf::from(".cowork-v2/iterations").join(&iteration_id);
+    let cowork_dir = get_cowork_dir()?;
+    let path = cowork_dir.join("iterations").join(&iteration_id);
 
     // Create iteration directory and subdirectories
     fs::create_dir_all(&path)
@@ -370,15 +372,15 @@ pub fn generate_id(prefix: &str, counter: usize) -> String {
 
 /// Check if .cowork-v2 directory exists
 pub fn cowork_dir_exists() -> bool {
-    Path::new(".cowork-v2").exists()
+    get_cowork_dir().map(|p| p.exists()).unwrap_or(false)
 }
 
 /// Check if current iteration directory exists
 pub fn iteration_dir_exists() -> bool {
     match get_iteration_id() {
-        Some(iteration_id) => Path::new(".cowork-v2/iterations")
-            .join(&iteration_id)
-            .exists(),
+        Some(iteration_id) => get_cowork_dir()
+            .map(|p| p.join("iterations").join(&iteration_id).exists())
+            .unwrap_or(false),
         None => false,
     }
 }
