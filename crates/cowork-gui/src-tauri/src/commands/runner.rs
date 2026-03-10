@@ -1,29 +1,61 @@
 use crate::gui_types::*;
 use crate::static_server;
 use crate::commands::PROJECT_RUNNER;
-use cowork_core::persistence::IterationStore;
+use crate::AppState;
 use cowork_core::RuntimeType;
 use std::path::PathBuf;
 use std::fs;
-use tauri::{Emitter, Window};
+use tauri::{Emitter, State, Window};
 
-fn get_code_directory(iteration_id: &str) -> Result<PathBuf, String> {
-    let iteration_store = IterationStore::new();
-    let workspace = iteration_store
-        .workspace_path(iteration_id)
-        .map_err(|e| e.to_string())?;
+/// Get the code directory for an iteration using the workspace path from AppState
+/// This is critical for release builds where std::env::current_dir() may return
+/// unexpected values (e.g., macOS App Bundle internal paths)
+fn get_code_directory(iteration_id: &str, workspace_path: Option<&str>) -> Result<PathBuf, String> {
+    // workspace_path MUST be set - it's set when user opens a project
+    let ws_path = workspace_path.ok_or_else(|| {
+        "No workspace path set. Please open a project first.".to_string()
+    })?;
     
-    println!("[Runner] Workspace path from store: {:?}", workspace);
+    let workspace = PathBuf::from(ws_path)
+        .join(".cowork-v2")
+        .join("iterations")
+        .join(iteration_id)
+        .join("workspace");
     
-    let project_root = std::env::current_dir().map_err(|e| e.to_string())?;
-    println!("[Runner] Current directory: {:?}", project_root);
+    eprintln!("[Runner] Using workspace path from AppState: {:?}", ws_path);
+    eprintln!("[Runner] Resolved workspace: {:?}", workspace);
     
     if workspace.exists() {
-        println!("[Runner] Using workspace path: {:?}", workspace);
+        eprintln!("[Runner] Found workspace directory: {:?}", workspace);
         Ok(workspace)
     } else {
-        println!("[Runner] Workspace not found, using current dir: {:?}", project_root);
-        Ok(project_root)
+        // List what exists for debugging
+        let cowork_dir = PathBuf::from(ws_path).join(".cowork-v2");
+        eprintln!("[Runner] .cowork-v2 exists: {}", cowork_dir.exists());
+        
+        let iterations_dir = cowork_dir.join("iterations");
+        eprintln!("[Runner] iterations dir exists: {}", iterations_dir.exists());
+        
+        if iterations_dir.exists() {
+            if let Ok(entries) = fs::read_dir(&iterations_dir) {
+                eprintln!("[Runner] Available iterations:");
+                for entry in entries.flatten() {
+                    eprintln!("[Runner]   - {:?}", entry.file_name());
+                }
+            }
+        }
+        
+        Err(format!(
+            "Workspace directory not found for iteration: {}\n\
+             Expected path: {:?}\n\
+             Workspace root: {}\n\
+             \n\
+             This may indicate:\n\
+             1. The iteration ID is incorrect\n\
+             2. The project was not properly initialized\n\
+             3. The workspace path in AppState is wrong",
+            iteration_id, workspace, ws_path
+        ))
     }
 }
 
@@ -35,13 +67,13 @@ async fn install_deps_if_needed(workspace: &std::path::Path) -> Result<(), Strin
         else if which::which("npm").is_ok() { ("npm", vec!["install"]) }
         else { return Ok(()) };
         
-        println!("[Runner] Installing dependencies with {} {:?}", cmd, args);
+        eprintln!("[Runner] Installing dependencies with {} {:?}", cmd, args);
         let out = std::process::Command::new(cmd).args(&args).current_dir(workspace).output();
         if let Ok(r) = out {
             if !r.status.success() { 
-                println!("[Runner] Install warning: {}", String::from_utf8_lossy(&r.stderr));
+                eprintln!("[Runner] Install warning: {}", String::from_utf8_lossy(&r.stderr));
             } else {
-                println!("[Runner] Dependencies installed successfully");
+                eprintln!("[Runner] Dependencies installed successfully");
             }
         }
     }
@@ -56,14 +88,14 @@ fn try_analyze(code_dir: &std::path::Path) -> Result<cowork_core::ProjectRuntime
         cowork_core::RuntimeAnalyzer::new()
     };
     
-    println!("[Runner] Attempting LLM analysis...");
+    eprintln!("[Runner] Attempting LLM analysis...");
     let result = tokio::task::block_in_place(|| {
         tauri::async_runtime::handle().block_on(async { analyzer.analyze(code_dir).await })
     });
     
     match &result {
-        Ok(config) => println!("[Runner] LLM analysis succeeded, runtime type: {:?}", config.runtime_type),
-        Err(e) => println!("[Runner] LLM analysis failed: {}", e),
+        Ok(config) => eprintln!("[Runner] LLM analysis succeeded, runtime type: {:?}", config.runtime_type),
+        Err(e) => eprintln!("[Runner] LLM analysis failed: {}", e),
     }
     
     result
@@ -115,7 +147,7 @@ fn detect_npm_start_command(dir: &std::path::Path) -> Option<String> {
                     if scripts.get(*script_name).and_then(|s| s.as_str()).is_some() {
                         let pkg_manager = if which::which("bun").is_ok() { "bun" } else { "npm" };
                         let command = format!("{} run {}", pkg_manager, script_name);
-                        println!("[Runner] Detected start command from package.json: {}", command);
+                        eprintln!("[Runner] Detected start command from package.json: {}", command);
                         return Some(command);
                     }
                 }
@@ -127,12 +159,29 @@ fn detect_npm_start_command(dir: &std::path::Path) -> Option<String> {
 }
 
 #[tauri::command]
-pub async fn start_iteration_project(iteration_id: String, window: Window) -> Result<RunInfo, String> {
-    println!("[Runner] ========== Starting project for iteration: {} ==========", iteration_id);
+pub async fn start_iteration_project(
+    iteration_id: String, 
+    window: Window,
+    state: State<'_, AppState>,
+) -> Result<RunInfo, String> {
+    eprintln!("[Runner] ========== Starting project for iteration: {} ==========", iteration_id);
+    
+    // Get workspace path from AppState (this is the reliable source)
+    let workspace_path = state.workspace_path.lock()
+        .map_err(|e| format!("Failed to get workspace path: {}", e))?
+        .clone();
+    
+    eprintln!("[Runner] Workspace path from AppState: {:?}", workspace_path);
+    
+    // workspace_path MUST be set - it's set when user opens a project
+    let ws_path = workspace_path.as_ref()
+        .ok_or_else(|| "No workspace path set. Please open a project first. If you opened a project, there may be an issue with the project registration.".to_string())?;
+    
+    eprintln!("[Runner] Using workspace path: {}", ws_path);
     
     // Check if already running
     if static_server::is_server_running(&iteration_id) {
-        println!("[Runner] Server already running for iteration: {}", iteration_id);
+        eprintln!("[Runner] Server already running for iteration: {}", iteration_id);
         // Emit event to notify frontend
         let _ = window.emit("project_started", serde_json::json!({
             "iteration_id": iteration_id,
@@ -147,7 +196,7 @@ pub async fn start_iteration_project(iteration_id: String, window: Window) -> Re
     }
     
     if static_server::is_fullstack_running(&iteration_id) {
-        println!("[Runner] Fullstack process already running for iteration: {}", iteration_id);
+        eprintln!("[Runner] Fullstack process already running for iteration: {}", iteration_id);
         let _ = window.emit("project_started", serde_json::json!({
             "iteration_id": iteration_id,
             "already_running": true
@@ -160,17 +209,21 @@ pub async fn start_iteration_project(iteration_id: String, window: Window) -> Re
         });
     }
     
-    let code_dir = get_code_directory(&iteration_id)?;
+    let code_dir = get_code_directory(&iteration_id, workspace_path.as_deref())?;
+    
+    eprintln!("[Runner] Code directory resolved: {:?}", code_dir);
     
     if !code_dir.exists() {
-        return Err(format!("Code directory does not exist: {:?}", code_dir));
+        return Err(format!("Code directory does not exist: {:?}. Please check if the iteration has completed the coding stage.", code_dir));
     }
     
-    println!("[Runner] Code directory exists, contents:");
+    eprintln!("[Runner] Code directory exists, contents:");
     if let Ok(entries) = fs::read_dir(&code_dir) {
         for entry in entries.flatten() {
-            println!("[Runner]   - {:?}", entry.file_name());
+            eprintln!("[Runner]   - {:?}", entry.file_name());
         }
+    } else {
+        eprintln!("[Runner]   (unable to read directory contents)");
     }
     
     install_deps_if_needed(&code_dir).await?;
@@ -180,17 +233,21 @@ pub async fn start_iteration_project(iteration_id: String, window: Window) -> Re
     
     // Check if it's a vanilla HTML project
     let is_vanilla_html = is_vanilla_html_project(&code_dir);
-    println!("[Runner] Is vanilla HTML: {}", is_vanilla_html);
+    eprintln!("[Runner] Is vanilla HTML: {}", is_vanilla_html);
     
     // Check for package.json
     let has_package_json = code_dir.join("package.json").exists();
-    println!("[Runner] Has package.json: {}", has_package_json);
+    eprintln!("[Runner] Has package.json: {}", has_package_json);
+    
+    // Check for index.html
+    let has_index_html = code_dir.join("index.html").exists();
+    eprintln!("[Runner] Has index.html: {}", has_index_html);
     
     if let Ok(ref config) = config_result {
-        println!("[Runner] Runtime type from LLM: {:?}", config.runtime_type);
+        eprintln!("[Runner] Runtime type from LLM: {:?}", config.runtime_type);
         
         if config.runtime_type == RuntimeType::VanillaHtml || is_vanilla_html {
-            println!("[Runner] Starting static server for HTML project");
+            eprintln!("[Runner] Starting static server for HTML project");
             let srv = static_server::start_static_server(iteration_id.clone(), code_dir.clone(), 8000, None)?;
             let url = format!("http://localhost:{}", srv.port);
             let _ = window.emit("project_started", serde_json::json!({
@@ -207,22 +264,24 @@ pub async fn start_iteration_project(iteration_id: String, window: Window) -> Re
         }
         
         if is_fullstack(&config.runtime_type) {
+            eprintln!("[Runner] Starting fullstack project");
             return start_fullstack(iteration_id, code_dir, config).await;
         }
         
         // LLM detected a specific runtime type, try to use its command
         if let Some(cmd) = get_start_command_from_config(config) {
-            println!("[Runner] Using command from LLM config: {}", cmd);
+            eprintln!("[Runner] Using command from LLM config: {}", cmd);
             let pid = PROJECT_RUNNER.start(iteration_id.clone(), cmd.clone(), code_dir.to_string_lossy().to_string(), None, None).await?;
             return Ok(RunInfo { status: RunStatus::Running, process_id: Some(pid), command: Some(cmd), ..Default::default() });
         }
     }
     
     // LLM analysis failed or didn't provide a command - try fallback detection
+    eprintln!("[Runner] LLM analysis failed or no command detected, trying fallbacks...");
     
     // Fallback 1: HTML project without package.json
-    if is_vanilla_html || has_html_files(&code_dir) {
-        println!("[Runner] Fallback: starting static server for HTML files");
+    if is_vanilla_html {
+        eprintln!("[Runner] Fallback 1: vanilla HTML detected, starting static server");
         let srv = static_server::start_static_server(iteration_id.clone(), code_dir.clone(), 8000, None)?;
         let url = format!("http://localhost:{}", srv.port);
         let _ = window.emit("project_started", serde_json::json!({
@@ -238,10 +297,29 @@ pub async fn start_iteration_project(iteration_id: String, window: Window) -> Re
         });
     }
     
-    // Fallback 2: Node.js project with package.json
+    // Fallback 2: Has HTML files
+    if has_html_files(&code_dir) {
+        eprintln!("[Runner] Fallback 2: HTML files found, starting static server");
+        let srv = static_server::start_static_server(iteration_id.clone(), code_dir.clone(), 8000, None)?;
+        let url = format!("http://localhost:{}", srv.port);
+        let _ = window.emit("project_started", serde_json::json!({
+            "iteration_id": iteration_id,
+            "port": srv.port,
+            "url": url
+        }));
+        return Ok(RunInfo { 
+            status: RunStatus::Running, 
+            process_id: None, 
+            command: Some(format!("Static server on port {}", srv.port)), 
+            ..Default::default() 
+        });
+    }
+    
+    // Fallback 3: Node.js project with package.json
     if has_package_json {
+        eprintln!("[Runner] Fallback 3: package.json found, trying npm/bun start");
         if let Some(cmd) = detect_npm_start_command(&code_dir) {
-            println!("[Runner] Fallback: using npm script: {}", cmd);
+            eprintln!("[Runner] Fallback: using npm script: {}", cmd);
             let pid = PROJECT_RUNNER.start(iteration_id.clone(), cmd.clone(), code_dir.to_string_lossy().to_string(), None, None).await?;
             return Ok(RunInfo { status: RunStatus::Running, process_id: Some(pid), command: Some(cmd), ..Default::default() });
         }
@@ -249,7 +327,7 @@ pub async fn start_iteration_project(iteration_id: String, window: Window) -> Re
         // No start script but has package.json - try common defaults
         let pkg_manager = if which::which("bun").is_ok() { "bun" } else { "npm" };
         let default_cmd = format!("{} run dev", pkg_manager);
-        println!("[Runner] Fallback: trying default command: {}", default_cmd);
+        eprintln!("[Runner] Fallback: trying default command: {}", default_cmd);
         
         // Check if dev script exists, otherwise try start
         if let Ok(content) = fs::read_to_string(code_dir.join("package.json")) {
@@ -268,21 +346,29 @@ pub async fn start_iteration_project(iteration_id: String, window: Window) -> Re
         }
     }
     
-    // Fallback 3: Cargo.toml (Rust project)
+    // Fallback 4: Cargo.toml (Rust project)
     if code_dir.join("Cargo.toml").exists() {
+        eprintln!("[Runner] Fallback 4: Cargo.toml found, using cargo run");
         let cmd = "cargo run".to_string();
-        println!("[Runner] Fallback: detected Rust project, using: {}", cmd);
         let pid = PROJECT_RUNNER.start(iteration_id.clone(), cmd.clone(), code_dir.to_string_lossy().to_string(), None, None).await?;
         return Ok(RunInfo { status: RunStatus::Running, process_id: Some(pid), command: Some(cmd), ..Default::default() });
     }
 
+    eprintln!("[Runner] No suitable runtime detected for project at: {:?}", code_dir);
     Err(format!(
-        "Cannot start project. Please check:\n\
-         1. For Node.js projects: ensure package.json has 'dev' or 'start' script\n\
-         2. For Rust projects: ensure Cargo.toml exists\n\
-         3. For static HTML: use Preview button instead\n\
-         \nProject directory: {:?}",
-        code_dir
+        "Cannot start project. The project type could not be detected.\n\
+         Project directory: {:?}\n\
+         Contents: {}\n\
+         \nPlease ensure your project has one of:\n\
+         - index.html (for static HTML projects)\n\
+         - package.json with 'dev' or 'start' script (for Node.js projects)\n\
+         - Cargo.toml (for Rust projects)",
+        code_dir,
+        if let Ok(entries) = fs::read_dir(&code_dir) {
+            entries.filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().to_string()).collect::<Vec<_>>().join(", ")
+        } else {
+            "(unable to read)".to_string()
+        }
     ))
 }
 

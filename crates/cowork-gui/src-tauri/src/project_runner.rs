@@ -66,6 +66,23 @@ impl ProjectRunner {
             return Err(format!("Code directory not found: {}", code_dir));
         }
 
+        // Debug: Print PATH and check commands
+        let path_env = std::env::var("PATH").unwrap_or_else(|_| "PATH not found".to_string());
+        println!("[Runner] PATH = {}", path_env);
+        
+        // Check if bun or sh exists
+        println!("[Runner] Checking commands...");
+        if std::process::Command::new("which").arg("bun").output().map(|o| o.status.success()).unwrap_or(false) {
+            println!("[Runner] bun found");
+        } else {
+            println!("[Runner] bun NOT found");
+        }
+        if std::process::Command::new("which").arg("sh").output().map(|o| o.status.success()).unwrap_or(false) {
+            println!("[Runner] sh found");
+        } else {
+            println!("[Runner] sh NOT found");
+        }
+
         println!("[Runner] Starting command: {} in {}", command, code_dir);
 
         #[cfg(target_os = "windows")]
@@ -81,13 +98,22 @@ impl ProjectRunner {
         };
 
         #[cfg(not(target_os = "windows"))]
-        let mut child = tokio::process::Command::new("sh")
-            .args(["-c", &command])
-            .current_dir(&code_path)
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("Failed to start: {}", e))?;
+        let mut child = {
+            // Set PATH to include common locations - critical for macOS app bundle
+            let path = std::env::var("PATH").unwrap_or_else(|_| {
+                // Default PATH for macOS
+                "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin".to_string()
+            });
+            
+            tokio::process::Command::new("sh")
+                .args(["-c", &command])
+                .current_dir(&code_path)
+                .env("PATH", path)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .map_err(|e| format!("Failed to start: {}", e))?
+        };
 
         let pid = child.id().unwrap();
 

@@ -1,18 +1,35 @@
 use crate::gui_types::*;
 use crate::static_server;
 use crate::commands::PROJECT_RUNNER;
-use cowork_core::persistence::IterationStore;
+use crate::AppState;
 use std::path::PathBuf;
+use tauri::State;
 
-fn get_code_directory(iteration_id: &str) -> Result<PathBuf, String> {
-    let iteration_store = IterationStore::new();
-    let workspace = iteration_store
-        .workspace_path(iteration_id)
-        .map_err(|e| e.to_string())?;
-
-    let project_root = std::env::current_dir().map_err(|e| e.to_string())?;
-
-    if workspace.exists() { Ok(workspace) } else { Ok(project_root) }
+/// Get the code directory for an iteration using the workspace path from AppState
+fn get_code_directory(iteration_id: &str, workspace_path: Option<&str>) -> Result<PathBuf, String> {
+    // workspace_path MUST be set - it's set when user opens a project
+    let ws_path = workspace_path.ok_or_else(|| {
+        "No workspace path set. Please open a project first.".to_string()
+    })?;
+    
+    let workspace = PathBuf::from(ws_path)
+        .join(".cowork-v2")
+        .join("iterations")
+        .join(iteration_id)
+        .join("workspace");
+    
+    println!("[Preview] Using workspace path from AppState: {:?}", ws_path);
+    println!("[Preview] Resolved workspace: {:?}", workspace);
+    
+    if workspace.exists() {
+        Ok(workspace)
+    } else {
+        Err(format!(
+            "Workspace directory not found for iteration: {}\n\
+             Expected path: {:?}",
+            iteration_id, workspace
+        ))
+    }
 }
 
 async fn install_dependencies_if_needed(workspace: &std::path::Path) -> Result<(), String> {
@@ -88,9 +105,18 @@ fn has_html_files(dir: &std::path::Path) -> bool {
 }
 
 #[tauri::command]
-pub async fn start_iteration_preview(iteration_id: String) -> Result<PreviewInfo, String> {
+pub async fn start_iteration_preview(
+    iteration_id: String,
+    state: State<'_, AppState>,
+) -> Result<PreviewInfo, String> {
     println!("[Preview] Starting preview for iteration: {}", iteration_id);
-    let code_dir = get_code_directory(&iteration_id)?;
+    
+    // Get workspace path from AppState
+    let workspace_path = state.workspace_path.lock()
+        .map_err(|e| format!("Failed to get workspace path: {}", e))?
+        .clone();
+    
+    let code_dir = get_code_directory(&iteration_id, workspace_path.as_deref())?;
     println!("[Preview] Code directory: {:?}", code_dir);
     
     if !code_dir.exists() {
@@ -182,8 +208,16 @@ pub async fn check_preview_status(iteration_id: String) -> Result<Option<Preview
 }
 
 #[tauri::command]
-pub async fn get_project_runtime_info(iteration_id: String) -> Result<ProjectRuntimeInfo, String> {
-    let code_dir = get_code_directory(&iteration_id)?;
+pub async fn get_project_runtime_info(
+    iteration_id: String,
+    state: State<'_, AppState>,
+) -> Result<ProjectRuntimeInfo, String> {
+    // Get workspace path from AppState
+    let workspace_path = state.workspace_path.lock()
+        .map_err(|e| format!("Failed to get workspace path: {}", e))?
+        .clone();
+    
+    let code_dir = get_code_directory(&iteration_id, workspace_path.as_deref())?;
     let config_result = try_analyze_runtime(&code_dir);
     let is_vanilla_html = is_vanilla_html_project(&code_dir);
 
