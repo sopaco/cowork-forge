@@ -79,7 +79,7 @@ function App() {
 	// Custom hooks
 	useAppEvents(userInput, setUserInput);
 	const { handlePMSendMessage, handlePMAction } = usePMAgent();
-	const { handleSelectIteration, handleExecuteIteration, handleOpenProjectFolder, handleCommandSelect } = useIterationActions();
+	const { handleSelectIteration, handleExecuteIteration, handleOpenProjectFolder, handleOpenIterationFolder, handleCommandSelect } = useIterationActions();
 	const {
 		inputRequest: chatInputRequest,
 		handleSendUserMessage,
@@ -343,8 +343,13 @@ function App() {
 							<span style={{ marginRight: '16px', cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
 								Project: <strong>{project.name}</strong>
 							</span>
-							<span>
+							<span
+								style={{ cursor: currentIteration ? 'pointer' : 'default' }}
+								onClick={() => currentIteration && handleOpenIterationFolder(currentIteration.id)}
+								title={currentIteration ? `Click to open iteration folder: ${currentIteration.id}` : undefined}
+							>
 								Iterations: <strong>{iterations.length}</strong>
+								{currentIteration && <span style={{ marginLeft: '4px', color: '#1890ff' }}>(#{currentIteration.number})</span>}
 							</span>
 						</>
 					) : (

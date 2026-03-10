@@ -86,6 +86,60 @@ impl Iteration {
         self.status = IterationStatus::Completed;
         self.completed_at = Some(Utc::now());
         self.current_stage = None;
+        
+        // Ensure we capture all stages that were executed
+        // This handles cases where the flow configuration changed during execution
+        // or stages were skipped due to inheritance mode
+        self.finalize_completed_stages();
+    }
+    
+    /// Finalize completed_stages based on the flow configuration
+    /// This ensures progress displays correctly even when flow config changes
+    fn finalize_completed_stages(&mut self) {
+        // Get stages from the default flow configuration
+        let flow_stages = self.get_flow_stages();
+        
+        // For stages that have artifacts, ensure they're in completed_stages
+        let artifact_stages = [
+            ("idea", &self.artifacts.idea),
+            ("prd", &self.artifacts.prd),
+            ("design", &self.artifacts.design),
+            ("plan", &self.artifacts.plan),
+            ("coding", &self.artifacts.coding),
+            ("delivery", &self.artifacts.delivery),
+        ];
+        
+        for (stage_name, artifact) in artifact_stages {
+            if artifact.is_some() && !self.completed_stages.contains(&stage_name.to_string()) {
+                self.completed_stages.push(stage_name.to_string());
+            }
+        }
+        
+        // If no stages were recorded but we have a flow, mark all flow stages as complete
+        // This handles the case where the iteration was completed but stages weren't tracked
+        if self.completed_stages.is_empty() && !flow_stages.is_empty() {
+            self.completed_stages = flow_stages;
+        }
+    }
+    
+    /// Get the list of stages from the default flow configuration
+    fn get_flow_stages(&self) -> Vec<String> {
+        use crate::config_definition::registry::global_registry;
+        
+        if let Some(flow) = global_registry().get_default_flow() {
+            flow.stages.iter().map(|s| s.stage_id.clone()).collect()
+        } else {
+            // Default stages
+            vec![
+                "idea".to_string(),
+                "prd".to_string(),
+                "design".to_string(),
+                "plan".to_string(),
+                "coding".to_string(),
+                "check".to_string(),
+                "delivery".to_string(),
+            ]
+        }
     }
 
     pub fn fail(&mut self) {

@@ -68,6 +68,17 @@ export function useIterationActions() {
 	}, [message]);
 
 	/**
+	 * Handle opening iteration folder
+	 */
+	const handleOpenIterationFolder = useCallback(async (iterationId: string) => {
+		try {
+			await API.util.openInFileManager(iterationId);
+		} catch (error) {
+			message.error('Failed to open iteration folder: ' + error);
+		}
+	}, [message]);
+
+	/**
 	 * Handle command palette selection
 	 */
 	const handleCommandSelect = useCallback(
@@ -93,6 +104,7 @@ export function useIterationActions() {
 		handleSelectIteration,
 		handleExecuteIteration,
 		handleOpenProjectFolder,
+		handleOpenIterationFolder,
 		handleCommandSelect
 	};
 }

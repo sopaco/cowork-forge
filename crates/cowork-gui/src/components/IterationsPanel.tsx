@@ -77,7 +77,9 @@ const getStageColor = (stageId: string): string => {
   return colors[stageId] || '#666';
 };
 
-const calculateProgress = (completedStages?: string[], totalStages?: number): number => {
+const calculateProgress = (completedStages?: string[], totalStages?: number, status?: string): number => {
+  // For completed iterations, always show 100%
+  if (status === "Completed") return 100;
   if (!completedStages) return 0;
   const total = totalStages || STAGES.length;
   return Math.round((completedStages.length / total) * 100);
@@ -299,9 +301,9 @@ const IterationsPanel: React.FC<IterationsPanelProps> = ({
                   <div style={{ marginTop: "12px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
                       <span style={{ fontSize: "12px", color: "#888" }}>Progress</span>
-                      <span style={{ fontSize: "12px", color: "#888" }}>{calculateProgress(iteration.completed_stages, currentStages.length)}%</span>
+                      <span style={{ fontSize: "12px", color: "#888" }}>{calculateProgress(iteration.completed_stages, currentStages.length, iteration.status)}%</span>
                     </div>
-                    <Progress percent={calculateProgress(iteration.completed_stages, currentStages.length)} status={iteration.status === "Failed" ? "exception" : "active"} />
+                    <Progress percent={calculateProgress(iteration.completed_stages, currentStages.length, iteration.status)} status={iteration.status === "Failed" ? "exception" : iteration.status === "Completed" ? "success" : "active"} />
                   </div>
 
                   {iteration.current_stage && (
@@ -314,9 +316,11 @@ const IterationsPanel: React.FC<IterationsPanelProps> = ({
                     {currentStages.map((stage) => {
                       const currentStageIndex = currentStages.findIndex((s) => s.key === iteration.current_stage);
                       const stageIndex = currentStages.findIndex((s) => s.key === stage.key);
+                      // For completed iterations, all stages should show as completed
+                      // regardless of the completed_stages array content
                       const isCompleted = iteration.status === "Completed"
-                        ? iteration.completed_stages?.includes(stage.key)
-                        : currentStageIndex >= 0 && stageIndex < currentStageIndex;
+                        ? true
+                        : iteration.completed_stages?.includes(stage.key) ?? (currentStageIndex >= 0 && stageIndex < currentStageIndex);
                       const isCurrent = iteration.current_stage === stage.key;
 
                       return (
