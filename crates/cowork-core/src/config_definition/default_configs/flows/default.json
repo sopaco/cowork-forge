@@ -1,0 +1,65 @@
+{
+  "id": "default",
+  "name": "Default Development Flow",
+  "description": "Standard 7-stage software development workflow matching V2 behavior",
+  "version": "1.0.0",
+  "stages": [
+    {
+      "stage_id": "idea",
+      "alias": null,
+      "overrides": {},
+      "on_success": "prd"
+    },
+    {
+      "stage_id": "prd",
+      "alias": null,
+      "overrides": {},
+      "on_success": "design"
+    },
+    {
+      "stage_id": "design",
+      "alias": null,
+      "overrides": {},
+      "on_success": "plan"
+    },
+    {
+      "stage_id": "plan",
+      "alias": null,
+      "overrides": {},
+      "on_success": "coding"
+    },
+    {
+      "stage_id": "coding",
+      "alias": null,
+      "overrides": {},
+      "on_success": "check"
+    },
+    {
+      "stage_id": "check",
+      "alias": null,
+      "overrides": {},
+      "on_success": "delivery"
+    },
+    {
+      "stage_id": "delivery",
+      "alias": null,
+      "overrides": {}
+    }
+  ],
+  "start_stage": "idea",
+  "global_hooks": [],
+  "config": {
+    "stop_on_failure": true,
+    "save_state_on_interrupt": true,
+    "memory_scope": "merged",
+    "inheritance": {
+      "default_mode": "partial",
+      "stage_mapping": {
+        "none": "idea",
+        "partial": "plan",
+        "full": "idea"
+      }
+    }
+  },
+  "tags": ["built-in", "default"]
+}

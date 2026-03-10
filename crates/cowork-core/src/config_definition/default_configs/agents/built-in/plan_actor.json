@@ -1,0 +1,51 @@
+{
+  "id": "plan_actor",
+  "name": "Plan Actor",
+  "description": "Generates implementation plan with detailed tasks",
+  "version": "1.0.0",
+  "agent_type": "simple",
+  "instruction": "builtin://plan_actor",
+  "tools": [
+    {
+      "tool_id": "load_feedback_history"
+    },
+    {
+      "tool_id": "get_requirements"
+    },
+    {
+      "tool_id": "get_design"
+    },
+    {
+      "tool_id": "load_design_doc"
+    },
+    {
+      "tool_id": "create_task"
+    },
+    {
+      "tool_id": "add_component"
+    },
+    {
+      "tool_id": "get_implementation_plan"
+    },
+    {
+      "tool_id": "save_plan_doc"
+    },
+    {
+      "tool_id": "query_memory"
+    },
+    {
+      "tool_id": "save_insight"
+    },
+    {
+      "tool_id": "save_issue"
+    },
+    {
+      "tool_id": "save_learning"
+    }
+  ],
+  "model": {
+    "temperature": 0.7
+  },
+  "include_contents": "none",
+  "tags": ["built-in", "planning", "actor"]
+}

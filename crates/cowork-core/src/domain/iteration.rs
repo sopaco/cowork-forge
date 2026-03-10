@@ -86,6 +86,60 @@ impl Iteration {
         self.status = IterationStatus::Completed;
         self.completed_at = Some(Utc::now());
         self.current_stage = None;
+        
+        // Ensure we capture all stages that were executed
+        // This handles cases where the flow configuration changed during execution
+        // or stages were skipped due to inheritance mode
+        self.finalize_completed_stages();
+    }
+    
+    /// Finalize completed_stages based on the flow configuration
+    /// This ensures progress displays correctly even when flow config changes
+    fn finalize_completed_stages(&mut self) {
+        // Get stages from the default flow configuration
+        let flow_stages = self.get_flow_stages();
+        
+        // For stages that have artifacts, ensure they're in completed_stages
+        let artifact_stages = [
+            ("idea", &self.artifacts.idea),
+            ("prd", &self.artifacts.prd),
+            ("design", &self.artifacts.design),
+            ("plan", &self.artifacts.plan),
+            ("coding", &self.artifacts.coding),
+            ("delivery", &self.artifacts.delivery),
+        ];
+        
+        for (stage_name, artifact) in artifact_stages {
+            if artifact.is_some() && !self.completed_stages.contains(&stage_name.to_string()) {
+                self.completed_stages.push(stage_name.to_string());
+            }
+        }
+        
+        // If no stages were recorded but we have a flow, mark all flow stages as complete
+        // This handles the case where the iteration was completed but stages weren't tracked
+        if self.completed_stages.is_empty() && !flow_stages.is_empty() {
+            self.completed_stages = flow_stages;
+        }
+    }
+    
+    /// Get the list of stages from the default flow configuration
+    fn get_flow_stages(&self) -> Vec<String> {
+        use crate::config_definition::registry::global_registry;
+        
+        if let Some(flow) = global_registry().get_default_flow() {
+            flow.stages.iter().map(|s| s.stage_id.clone()).collect()
+        } else {
+            // Default stages
+            vec![
+                "idea".to_string(),
+                "prd".to_string(),
+                "design".to_string(),
+                "plan".to_string(),
+                "coding".to_string(),
+                "check".to_string(),
+                "delivery".to_string(),
+            ]
+        }
     }
 
     pub fn fail(&mut self) {
@@ -116,18 +170,51 @@ impl Iteration {
     }
 
     /// Determine the starting stage based on inheritance mode
+    /// Uses Flow configuration's stage_mapping if provided, otherwise falls back to defaults
     pub fn determine_start_stage(&self) -> String {
-        match self.inheritance {
-            InheritanceMode::None => "idea".to_string(),
+        // Try to get stage mapping from default flow configuration
+        let stage_mapping = self.get_stage_mapping_from_flow();
+        
+        let mode_key = match self.inheritance {
+            InheritanceMode::None => "none",
             InheritanceMode::Full => {
-                // Full inheritance: artifacts are copied, so we can start based on change scope
-                analyze_change_scope(&self.description)
+                // Full inheritance: use smart analysis to determine scope
+                // But respect stage_mapping as the final decision
+                let analyzed = analyze_change_scope(&self.description);
+                // If stage_mapping has an entry for "full", use it; otherwise use analyzed result
+                if stage_mapping.contains_key("full") {
+                    "full"
+                } else {
+                    return analyzed;
+                }
             }
-            InheritanceMode::Partial => {
-                // Partial inheritance: artifacts are NOT copied, must regenerate from idea
-                // This ensures all necessary artifacts (idea.md, prd.md, design.md, plan.md) exist
-                "idea".to_string()
-            }
+            InheritanceMode::Partial => "partial",
+        };
+        
+        // Get stage from mapping, or use smart defaults
+        stage_mapping
+            .get(mode_key)
+            .cloned()
+            .unwrap_or_else(|| match self.inheritance {
+                InheritanceMode::None => "idea".to_string(),
+                InheritanceMode::Full => analyze_change_scope(&self.description),
+                InheritanceMode::Partial => "plan".to_string(),
+            })
+    }
+    
+    /// Get stage mapping from default flow configuration
+    fn get_stage_mapping_from_flow(&self) -> std::collections::HashMap<String, String> {
+        use crate::config_definition::registry::global_registry;
+        
+        if let Some(flow) = global_registry().get_default_flow() {
+            flow.config.inheritance.stage_mapping
+        } else {
+            // Default mapping
+            let mut mapping = std::collections::HashMap::new();
+            mapping.insert("none".to_string(), "idea".to_string());
+            mapping.insert("partial".to_string(), "plan".to_string());
+            mapping.insert("full".to_string(), "idea".to_string());
+            mapping
         }
     }
 

@@ -1,0 +1,54 @@
+{
+  "id": "coding_actor",
+  "name": "Coding Actor",
+  "description": "Implements the code based on the implementation plan",
+  "version": "1.0.0",
+  "agent_type": "simple",
+  "instruction": "builtin://coding_actor",
+  "tools": [
+    {
+      "tool_id": "load_feedback_history"
+    },
+    {
+      "tool_id": "get_implementation_plan"
+    },
+    {
+      "tool_id": "update_task_status"
+    },
+    {
+      "tool_id": "read_file"
+    },
+    {
+      "tool_id": "write_file"
+    },
+    {
+      "tool_id": "list_files"
+    },
+    {
+      "tool_id": "run_command"
+    },
+    {
+      "tool_id": "read_file_truncated"
+    },
+    {
+      "tool_id": "goto_stage"
+    },
+    {
+      "tool_id": "query_memory"
+    },
+    {
+      "tool_id": "save_insight"
+    },
+    {
+      "tool_id": "save_issue"
+    },
+    {
+      "tool_id": "save_learning"
+    }
+  ],
+  "model": {
+    "temperature": 0.7
+  },
+  "include_contents": "none",
+  "tags": ["built-in", "coding", "actor"]
+}

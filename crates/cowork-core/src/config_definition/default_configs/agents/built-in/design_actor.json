@@ -1,0 +1,45 @@
+{
+  "id": "design_actor",
+  "name": "Design Actor",
+  "description": "Generates system design specification based on requirements",
+  "version": "1.0.0",
+  "agent_type": "simple",
+  "instruction": "builtin://design_actor",
+  "tools": [
+    {
+      "tool_id": "load_feedback_history"
+    },
+    {
+      "tool_id": "get_requirements"
+    },
+    {
+      "tool_id": "get_design"
+    },
+    {
+      "tool_id": "load_prd_doc"
+    },
+    {
+      "tool_id": "create_design_component"
+    },
+    {
+      "tool_id": "save_design_doc"
+    },
+    {
+      "tool_id": "query_memory"
+    },
+    {
+      "tool_id": "save_insight"
+    },
+    {
+      "tool_id": "save_issue"
+    },
+    {
+      "tool_id": "save_learning"
+    }
+  ],
+  "model": {
+    "temperature": 0.7
+  },
+  "include_contents": "none",
+  "tags": ["built-in", "design", "actor"]
+}

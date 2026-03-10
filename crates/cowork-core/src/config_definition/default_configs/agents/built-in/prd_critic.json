@@ -1,0 +1,30 @@
+{
+  "id": "prd_critic",
+  "name": "PRD Critic",
+  "description": "Reviews and validates the Product Requirements Document",
+  "version": "1.0.0",
+  "agent_type": "simple",
+  "instruction": "builtin://prd_critic",
+  "tools": [
+    {
+      "tool_id": "get_requirements"
+    },
+    {
+      "tool_id": "load_idea"
+    },
+    {
+      "tool_id": "provide_feedback"
+    },
+    {
+      "tool_id": "query_memory"
+    },
+    {
+      "tool_id": "save_issue"
+    }
+  ],
+  "model": {
+    "temperature": 0.3
+  },
+  "include_contents": "none",
+  "tags": ["built-in", "requirements", "critic"]
+}

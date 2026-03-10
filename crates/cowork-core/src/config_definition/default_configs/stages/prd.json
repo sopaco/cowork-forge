@@ -1,0 +1,31 @@
+{
+  "id": "prd",
+  "name": "PRD Stage",
+  "description": "Generates Product Requirements Document with Actor-Critic validation",
+  "stage_type": "actor_critic",
+  "actor_critic": {
+    "actor": "prd_actor",
+    "critic": "prd_critic",
+    "max_iterations": 1
+  },
+  "needs_confirmation": true,
+  "artifacts": [
+    {
+      "path": "artifacts/prd.md",
+      "required": true,
+      "description": "The Product Requirements Document"
+    },
+    {
+      "path": "data/requirements.json",
+      "required": true,
+      "description": "Structured requirements data"
+    },
+    {
+      "path": "data/feature_list.json",
+      "required": false,
+      "description": "Feature list derived from requirements"
+    }
+  ],
+  "hooks": [],
+  "tags": ["built-in", "requirements"]
+}

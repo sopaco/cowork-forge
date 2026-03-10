@@ -1,5 +1,5 @@
 //! ACP (Agent Client Protocol) Client Implementation
-//! 
+//!
 //! This module uses the official agent-client-protocol SDK to connect to external
 //! coding agents like OpenCode, Claude Code, Gemini CLI, etc.
 //!
@@ -166,10 +166,10 @@ impl AcpTaskResult {
 }
 
 /// Execute a task using an external agent via ACP
-/// 
+///
 /// This function runs the ACP client in a dedicated thread with its own
 /// tokio runtime and LocalSet, communicating results via channels.
-/// 
+///
 /// Returns a receiver for real-time agent messages.
 pub fn execute_with_external_agent(
     config: CodingAgentConfig,
@@ -253,7 +253,7 @@ fn run_acp_in_thread(
 
         local_set.run_until(async move {
             let (conn, handle_io) = acp::ClientSideConnection::new(
-                CoworkClient { 
+                CoworkClient {
                     output: output_clone,
                     message_tx,
                 },
@@ -274,7 +274,7 @@ fn run_acp_in_thread(
                 acp::InitializeRequest::new(acp::ProtocolVersion::V1)
                     .client_info(acp::Implementation::new(
                         "cowork-forge".to_string(),
-                        "2.0.0".to_string(),
+                        "2.5.0".to_string(),
                     ).title("Cowork Forge".to_string()))
             )
             .await
@@ -292,7 +292,7 @@ fn run_acp_in_thread(
 
             // Send prompt
             eprintln!("DEBUG: Sending prompt to agent...");
-            
+
             let result = conn
                 .prompt(acp::PromptRequest::new(
                     session_response.session_id,

@@ -310,7 +310,7 @@ async fn set_workspace(
 ) -> Result<(), String> {
     use std::path::Path;
 
-    println!("[GUI] Setting workspace to: {}", workspace_path);
+    eprintln!("[GUI] Setting workspace to: {}", workspace_path);
 
     let path = Path::new(&workspace_path);
     if !path.exists() {
@@ -331,6 +331,11 @@ async fn set_workspace(
         return Err("This window already has a project opened. Please open a new window to work on another project.".to_string());
     }
     drop(workspace);
+
+    // Set the global workspace path in cowork-core
+    // This is critical for macOS app bundle launches where current_dir() returns unexpected values
+    cowork_core::persistence::set_workspace_path(path.to_path_buf());
+    eprintln!("[GUI] Set global workspace path in cowork-core: {:?}", path);
 
     // Change current directory
     std::env::set_current_dir(path)
@@ -480,13 +485,18 @@ async fn open_project_in_current_window(
     drop(registry);
 
     // Log for debugging
-    println!("[GUI] Project opened in current window: {}", workspace_path);
+    eprintln!("[GUI] Project opened in current window: {}", workspace_path);
 
     // Set workspace in current window
     let path = Path::new(&workspace_path);
     if !path.exists() {
         return Err(format!("Project path does not exist: {}", workspace_path));
     }
+
+    // Set the global workspace path in cowork-core
+    // This is critical for macOS app bundle launches where current_dir() returns unexpected values
+    cowork_core::persistence::set_workspace_path(path.to_path_buf());
+    eprintln!("[GUI] Set global workspace path in cowork-core: {:?}", path);
 
     std::env::set_current_dir(path)
         .map_err(|e| format!("Failed to set current directory: {}", e))?;
@@ -632,6 +642,16 @@ pub fn run() {
         .setup(move |app| {
             // Initialize app handle for project runner
             init_app_handle(app.handle().clone());
+            
+            // Initialize system locale at startup
+            system::init_system_locale();
+            
+            // Initialize V3 config registry with built-in configurations
+            if let Err(e) = cowork_core::config_definition::initialize_config_registry() {
+                eprintln!("[GUI] Failed to initialize config registry: {}", e);
+            } else {
+                println!("[GUI] Config registry initialized successfully");
+            }
 
             // Initialize tool notification callback
             let app_handle = app.handle().clone();
@@ -659,10 +679,15 @@ pub fn run() {
                 use std::path::Path;
                 let path = Path::new(&workspace);
                 if path.exists() && path.is_dir() {
+                    // Set the global workspace path in cowork-core
+                    // This is critical for macOS app bundle launches where current_dir() returns unexpected values
+                    cowork_core::persistence::set_workspace_path(path.to_path_buf());
+                    eprintln!("[GUI] Set global workspace path in cowork-core: {:?}", path);
+                    
                     if let Err(e) = std::env::set_current_dir(path) {
                         eprintln!("[GUI] Failed to set workspace directory: {}", e);
                     } else {
-                        println!("[GUI] Working directory set to: {}", workspace);
+                        eprintln!("[GUI] Working directory set to: {}", workspace);
                         // Store in app state
                         if let Some(state) = app.try_state::<AppState>() {
                             if let Ok(mut ws) = state.workspace_path.lock() {
@@ -717,6 +742,7 @@ pub fn run() {
             memory::save_session_memory,
             memory::promote_to_project_memory,
             memory::get_memory_context,
+            memory::get_available_stages,
             // Template commands
             template::get_templates,
             template::export_template,
@@ -749,6 +775,25 @@ pub fn run() {
             config_commands::open_config_folder,
             config_commands::test_llm_connection,
             config_commands::has_valid_config,
+            // V3 Config commands
+            config_commands::gui_get_config_registry,
+            config_commands::gui_reset_config_registry,
+            config_commands::gui_save_agent_config,
+            config_commands::gui_delete_agent_config,
+            config_commands::gui_save_stage_config,
+            config_commands::gui_delete_stage_config,
+            config_commands::gui_save_flow_config,
+            config_commands::gui_delete_flow_config,
+            config_commands::gui_set_default_flow,
+            config_commands::gui_install_skill,
+            config_commands::gui_uninstall_skill,
+            config_commands::gui_save_integration_config,
+            config_commands::gui_delete_integration_config,
+            config_commands::gui_validate_agent_config,
+            config_commands::gui_validate_flow_config,
+            config_commands::gui_export_config,
+            config_commands::gui_import_config,
+            config_commands::gui_get_builtin_instructions,
             // Project creation commands
             path_exists,
             create_project_at_path,

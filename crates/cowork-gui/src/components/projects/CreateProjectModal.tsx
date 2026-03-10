@@ -109,15 +109,13 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
     setLoading(true);
     try {
-      const request: CreateProjectRequest = {
-        path: projectPath,
-        name: projectName,
-        description: projectDescription || null,
-      };
-
       const result = await invoke<CreateProjectResponse>(
         "create_project_at_path",
-        { request }
+        {
+          path: projectPath,
+          name: projectName,
+          description: projectDescription || null,
+        }
       );
 
       if (result.created_dir) {

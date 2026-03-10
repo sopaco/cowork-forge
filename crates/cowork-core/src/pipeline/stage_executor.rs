@@ -1,14 +1,14 @@
-// Stage Executor - Uses real adk-rust Agents (LlmAgentBuilder, LoopAgent)
+// Stage Executor - Configuration-driven stage execution
 //
 // This module provides a unified execution framework for all stages:
-// - Uses real adk-rust Agents created with LlmAgentBuilder
-// - Invokes agent functions from agents/mod.rs
+// - Uses configuration registry to create agents
+// - Supports both Simple and Actor-Critic stage types
 // - Handles feedback and iteration
 // - Saves artifacts
 // - Sends real-time streaming output
 
-use crate::agents::*;
 use crate::config::{get_language_instruction};
+use crate::config_definition::{global_registry, create_agent_for_stage};
 use crate::interaction::{InteractiveBackend, MessageContext};
 use crate::llm::{create_llm_client};
 use crate::llm::config::load_config;
@@ -20,36 +20,27 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Map internal agent names to user-friendly display names
-fn get_display_name(agent_name: &str) -> &'static str {
+fn get_display_name(agent_name: &str) -> String {
+    // Try to get agent name from registry first
+    let registry = global_registry();
+    if let Some(agent_def) = registry.get_agent(agent_name) {
+        return agent_def.name.clone();
+    }
+    
+    // Fallback to hardcoded names for system agents
     match agent_name {
-        // Individual agent names
-        "idea_agent" => "Idea Agent",
-        "prd_actor" => "PRD Agent",
-        "prd_critic" => "PRD Reviewer",
-        "design_actor" => "Design Agent",
-        "design_critic" => "Design Reviewer",
-        "plan_actor" => "Plan Agent",
-        "plan_critic" => "Plan Reviewer",
-        "coding_actor" => "Coding Agent",
-        "coding_critic" => "Code Reviewer",
-        "check_agent" => "Validation Agent",
-        "delivery_agent" => "Delivery Agent",
-        "summary_agent" => "Summary Agent",
-        "knowledge_gen_agent" => "Knowledge Agent",
-
-        // Loop agent names (composite)
-        "prd_loop" => "PRD Agent",
-        "design_loop" => "Design Agent",
-        "plan_loop" => "Plan Agent",
-        "coding_loop" => "Coding Agent",
-
         // System agents
-        "Pipeline Controller" => "Pipeline",
-        "Memory System" => "Memory",
-        "Knowledge System" => "Knowledge",
-
+        "Pipeline Controller" => "Pipeline".to_string(),
+        "Memory System" => "Memory".to_string(),
+        "Knowledge System" => "Knowledge".to_string(),
         // Fallback
-        _ => "AI Agent",
+        _ => format!("{} Agent", agent_name.replace("_", " ").split_whitespace().map(|s| {
+            let mut c = s.chars();
+            match c.next() {
+                None => String::new(),
+                Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+            }
+        }).collect::<Vec<_>>().join(" ")),
     }
 }
 
@@ -109,24 +100,9 @@ pub async fn execute_stage_with_instruction(
         let model = create_llm_client(&llm_config.llm)
             .map_err(|e| format!("Failed to create LLM client: {}", e))?;
 
-        // Create appropriate agent based on stage name
-        let agent = match stage_name {
-            "idea" => create_idea_agent_with_id(model, ctx.iteration.id.clone())
-                .map_err(|e| format!("Failed to create idea agent: {}", e))?,
-            "prd" => create_prd_loop_with_id(model, ctx.iteration.id.clone())
-                .map_err(|e| format!("Failed to create PRD agent: {}", e))?,
-            "design" => create_design_loop_with_id(model, ctx.iteration.id.clone())
-                .map_err(|e| format!("Failed to create design agent: {}", e))?,
-            "plan" => create_plan_loop_with_id(model, ctx.iteration.id.clone())
-                .map_err(|e| format!("Failed to create plan agent: {}", e))?,
-            "coding" => create_coding_loop_with_id(model, ctx.iteration.id.clone())
-                .map_err(|e| format!("Failed to create coding agent: {}", e))?,
-            "check" => create_check_agent_with_id(model, ctx.iteration.id.clone())
-                .map_err(|e| format!("Failed to create check agent: {}", e))?,
-            "delivery" => create_delivery_agent_with_id(model, ctx.iteration.id.clone())
-                .map_err(|e| format!("Failed to create delivery agent: {}", e))?,
-            _ => return Err(format!("Unknown stage: {}", stage_name)),
-        };
+        // Create agent using configuration registry
+        let agent = create_agent_for_stage(stage_name, model, ctx.iteration.id.clone())
+            .map_err(|e| format!("Failed to create agent for stage '{}': {}", stage_name, e))?;
 
         Ok((agent, artifact_path))
     }
@@ -139,7 +115,7 @@ pub async fn execute_stage_with_instruction(
 
     // Get the actual agent name and map to user-friendly display name
     let internal_name = agent.name();
-    let display_name = get_display_name(internal_name).to_string();
+    let display_name = get_display_name(internal_name);
 
     // Build prompt with context
     let prompt = build_prompt(ctx, stage_name, feedback);

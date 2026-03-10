@@ -3,6 +3,9 @@
 // Global configuration
 pub mod config;
 
+// V3 Configuration Definition Layer
+pub mod config_definition;
+
 // ACP (Agent Client Protocol) for external coding agent integration
 pub mod acp;
 
@@ -30,6 +33,12 @@ pub mod pipeline;
 pub mod instructions;
 pub mod interaction;
 
+// Skills ecosystem (V3)
+pub mod skills;
+
+// Integration system (V3)
+pub mod integration;
+
 // Re-exports for convenience
 pub use domain::*;
 pub use persistence::*;
@@ -56,6 +65,30 @@ pub use config::{get_system_locale, set_system_locale, get_language_instruction}
 
 // Re-exports for ACP module
 pub use acp::{AcpClient, AcpTaskResult};
+
+// Re-exports for config_definition (V3)
+pub use config_definition::{
+    AgentDefinition, AgentType, ModelConfig, ToolReference, IncludeContentsMode,
+    StageDefinition, StageType, HookConfig, HookPoint, ArtifactConfig, StageRetryConfig,
+    FlowDefinition, StageReference, FlowConfig, MemoryScope, InheritanceConfig, InheritanceMode,
+    SkillDefinition, SkillCategory, SkillTool, SkillPrompt, SkillManifest,
+    IntegrationDefinition, IntegrationType, ConnectionConfig, AuthConfig, IntegrationEvent,
+    ConfigRegistry, global_registry, ConfigLoader, LoadReport, ConfigValidator, ValidationResult,
+    create_agent_for_stage, create_agent_from_config, initialize_config_registry,
+};
+
+// Re-exports for skills (V3)
+pub use skills::{
+    SkillLoader, SkillLoadReport, SkillValidator, SkillValidationResult,
+    SkillRuntime, SkillRuntimeError, LoadedSkill,
+    SkillContext, SkillContextBuilder, PromptInjection,
+};
+
+// Re-exports for integration (V3)
+pub use integration::{
+    HookManager, HookExecutionContext, HookExecutionResult,
+    IntegrationAdapter, AdapterError, RestAdapter,
+};
 
 // Version info
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

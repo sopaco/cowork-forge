@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Spin, Tag } from 'antd';
 import { TeamOutlined } from '@ant-design/icons';
 import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
 import type { ChatMessage, InputRequest, InputOption, PMAction } from '../../stores';
+import { useConfigStore } from '../../stores/configStore';
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -50,6 +51,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onToggleThinking,
   onActionClick,
 }) => {
+  // Get stage display name from flow config
+  const { flows, default_flow_id } = useConfigStore();
+  const stageDisplayName = useMemo(() => {
+    if (!currentStage) return null;
+    if (default_flow_id && flows[default_flow_id]) {
+      const flow = flows[default_flow_id];
+      const stage = flow.stages.find(s => s.stage_id === currentStage);
+      if (stage?.alias) return stage.alias;
+    }
+    // Fallback: capitalize stage id
+    return currentStage.charAt(0).toUpperCase() + currentStage.slice(1);
+  }, [currentStage, flows, default_flow_id]);
+
   if (mode === 'disabled') {
     return (
       <div style={{ padding: '16px', color: '#888', textAlign: 'center' }}>
@@ -135,7 +149,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   {currentAgent} is working...
                 </div>
                 <div style={{ fontSize: '12px', color: '#666' }}>
-                  {currentStage ? `Stage: ${currentStage}` : 'Processing...'}
+                  {stageDisplayName ? `Stage: ${stageDisplayName}` : 'Processing...'}
                 </div>
               </div>
             </div>

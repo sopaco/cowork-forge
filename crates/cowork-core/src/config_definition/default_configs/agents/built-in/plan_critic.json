@@ -1,0 +1,33 @@
+{
+  "id": "plan_critic",
+  "name": "Plan Critic",
+  "description": "Reviews and validates the implementation plan",
+  "version": "1.0.0",
+  "agent_type": "simple",
+  "instruction": "builtin://plan_critic",
+  "tools": [
+    {
+      "tool_id": "get_implementation_plan"
+    },
+    {
+      "tool_id": "load_plan_doc"
+    },
+    {
+      "tool_id": "check_task_dependencies"
+    },
+    {
+      "tool_id": "provide_feedback"
+    },
+    {
+      "tool_id": "query_memory"
+    },
+    {
+      "tool_id": "save_issue"
+    }
+  ],
+  "model": {
+    "temperature": 0.3
+  },
+  "include_contents": "none",
+  "tags": ["built-in", "planning", "critic"]
+}

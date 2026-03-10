@@ -180,6 +180,8 @@ Multi-layer security checks prevent:
 
 # 🌟 Features & Capabilities
 
+## Core Workflow
+
 - <strong>7-Stage Development Workflow:</strong> Comprehensive workflow covering Idea Intake → PRD Generation → Technical Design → Implementation Plan → Coding → Quality Check → Delivery.
 - <strong>Specialized AI Agents:</strong> Each stage handled by a dedicated agent with domain expertise. Four critical stages (PRD, Design, Plan, Coding) use actor-critic loops for iterative refinement.
 - <strong>Project Manager Agent:</strong> Post-delivery chat interface for continued project interaction. Request modifications, create new iterations, or ask questions about your completed project.
@@ -188,6 +190,16 @@ Multi-layer security checks prevent:
 - <strong>Incremental Code Updates:</strong> Smart delta analysis updates only affected files, preserving existing modifications.
 - <strong>Automated Quality Verification:</strong> Multi-language build/test integration with comprehensive error analysis and reporting.
 - <strong>Human-in-the-Loop Validation:</strong> Critical outputs (PRD, design, plans) require human confirmation before proceeding.
+
+## Configurable System
+
+- <strong>Custom Workflows (Flow):</strong> Create custom development pipelines with configurable stage combinations and execution order. Enterprises can define standardized process templates for different project types (Web apps, CLI tools, API services) to ensure consistent development practices across teams.
+- <strong>Custom Agents:</strong> Define specialized AI agent roles with custom instructions, tool sets, and model parameters. Teams can create domain-specific agents like security reviewers, performance optimizers, or code quality specialists tailored to their business needs.
+- <strong>Skill Extensions:</strong> Skill package system for injecting domain-specific tools, prompts, and context into agents. Supports multiple skill categories including frontend development, backend services, mobile apps, and DevOps—install and combine as needed.
+- <strong>External Integrations:</strong> Configure integrations with external systems such as deployment platforms, requirement management tools, and CI/CD pipelines through webhooks and REST APIs for automated workflows.
+
+## Data Management
+
 - <strong>Artifact-Based Storage:</strong> Versioned storage of all stage outputs with JSON and Markdown formats.
 - <strong>Todo List Management:</strong> Automatic task tracking with status inference and progress reporting.
 - <strong>Multi-Language Project Support:</strong> Automatic detection and handling of Rust, Python, JavaScript/TypeScript projects.

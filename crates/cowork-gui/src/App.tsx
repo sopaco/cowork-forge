@@ -14,7 +14,8 @@ import {
 	CheckCircleOutlined,
 	RocketOutlined,
 	BookOutlined,
-	SettingOutlined
+	SettingOutlined,
+	ControlOutlined
 } from '@ant-design/icons';
 
 import { useProjectStore, useAgentStore, useUIStore } from './stores';
@@ -33,6 +34,7 @@ import KnowledgePanel from './components/KnowledgePanel';
 import CommandPalette from './components/CommandPalette';
 import IterationsPanel from './components/IterationsPanel';
 import SettingsPanel from './components/SettingsPanel';
+import { AgentsSetupPanel } from './components/config';
 
 const { Sider, Content, Header, Footer } = Layout;
 
@@ -42,47 +44,42 @@ function App() {
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
 	const pmMessagesContainerRef = useRef<HTMLDivElement>(null);
 
-	// Project store
-	const {
-		project,
-		iterations,
-		currentIteration,
-		loading,
-		loadProject,
-		setCurrentIteration,
-		updateCurrentIterationStatus
-	} = useProjectStore();
+	// Project store - use selectors to avoid unnecessary re-renders
+	const project = useProjectStore(state => state.project);
+	const iterations = useProjectStore(state => state.iterations);
+	const currentIteration = useProjectStore(state => state.currentIteration);
+	const loading = useProjectStore(state => state.loading);
+	const loadProject = useProjectStore(state => state.loadProject);
+	const setCurrentIteration = useProjectStore(state => state.setCurrentIteration);
+	const updateCurrentIterationStatus = useProjectStore(state => state.updateCurrentIterationStatus);
 
-	// Agent store
-	const {
-		messages,
-		pmMessages,
-		isProcessing,
-		currentAgent,
-		inputRequest,
-		pmProcessing,
-		setInputRequest,
-		loadPMWelcomeMessage
-	} = useAgentStore();
+	// Agent store - use selectors
+	const messages = useAgentStore(state => state.messages);
+	const pmMessages = useAgentStore(state => state.pmMessages);
+	const isProcessing = useAgentStore(state => state.isProcessing);
+	const currentAgent = useAgentStore(state => state.currentAgent);
+	const currentStage = useAgentStore(state => state.currentStage);
+	const inputRequest = useAgentStore(state => state.inputRequest);
+	const pmProcessing = useAgentStore(state => state.pmProcessing);
+	const setInputRequest = useAgentStore(state => state.setInputRequest);
+	const loadPMWelcomeMessage = useAgentStore(state => state.loadPMWelcomeMessage);
 
-	// UI store
-	const {
-		activeView,
-		commandPaletteVisible,
-		activeArtifactTab,
-		artifactsRefreshTrigger,
-		codeRefreshTrigger,
-		memoryRefreshTrigger,
-		knowledgeRefreshTrigger,
-		setActiveView,
-		setCommandPaletteVisible,
-		setActiveArtifactTab
-	} = useUIStore();
+	// UI store - use selectors
+	const activeView = useUIStore(state => state.activeView);
+	const commandPaletteVisible = useUIStore(state => state.commandPaletteVisible);
+	const activeArtifactTab = useUIStore(state => state.activeArtifactTab);
+	const artifactsRefreshTrigger = useUIStore(state => state.artifactsRefreshTrigger);
+	const codeRefreshTrigger = useUIStore(state => state.codeRefreshTrigger);
+	const memoryRefreshTrigger = useUIStore(state => state.memoryRefreshTrigger);
+	const knowledgeRefreshTrigger = useUIStore(state => state.knowledgeRefreshTrigger);
+	const setActiveView = useUIStore(state => state.setActiveView);
+	const setCommandPaletteVisible = useUIStore(state => state.setCommandPaletteVisible);
+	const setActiveArtifactTab = useUIStore(state => state.setActiveArtifactTab);
 
 	// Custom hooks
 	useAppEvents(userInput, setUserInput);
 	const { handlePMSendMessage, handlePMAction } = usePMAgent();
-	const { handleSelectIteration, handleExecuteIteration, handleOpenProjectFolder, handleCommandSelect } = useIterationActions();
+	const { handleSelectIteration, handleExecuteIteration, handleOpenProjectFolder, handleOpenIterationFolder, handleCommandSelect } = useIterationActions();
 	const {
 		inputRequest: chatInputRequest,
 		handleSendUserMessage,
@@ -214,6 +211,10 @@ function App() {
 				<SettingsPanel />
 			</div>
 
+			<div style={{ height: '100%', display: activeView === 'config' ? 'block' : 'none', overflow: 'auto' }}>
+				<AgentsSetupPanel />
+			</div>
+
 			<div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
 				{currentIteration ? (
 					<ChatPanel
@@ -225,7 +226,7 @@ function App() {
 						currentAgent={currentAgent}
 						iterationTitle={currentIteration.title}
 						iterationDescription={currentIteration.description}
-						currentStage={currentIteration.current_stage}
+						currentStage={currentStage}
 						inputRequest={inputRequest}
 						userInput={userInput}
 						messagesContainerRef={messagesContainerRef as React.RefObject<HTMLDivElement>}
@@ -315,6 +316,7 @@ function App() {
 							{ key: 'execution-memory', icon: <DatabaseOutlined />, label: 'Memory' },
 							{ key: 'project-knowledge', icon: <BookOutlined />, label: 'Knowledge' },
 							{ type: 'divider' },
+							{ key: 'config', icon: <ControlOutlined />, label: 'Agents Setup' },
 							{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' }
 						]}
 					/>
@@ -341,8 +343,13 @@ function App() {
 							<span style={{ marginRight: '16px', cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
 								Project: <strong>{project.name}</strong>
 							</span>
-							<span>
+							<span
+								style={{ cursor: currentIteration ? 'pointer' : 'default' }}
+								onClick={() => currentIteration && handleOpenIterationFolder(currentIteration.id)}
+								title={currentIteration ? `Click to open iteration folder: ${currentIteration.id}` : undefined}
+							>
 								Iterations: <strong>{iterations.length}</strong>
+								{currentIteration && <span style={{ marginLeft: '4px', color: '#1890ff' }}>(#{currentIteration.number})</span>}
 							</span>
 						</>
 					) : (

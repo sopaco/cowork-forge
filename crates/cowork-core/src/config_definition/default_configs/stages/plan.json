@@ -1,0 +1,26 @@
+{
+  "id": "plan",
+  "name": "Plan Stage",
+  "description": "Creates implementation plan with detailed tasks",
+  "stage_type": "actor_critic",
+  "actor_critic": {
+    "actor": "plan_actor",
+    "critic": "plan_critic",
+    "max_iterations": 1
+  },
+  "needs_confirmation": true,
+  "artifacts": [
+    {
+      "path": "artifacts/plan.md",
+      "required": true,
+      "description": "The implementation plan document"
+    },
+    {
+      "path": "data/implementation_plan.json",
+      "required": true,
+      "description": "Structured implementation tasks"
+    }
+  ],
+  "hooks": [],
+  "tags": ["built-in", "planning"]
+}

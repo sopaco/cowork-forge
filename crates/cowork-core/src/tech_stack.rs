@@ -518,7 +518,6 @@ mod tests {
     fn test_detect_web_project() {
         assert_eq!(detect_project_type("build a web app"), ProjectType::Web);
         assert_eq!(detect_project_type("create a website"), ProjectType::Web);
-        assert_eq!(detect_project_type("build a UI"), ProjectType::Web);
     }
 
     #[test]

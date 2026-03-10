@@ -20,7 +20,7 @@ pub fn set_system_locale(locale: String) {
 /// Build language instruction based on system locale
 pub fn get_language_instruction() -> String {
     let locale = get_system_locale();
-    
+
     if locale.starts_with("zh") {
         "请使用简体中文回复。所有生成的内容（文档、代码注释、说明等）都应使用简体中文。".to_string()
     } else if locale.starts_with("ja") {

@@ -1,7 +1,26 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { App, Card, Input, Select, Button, Tag, Empty, Spin, Modal, Tabs, Typography, Space, Divider } from "antd";
-import { SearchOutlined, EyeOutlined, DatabaseOutlined, ClockCircleOutlined } from "@ant-design/icons";
+import {
+  App,
+  Card,
+  Input,
+  Select,
+  Button,
+  Tag,
+  Empty,
+  Spin,
+  Modal,
+  Tabs,
+  Typography,
+  Space,
+  Divider,
+} from "antd";
+import {
+  SearchOutlined,
+  EyeOutlined,
+  DatabaseOutlined,
+  ClockCircleOutlined,
+} from "@ant-design/icons";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -38,7 +57,10 @@ interface MemoryPanelProps {
   refreshTrigger?: number;
 }
 
-const MemoryPanel: React.FC<MemoryPanelProps> = ({ currentSession, refreshTrigger }) => {
+const MemoryPanel: React.FC<MemoryPanelProps> = ({
+  currentSession,
+  refreshTrigger,
+}) => {
   const { message } = App.useApp();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,6 +72,27 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ currentSession, refreshTrigge
   const [memoryDetail, setMemoryDetail] = useState<MemoryDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [total, setTotal] = useState(0);
+  const [availableStages, setAvailableStages] = useState<string[]>([]);
+
+  // Load available stages when session changes
+  useEffect(() => {
+    if (currentSession) {
+      loadAvailableStages();
+    }
+  }, [currentSession, refreshTrigger]);
+
+  const loadAvailableStages = async () => {
+    if (!currentSession) return;
+    try {
+      const result = await invoke<{ stages: string[] }>("get_available_stages", {
+        iterationId: currentSession,
+      });
+      setAvailableStages(result.stages || []);
+    } catch (error) {
+      console.error("[MemoryPanel] Failed to load available stages:", error);
+      setAvailableStages([]);
+    }
+  };
 
   useEffect(() => {
     loadMemories();
@@ -63,8 +106,17 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ currentSession, refreshTrigge
     }
     setLoading(true);
     try {
-      const params = { queryType, category, stage: stage || null, limit, iterationId: currentSession };
-      const result = await invoke<MemoryQueryResult>("query_memory_index", params);
+      const params = {
+        queryType,
+        category,
+        stage: stage || null,
+        limit,
+        iterationId: currentSession,
+      };
+      const result = await invoke<MemoryQueryResult>(
+        "query_memory_index",
+        params,
+      );
       setMemories(result.results || []);
       setTotal(result.total || 0);
     } catch (error) {
@@ -82,7 +134,10 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ currentSession, refreshTrigge
     setDetailLoading(true);
     try {
       const detail = await invoke<MemoryDetail>("load_memory_detail", {
-        memoryId: memory.id, file: memory.file, iterationId: currentSession || null, ts: memory._ts,
+        memoryId: memory.id,
+        file: memory.file,
+        iterationId: currentSession || null,
+        ts: memory._ts,
       });
       setMemoryDetail(detail);
     } catch (error) {
@@ -94,22 +149,46 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ currentSession, refreshTrigge
     }
   };
 
-  const getCategoryColor = (cat: string): "blue" | "green" | "purple" | "orange" | "default" => {
+  const getCategoryColor = (
+    cat: string,
+  ): "blue" | "green" | "purple" | "default" => {
     switch (cat) {
-      case "decision": return "blue";
-      case "experience": return "green";
-      case "pattern": return "purple";
-      case "record": return "orange";
-      default: return "default";
+      case "decision":
+        return "blue";
+      case "experience":
+        return "green";
+      case "pattern":
+        return "purple";
+      default:
+        return "default";
     }
   };
 
-  const getImpactColor = (impact: string): "red" | "orange" | "green" | "default" => {
+  const getCategoryLabel = (cat: string): string => {
+    switch (cat) {
+      case "decision":
+        return "Decision";
+      case "experience":
+        return "Experience";
+      case "pattern":
+        return "Pattern";
+      default:
+        return cat;
+    }
+  };
+
+  const getImpactColor = (
+    impact: string,
+  ): "red" | "orange" | "green" | "default" => {
     switch (impact) {
-      case "high": return "red";
-      case "medium": return "orange";
-      case "low": return "green";
-      default: return "default";
+      case "high":
+        return "red";
+      case "medium":
+        return "orange";
+      case "low":
+        return "green";
+      default:
+        return "default";
     }
   };
 
@@ -123,50 +202,143 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ currentSession, refreshTrigge
   };
 
   return (
-    <div style={{ padding: "20px", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", flexShrink: 0 }}>
-        <h2 style={{ margin: 0, display: "flex", alignItems: "center", gap: "10px" }}><DatabaseOutlined /> Memory Browser</h2>
+    <div
+      style={{
+        padding: "20px",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "20px",
+          flexShrink: 0,
+        }}
+      >
+        <h2
+          style={{
+            margin: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+          }}
+        >
+          <DatabaseOutlined /> Memory Browser
+        </h2>
         <Space>
           <Text type="secondary">Total: {total}</Text>
-          <Button icon={<SearchOutlined />} onClick={loadMemories} loading={loading}>Refresh</Button>
+          <Button
+            icon={<SearchOutlined />}
+            onClick={loadMemories}
+            loading={loading}
+          >
+            Refresh
+          </Button>
         </Space>
       </div>
 
-      <Card  style={{ marginBottom: "20px", flexShrink: 0 }}>
-        <Space direction="vertical" style={{ width: "100%" }} >
-          <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: "150px" }}>
+      <Card style={{ marginBottom: "20px", flexShrink: 0 }}>
+        <Space direction="vertical" style={{ width: "100%" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                minWidth: "150px",
+              }}
+            >
               <Text strong>Query Type:</Text>
-              <Select value={queryType} onChange={setQueryType} style={{ flex: 1, minWidth: "120px" }} >
+              <Select
+                value={queryType}
+                onChange={setQueryType}
+                style={{ flex: 1, minWidth: "120px" }}
+              >
                 <Option value="all">All</Option>
                 <Option value="project">Project</Option>
                 <Option value="session">Session</Option>
               </Select>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: "150px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                minWidth: "150px",
+              }}
+            >
               <Text strong>Category:</Text>
-              <Select value={category} onChange={setCategory} style={{ flex: 1, minWidth: "120px" }} >
+              <Select
+                value={category}
+                onChange={setCategory}
+                style={{ flex: 1, minWidth: "160px" }}
+              >
                 <Option value="all">All</Option>
-                <Option value="decision">Decisions</Option>
-                <Option value="experience">Experiences</Option>
-                <Option value="pattern">Patterns</Option>
-                <Option value="record">Records</Option>
+                <Option value="decision">Decisions & Insights</Option>
+                <Option value="experience">Experiences & Issues</Option>
+                <Option value="pattern">Patterns & Learnings</Option>
               </Select>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: "150px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                minWidth: "150px",
+              }}
+            >
               <Text strong>Stage:</Text>
-              <Select value={stage} onChange={setStage} style={{ flex: 1, minWidth: "120px" }}  allowClear placeholder="All">
-                <Option value="idea">Idea</Option>
-                <Option value="prd">PRD</Option>
-                <Option value="design">Design</Option>
-                <Option value="plan">Plan</Option>
-                <Option value="coding">Coding</Option>
-                <Option value="check">Check</Option>
+              <Select
+                value={stage}
+                onChange={setStage}
+                style={{ flex: 1, minWidth: "120px" }}
+                allowClear
+                placeholder="All"
+              >
+                {availableStages.length > 0 ? (
+                  availableStages.map((s) => (
+                    <Option key={s} value={s}>
+                      {s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()}
+                    </Option>
+                  ))
+                ) : (
+                  <>
+                    <Option value="idea">Idea</Option>
+                    <Option value="prd">PRD</Option>
+                    <Option value="design">Design</Option>
+                    <Option value="plan">Plan</Option>
+                    <Option value="coding">Coding</Option>
+                    <Option value="check">Check</Option>
+                  </>
+                )}
               </Select>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: "100px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                minWidth: "100px",
+              }}
+            >
               <Text strong>Limit:</Text>
-              <Select value={limit} onChange={setLimit} style={{ flex: 1, minWidth: "80px" }} >
+              <Select
+                value={limit}
+                onChange={setLimit}
+                style={{ flex: 1, minWidth: "80px" }}
+              >
                 <Option value={10}>10</Option>
                 <Option value={20}>20</Option>
                 <Option value={50}>50</Option>
@@ -177,33 +349,106 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ currentSession, refreshTrigge
         </Space>
       </Card>
 
-      <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
+      <div
+        style={{
+          flex: 1,
+          overflow: "auto",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         {loading ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}><Spin size="large" /></div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+            }}
+          >
+            <Spin size="large" />
+          </div>
         ) : memories.length === 0 ? (
-          <Empty description="No memories found" style={{ marginTop: "50px" }} />
+          <Empty
+            description="No memories found"
+            style={{ marginTop: "50px" }}
+          />
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {memories.map((memory) => (
-              <Card key={memory.id}  hoverable style={{ cursor: "pointer" }} onClick={() => handleViewDetail(memory)}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+          >
+            {memories.map((memory, index) => (
+              <Card
+                key={`${memory.id}-${index}`}
+                hoverable
+                style={{ cursor: "pointer" }}
+                onClick={() => handleViewDetail(memory)}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    marginBottom: "8px",
+                  }}
+                >
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        marginBottom: "4px",
+                      }}
+                    >
                       <Text strong>{memory.title}</Text>
-                      <Tag color={getCategoryColor(memory.category)}>{memory.category}</Tag>
+                      <Tag color={getCategoryColor(memory.category)}>
+                        {getCategoryLabel(memory.category)}
+                      </Tag>
                       {memory.stage && <Tag>{memory.stage}</Tag>}
                     </div>
-                    <Paragraph ellipsis={{ rows: 2 }} style={{ margin: 0, fontSize: "13px", color: "#888" }}>{memory.summary}</Paragraph>
+                    <Paragraph
+                      ellipsis={{ rows: 2 }}
+                      style={{ margin: 0, fontSize: "13px", color: "#888" }}
+                    >
+                      {memory.summary}
+                    </Paragraph>
                   </div>
-                  <Button type="text" icon={<EyeOutlined />}  onClick={(e) => { e.stopPropagation(); handleViewDetail(memory); }} />
+                  <Button
+                    type="text"
+                    icon={<EyeOutlined />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewDetail(memory);
+                    }}
+                  />
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#666" }}>
-                  <Space >
-                    <span><ClockCircleOutlined /> {formatDate(memory.created_at)}</span>
-                    {memory.impact && <Tag color={getImpactColor(memory.impact)} >{memory.impact}</Tag>}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontSize: "12px",
+                    color: "#666",
+                  }}
+                >
+                  <Space>
+                    <span>
+                      <ClockCircleOutlined /> {formatDate(memory.created_at)}
+                    </span>
+                    {memory.impact && (
+                      <Tag color={getImpactColor(memory.impact)}>
+                        {memory.impact}
+                      </Tag>
+                    )}
                   </Space>
-                  <Space >
-                    {memory.tags && memory.tags.slice(0, 2).map((tag, idx) => <Tag key={idx} style={{ fontSize: "11px" }}>{tag}</Tag>)}
+                  <Space>
+                    {memory.tags &&
+                      memory.tags.slice(0, 2).map((tag, idx) => (
+                        <Tag key={idx} style={{ fontSize: "11px" }}>
+                          {tag}
+                        </Tag>
+                      ))}
                   </Space>
                 </div>
               </Card>
@@ -215,36 +460,115 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ currentSession, refreshTrigge
       <Modal
         title={selectedMemory?.title}
         open={!!selectedMemory}
-        onCancel={() => { setSelectedMemory(null); setMemoryDetail(null); }}
-        footer={[<Button key="close" onClick={() => { setSelectedMemory(null); setMemoryDetail(null); }}>Close</Button>]}
+        onCancel={() => {
+          setSelectedMemory(null);
+          setMemoryDetail(null);
+        }}
+        footer={[
+          <Button
+            key="close"
+            onClick={() => {
+              setSelectedMemory(null);
+              setMemoryDetail(null);
+            }}
+          >
+            Close
+          </Button>,
+        ]}
         width={800}
         style={{ top: "5vh" }}
         styles={{ body: { maxHeight: "75vh", overflow: "auto" } }}
       >
         {detailLoading ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "200px" }}><Spin size="large" /></div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "200px",
+            }}
+          >
+            <Spin size="large" />
+          </div>
         ) : (
           <Tabs defaultActiveKey="content">
             <Tabs.TabPane tab="Content" key="content">
               {memoryDetail ? (
                 <div>
-                  <div style={{ marginBottom: "16px", padding: "20px", background: "#f5f5f5", borderRadius: "4px" }}>
-                    <Space direction="vertical" style={{ width: "100%" }} >
-                      <div><Text strong>ID: </Text><Text code>{selectedMemory?.id}</Text></div>
-                      <div><Text strong>Category: </Text><Tag color={getCategoryColor(selectedMemory?.category || '')}>{selectedMemory?.category}</Tag></div>
-                      {selectedMemory?.stage && <div><Text strong>Stage: </Text><Tag>{selectedMemory.stage}</Tag></div>}
-                      <div><Text strong>Created: </Text><Text>{formatDate(selectedMemory?.created_at)}</Text></div>
-                      {selectedMemory?.impact && <div><Text strong>Impact: </Text><Tag color={getImpactColor(selectedMemory.impact)}>{selectedMemory.impact}</Tag></div>}
-                      {selectedMemory?.tags && selectedMemory.tags.length > 0 && (
-                        <div><Text strong>Tags: </Text><Space >{selectedMemory.tags.map((tag, idx) => <Tag key={idx}>{tag}</Tag>)}</Space></div>
+                  <div
+                    style={{
+                      marginBottom: "16px",
+                      padding: "20px",
+                      background: "#f5f5f5",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    <Space direction="vertical" style={{ width: "100%" }}>
+                      <div>
+                        <Text strong>ID: </Text>
+                        <Text code>{selectedMemory?.id}</Text>
+                      </div>
+                      <div>
+                        <Text strong>Category: </Text>
+                        <Tag
+                          color={getCategoryColor(
+                            selectedMemory?.category || "",
+                          )}
+                        >
+                          {getCategoryLabel(selectedMemory?.category || "")}
+                        </Tag>
+                      </div>
+                      {selectedMemory?.stage && (
+                        <div>
+                          <Text strong>Stage: </Text>
+                          <Tag>{selectedMemory.stage}</Tag>
+                        </div>
                       )}
+                      <div>
+                        <Text strong>Created: </Text>
+                        <Text>{formatDate(selectedMemory?.created_at)}</Text>
+                      </div>
+                      {selectedMemory?.impact && (
+                        <div>
+                          <Text strong>Impact: </Text>
+                          <Tag color={getImpactColor(selectedMemory.impact)}>
+                            {selectedMemory.impact}
+                          </Tag>
+                        </div>
+                      )}
+                      {selectedMemory?.tags &&
+                        selectedMemory.tags.length > 0 && (
+                          <div>
+                            <Text strong>Tags: </Text>
+                            <Space>
+                              {selectedMemory.tags.map((tag, idx) => (
+                                <Tag key={idx}>{tag}</Tag>
+                              ))}
+                            </Space>
+                          </div>
+                        )}
                     </Space>
                   </div>
-                  <div style={{ maxHeight: "50vh", overflow: "auto", padding: "20px", backgroundColor: "#fafafa", borderRadius: "4px" }}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, rehypeRaw]}>{memoryDetail.content}</ReactMarkdown>
+                  <div
+                    style={{
+                      maxHeight: "50vh",
+                      overflow: "auto",
+                      padding: "20px",
+                      backgroundColor: "#fafafa",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                    >
+                      {memoryDetail.content}
+                    </ReactMarkdown>
                   </div>
                 </div>
-              ) : <Empty description="Failed to load memory detail" />}
+              ) : (
+                <Empty description="Failed to load memory detail" />
+              )}
             </Tabs.TabPane>
             <Tabs.TabPane tab="Summary" key="summary">
               {selectedMemory && (
@@ -252,11 +576,30 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ currentSession, refreshTrigge
                   <div style={{ marginBottom: "16px" }}>
                     <Text strong>Summary</Text>
                     <Divider style={{ margin: "8px 0" }} />
-                    <div style={{ padding: "20px", backgroundColor: "#fafafa", borderRadius: "4px", maxHeight: "60vh", overflow: "auto" }}>
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, rehypeRaw]}>{selectedMemory.summary}</ReactMarkdown>
+                    <div
+                      style={{
+                        padding: "20px",
+                        backgroundColor: "#fafafa",
+                        borderRadius: "4px",
+                        maxHeight: "60vh",
+                        overflow: "auto",
+                      }}
+                    >
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                      >
+                        {selectedMemory.summary}
+                      </ReactMarkdown>
                     </div>
                   </div>
-                  {selectedMemory.file && <div><Text strong>File</Text><Divider style={{ margin: "8px 0" }} /><Text code>{selectedMemory.file}</Text></div>}
+                  {selectedMemory.file && (
+                    <div>
+                      <Text strong>File</Text>
+                      <Divider style={{ margin: "8px 0" }} />
+                      <Text code>{selectedMemory.file}</Text>
+                    </div>
+                  )}
                 </div>
               )}
             </Tabs.TabPane>

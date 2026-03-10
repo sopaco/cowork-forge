@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Spin, Tag } from 'antd';
 import { TeamOutlined } from '@ant-design/icons';
 import { MarkdownMessage } from '../common';
@@ -31,7 +31,8 @@ interface MessageListProps {
   onActionClick?: (action: PMAction) => void;
 }
 
-const ThinkingMessageItem: React.FC<{ message: ThinkingMessage; onToggle: () => void }> = ({ message, onToggle }) => (
+// Memoized message item components
+const ThinkingMessageItem = memo<{ message: ThinkingMessage; onToggle: () => void }>(({ message, onToggle }) => (
   <div>
     <div
       style={{
@@ -68,9 +69,9 @@ const ThinkingMessageItem: React.FC<{ message: ThinkingMessage; onToggle: () => 
       </div>
     )}
   </div>
-);
+));
 
-const ToolCallMessageItem: React.FC<{ message: ToolCallMessage }> = ({ message }) => (
+const ToolCallMessageItem = memo<{ message: ToolCallMessage }>(({ message }) => (
   <div
     style={{
       backgroundColor: '#fff3e0',
@@ -104,9 +105,9 @@ const ToolCallMessageItem: React.FC<{ message: ToolCallMessage }> = ({ message }
       </pre>
     )}
   </div>
-);
+));
 
-const ToolResultMessageItem: React.FC<{ message: ToolResultMessage }> = ({ message }) => (
+const ToolResultMessageItem = memo<{ message: ToolResultMessage }>(({ message }) => (
   <div
     style={{
       backgroundColor: message.success ? '#e8f5e9' : '#ffebee',
@@ -125,9 +126,9 @@ const ToolResultMessageItem: React.FC<{ message: ToolResultMessage }> = ({ messa
       {message.success ? 'succeeded' : 'failed'}
     </span>
   </div>
-);
+));
 
-const PMAgentMessageItem: React.FC<{ message: PMAgentMessage; onActionClick?: (action: PMAction) => void }> = ({ 
+const PMAgentMessageItem = memo<{ message: PMAgentMessage; onActionClick?: (action: PMAction) => void }>(({ 
   message, 
   onActionClick 
 }) => {
@@ -219,7 +220,7 @@ const PMAgentMessageItem: React.FC<{ message: PMAgentMessage; onActionClick?: (a
       )}
     </div>
   );
-};
+});
 
 export const MessageList: React.FC<MessageListProps> = ({
   messages = [],

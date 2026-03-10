@@ -1,9 +1,10 @@
 [package]
 name = "cowork-gui"
-version = "2.0.0"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
 description = "Cowork Forge GUI"
-authors = ["cowork-forge"]
-edition = "2024"
 
 [lib]
 name = "cowork_gui_lib"

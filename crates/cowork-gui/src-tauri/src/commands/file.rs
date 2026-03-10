@@ -3,18 +3,63 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::gui_types::*;
+use crate::AppState;
+use tauri::State;
+
+/// Get the workspace directory for an iteration using the workspace path from AppState
+fn get_workspace_path_internal(iteration_id: &str, workspace_path: Option<&str>) -> Result<PathBuf, String> {
+    // workspace_path MUST be set - it's set when user opens a project
+    let ws_path = workspace_path.ok_or_else(|| {
+        "No workspace path set. Please open a project first.".to_string()
+    })?;
+    
+    let workspace = PathBuf::from(ws_path)
+        .join(".cowork-v2")
+        .join("iterations")
+        .join(iteration_id)
+        .join("workspace");
+    
+    if workspace.exists() {
+        Ok(workspace)
+    } else {
+        Err(format!("Workspace not found for iteration: {} at {:?}", iteration_id, workspace))
+    }
+}
+
+/// Get the iteration directory using the workspace path from AppState
+fn get_iteration_path_internal(iteration_id: &str, workspace_path: Option<&str>) -> Result<PathBuf, String> {
+    // workspace_path MUST be set - it's set when user opens a project
+    let ws_path = workspace_path.ok_or_else(|| {
+        "No workspace path set. Please open a project first.".to_string()
+    })?;
+    
+    let iteration_dir = PathBuf::from(ws_path)
+        .join(".cowork-v2")
+        .join("iterations")
+        .join(iteration_id);
+    
+    if iteration_dir.exists() {
+        Ok(iteration_dir)
+    } else {
+        Err(format!("Iteration directory not found: {} at {:?}", iteration_id, iteration_dir))
+    }
+}
 
 #[tauri::command]
-pub async fn open_in_file_manager(path: String) -> Result<(), String> {
+pub async fn open_in_file_manager(
+    path: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    // Get workspace path from AppState
+    let workspace_path = state.workspace_path.lock()
+        .map_err(|e| format!("Failed to get workspace path: {}", e))?
+        .clone();
+    
     let resolved_path = if path.starts_with("workspace_") {
         let iteration_id = path.strip_prefix("workspace_").unwrap_or(&path);
-        cowork_core::persistence::IterationStore::new()
-            .workspace_path(iteration_id)
-            .map_err(|e| e.to_string())?
+        get_workspace_path_internal(iteration_id, workspace_path.as_deref())?
     } else if path.contains("iter-") {
-        cowork_core::persistence::IterationStore::new()
-            .iteration_path(&path)
-            .map_err(|e| e.to_string())?
+        get_iteration_path_internal(&path, workspace_path.as_deref())?
     } else {
         PathBuf::from(path)
     };
@@ -37,15 +82,16 @@ pub async fn open_in_file_manager(path: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn get_iteration_artifacts(
     iteration_id: String,
+    state: State<'_, AppState>,
 ) -> Result<IterationArtifacts, String> {
     eprintln!("[Artifacts] get_iteration_artifacts called with iteration_id: {}", iteration_id);
     
-    let iteration_store = cowork_core::persistence::IterationStore::new();
-    iteration_store.load(&iteration_id).map_err(|e| e.to_string())?;
+    // Get workspace path from AppState
+    let workspace_path = state.workspace_path.lock()
+        .map_err(|e| format!("Failed to get workspace path: {}", e))?
+        .clone();
 
-    let iteration_dir = iteration_store
-        .iteration_path(&iteration_id)
-        .map_err(|e| e.to_string())?;
+    let iteration_dir = get_iteration_path_internal(&iteration_id, workspace_path.as_deref())?;
     let artifacts_dir = iteration_dir.join("artifacts");
     
     eprintln!("[Artifacts] Looking in artifacts_dir: {:?}", artifacts_dir);
@@ -59,9 +105,7 @@ pub async fn get_iteration_artifacts(
     let delivery_report = fs::read_to_string(artifacts_dir.join("delivery_report.md")).ok();
     let check_report = fs::read_to_string(artifacts_dir.join("check_report.md")).ok();
 
-    let workspace = iteration_store
-        .workspace_path(&iteration_id)
-        .map_err(|e| e.to_string())?;
+    let workspace = get_workspace_path_internal(&iteration_id, workspace_path.as_deref())?;
     let code_files = if workspace.exists() { collect_files(&workspace) } else { vec![] };
 
     Ok(IterationArtifacts {
@@ -82,11 +126,14 @@ pub async fn read_iteration_file(
     file_path: String,
     offset: Option<usize>,
     limit: Option<usize>,
+    state: State<'_, AppState>,
 ) -> Result<FileReadResult, String> {
-    let iteration_store = cowork_core::persistence::IterationStore::new();
-    let workspace = iteration_store
-        .workspace_path(&iteration_id)
-        .map_err(|e| e.to_string())?;
+    // Get workspace path from AppState
+    let workspace_path = state.workspace_path.lock()
+        .map_err(|e| format!("Failed to get workspace path: {}", e))?
+        .clone();
+    
+    let workspace = get_workspace_path_internal(&iteration_id, workspace_path.as_deref())?;
 
     let full_path = workspace.join(&file_path);
     let metadata = fs::metadata(&full_path).map_err(|e| e.to_string())?;
@@ -128,11 +175,14 @@ pub async fn save_iteration_file(
     iteration_id: String,
     file_path: String,
     content: String,
+    state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let iteration_store = cowork_core::persistence::IterationStore::new();
-    let workspace = iteration_store
-        .workspace_path(&iteration_id)
-        .map_err(|e| e.to_string())?;
+    // Get workspace path from AppState
+    let workspace_path = state.workspace_path.lock()
+        .map_err(|e| format!("Failed to get workspace path: {}", e))?
+        .clone();
+    
+    let workspace = get_workspace_path_internal(&iteration_id, workspace_path.as_deref())?;
 
     let full_path = workspace.join(&file_path);
     if let Some(parent) = full_path.parent() {
@@ -144,11 +194,16 @@ pub async fn save_iteration_file(
 }
 
 #[tauri::command]
-pub async fn get_iteration_file_tree(iteration_id: String) -> Result<FileTreeNode, String> {
-    let iteration_store = cowork_core::persistence::IterationStore::new();
-    let workspace = iteration_store
-        .workspace_path(&iteration_id)
-        .map_err(|e| e.to_string())?;
+pub async fn get_iteration_file_tree(
+    iteration_id: String,
+    state: State<'_, AppState>,
+) -> Result<FileTreeNode, String> {
+    // Get workspace path from AppState
+    let workspace_path = state.workspace_path.lock()
+        .map_err(|e| format!("Failed to get workspace path: {}", e))?
+        .clone();
+    
+    let workspace = get_workspace_path_internal(&iteration_id, workspace_path.as_deref())?;
 
     if !workspace.exists() {
         return Ok(FileTreeNode {

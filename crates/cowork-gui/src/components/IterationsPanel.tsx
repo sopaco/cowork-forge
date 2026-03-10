@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactElement } from "react";
+import { useState, useEffect, ReactElement, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   App,
@@ -29,8 +29,9 @@ import {
 
 import { useIterationsData } from '../hooks';
 import { CreateIterationModal, IterationDetailsModal, InitProjectModal } from './iterations';
-import type { IterationInfo } from '../types';
+import type { IterationInfo, StageDef } from '../types';
 import { STAGES } from '../constants';
+import { useConfigStore } from '../stores/configStore';
 
 interface IterationsPanelProps {
   onSelectIteration?: (iterationId: string) => void;
@@ -63,9 +64,25 @@ const getStatusIcon = (status: string): ReactElement | null => {
   }
 };
 
-const calculateProgress = (completedStages?: string[]): number => {
+const getStageColor = (stageId: string): string => {
+  const colors: Record<string, string> = {
+    idea: '#1890ff',
+    prd: '#52c41a',
+    design: '#722ed1',
+    plan: '#fa8c16',
+    coding: '#13c2c2',
+    check: '#eb2f96',
+    delivery: '#52c41a',
+  };
+  return colors[stageId] || '#666';
+};
+
+const calculateProgress = (completedStages?: string[], totalStages?: number, status?: string): number => {
+  // For completed iterations, always show 100%
+  if (status === "Completed") return 100;
   if (!completedStages) return 0;
-  return Math.round((completedStages.length / STAGES.length) * 100);
+  const total = totalStages || STAGES.length;
+  return Math.round((completedStages.length / total) * 100);
 };
 
 const formatDate = (dateString?: string): string => {
@@ -80,6 +97,20 @@ const IterationsPanel: React.FC<IterationsPanelProps> = ({
 }) => {
   const { message } = App.useApp();
   const { iterations, project, loading, executingId, setExecutingId, loadData } = useIterationsData();
+  
+  // Get stages from current flow configuration
+  const { flows, default_flow_id } = useConfigStore();
+  const currentStages: StageDef[] = useMemo(() => {
+    if (default_flow_id && flows[default_flow_id]) {
+      const flow = flows[default_flow_id];
+      return flow.stages.map(s => ({
+        key: s.stage_id,
+        label: s.alias || s.stage_id,
+        color: getStageColor(s.stage_id),
+      }));
+    }
+    return STAGES;
+  }, [flows, default_flow_id]);
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -270,24 +301,26 @@ const IterationsPanel: React.FC<IterationsPanelProps> = ({
                   <div style={{ marginTop: "12px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
                       <span style={{ fontSize: "12px", color: "#888" }}>Progress</span>
-                      <span style={{ fontSize: "12px", color: "#888" }}>{calculateProgress(iteration.completed_stages)}%</span>
+                      <span style={{ fontSize: "12px", color: "#888" }}>{calculateProgress(iteration.completed_stages, currentStages.length, iteration.status)}%</span>
                     </div>
-                    <Progress percent={calculateProgress(iteration.completed_stages)} status={iteration.status === "Failed" ? "exception" : "active"} />
+                    <Progress percent={calculateProgress(iteration.completed_stages, currentStages.length, iteration.status)} status={iteration.status === "Failed" ? "exception" : iteration.status === "Completed" ? "success" : "active"} />
                   </div>
 
                   {iteration.current_stage && (
                     <div style={{ marginTop: "8px", fontSize: "12px", color: "#1890ff" }}>
-                      Current: {iteration.current_stage}
+                      Current: {currentStages.find(s => s.key === iteration.current_stage)?.label || iteration.current_stage}
                     </div>
                   )}
 
                   <div style={{ marginTop: "12px", display: "flex", flexWrap: "wrap", gap: "4px" }}>
-                    {STAGES.map((stage) => {
-                      const currentStageIndex = STAGES.findIndex((s) => s.key === iteration.current_stage);
-                      const stageIndex = STAGES.findIndex((s) => s.key === stage.key);
+                    {currentStages.map((stage) => {
+                      const currentStageIndex = currentStages.findIndex((s) => s.key === iteration.current_stage);
+                      const stageIndex = currentStages.findIndex((s) => s.key === stage.key);
+                      // For completed iterations, all stages should show as completed
+                      // regardless of the completed_stages array content
                       const isCompleted = iteration.status === "Completed"
-                        ? iteration.completed_stages?.includes(stage.key)
-                        : currentStageIndex >= 0 && stageIndex < currentStageIndex;
+                        ? true
+                        : iteration.completed_stages?.includes(stage.key) ?? (currentStageIndex >= 0 && stageIndex < currentStageIndex);
                       const isCurrent = iteration.current_stage === stage.key;
 
                       return (
