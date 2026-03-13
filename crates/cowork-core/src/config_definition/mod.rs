@@ -1,13 +1,14 @@
 // Configuration Definition Module for V3
 // 
 // This module provides data-driven configuration for Agents, Stages, Flows,
-// Skills, and Integrations. It enables the transition from hardcoded definitions
+// and Integrations. It enables the transition from hardcoded definitions
 // to configurable, extensible system architecture.
+//
+// Skills are now handled by the `skills` module using adk-skill (agentskills.io standard).
 
 pub mod agent_definition;
 pub mod stage_definition;
 pub mod flow_definition;
-pub mod skill_definition;
 pub mod integration_definition;
 pub mod registry;
 pub mod loader;
@@ -18,7 +19,6 @@ pub mod agent_factory;
 pub use agent_definition::*;
 pub use stage_definition::*;
 pub use flow_definition::*;
-pub use skill_definition::*;
 pub use integration_definition::*;
 pub use registry::*;
 pub use loader::*;

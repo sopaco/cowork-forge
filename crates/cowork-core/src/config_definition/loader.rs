@@ -4,6 +4,9 @@
 // - System default directory: .cowork-v3/config/
 // - User directory: ~/.cowork/config/
 // - Project directory: project/.cowork-v3/config/
+//
+// Note: Skills are managed separately via adk-skill (SKILL.md format)
+// See the `skills` module for skill management.
 
 use std::path::{Path, PathBuf};
 use std::fs;
@@ -13,7 +16,6 @@ use walkdir::WalkDir;
 use super::agent_definition::AgentDefinition;
 use super::stage_definition::StageDefinition;
 use super::flow_definition::FlowDefinition;
-use super::skill_definition::SkillManifest;
 use super::integration_definition::IntegrationDefinition;
 use super::registry::ConfigRegistry;
 
@@ -62,7 +64,8 @@ impl ConfigLoader {
     pub fn load_all(&self, registry: &ConfigRegistry) -> Result<LoadReport> {
         let mut report = LoadReport::default();
         
-        // Load in order: agents, stages, flows, skills, integrations
+        // Load in order: agents, stages, flows, integrations
+        // Note: Skills are managed via adk-skill module
         for path in &self.search_paths {
             if !path.exists() {
                 continue;
@@ -71,7 +74,6 @@ impl ConfigLoader {
             self.load_agents(path, registry, &mut report)?;
             self.load_stages(path, registry, &mut report)?;
             self.load_flows(path, registry, &mut report)?;
-            self.load_skills(path, registry, &mut report)?;
             self.load_integrations(path, registry, &mut report)?;
         }
         
@@ -212,53 +214,6 @@ impl ConfigLoader {
         Ok(flow)
     }
     
-    /// Load skill definitions from a directory
-    fn load_skills(&self, base: &Path, registry: &ConfigRegistry, report: &mut LoadReport) -> Result<()> {
-        let skills_dir = base.join("skills");
-        if !skills_dir.exists() {
-            return Ok(());
-        }
-        
-        // Skills are directories with manifest.json
-        for entry in fs::read_dir(skills_dir)?
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().is_dir())
-        {
-            let skill_dir = entry.path();
-            let manifest_path = skill_dir.join("manifest.json");
-            
-            if !manifest_path.exists() {
-                continue;
-            }
-            
-            match self.load_skill_manifest(&manifest_path) {
-                Ok(manifest) => {
-                    let id = manifest.definition.id.clone();
-                    registry.register_skill(manifest.definition)?;
-                    report.skills_loaded += 1;
-                    tracing::debug!("Loaded skill: {} from {:?}", id, skill_dir);
-                }
-                Err(e) => {
-                    report.errors.push(format!("Failed to load skill from {:?}: {}", skill_dir, e));
-                    tracing::warn!("Failed to load skill from {:?}: {}", skill_dir, e);
-                }
-            }
-        }
-        
-        Ok(())
-    }
-    
-    /// Load a skill manifest
-    fn load_skill_manifest(&self, path: &Path) -> Result<SkillManifest> {
-        let content = fs::read_to_string(path)
-            .with_context(|| format!("Failed to read file: {:?}", path))?;
-        
-        let manifest: SkillManifest = serde_json::from_str(&content)
-            .with_context(|| format!("Failed to parse skill manifest: {:?}", path))?;
-        
-        Ok(manifest)
-    }
-    
     /// Load integration definitions from a directory
     fn load_integrations(&self, base: &Path, registry: &ConfigRegistry, report: &mut LoadReport) -> Result<()> {
         let integrations_dir = base.join("integrations");
@@ -308,7 +263,6 @@ pub struct LoadReport {
     pub agents_loaded: usize,
     pub stages_loaded: usize,
     pub flows_loaded: usize,
-    pub skills_loaded: usize,
     pub integrations_loaded: usize,
     pub default_flow_set: bool,
     pub errors: Vec<String>,
@@ -316,8 +270,7 @@ pub struct LoadReport {
 
 impl LoadReport {
     pub fn total_loaded(&self) -> usize {
-        self.agents_loaded + self.stages_loaded + self.flows_loaded + 
-        self.skills_loaded + self.integrations_loaded
+        self.agents_loaded + self.stages_loaded + self.flows_loaded + self.integrations_loaded
     }
     
     pub fn has_errors(&self) -> bool {

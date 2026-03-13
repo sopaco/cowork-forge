@@ -12,7 +12,6 @@ import {
   Empty,
   Drawer,
   Descriptions,
-  Divider,
   Card,
   Badge,
   Tooltip,
@@ -23,14 +22,11 @@ import {
   DeleteOutlined,
   ThunderboltOutlined,
   FolderOpenOutlined,
-  ToolOutlined,
-  FileTextOutlined,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
   InfoCircleOutlined,
+  TagOutlined,
 } from '@ant-design/icons';
 import { useConfigStore } from '../../stores/configStore';
-import type { SkillManifest, SkillCategory } from '../../types/config';
+import type { SkillInfo } from '../../types/config';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -67,62 +63,37 @@ const SkillManager: React.FC = () => {
     }
   };
 
-  const handleView = (skill: SkillManifest) => {
-    selectSkill(skill.id);
+  const handleView = (skill: SkillInfo) => {
+    selectSkill(skill.name);
     setDetailDrawerVisible(true);
   };
 
-  const handleUninstall = async (id: string) => {
+  const handleUninstall = async (name: string) => {
     try {
-      await uninstallSkill(id);
+      await uninstallSkill(name);
       message.success('Skill uninstalled successfully');
     } catch (error) {
       message.error('Failed to uninstall skill');
     }
   };
 
-  const selectedSkillData = selectedSkill ? skills[selectedSkill] : null;
-
-  const getCategoryColor = (category: SkillCategory): string => {
-    const colors: Record<string, string> = {
-      domain: 'blue',
-      tool: 'green',
-      integration: 'purple',
-      template: 'orange',
-    };
-    return colors[category] || 'default';
-  };
-
-  const getCategoryLabel = (category: SkillCategory): string => {
-    const labels: Record<string, string> = {
-      domain: 'Domain Skill',
-      tool: 'Tool Extension',
-      integration: 'Integration',
-      template: 'Template',
-    };
-    return labels[category] || category;
-  };
-
-  const groupedSkills = Object.values(skills).reduce((acc, skill) => {
-    const cat = skill.category;
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(skill);
-    return acc;
-  }, {} as Record<string, SkillManifest[]>);
+  const selectedSkillData = selectedSkill 
+    ? skills.find(s => s.name === selectedSkill) 
+    : null;
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Title level={5} style={{ margin: 0 }}>
           Skill Manager
-          <Badge count={Object.keys(skills).length} style={{ marginLeft: 8 }} />
+          <Badge count={skills.length} style={{ marginLeft: 8 }} />
         </Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setInstallModalVisible(true)}>
           Install Skill
         </Button>
       </div>
 
-      {Object.keys(skills).length === 0 ? (
+      {skills.length === 0 ? (
         <Empty 
           description={
             <Space direction="vertical" size="small">
@@ -134,77 +105,57 @@ const SkillManager: React.FC = () => {
         />
       ) : (
         <div style={{ flex: 1, overflow: 'auto', padding: '0 16px' }}>
-          {Object.entries(groupedSkills).map(([category, categorySkills]) => (
-            <Card
-              key={category}
-              title={
-                <Space>
-                  <Tag color={getCategoryColor(category as SkillCategory)}>
-                    {getCategoryLabel(category as SkillCategory)}
-                  </Tag>
-                  <Text type="secondary">({categorySkills.length})</Text>
-                </Space>
-              }
-              size="small"
-              style={{ marginBottom: 16 }}
-            >
-              <List
-                dataSource={categorySkills.sort((a, b) => a.name.localeCompare(b.name))}
-                renderItem={(skill) => (
-                  <List.Item
-                    actions={[
-                      <Button
-                        key="view"
-                        type="link"
-                        size="small"
-                        icon={<InfoCircleOutlined />}
-                        onClick={() => handleView(skill)}
-                      >
-                        Details
-                      </Button>,
-                      <Popconfirm
-                        key="uninstall"
-                        title="Uninstall this skill?"
-                        onConfirm={() => handleUninstall(skill.id)}
-                      >
-                        <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-                          Uninstall
-                        </Button>
-                      </Popconfirm>,
-                    ]}
-                  >
-                    <List.Item.Meta
-                      avatar={<ThunderboltOutlined style={{ fontSize: 24, color: '#1890ff' }} />}
-                      title={
-                        <Space>
-                          <Text strong>{skill.name}</Text>
-                          <Tag>v{skill.version}</Tag>
-                          {skill.author && <Text type="secondary">by {skill.author}</Text>}
+          <Card size="small" style={{ marginBottom: 16 }}>
+            <List
+              dataSource={skills.sort((a, b) => a.name.localeCompare(b.name))}
+              renderItem={(skill) => (
+                <List.Item
+                  actions={[
+                    <Button
+                      key="view"
+                      type="link"
+                      size="small"
+                      icon={<InfoCircleOutlined />}
+                      onClick={() => handleView(skill)}
+                    >
+                      Details
+                    </Button>,
+                    <Popconfirm
+                      key="uninstall"
+                      title="Uninstall this skill?"
+                      onConfirm={() => handleUninstall(skill.name)}
+                    >
+                      <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+                        Uninstall
+                      </Button>
+                    </Popconfirm>,
+                  ]}
+                >
+                  <List.Item.Meta
+                    avatar={<ThunderboltOutlined style={{ fontSize: 24, color: '#1890ff' }} />}
+                    title={
+                      <Space>
+                        <Text strong>{skill.name}</Text>
+                      </Space>
+                    }
+                    description={
+                      <Space direction="vertical" size="small">
+                        <Text type="secondary">{skill.description}</Text>
+                        <Space size={4}>
+                          {skill.tags.slice(0, 3).map((tag, i) => (
+                            <Tag key={i} color="blue">{tag}</Tag>
+                          ))}
+                          {skill.tags.length > 3 && (
+                            <Tag>+{skill.tags.length - 3}</Tag>
+                          )}
                         </Space>
-                      }
-                      description={
-                        <Space direction="vertical" size="small">
-                          <Text type="secondary">{skill.description}</Text>
-                          <Space size={4}>
-                            <Tooltip title="Tools provided">
-                              <Tag icon={<ToolOutlined />} color="green">
-                                {skill.tools.length} tools
-                              </Tag>
-                            </Tooltip>
-                            <Tooltip title="Prompts included">
-                              <Tag icon={<FileTextOutlined />} color="blue">
-                                {skill.prompts.length} prompts
-                              </Tag>
-                            </Tooltip>
-                          </Space>
-                        </Space>
-                      }
-                    />
-                  </List.Item>
-                )}
-              />
-            </Card>
-          ))}
+                      </Space>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          </Card>
         </div>
       )}
 
@@ -217,9 +168,9 @@ const SkillManager: React.FC = () => {
         okText="Install"
         confirmLoading={installing}
       >
-        <Space direction="vertical" style={{ width: '100%' }}>
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
           <Alert
-            message="Enter the path to a skill directory containing a manifest.json file"
+            message="Enter the path to a skill directory containing a SKILL.md file"
             type="info"
             showIcon
           />
@@ -230,7 +181,7 @@ const SkillManager: React.FC = () => {
             prefix={<FolderOpenOutlined />}
           />
           <Text type="secondary">
-            Skills can be installed from local directories or Git repositories
+            Skills follow the agentskills.io standard. Each skill directory should contain a SKILL.md file with YAML frontmatter.
           </Text>
         </Space>
       </Modal>
@@ -245,110 +196,38 @@ const SkillManager: React.FC = () => {
       >
         {selectedSkillData && (
           <Space direction="vertical" style={{ width: '100%' }} size="large">
-            <Descriptions column={2} bordered size="small">
+            <Descriptions column={1} bordered size="small">
               <Descriptions.Item label="ID">{selectedSkillData.id}</Descriptions.Item>
-              <Descriptions.Item label="Version">{selectedSkillData.version}</Descriptions.Item>
-              <Descriptions.Item label="Category">
-                <Tag color={getCategoryColor(selectedSkillData.category)}>
-                  {getCategoryLabel(selectedSkillData.category)}
-                </Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Author">{selectedSkillData.author || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Description" span={2}>
+              <Descriptions.Item label="Name">{selectedSkillData.name}</Descriptions.Item>
+              <Descriptions.Item label="Description">
                 {selectedSkillData.description}
               </Descriptions.Item>
-              {selectedSkillData.homepage && (
-                <Descriptions.Item label="Homepage" span={2}>
-                  <a href={selectedSkillData.homepage} target="_blank" rel="noopener noreferrer">
-                    {selectedSkillData.homepage}
-                  </a>
-                </Descriptions.Item>
-              )}
-              {selectedSkillData.repository && (
-                <Descriptions.Item label="Repository" span={2}>
-                  <a href={selectedSkillData.repository} target="_blank" rel="noopener noreferrer">
-                    {selectedSkillData.repository}
-                  </a>
-                </Descriptions.Item>
-              )}
             </Descriptions>
 
-            <Title level={5}>Keywords</Title>
+            <Title level={5}>
+              <TagOutlined style={{ marginRight: 8 }} />
+              Tags
+            </Title>
             <Space wrap>
-              {selectedSkillData.keywords.map((keyword, i) => (
-                <Tag key={i}>{keyword}</Tag>
-              ))}
-            </Space>
-
-            {selectedSkillData.dependencies.length > 0 && (
-              <>
-                <Title level={5}>Dependencies</Title>
-                <Space wrap>
-                  {selectedSkillData.dependencies.map((dep, i) => (
-                    <Tag key={i} color="orange">{dep}</Tag>
-                  ))}
-                </Space>
-              </>
-            )}
-
-            <Title level={5}>Tools Provided ({selectedSkillData.tools.length})</Title>
-            {selectedSkillData.tools.length > 0 ? (
-              <List
-                size="small"
-                bordered
-                dataSource={selectedSkillData.tools}
-                renderItem={(tool) => (
-                  <List.Item>
-                    <List.Item.Meta
-                      title={tool.name}
-                      description={tool.description}
-                    />
-                  </List.Item>
-                )}
-              />
-            ) : (
-              <Text type="secondary">No tools provided</Text>
-            )}
-
-            <Title level={5}>Prompts ({selectedSkillData.prompts.length})</Title>
-            {selectedSkillData.prompts.length > 0 ? (
-              <List
-                size="small"
-                bordered
-                dataSource={selectedSkillData.prompts}
-                renderItem={(prompt) => (
-                  <List.Item>
-                    <List.Item.Meta
-                      title={
-                        <Space>
-                          {prompt.name}
-                          <Tag>{prompt.prompt_type}</Tag>
-                          {prompt.target_agent && <Tag color="blue">{prompt.target_agent}</Tag>}
-                        </Space>
-                      }
-                      description={
-                        <Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 0 }}>
-                          {prompt.content}
-                        </Paragraph>
-                      }
-                    />
-                  </List.Item>
-                )}
-              />
-            ) : (
-              <Text type="secondary">No prompts included</Text>
-            )}
-
-            <Title level={5}>Compatible Agents</Title>
-            <Space wrap>
-              {selectedSkillData.compatible_agents.length > 0 ? (
-                selectedSkillData.compatible_agents.map((agent, i) => (
-                  <Tag key={i} color="purple">{agent}</Tag>
+              {selectedSkillData.tags.length > 0 ? (
+                selectedSkillData.tags.map((tag, i) => (
+                  <Tag key={i} color="blue">{tag}</Tag>
                 ))
               ) : (
-                <Text type="secondary">All agents</Text>
+                <Text type="secondary">No tags</Text>
               )}
             </Space>
+
+            <Title level={5}>Skill Instructions</Title>
+            {selectedSkillData.body ? (
+              <Card size="small" style={{ maxHeight: 400, overflow: 'auto' }}>
+                <Paragraph style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>
+                  {selectedSkillData.body}
+                </Paragraph>
+              </Card>
+            ) : (
+              <Text type="secondary">No instructions defined</Text>
+            )}
           </Space>
         )}
       </Drawer>

@@ -49,4 +49,5 @@ cowork-core = { path = "../../cowork-core" }
 adk-core = { workspace = true }
 adk-runner = { workspace = true }
 adk-session = { workspace = true }
+adk-skill = { workspace = true }
 which = "8.0.0"

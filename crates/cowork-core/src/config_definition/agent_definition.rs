@@ -80,10 +80,6 @@ pub struct AgentDefinition {
     #[serde(default)]
     pub tools: Vec<ToolReference>,
     
-    /// Skills to load for this agent (provides additional tools and context)
-    #[serde(default)]
-    pub skills: Vec<String>,
-    
     /// Model configuration (overrides global default)
     #[serde(default)]
     pub model: ModelConfig,
@@ -92,7 +88,7 @@ pub struct AgentDefinition {
     #[serde(default)]
     pub include_contents: IncludeContentsMode,
     
-    /// Tags for categorization
+    /// Tags for categorization and skill matching
     #[serde(default)]
     pub tags: Vec<String>,
     
@@ -136,7 +132,6 @@ impl AgentDefinition {
             agent_type: AgentType::Simple,
             instruction: instruction.into(),
             tools: Vec::new(),
-            skills: Vec::new(),
             model: ModelConfig::default(),
             include_contents: IncludeContentsMode::None,
             tags: Vec::new(),
@@ -162,9 +157,9 @@ impl AgentDefinition {
         self
     }
     
-    /// Add a skill reference
-    pub fn with_skill(mut self, skill_id: impl Into<String>) -> Self {
-        self.skills.push(skill_id.into());
+    /// Add a tag for skill matching
+    pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
+        self.tags.push(tag.into());
         self
     }
     

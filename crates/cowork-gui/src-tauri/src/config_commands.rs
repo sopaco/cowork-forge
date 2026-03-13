@@ -1,12 +1,45 @@
 use cowork_core::llm::config::{self, ModelConfig, LlmConfig};
 use cowork_core::config_definition::{AgentDefinition, StageDefinition, FlowDefinition};
 use cowork_core::config_definition::validator::ConfigValidator;
-use cowork_core::skills::SkillLoader;
-use cowork_core::config_definition::SkillDefinition;
+use cowork_core::skills::SkillManager;
 use cowork_core::config_definition::IntegrationDefinition;
 use cowork_core::instructions::*;
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
+
+/// Skill info for frontend (from adk-skill SkillDocument)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillInfo {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub tags: Vec<String>,
+    pub body: String,
+}
+
+impl From<&adk_skill::SkillDocument> for SkillInfo {
+    fn from(doc: &adk_skill::SkillDocument) -> Self {
+        Self {
+            id: doc.id.clone(),
+            name: doc.name.clone(),
+            description: doc.description.clone(),
+            tags: doc.tags.clone(),
+            body: doc.body.clone(),
+        }
+    }
+}
+
+impl From<&adk_skill::ParsedSkill> for SkillInfo {
+    fn from(parsed: &adk_skill::ParsedSkill) -> Self {
+        Self {
+            id: format!("skill-{}", parsed.name),
+            name: parsed.name.clone(),
+            description: parsed.description.clone(),
+            tags: parsed.tags.clone(),
+            body: parsed.body.clone(),
+        }
+    }
+}
 
 /// V3 Config Registry state for frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -14,7 +47,7 @@ pub struct ConfigRegistryState {
     pub agents: HashMap<String, AgentDefinition>,
     pub stages: HashMap<String, StageDefinition>,
     pub flows: HashMap<String, FlowDefinition>,
-    pub skills: HashMap<String, SkillDefinition>,
+    pub skills: Vec<SkillInfo>,
     pub integrations: HashMap<String, IntegrationDefinition>,
     pub default_flow_id: Option<String>,
 }
@@ -46,12 +79,14 @@ pub async fn gui_get_config_registry() -> Result<ConfigRegistryState, String> {
         }
     }
     
-    let mut skills = HashMap::new();
-    for id in registry.list_skills() {
-        if let Some(skill) = registry.get_skill(&id) {
-            skills.insert(id, skill);
+    // Get skills from SkillManager (using current directory as project root)
+    let skills = match SkillManager::for_project(".") {
+        Ok(manager) => manager.list_skills().iter().map(SkillInfo::from).collect(),
+        Err(e) => {
+            tracing::warn!("Failed to load skills: {}", e);
+            Vec::new()
         }
-    }
+    };
     
     let mut integrations = HashMap::new();
     for id in registry.list_integrations() {
@@ -328,26 +363,83 @@ pub async fn gui_set_default_flow(flow_id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Install a skill from a local directory
 #[tauri::command]
-pub async fn gui_install_skill(skill_path: String) -> Result<SkillDefinition, String> {
+pub async fn gui_install_skill(skill_path: String) -> Result<SkillInfo, String> {
     use std::path::Path;
-    let path = Path::new(&skill_path);
-    let loader = SkillLoader::new(None);
-    let manifest = loader.load_skill(path)
-        .map_err(|e| format!("Failed to load skill: {}", e))?;
     
-    // Register the skill
-    let registry = cowork_core::config_definition::global_registry();
-    registry.register_skill(manifest.definition.clone())
-        .map_err(|e| format!("Failed to register skill: {}", e))?;
+    // Strip @ prefix if present (Tauri dialog may add this)
+    let skill_path = skill_path.strip_prefix('@').unwrap_or(&skill_path);
+    let path = Path::new(skill_path);
     
-    Ok(manifest.definition)
+    // Read and parse SKILL.md first to get skill info
+    let skill_md_path = path.join("SKILL.md");
+    if !skill_md_path.exists() {
+        return Err(format!("Source directory does not contain SKILL.md: {:?}", path));
+    }
+    
+    let content = std::fs::read_to_string(&skill_md_path)
+        .map_err(|e| format!("Failed to read SKILL.md: {}", e))?;
+    
+    let parsed = adk_skill::parse_skill_markdown(&skill_md_path, &content)
+        .map_err(|e| format!("Failed to parse SKILL.md: {}", e))?;
+    
+    let skill_name = parsed.name.clone();
+    
+    // Create target directory and copy skill files
+    let target_dir = Path::new(".").join(".skills").join(&skill_name);
+    std::fs::create_dir_all(&target_dir)
+        .map_err(|e| format!("Failed to create target directory: {}", e))?;
+    
+    // Copy all files from source to target
+    copy_dir_all(path, &target_dir)
+        .map_err(|e| format!("Failed to copy skill files: {}", e))?;
+    
+    tracing::info!("Installed skill '{}' to {:?}", skill_name, target_dir);
+    
+    // Return SkillInfo from the parsed skill document
+    Ok(SkillInfo::from(&parsed))
 }
 
+/// Recursively copy a directory
+fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> Result<(), String> {
+    std::fs::create_dir_all(dst)
+        .map_err(|e| format!("Failed to create directory: {}", e))?;
+    
+    for entry in std::fs::read_dir(src)
+        .map_err(|e| format!("Failed to read directory: {}", e))? 
+    {
+        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+        let ty = entry.file_type()
+            .map_err(|e| format!("Failed to get file type: {}", e))?;
+        
+        if ty.is_dir() {
+            copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            std::fs::copy(entry.path(), dst.join(entry.file_name()))
+                .map_err(|e| format!("Failed to copy file: {}", e))?;
+        }
+    }
+    
+    Ok(())
+}
+
+/// Uninstall a skill by name
 #[tauri::command]
-pub async fn gui_uninstall_skill(skill_id: String) -> Result<(), String> {
-    // Note: unregister_skill not implemented, just return success
-    let _ = skill_id;
+pub async fn gui_uninstall_skill(skill_name: String) -> Result<(), String> {
+    use std::path::Path;
+    
+    // Get skills directory
+    let skills_dir = Path::new(".").join(".skills").join(&skill_name);
+    
+    if skills_dir.exists() {
+        std::fs::remove_dir_all(&skills_dir)
+            .map_err(|e| format!("Failed to remove skill directory: {}", e))?;
+        tracing::info!("Uninstalled skill: {}", skill_name);
+    } else {
+        tracing::warn!("Skill directory not found: {:?}", skills_dir);
+    }
+    
     Ok(())
 }
 

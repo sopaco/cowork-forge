@@ -4,7 +4,7 @@ import type {
   AgentDefinition,
   StageDefinition,
   FlowDefinition,
-  SkillManifest,
+  SkillInfo,
   IntegrationDefinition,
   ConfigRegistryState,
   ValidationResult,
@@ -17,7 +17,7 @@ interface ConfigState extends ConfigRegistryState {
   selectedFlow: string | null;
   selectedAgent: string | null;
   selectedStage: string | null;
-  selectedSkill: string | null;
+  selectedSkill: string | null;  // skill name
   selectedIntegration: string | null;
 
   // Actions
@@ -26,7 +26,7 @@ interface ConfigState extends ConfigRegistryState {
   selectFlow: (id: string | null) => void;
   selectAgent: (id: string | null) => void;
   selectStage: (id: string | null) => void;
-  selectSkill: (id: string | null) => void;
+  selectSkill: (name: string | null) => void;
   selectIntegration: (id: string | null) => void;
 
   // CRUD Operations
@@ -38,7 +38,7 @@ interface ConfigState extends ConfigRegistryState {
   deleteFlow: (id: string) => Promise<void>;
   setDefaultFlow: (id: string) => Promise<void>;
   installSkill: (skillPath: string) => Promise<void>;
-  uninstallSkill: (id: string) => Promise<void>;
+  uninstallSkill: (name: string) => Promise<void>;
   saveIntegration: (integration: IntegrationDefinition) => Promise<void>;
   deleteIntegration: (id: string) => Promise<void>;
 
@@ -59,7 +59,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   agents: {},
   stages: {},
   flows: {},
-  skills: {},
+  skills: [],
   integrations: {},
   default_flow_id: null,
   loading: false,
@@ -199,8 +199,8 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
 
   installSkill: async (skillPath) => {
     try {
-      const skill = await invoke<SkillManifest>('gui_install_skill', { skillPath });
-      const skills = { ...get().skills, [skill.id]: skill };
+      const skill = await invoke<SkillInfo>('gui_install_skill', { skillPath });
+      const skills = [...get().skills, skill];
       set({ skills });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to install skill' });
@@ -208,12 +208,11 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     }
   },
 
-  uninstallSkill: async (id) => {
+  uninstallSkill: async (name) => {
     try {
-      await invoke('gui_uninstall_skill', { skillId: id });
-      const skills = { ...get().skills };
-      delete skills[id];
-      set({ skills, selectedSkill: get().selectedSkill === id ? null : get().selectedSkill });
+      await invoke('gui_uninstall_skill', { skillName: name });
+      const skills = get().skills.filter(s => s.name !== name);
+      set({ skills, selectedSkill: get().selectedSkill === name ? null : get().selectedSkill });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to uninstall skill' });
       throw error;
