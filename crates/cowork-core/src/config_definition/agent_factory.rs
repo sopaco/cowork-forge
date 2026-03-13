@@ -12,8 +12,75 @@ use crate::config_definition::{
 use crate::instructions::*;
 use crate::tools::*;
 use crate::storage::set_iteration_id;
+use crate::skills::{SkillManager, SelectionPolicy};
 use adk_agent::{LlmAgentBuilder, LoopAgent};
 use adk_core::{Llm, Agent, IncludeContents};
+use adk_skill::select_skill_prompt_block;
+
+/// Default max characters to inject from skill body
+const DEFAULT_MAX_SKILL_CHARS: usize = 4000;
+
+/// Build a skill context string for injection into agent instructions
+///
+/// Selects relevant skills based on agent metadata (tags, description, stage type)
+/// and returns a formatted context block to prepend to instructions.
+fn build_skill_context(definition: &AgentDefinition, stage_type: Option<&StageType>) -> Option<String> {
+    // Try to load skills from current directory
+    let manager = match SkillManager::for_project(".") {
+        Ok(m) => m,
+        Err(_) => return None, // No skills available
+    };
+    
+    if manager.is_empty() {
+        return None;
+    }
+    
+    // Build query from agent metadata
+    let query = build_skill_query(definition, stage_type);
+    
+    // Select matching skill
+    let policy = SelectionPolicy::default();
+    let (skill_match, prompt_block) = select_skill_prompt_block(
+        manager.index(),
+        &query,
+        &policy,
+        DEFAULT_MAX_SKILL_CHARS,
+    )?;
+    
+    tracing::info!(
+        "Injected skill '{}' into agent '{}' (score: {:.2})",
+        skill_match.skill.name,
+        definition.id,
+        skill_match.score
+    );
+    
+    Some(prompt_block)
+}
+
+/// Build a query string for skill matching based on agent metadata
+fn build_skill_query(definition: &AgentDefinition, stage_type: Option<&StageType>) -> String {
+    let mut parts = Vec::new();
+    
+    // Add agent description
+    if let Some(desc) = &definition.description {
+        parts.push(desc.clone());
+    }
+    
+    // Add tags
+    parts.extend(definition.tags.clone());
+    
+    // Add stage type context
+    if let Some(st) = stage_type {
+        let stage_str = match st {
+            StageType::Simple => "simple execution",
+            StageType::ActorCritic => "iterative refinement actor critic",
+        };
+        parts.push(stage_str.to_string());
+    }
+    
+    // Join all parts
+    parts.join(" ")
+}
 
 /// Create an agent from configuration definition
 pub fn create_agent_from_config(
@@ -21,8 +88,29 @@ pub fn create_agent_from_config(
     model: Arc<dyn Llm>,
     iteration_id: String,
 ) -> Result<Arc<dyn Agent>> {
+    create_agent_from_config_with_stage(definition, model, iteration_id, None)
+}
+
+/// Create an agent from configuration definition with optional stage context for skill matching
+pub fn create_agent_from_config_with_stage(
+    definition: &AgentDefinition,
+    model: Arc<dyn Llm>,
+    iteration_id: String,
+    stage_type: Option<&StageType>,
+) -> Result<Arc<dyn Agent>> {
     // Resolve instruction from reference
-    let instruction = resolve_instruction(&definition.instruction, &iteration_id)?;
+    let base_instruction = resolve_instruction(&definition.instruction, &iteration_id)?;
+    
+    // Build skill context and combine with base instruction
+    let instruction = if let Some(skill_context) = build_skill_context(definition, stage_type) {
+        format!(
+            "## Relevant Skills\n\n{}\n\n---\n\n## Agent Instructions\n\n{}",
+            skill_context,
+            base_instruction
+        )
+    } else {
+        base_instruction
+    };
     
     // Create agent builder
     let mut builder = LlmAgentBuilder::new(&definition.id)
@@ -63,11 +151,21 @@ pub fn create_loop_agent_from_config(
     let critic_def = registry.get_agent(&actor_critic.critic)
         .with_context(|| format!("Critic agent not found: {}", actor_critic.critic))?;
     
-    // Create actor agent
-    let actor = create_simple_agent_from_config(&actor_def, model.clone(), iteration_id.clone())?;
+    // Create actor agent with skill injection
+    let actor = create_simple_agent_from_config_with_stage(
+        &actor_def, 
+        model.clone(), 
+        iteration_id.clone(),
+        Some(&StageType::ActorCritic)
+    )?;
     
-    // Create critic agent
-    let critic = create_simple_agent_from_config(&critic_def, model, iteration_id)?;
+    // Create critic agent with skill injection
+    let critic = create_simple_agent_from_config_with_stage(
+        &critic_def, 
+        model, 
+        iteration_id,
+        Some(&StageType::ActorCritic)
+    )?;
     
     // Create loop agent
     let max_iterations = actor_critic.max_iterations;
@@ -80,14 +178,26 @@ pub fn create_loop_agent_from_config(
     Ok(Arc::new(loop_agent))
 }
 
-/// Create a simple (non-loop) agent from config
-fn create_simple_agent_from_config(
+/// Create a simple (non-loop) agent from config with optional stage context for skill matching
+fn create_simple_agent_from_config_with_stage(
     definition: &AgentDefinition,
     model: Arc<dyn Llm>,
     iteration_id: String,
+    stage_type: Option<&StageType>,
 ) -> Result<Arc<dyn Agent>> {
     // Resolve instruction
-    let instruction = resolve_instruction(&definition.instruction, &iteration_id)?;
+    let base_instruction = resolve_instruction(&definition.instruction, &iteration_id)?;
+    
+    // Build skill context and combine with base instruction
+    let instruction = if let Some(skill_context) = build_skill_context(definition, stage_type) {
+        format!(
+            "## Relevant Skills\n\n{}\n\n---\n\n## Agent Instructions\n\n{}",
+            skill_context,
+            base_instruction
+        )
+    } else {
+        base_instruction
+    };
     
     // Create agent builder
     let mut builder = LlmAgentBuilder::new(&definition.id)
@@ -269,7 +379,7 @@ pub fn create_agent_for_stage(
                 .with_context(|| format!("Simple stage {} has no agent reference", stage_id))?;
             let agent_def = registry.get_agent(agent_id)
                 .with_context(|| format!("Agent not found: {}", agent_id))?;
-            create_agent_from_config(&agent_def, model, iteration_id)
+            create_agent_from_config_with_stage(&agent_def, model, iteration_id, Some(&stage.stage_type))
         }
         StageType::ActorCritic => {
             create_loop_agent_from_config(&stage, model, iteration_id)
