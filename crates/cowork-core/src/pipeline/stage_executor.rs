@@ -16,7 +16,6 @@ use crate::pipeline::{PipelineContext, StageResult};
 use crate::storage::set_iteration_id;
 use adk_core::{Content, Event};
 use futures::StreamExt;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Map internal agent names to user-friendly display names
@@ -26,7 +25,7 @@ fn get_display_name(agent_name: &str) -> String {
     if let Some(agent_def) = registry.get_agent(agent_name) {
         return agent_def.name.clone();
     }
-    
+
     // Fallback to hardcoded names for system agents
     match agent_name {
         // System agents
@@ -155,7 +154,7 @@ pub async fn execute_stage_with_instruction(
                 if parts.len() == 2 {
                     let target_stage = parts[0].to_string();
                     let reason = parts[1].to_string();
-                    
+
                     interaction
                         .show_message_with_context(
                             crate::interaction::MessageLevel::Warning,
@@ -163,7 +162,7 @@ pub async fn execute_stage_with_instruction(
                             MessageContext::new(&display_name).with_stage(stage_name),
                         )
                         .await;
-                    
+
                     return StageResult::GotoStage(target_stage, reason);
                 }
             }
@@ -207,7 +206,7 @@ pub async fn execute_stage_with_instruction(
                         if parts.len() == 2 {
                             let target_stage = parts[0].to_string();
                             let reason = parts[1].to_string();
-                            
+
                             interaction
                                 .show_message_with_context(
                                     crate::interaction::MessageLevel::Warning,
@@ -215,13 +214,13 @@ pub async fn execute_stage_with_instruction(
                                     MessageContext::new(&display_name).with_stage(stage_name),
                                 )
                                 .await;
-                            
+
                             // Return immediately to trigger stage jump
                             return StageResult::GotoStage(target_stage, reason);
                         }
                     }
                 }
-                
+
                 interaction
                     .show_message_with_context(
                         crate::interaction::MessageLevel::Error,
@@ -281,7 +280,7 @@ fn truncate_content(content: &str, max_chars: usize) -> String {
 fn load_artifact_content(ctx: &PipelineContext, artifact_name: &str) -> Option<String> {
     let iteration_dir = ctx.workspace_path.parent().unwrap_or(&ctx.workspace_path);
     let artifact_path = iteration_dir.join("artifacts").join(artifact_name);
-    
+
     if artifact_path.exists() {
         match std::fs::read_to_string(&artifact_path) {
             Ok(content) if !content.trim().is_empty() => {
@@ -304,7 +303,7 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
 
     // Pre-inject artifacts from previous stages (Optimization: reduces tool calls)
     let mut injected_artifacts = Vec::new();
-    
+
     match stage_name {
         "prd" => {
             // PRD needs Idea
@@ -367,7 +366,7 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
                 ("design.md", "Design Document"),
                 ("plan.md", "Implementation Plan"),
             ];
-            
+
             for (filename, label) in artifacts {
                 if let Some(content) = load_artifact_content(ctx, filename) {
                     prompt.push_str("═══════════════════════════════════════════════════════════════\n");
@@ -552,7 +551,7 @@ impl SimpleInvocationContext {
             session: Box::new(SimpleSession::new(&ctx.iteration.id, content.clone())),
             run_config: adk_core::RunConfig {
                 streaming_mode: adk_core::StreamingMode::SSE,
-                tool_confirmation_decisions: HashMap::new(),
+                ..adk_core::RunConfig::default()
             },
             ended: std::sync::atomic::AtomicBool::new(false),
             artifacts: None, // TODO: implement artifacts

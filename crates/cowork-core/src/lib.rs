@@ -33,7 +33,7 @@ pub mod pipeline;
 pub mod instructions;
 pub mod interaction;
 
-// Skills ecosystem (V3)
+// Skills ecosystem (agentskills.io standard via adk-skill)
 pub mod skills;
 
 // Integration system (V3)
@@ -71,17 +71,27 @@ pub use config_definition::{
     AgentDefinition, AgentType, ModelConfig, ToolReference, IncludeContentsMode,
     StageDefinition, StageType, HookConfig, HookPoint, ArtifactConfig, StageRetryConfig,
     FlowDefinition, StageReference, FlowConfig, MemoryScope, InheritanceConfig, InheritanceMode,
-    SkillDefinition, SkillCategory, SkillTool, SkillPrompt, SkillManifest,
     IntegrationDefinition, IntegrationType, ConnectionConfig, AuthConfig, IntegrationEvent,
     ConfigRegistry, global_registry, ConfigLoader, LoadReport, ConfigValidator, ValidationResult,
     create_agent_for_stage, create_agent_from_config, initialize_config_registry,
 };
 
-// Re-exports for skills (V3)
+// Re-exports for skills (agentskills.io standard via adk-skill)
 pub use skills::{
-    SkillLoader, SkillLoadReport, SkillValidator, SkillValidationResult,
-    SkillRuntime, SkillRuntimeError, LoadedSkill,
-    SkillContext, SkillContextBuilder, PromptInjection,
+    SkillManager, SkillManagerConfig,
+    // Core types
+    SkillDocument, SkillIndex, SkillSummary, SkillMatch,
+    // Selection
+    SelectionPolicy,
+    // Injection
+    SkillInjector, SkillInjectorConfig,
+    apply_skill_injection, select_skill_prompt_block,
+    // Loading and parsing
+    load_skill_index, parse_skill_markdown, parse_instruction_markdown,
+    // Discovery
+    discover_skill_files, discover_instruction_files,
+    // Errors
+    SkillError, SkillResult,
 };
 
 // Re-exports for integration (V3)

@@ -133,47 +133,13 @@ export interface FlowDefinition {
   is_builtin?: boolean;
 }
 
-// Skill Types
-export type SkillCategory = 'domain' | 'tool' | 'integration' | 'template';
-
-export type SkillPromptType = 'prepend' | 'append' | 'replace';
-
-export interface SkillPrompt {
-  name: string;
-  prompt_type: SkillPromptType;
-  content: string;
-  target_agent?: string;
-}
-
-export type ToolImplementation = 
-  | { builtin: { tool_id: string } }
-  | { script: { script: string; interpreter?: string } }
-  | { command: { command: string; args?: string[] } };
-
-export interface SkillTool {
-  name: string;
-  description: string;
-  implementation: ToolImplementation;
-}
-
-export interface SkillManifest {
+// Skill Types (agentskills.io standard)
+export interface SkillInfo {
   id: string;
   name: string;
-  version: string;
   description: string;
-  category: SkillCategory;
-  author?: string;
-  homepage?: string;
-  repository?: string;
-  keywords: string[];
-  dependencies: string[];
-  tools: SkillTool[];
-  prompts: SkillPrompt[];
-  provides_tools: string[];
-  compatible_agents: string[];
-  min_platform_version?: string;
-  license?: string;
-  config_schema?: Record<string, unknown>;
+  tags: string[];
+  body: string;
 }
 
 // Integration Types
@@ -228,7 +194,7 @@ export interface ConfigRegistryState {
   agents: Record<string, AgentDefinition>;
   stages: Record<string, StageDefinition>;
   flows: Record<string, FlowDefinition>;
-  skills: Record<string, SkillManifest>;
+  skills: SkillInfo[];
   integrations: Record<string, IntegrationDefinition>;
   default_flow_id?: string;
 }

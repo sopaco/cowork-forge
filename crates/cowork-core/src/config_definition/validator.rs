@@ -3,13 +3,13 @@
 // Validates:
 // - Required fields
 // - Reference integrity (e.g., stage references existing agent)
-// - Dependency satisfaction (e.g., skill dependencies)
 // - Schema compliance
+//
+// Note: Skills are validated by adk-skill module
 
 use super::agent_definition::AgentDefinition;
 use super::stage_definition::{StageDefinition, StageType};
 use super::flow_definition::FlowDefinition;
-use super::skill_definition::SkillDefinition;
 use super::integration_definition::IntegrationDefinition;
 use super::registry::ConfigRegistry;
 use std::collections::HashSet;
@@ -88,14 +88,6 @@ impl<'a> ConfigValidator<'a> {
             }
         }
         
-        // Validate all skills
-        for id in self.registry.list_skills() {
-            if let Some(skill) = self.registry.get_skill(&id) {
-                let skill_result = self.validate_skill(&skill);
-                result.merge(skill_result);
-            }
-        }
-        
         // Validate all integrations
         for id in self.registry.list_integrations() {
             if let Some(integration) = self.registry.get_integration(&id) {
@@ -133,16 +125,6 @@ impl<'a> ConfigValidator<'a> {
                 "Agent '{}' instruction '{}' does not use a recognized protocol (builtin://, file://, inline://)",
                 agent.id, agent.instruction
             ));
-        }
-        
-        // Validate skill references
-        for skill_id in &agent.skills {
-            if self.registry.get_skill(skill_id).is_none() {
-                result.warning(format!(
-                    "Agent '{}' references unknown skill: {}",
-                    agent.id, skill_id
-                ));
-            }
         }
         
         // Validate model configuration
@@ -286,64 +268,6 @@ impl<'a> ConfigValidator<'a> {
                 result.error(format!(
                     "Flow '{}' global hook references unknown integration: {}",
                     flow.id, hook.integration_id
-                ));
-            }
-        }
-        
-        result
-    }
-    
-    /// Validate a skill definition
-    pub fn validate_skill(&self, skill: &SkillDefinition) -> ValidationResult {
-        let mut result = ValidationResult::new();
-        
-        // Check required fields
-        if skill.id.is_empty() {
-            result.error("Skill ID is required");
-        }
-        
-        if skill.name.is_empty() {
-            result.error(format!("Skill '{}' name is required", skill.id));
-        }
-        
-        if skill.version.is_empty() {
-            result.error(format!("Skill '{}' version is required", skill.id));
-        }
-        
-        // Validate version format (basic check)
-        if !skill.version.contains('.') {
-            result.warning(format!(
-                "Skill '{}' version '{}' may not be semver format",
-                skill.id, skill.version
-            ));
-        }
-        
-        // Validate dependencies
-        for dep in &skill.dependencies {
-            if self.registry.get_skill(&dep.skill_id).is_none() {
-                if dep.optional {
-                    result.warning(format!(
-                        "Skill '{}' has optional dependency on unknown skill: {}",
-                        skill.id, dep.skill_id
-                    ));
-                } else {
-                    result.error(format!(
-                        "Skill '{}' has required dependency on unknown skill: {}",
-                        skill.id, dep.skill_id
-                    ));
-                }
-            }
-        }
-        
-        // Validate tool definitions
-        for tool in &skill.tools {
-            if tool.tool_id.is_empty() {
-                result.error(format!("Skill '{}' has tool with empty ID", skill.id));
-            }
-            if tool.description.is_empty() {
-                result.warning(format!(
-                    "Skill '{}' tool '{}' has no description",
-                    skill.id, tool.tool_id
                 ));
             }
         }

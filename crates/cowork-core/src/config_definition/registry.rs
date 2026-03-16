@@ -1,7 +1,9 @@
 // Configuration Registry - Central registry for all configuration definitions
 //
-// The registry manages Agent, Stage, Flow, Skill, and Integration definitions.
-// It provides lookup, validation, and lifecycle management.
+// The registry manages Agent, Stage, Flow, and Integration definitions.
+// Skills are managed separately via adk-skill (see `skills` module).
+//
+// Provides lookup, validation, and lifecycle management.
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -13,7 +15,6 @@ use serde::{Serialize, Deserialize};
 use super::agent_definition::AgentDefinition;
 use super::stage_definition::StageDefinition;
 use super::flow_definition::FlowDefinition;
-use super::skill_definition::SkillDefinition;
 use super::integration_definition::IntegrationDefinition;
 
 /// Get the user config directory for persistent storage
@@ -44,8 +45,6 @@ pub struct ConfigRegistry {
     stages: RwLock<HashMap<String, StageDefinition>>,
     /// Flow definitions by ID
     flows: RwLock<HashMap<String, FlowDefinition>>,
-    /// Skill definitions by ID
-    skills: RwLock<HashMap<String, SkillDefinition>>,
     /// Integration definitions by ID
     integrations: RwLock<HashMap<String, IntegrationDefinition>>,
     /// Default flow ID
@@ -65,7 +64,6 @@ impl ConfigRegistry {
             agents: RwLock::new(HashMap::new()),
             stages: RwLock::new(HashMap::new()),
             flows: RwLock::new(HashMap::new()),
-            skills: RwLock::new(HashMap::new()),
             integrations: RwLock::new(HashMap::new()),
             default_flow: RwLock::new(None),
         }
@@ -263,48 +261,6 @@ impl ConfigRegistry {
     }
     
     // =========================================================================
-    // Skill Management
-    // =========================================================================
-    
-    /// Register a skill definition
-    pub fn register_skill(&self, definition: SkillDefinition) -> Result<()> {
-        let id = definition.id.clone();
-        let mut skills = self.skills.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-        skills.insert(id.clone(), definition);
-        tracing::debug!("Registered skill: {}", id);
-        Ok(())
-    }
-    
-    /// Get a skill definition by ID
-    pub fn get_skill(&self, id: &str) -> Option<SkillDefinition> {
-        let skills = self.skills.read().ok()?;
-        skills.get(id).cloned()
-    }
-    
-    /// List all skill IDs
-    pub fn list_skills(&self) -> Vec<String> {
-        let skills = self.skills.read().unwrap_or_else(|e| {
-            tracing::error!("Lock error: {}", e);
-            panic!("Lock error")
-        });
-        skills.keys().cloned().collect()
-    }
-    
-    /// Check if all skill dependencies are satisfied
-    pub fn check_skill_dependencies(&self, skill_id: &str) -> Result<Vec<String>> {
-        let skill = self.get_skill(skill_id)
-            .with_context(|| format!("Skill not found: {}", skill_id))?;
-        
-        let mut missing = Vec::new();
-        for dep in &skill.dependencies {
-            if !dep.optional && self.get_skill(&dep.skill_id).is_none() {
-                missing.push(dep.skill_id.clone());
-            }
-        }
-        Ok(missing)
-    }
-    
-    // =========================================================================
     // Integration Management
     // =========================================================================
     
@@ -360,10 +316,6 @@ impl ConfigRegistry {
             flows.clear();
         }
         {
-            let mut skills = self.skills.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-            skills.clear();
-        }
-        {
             let mut integrations = self.integrations.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
             integrations.clear();
         }
@@ -376,7 +328,6 @@ impl ConfigRegistry {
             agents: self.agents.read().map(|g| g.len()).unwrap_or(0),
             stages: self.stages.read().map(|g| g.len()).unwrap_or(0),
             flows: self.flows.read().map(|g| g.len()).unwrap_or(0),
-            skills: self.skills.read().map(|g| g.len()).unwrap_or(0),
             integrations: self.integrations.read().map(|g| g.len()).unwrap_or(0),
         }
     }
@@ -666,7 +617,6 @@ pub struct RegistryStats {
     pub agents: usize,
     pub stages: usize,
     pub flows: usize,
-    pub skills: usize,
     pub integrations: usize,
 }
 
