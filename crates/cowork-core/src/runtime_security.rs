@@ -82,7 +82,7 @@ impl RuntimeSecurityChecker {
                 // Deployment/publish (not for dev)
                 Regex::new(r"(?i)npm\s+publish").unwrap(),
                 Regex::new(r"(?i)npm\s+deploy").unwrap(),
-                Regex::new(r"(?i)npm\s+eject").unwrap(),
+                Regex::new(r"(?i)npm\s+(run\s+)?eject").unwrap(),
                 Regex::new(r"(?i)cargo\s+publish").unwrap(),
                 Regex::new(r"(?i)pip\s+upload").unwrap(),
                 Regex::new(r"(?i)twine\s+upload").unwrap(),
