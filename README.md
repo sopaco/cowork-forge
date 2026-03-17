@@ -99,22 +99,34 @@ Cowork Forge GUI guides you through the standard **7-Stage Development Lifecycle
 6.  **✅ Quality Check**: Verify the implementation against requirements.
 7.  **📦 Delivery**: Receive the final project report and artifacts.
 
-## 🔄 Post-Delivery Support
+## 🔄 Post-Delivery Support with PM Agent
 
-After an iteration completes, the **Project Manager Agent** becomes available for continued interaction:
+After an iteration completes, the **Project Manager Agent (PM Agent)** becomes available for continued interaction. PM Agent acts as an intelligent project assistant that understands your intent and takes appropriate actions.
 
-- **💬 Natural Language Chat**: Ask questions about your project, request modifications, or discuss next steps
-- **🔀 Stage Navigation**: Jump back to any stage (Idea, PRD, Design, Plan, Coding) to make changes
-- **➕ Create New Iterations**: Start new iterations for new features with inheritance support
+### Supported Operations
+
+- **🔀 Stage Navigation**: Return to any previous stage (Idea, PRD, Design, Plan, Coding) for re-execution with user confirmation
+- **➕ Create New Iteration**: Start evolution iterations for new features with automatic inheritance (default: partial mode)
+- **💬 Q&A Interaction**: Answer questions about project architecture, artifacts, decisions, and memory
+- **🤔 Clarification Request**: Ask for more details when intent is ambiguous
+
+### Available Tools
+
+- `pm_goto_stage`: Navigate to a specific development stage
+- `pm_create_iteration`: Create a new evolution iteration
+- `pm_respond`: Respond to user questions
+- `pm_save_decision`: Save project decisions
+- `query_memory`: Query project memory for context
 
 ```
 Iteration Completed
         ↓
 [PM Agent Activated]
         ↓
-User: "Fix the login bug" → PM Agent: Jumps to Coding stage
-User: "Add payment feature" → PM Agent: Creates new iteration
-User: "What tech stack?" → PM Agent: Answers directly
+User: "Fix the login bug" → PM Agent: Analyzes intent → Jumps to Coding stage
+User: "Add payment feature" → PM Agent: Creates new iteration with partial inheritance
+User: "What tech stack?" → PM Agent: Queries memory → Answers directly
+User: "Modify the homepage" → PM Agent: Clarifies scope → Suggests options
 ```
 
 
@@ -154,7 +166,8 @@ Cowork Forge's specialized agents work together like a real development team:
 - <strong>Coding Loop Agent</strong>: Plans and executes code changes with actor-critic refinement
 - <strong>Check Agent</strong>: Verifies code quality and completeness
 - <strong>Delivery Agent</strong>: Generates comprehensive delivery reports
-- <strong>Project Manager Agent</strong>: Post-delivery assistant for modifications and new iterations
+- <strong>Knowledge Generation Agent</strong>: Extracts and summarizes project knowledge
+- <strong>Project Manager Agent (PM Agent)</strong>: Post-delivery assistant for modifications, new iterations, and project inquiries
 - <strong>Change Triage Agent</strong>: Analyzes and triages incremental change requests
 - <strong>Code Patch Agent</strong>: Implements precise code patches for modifications
 
@@ -184,19 +197,86 @@ Multi-layer security checks prevent:
 
 - <strong>7-Stage Development Workflow:</strong> Comprehensive workflow covering Idea Intake → PRD Generation → Technical Design → Implementation Plan → Coding → Quality Check → Delivery.
 - <strong>Specialized AI Agents:</strong> Each stage handled by a dedicated agent with domain expertise. Four critical stages (PRD, Design, Plan, Coding) use actor-critic loops for iterative refinement.
-- <strong>Project Manager Agent:</strong> Post-delivery chat interface for continued project interaction. Request modifications, create new iterations, or ask questions about your completed project.
+- <strong>Project Manager Agent:</strong> Post-delivery chat interface for continued project interaction with intelligent intent recognition. Supports bug fixes, requirement changes, new features, and project consultations.
+- <strong>Knowledge Generation:</strong> Automatic extraction of project knowledge including decisions, patterns, and insights after each iteration completion.
 - <strong>External Coding Agent Support:</strong> Optionally integrate external ACP-compatible coding agents (OpenCode, iFlow, Codex, Gemini CLI, Claude CLI) for specialized coding tasks.
 - <strong>Intelligent Code Planning:</strong> Analyzes project structure, dependencies, and generates precise code change plans.
 - <strong>Incremental Code Updates:</strong> Smart delta analysis updates only affected files, preserving existing modifications.
 - <strong>Automated Quality Verification:</strong> Multi-language build/test integration with comprehensive error analysis and reporting.
 - <strong>Human-in-the-Loop Validation:</strong> Critical outputs (PRD, design, plans) require human confirmation before proceeding.
 
-## Configurable System
+## Agents Team Configuration System
 
-- <strong>Custom Workflows (Flow):</strong> Create custom development pipelines with configurable stage combinations and execution order. Enterprises can define standardized process templates for different project types (Web apps, CLI tools, API services) to ensure consistent development practices across teams.
-- <strong>Custom Agents:</strong> Define specialized AI agent roles with custom instructions, tool sets, and model parameters. Teams can create domain-specific agents like security reviewers, performance optimizers, or code quality specialists tailored to their business needs.
-- <strong>Skill Extensions:</strong> Skill package system for injecting domain-specific tools, prompts, and context into agents. Supports multiple skill categories including frontend development, backend services, mobile apps, and DevOps—install and combine as needed.
-- <strong>External Integrations:</strong> Configure integrations with external systems such as deployment platforms, requirement management tools, and CI/CD pipelines through webhooks and REST APIs for automated workflows.
+Cowork Forge V3 introduces a **data-driven configuration system** that transforms hardcoded Agent, Stage, Flow, and Skill definitions into configurable JSON formats, enabling unprecedented flexibility without code modifications.
+
+### Custom Workflows (Flow)
+
+Create custom development pipelines with configurable stage combinations and execution order:
+
+```json
+{
+  "id": "quick-prototype",
+  "name": "Quick Prototype Flow",
+  "stages": ["idea", "prd", "coding", "delivery"],
+  "config": {
+    "stop_on_failure": false,
+    "inheritance": { "default_mode": "partial" }
+  }
+}
+```
+
+Enterprises can define standardized process templates for different project types (Web apps, CLI tools, API services) to ensure consistent development practices.
+
+### Custom Agents
+
+Define specialized AI agent roles with custom instructions, tool sets, and model parameters:
+
+```json
+{
+  "id": "code_reviewer",
+  "name": "Code Reviewer",
+  "instruction": "builtin://code_review",
+  "tools": ["read_file", "query_memory"],
+  "model": { "temperature": 0.3 }
+}
+```
+
+Teams can create domain-specific agents like security reviewers, performance optimizers, or code quality specialists.
+
+### Skill Extensions
+
+Skill packages inject domain-specific tools, prompts, and context into agents using the [agentskills.io](https://agentskills.io) standard:
+
+- **Categories**: web_frontend, web_backend, mobile, devops, testing, security
+- **Discovery**: Automatic loading from `.skills/` directory
+- **Selection**: Semantic matching based on user queries
+
+```markdown
+<!-- .skills/react/SKILL.md -->
+---
+name: react-development
+description: React and TypeScript development skills
+categories: [web_frontend]
+---
+
+You are a React expert. Use functional components with hooks...
+```
+
+### External Integrations
+
+Configure integrations with external systems through REST APIs and webhooks:
+
+- **Deployment Platforms**: Auto-deploy on delivery completion
+- **Requirement Management**: Sync PRD with external tools
+- **CI/CD Pipelines**: Trigger builds on stage completion
+
+### Configuration Locations
+
+| Platform | User Config Directory |
+|----------|----------------------|
+| Windows | `%APPDATA%\com.cowork-forge.app\config\` |
+| macOS | `~/Library/Application Support/com.cowork-forge.app/config/` |
+| Linux | `~/.config/com.cowork-forge.app/config/` |
 
 ## Data Management
 
