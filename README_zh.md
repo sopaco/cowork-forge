@@ -112,6 +112,36 @@ Cowork Forge GUI 引导您完成标准的 **七阶段开发生命周期**：
 6.  **✅ 质量检查**: 根据需求验证实施情况。
 7.  **📦 交付**: 接收最终项目报告和工件。
 
+## 🔄 交付后支持与 PM Agent
+
+迭代完成后，**项目经理 Agent (PM Agent)** 将作为智能项目助理继续为您服务。PM Agent 能够理解您的意图并采取适当的行动。
+
+### 支持的操作
+
+- **🔀 阶段返回**：返回之前的任意阶段（创意、PRD、设计、计划、编码）重新执行，执行前需用户确认
+- **➕ 创建新迭代**：基于新需求创建演进迭代，自动继承（默认：部分继承模式）
+- **💬 问答交互**：回答关于项目架构、工件、决策和记忆的问题
+- **🤔 澄清请求**：当意图不明确时请求更多细节
+
+### 可用工具
+
+- `pm_goto_stage`：导航到指定开发阶段
+- `pm_create_iteration`：创建新的演进迭代
+- `pm_respond`：回复用户问题
+- `pm_save_decision`：保存项目决策
+- `query_memory`：查询项目记忆获取上下文
+
+```
+迭代完成
+    ↓
+[PM Agent 启用]
+    ↓
+用户: "修复登录 bug" → PM Agent: 分析意图 → 跳转到编码阶段
+用户: "添加支付功能" → PM Agent: 创建新迭代（部分继承）
+用户: "用的什么技术栈？" → PM Agent: 查询记忆 → 直接回答
+用户: "修改首页" → PM Agent: 澄清范围 → 提供选项
+```
+
 # 🏆 Cowork Forge 与竞品对比
 
 Cowork Forge 在 AI 开发工具领域通过其独特的多智能体架构和全面的工作流覆盖而脱颖而出。
@@ -155,9 +185,10 @@ Cowork Forge 的专业智能体像真实开发团队一样协同工作:
 - <strong>Coding Loop Agent</strong>: 使用演员-评论家模式规划和执行代码变更
 - <strong>Check Agent</strong>: 验证代码质量和完整性
 - <strong>Delivery Agent</strong>: 生成全面的交付报告
+- <strong>Knowledge Generation Agent</strong>: 提取和总结项目知识
+- <strong>Project Manager Agent (PM Agent)</strong>: 交付后的项目助理，支持修改、新迭代和项目咨询
 - <strong>Change Triage Agent</strong>: 分析和分流增量修改请求
 - <strong>Code Patch Agent</strong>: 实施精准的代码补丁
-- <strong>Modify Delivery Agent</strong>: 生成修改交付报告
 
 ### 3. 人机协作验证
 关键输出需要人工确认才能继续，确保：
@@ -187,17 +218,85 @@ Cowork Forge 的专业智能体像真实开发团队一样协同工作:
 
 - <strong>7 阶段开发工作流：</strong> 涵盖需求采集 → PRD 生成 → 技术设计 → 实施计划 → 编码 → 质量检查 → 交付的完整工作流。
 - <strong>专业 AI 智能体:</strong> 每个阶段由专门的智能体处理，具备领域专业知识。四个关键阶段（PRD、设计、计划、编码）使用演员-评论家循环进行迭代优化，确保输出质量达到专业水准。
+- <strong>项目经理 Agent (PM Agent)：</strong> 交付后的智能项目助理，支持意图识别、阶段返回、创建新迭代和项目问答。
+- <strong>知识自动提取：</strong> 每次迭代完成后自动提取项目知识，包括决策、模式和见解。
 - <strong>智能代码规划：</strong> 分析项目结构、依赖关系，生成精确的代码变更计划。
 - <strong>增量代码更新：</strong> 智能增量分析只更新受影响的文件，保留现有修改。
 - <strong>自动化质量验证：</strong> 多语言构建/测试集成，包含全面的错误分析和报告。
 - <strong>人机协作验证：</strong> 关键输出（PRD、设计、计划）需要人工确认才能继续。
 
-## 可配置系统
+## Agents Team配置系统
 
-- <strong>自定义工作流程 (Flow)：</strong> 支持创建自定义开发流程，企业可根据团队标准流程配置阶段组合和执行顺序。可为不同项目类型（Web 应用、CLI 工具、API 服务等）创建专属流程模板，实现开发流程的标准化和规范化。
-- <strong>自定义产研角色 (Agent)：</strong> 支持自定义 AI 智能体角色，配置专属指令、工具集和模型参数。团队可创建符合自身业务特点的专业角色，如安全审查专家、性能优化顾问、代码审查专员等。
-- <strong>技能扩展 (Skill)：</strong> 提供技能包系统，可为 Agent 注入领域特定的工具、提示和上下文。支持前端开发、后端服务、移动应用、DevOps 等多个技能类别，按需安装和组合。
-- <strong>外部集成 (Integration)：</strong> 支持配置外部系统集成，如部署平台、需求管理系统、CI/CD 流水线等，通过 Webhook 和 REST API 实现自动化工作流。
+Cowork Forge V3 引入了**数据驱动的配置系统**，将原本硬编码的 Agent、Stage、Flow、Skill 和 Integration 定义转为可配置的 JSON 格式，无需修改代码即可实现前所未有的灵活性。
+
+### 自定义工作流程 (Flow)
+
+创建自定义开发流程，配置阶段组合和执行顺序：
+
+```json
+{
+  "id": "quick-prototype",
+  "name": "快速原型流程",
+  "stages": ["idea", "prd", "coding", "delivery"],
+  "config": {
+    "stop_on_failure": false,
+    "inheritance": { "default_mode": "partial" }
+  }
+}
+```
+
+企业可为不同项目类型（Web 应用、CLI 工具、API 服务）定义标准化流程模板，确保开发实践的一致性。
+
+### 自定义产研角色 (Agent)
+
+定义专门的 AI 智能体角色，配置专属指令、工具集和模型参数：
+
+```json
+{
+  "id": "code_reviewer",
+  "name": "代码审查员",
+  "instruction": "builtin://code_review",
+  "tools": ["read_file", "query_memory"],
+  "model": { "temperature": 0.3 }
+}
+```
+
+团队可创建符合自身业务特点的专业角色，如安全审查专家、性能优化顾问、代码审查专员等。
+
+### 技能扩展 (Skill)
+
+使用 [agentskills.io](https://agentskills.io) 标准的技能包系统，可为 Agent 注入领域特定的工具、提示和上下文：
+
+- **技能类别**：web_frontend、web_backend、mobile、devops、testing、security
+- **自动发现**：从 `.skills/` 目录自动加载
+- **智能匹配**：基于用户查询的语义匹配
+
+```markdown
+<!-- .skills/react/SKILL.md -->
+---
+name: react-development
+description: React 和 TypeScript 开发技能
+categories: [web_frontend]
+---
+
+你是 React 专家。使用函数组件和 Hooks...
+```
+
+### 外部集成 (Integration)
+
+通过 REST API 和 Webhook 配置外部系统集成：
+
+- **部署平台**：交付完成时自动部署
+- **需求管理**：PRD 与外部工具同步
+- **CI/CD 流水线**：阶段完成时触发构建
+
+### 配置文件位置
+
+| 平台 | 用户配置目录 |
+|------|-------------|
+| Windows | `%APPDATA%\com.cowork-forge.app\config\` |
+| macOS | `~/Library/Application Support/com.cowork-forge.app/config/` |
+| Linux | `~/.config/com.cowork-forge.app/config/` |
 
 ## 数据管理
 
