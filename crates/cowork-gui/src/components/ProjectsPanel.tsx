@@ -9,6 +9,7 @@ import {
   Empty,
   Spin,
   Tooltip,
+  Space,
 } from "antd";
 import {
   FolderOpenOutlined,
@@ -17,10 +18,11 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   PlusOutlined,
+  ImportOutlined,
 } from "@ant-design/icons";
 
 import { useProjectsData } from '../hooks';
-import { CreateProjectModal, EditProjectModal } from './projects';
+import { CreateProjectModal, EditProjectModal, ImportProjectModal } from './projects';
 import type { ProjectData } from '../types';
 
 const ProjectsPanel: React.FC = () => {
@@ -30,6 +32,7 @@ const ProjectsPanel: React.FC = () => {
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectData | null>(null);
 
   // Project actions
@@ -74,6 +77,33 @@ const ProjectsPanel: React.FC = () => {
 
   const handleProjectCreated = async (projectId: string, projectName: string) => {
     loadProjects();
+
+    // Ask if user wants to open the project
+    Modal.confirm({
+      title: "Open Project?",
+      content: `Would you like to open "${projectName}" now?`,
+      okText: "Open Project",
+      cancelText: "Later",
+      onOk: async () => {
+        try {
+          const hasProject = await invoke<boolean>("has_open_project");
+          if (hasProject) {
+            await invoke("open_project", { projectId });
+            message.info("Opening project in new window...");
+          } else {
+            await invoke("open_project_in_current_window", { projectId });
+            message.success("Project opened successfully");
+          }
+        } catch (error) {
+          message.error("Failed to open project: " + error);
+        }
+      },
+    });
+  };
+
+  const handleProjectImported = async (projectId: string, projectName: string) => {
+    loadProjects();
+    message.success(`Project "${projectName}" imported successfully!`);
 
     // Ask if user wants to open the project
     Modal.confirm({
@@ -155,17 +185,27 @@ const ProjectsPanel: React.FC = () => {
         }}
       >
         <h2 style={{ margin: 0 }}>Projects</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>
-          New Project
-        </Button>
+        <Space>
+          <Button icon={<ImportOutlined />} onClick={() => setShowImportModal(true)}>
+            Import Project
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>
+            New Project
+          </Button>
+        </Space>
       </div>
 
       {/* Project list */}
       {projects.length === 0 ? (
         <Empty description="No projects yet" image={Empty.PRESENTED_IMAGE_SIMPLE}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>
-            Create Your First Project
-          </Button>
+          <Space direction="vertical">
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>
+              Create Your First Project
+            </Button>
+            <Button icon={<ImportOutlined />} onClick={() => setShowImportModal(true)}>
+              Import Existing Project
+            </Button>
+          </Space>
         </Empty>
       ) : (
         <div
@@ -294,6 +334,12 @@ const ProjectsPanel: React.FC = () => {
         }}
         onSuccess={loadProjects}
         project={selectedProject}
+      />
+
+      <ImportProjectModal
+        open={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={handleProjectImported}
       />
     </div>
   );

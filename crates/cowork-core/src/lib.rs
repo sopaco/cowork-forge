@@ -39,13 +39,16 @@ pub mod skills;
 // Integration system (V3)
 pub mod integration;
 
+// Project importer for legacy projects
+pub mod importer;
+
 // Re-exports for convenience
 pub use domain::*;
 pub use persistence::*;
 pub use data::*;
 pub use storage::*;
 pub use llm::*;
-pub use agents::{create_project_manager_agent, execute_pm_agent_message, execute_pm_agent_message_streaming, PMAgentResult, PMAgentAction, PMAgentStreamCallback};
+pub use agents::{create_project_manager_agent, execute_pm_agent_message, execute_pm_agent_message_streaming, PMAgentResult, PMAgentAction, PMAgentStreamCallback, create_legacy_project_analyzer, create_legacy_project_analyzer_with_context};
 pub use tech_stack::*;
 
 // Explicit exports for new modules (to avoid glob re-export conflicts)
@@ -98,6 +101,12 @@ pub use skills::{
 pub use integration::{
     HookManager, HookExecutionContext, HookExecutionResult,
     IntegrationAdapter, AdapterError, RestAdapter,
+};
+
+// Re-exports for importer module
+pub use importer::{
+    ImportConfig, ImportResult, ImportPreview, ArtifactOptions,
+    ProjectAnalysis, ProjectStructure, DetectedTechnology,
 };
 
 // Version info
