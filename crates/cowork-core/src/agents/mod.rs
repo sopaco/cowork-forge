@@ -21,6 +21,10 @@ use std::sync::Arc;
 pub mod external_coding_agent;
 pub use external_coding_agent::{ExternalCodingAgent, StreamingTask};
 
+// Legacy Project Analyzer Agent
+pub mod legacy_project_analyzer;
+pub use legacy_project_analyzer::{create_legacy_project_analyzer, create_legacy_project_analyzer_with_id, create_legacy_project_analyzer_with_context};
+
 // ============================================================================
 // IdeaAgent - Simple agent to capture initial idea
 // ============================================================================

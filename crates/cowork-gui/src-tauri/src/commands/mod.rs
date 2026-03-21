@@ -5,6 +5,7 @@ pub mod memory;
 pub mod template;
 pub mod pm;
 pub mod system;
+pub mod import_cmd;
 
 use lazy_static::lazy_static;
 use std::sync::Mutex;

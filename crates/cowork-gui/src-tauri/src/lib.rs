@@ -22,7 +22,7 @@ mod config_commands;
 use project_manager::*;
 
 // Re-export commands from new module structure
-use commands::{init_app_handle, file, preview, runner, memory, template, pm, system};
+use commands::{init_app_handle, file, preview, runner, memory, template, pm, system, import_cmd};
 
 
 
@@ -765,6 +765,11 @@ pub fn run() {
             pm::pm_restart_iteration,
             pm::pm_get_iteration_context,
             pm::pm_get_welcome_message,
+            // Import commands
+            import_cmd::preview_import,
+            import_cmd::analyze_existing_project,
+            import_cmd::import_project,
+            import_cmd::get_default_artifact_options,
             // System commands
             system::get_system_locale,
             // Config commands

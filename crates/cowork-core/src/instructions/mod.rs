@@ -10,6 +10,7 @@ pub mod delivery;
 pub mod summary;
 pub mod knowledge_gen;
 pub mod project_manager;
+pub mod legacy_project_analyzer;
 
 pub use idea::*;
 pub use prd::*;
@@ -21,3 +22,4 @@ pub use delivery::*;
 pub use summary::*;
 pub use knowledge_gen::*;
 pub use project_manager::*;
+pub use legacy_project_analyzer::*;
