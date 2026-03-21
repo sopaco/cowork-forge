@@ -99,6 +99,40 @@ Cowork Forge GUI guides you through the standard **7-Stage Development Lifecycle
 6.  **✅ Quality Check**: Verify the implementation against requirements.
 7.  **📦 Delivery**: Receive the final project report and artifacts.
 
+## 📥 Import Existing Projects
+
+Cowork Forge supports importing **any existing project** - even those not created with Cowork Forge. The import feature uses AI to reverse-engineer your project and generate comprehensive documentation:
+
+### What Gets Generated
+
+| Artifact | Description |
+|----------|-------------|
+| **idea.md** | Project overview, background, key features, and target users |
+| **prd.md** | Functional requirements, non-functional requirements, and constraints |
+| **design.md** | Technical architecture, technology stack, and module structure |
+| **plan.md** | Implementation phases, task breakdown, and next steps |
+
+### How It Works
+
+1. **Project Scan**: Analyzes directory structure, configurations, and dependencies
+2. **Tech Stack Detection**: Identifies frameworks, languages, and tools
+3. **Documentation Extraction**: Reads README, docs, and key source files
+4. **AI-Powered Generation**: Uses LLM to synthesize information into structured artifacts
+
+### Using Import Feature
+
+In the GUI, click **"Import Project"** on the dashboard and select any project directory. The system will:
+- Preview the project structure
+- Detect technology stack automatically
+- Let you choose which artifacts to generate
+- Create an initial iteration with all generated artifacts
+
+This feature is perfect for:
+- Onboarding existing codebases into Cowork Forge workflow
+- Generating documentation for undocumented projects
+- Understanding unfamiliar codebases quickly
+- Migrating projects to use Cowork Forge's iterative development approach
+
 ## 🔄 Post-Delivery Support with PM Agent
 
 After an iteration completes, the **Project Manager Agent (PM Agent)** becomes available for continued interaction. PM Agent acts as an intelligent project assistant that understands your intent and takes appropriate actions.
@@ -168,6 +202,7 @@ Cowork Forge's specialized agents work together like a real development team:
 - <strong>Delivery Agent</strong>: Generates comprehensive delivery reports
 - <strong>Knowledge Generation Agent</strong>: Extracts and summarizes project knowledge
 - <strong>Project Manager Agent (PM Agent)</strong>: Post-delivery assistant for modifications, new iterations, and project inquiries
+- <strong>Legacy Project Analyzer Agent</strong>: Analyzes existing projects and reverse-engineers documentation (idea.md, prd.md, design.md, plan.md)
 - <strong>Change Triage Agent</strong>: Analyzes and triages incremental change requests
 - <strong>Code Patch Agent</strong>: Implements precise code patches for modifications
 
@@ -198,6 +233,7 @@ Multi-layer security checks prevent:
 - <strong>7-Stage Development Workflow:</strong> Comprehensive workflow covering Idea Intake → PRD Generation → Technical Design → Implementation Plan → Coding → Quality Check → Delivery.
 - <strong>Specialized AI Agents:</strong> Each stage handled by a dedicated agent with domain expertise. Four critical stages (PRD, Design, Plan, Coding) use actor-critic loops for iterative refinement.
 - <strong>Project Manager Agent:</strong> Post-delivery chat interface for continued project interaction with intelligent intent recognition. Supports bug fixes, requirement changes, new features, and project consultations.
+- <strong>Legacy Project Import:</strong> Import any existing project and use AI to reverse-engineer comprehensive documentation (idea.md, prd.md, design.md, plan.md) from code structure and existing docs.
 - <strong>Knowledge Generation:</strong> Automatic extraction of project knowledge including decisions, patterns, and insights after each iteration completion.
 - <strong>External Coding Agent Support:</strong> Optionally integrate external ACP-compatible coding agents (OpenCode, iFlow, Codex, Gemini CLI, Claude CLI) for specialized coding tasks.
 - <strong>Intelligent Code Planning:</strong> Analyzes project structure, dependencies, and generates precise code change plans.
