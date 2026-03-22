@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
 import { Spin, Tag } from 'antd';
 import { TeamOutlined } from '@ant-design/icons';
 import { MarkdownMessage } from '../common';
@@ -30,6 +30,25 @@ interface MessageListProps {
   onToggleThinking: (index: number) => void;
   onActionClick?: (action: PMAction) => void;
 }
+
+// Helper to generate stable key for messages
+const getMessageKey = (msg: ChatMessage, index: number): string => {
+  if (msg.type === 'thinking') {
+    return `thinking-${index}-${msg.agentName || 'unknown'}`;
+  }
+  if (msg.type === 'tool_call') {
+    return `tool-call-${index}-${(msg as ToolCallMessage).toolName}`;
+  }
+  if (msg.type === 'tool_result') {
+    return `tool-result-${index}-${(msg as ToolResultMessage).toolName}`;
+  }
+  // For user/agent messages, use timestamp if available, otherwise index
+  const timestamp = (msg as { timestamp?: string | number }).timestamp;
+  if (timestamp) {
+    return `msg-${timestamp}`;
+  }
+  return `msg-${index}`;
+};
 
 // Memoized message item components
 const ThinkingMessageItem = memo<{ message: ThinkingMessage; onToggle: () => void }>(({ message, onToggle }) => (
@@ -78,24 +97,19 @@ const ToolCallMessageItem = memo<{ message: ToolCallMessage }>(({ message }) => 
       padding: '8px 12px',
       borderRadius: '4px',
       maxWidth: '70%',
-      fontSize: '13px',
+      fontSize: '12px',
       borderLeft: '3px solid #ff9800',
     }}
   >
-    <div style={{ fontWeight: 500, color: '#e65100', marginBottom: '4px' }}>
-      🔧 {message.agentName} called tool:{' '}
-      <code style={{ backgroundColor: 'rgba(0,0,0,0.05)', padding: '1px 4px', borderRadius: '2px', fontSize: '12px' }}>
-        {message.toolName}
-      </code>
+    <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+      🔧 Calling tool: <code style={{ backgroundColor: 'rgba(0,0,0,0.05)', padding: '1px 4px', borderRadius: '2px' }}>{message.toolName}</code>
     </div>
-    {message.arguments && Object.keys(message.arguments).length > 0 && (
+    {Object.keys(message.arguments).length > 0 && (
       <pre
         style={{
-          margin: '4px 0 0',
-          fontSize: '11px',
-          color: '#666',
-          backgroundColor: 'rgba(0,0,0,0.02)',
+          margin: '4px 0 0 0',
           padding: '6px',
+          backgroundColor: 'rgba(0,0,0,0.03)',
           borderRadius: '3px',
           overflow: 'auto',
           maxHeight: '100px',
@@ -128,101 +142,119 @@ const ToolResultMessageItem = memo<{ message: ToolResultMessage }>(({ message })
   </div>
 ));
 
+// Style constants to avoid creating new objects on each render
+const actionStyles: Record<string, React.CSSProperties> = {
+  base: {
+    cursor: 'pointer',
+    marginRight: '8px',
+    marginBottom: '8px',
+    padding: '4px 12px',
+    borderRadius: '4px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    border: '1px solid',
+    transition: 'all 0.2s',
+  },
+  pm_start_app: { backgroundColor: '#f6ffed', borderColor: '#b7eb8f', color: '#52c41a' },
+  pm_open_folder: { backgroundColor: '#e6f7ff', borderColor: '#91d5ff', color: '#1890ff' },
+  pm_view_knowledge: { backgroundColor: '#fff7e6', borderColor: '#ffd591', color: '#fa8c16' },
+  pm_view_artifacts: { backgroundColor: '#f9f0ff', borderColor: '#d3adf7', color: '#722ed1' },
+  pm_view_code: { backgroundColor: '#fff1f0', borderColor: '#ffa39e', color: '#f5222d' },
+  pm_goto_stage: { backgroundColor: '#fffbe6', borderColor: '#ffe58f', color: '#d48806' },
+  default: { backgroundColor: '#f5f5f5', borderColor: '#d9d9d9', color: '#595959' },
+};
+
+const actionIcons: Record<string, string> = {
+  pm_start_app: '🚀',
+  pm_open_folder: '📁',
+  pm_view_knowledge: '📚',
+  pm_view_artifacts: '📄',
+  pm_view_code: '💻',
+  pm_goto_stage: '↩️',
+  pm_create_iteration: '➕',
+};
+
+const getActionStyle = (actionType: string): React.CSSProperties => ({
+  ...actionStyles.base,
+  ...(actionStyles[actionType] || actionStyles.default),
+});
+
+const getActionIcon = (actionType: string): string => actionIcons[actionType] || '▶️';
+
 const PMAgentMessageItem = memo<{ message: PMAgentMessage; onActionClick?: (action: PMAction) => void }>(({ 
   message, 
   onActionClick 
-}) => {
-  const getActionStyle = (actionType: string): React.CSSProperties => {
-    const baseStyle: React.CSSProperties = {
-      cursor: 'pointer',
-      marginRight: '8px',
-      marginBottom: '8px',
-      padding: '4px 12px',
-      borderRadius: '4px',
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '6px',
-      border: '1px solid',
-      transition: 'all 0.2s',
-    };
-
-    switch (actionType) {
-      case 'pm_start_app':
-        return { ...baseStyle, backgroundColor: '#f6ffed', borderColor: '#b7eb8f', color: '#52c41a' };
-      case 'pm_open_folder':
-        return { ...baseStyle, backgroundColor: '#e6f7ff', borderColor: '#91d5ff', color: '#1890ff' };
-      case 'pm_view_knowledge':
-        return { ...baseStyle, backgroundColor: '#fff7e6', borderColor: '#ffd591', color: '#fa8c16' };
-      case 'pm_view_artifacts':
-        return { ...baseStyle, backgroundColor: '#f9f0ff', borderColor: '#d3adf7', color: '#722ed1' };
-      case 'pm_view_code':
-        return { ...baseStyle, backgroundColor: '#fff1f0', borderColor: '#ffa39e', color: '#f5222d' };
-      case 'pm_goto_stage':
-        return { ...baseStyle, backgroundColor: '#fffbe6', borderColor: '#ffe58f', color: '#d48806' };
-      default:
-        return { ...baseStyle, backgroundColor: '#f5f5f5', borderColor: '#d9d9d9', color: '#595959' };
-    }
-  };
-
-  const getActionIcon = (actionType: string): string => {
-    switch (actionType) {
-      case 'pm_start_app': return '🚀';
-      case 'pm_open_folder': return '📁';
-      case 'pm_view_knowledge': return '📚';
-      case 'pm_view_artifacts': return '📄';
-      case 'pm_view_code': return '💻';
-      case 'pm_goto_stage': return '↩️';
-      case 'pm_create_iteration': return '➕';
-      default: return '▶️';
-    }
-  };
-
-  return (
-    <div>
-      <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>
-        <TeamOutlined style={{ marginRight: '4px' }} />
-        Project Manager Agent
-      </div>
-      <div
-        style={{
-          backgroundColor: '#fff',
-          padding: '12px 16px',
-          borderRadius: '4px',
-          border: '1px solid #e8e8e8',
-          maxWidth: '70%',
-          wordBreak: 'break-word',
-          maxHeight: '300px',
-          overflowY: 'auto',
-        }}
-      >
-        <MarkdownMessage content={message.content} />
-      </div>
-      {message.actions && message.actions.length > 0 && (
-        <div style={{ marginTop: '12px' }}>
-          {message.actions.map((action, idx) => (
-            <span
-              key={idx}
-              style={getActionStyle(action.action_type)}
-              onClick={() => onActionClick?.(action)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.02)';
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              {getActionIcon(action.action_type)} {action.label || action.description || action.action_type}
-            </span>
-          ))}
-        </div>
-      )}
+}) => (
+  <div>
+    <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>
+      <TeamOutlined style={{ marginRight: '4px' }} />
+      Project Manager Agent
     </div>
-  );
-});
+    <div
+      style={{
+        backgroundColor: '#fff',
+        padding: '12px 16px',
+        borderRadius: '4px',
+        border: '1px solid #e8e8e8',
+        maxWidth: '70%',
+        wordBreak: 'break-word',
+        maxHeight: '300px',
+        overflowY: 'auto',
+      }}
+    >
+      <MarkdownMessage content={message.content} />
+    </div>
+    {message.actions && message.actions.length > 0 && (
+      <div style={{ marginTop: '12px' }}>
+        {message.actions.map((action, idx) => (
+          <span
+            key={idx}
+            style={getActionStyle(action.action_type)}
+            onClick={() => onActionClick?.(action)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.02)';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            {getActionIcon(action.action_type)} {action.label || action.description || action.action_type}
+          </span>
+        ))}
+      </div>
+    )}
+  </div>
+));
 
-export const MessageList: React.FC<MessageListProps> = ({
+// User message style constants
+const userMessageStyle: React.CSSProperties = {
+  display: 'inline-block',
+  backgroundColor: '#1890ff',
+  color: '#fff',
+  padding: '8px 12px',
+  borderRadius: '4px',
+  maxWidth: '70%',
+  wordBreak: 'break-word',
+  maxHeight: '200px',
+  overflowY: 'auto',
+  textAlign: 'left',
+};
+
+const agentMessageContainerStyle: React.CSSProperties = {
+  backgroundColor: '#fff',
+  padding: '12px 16px',
+  borderRadius: '4px',
+  border: '1px solid #e8e8e8',
+  maxWidth: '70%',
+  wordBreak: 'break-word',
+  maxHeight: '300px',
+  overflowY: 'auto',
+};
+
+const MessageListInner: React.FC<MessageListProps> = ({
   messages = [],
   pmMessages = [],
   mode,
@@ -234,7 +266,71 @@ export const MessageList: React.FC<MessageListProps> = ({
   const safeMessages = Array.isArray(messages) ? messages : [];
   const safePmMessages = Array.isArray(pmMessages) ? pmMessages : [];
 
-  if (mode === 'pm_agent') {
+  // Memoize message rendering
+  const renderPipelineMessages = useMemo(() => {
+    if (safeMessages.length === 0) {
+      return (
+        <div style={{ color: '#888', textAlign: 'center', marginTop: '40px' }}>
+          {isProcessing ? 'Waiting for agent response...' : 'No messages yet. Start the iteration to begin chatting.'}
+        </div>
+      );
+    }
+
+    return safeMessages.map((msg, index) => {
+      const key = getMessageKey(msg, index);
+      
+      if (msg.type === 'user') {
+        return (
+          <div key={key} style={{ marginBottom: '16px', textAlign: 'right' }}>
+            <div style={userMessageStyle}>
+              {(msg as { content: string }).content}
+            </div>
+          </div>
+        );
+      }
+      
+      if (msg.type === 'thinking') {
+        return (
+          <div key={key} style={{ marginBottom: '16px' }}>
+            <ThinkingMessageItem 
+              message={msg as ThinkingMessage} 
+              onToggle={() => onToggleThinking(index)} 
+            />
+          </div>
+        );
+      }
+      
+      if (msg.type === 'tool_call') {
+        return (
+          <div key={key} style={{ marginBottom: '16px' }}>
+            <ToolCallMessageItem message={msg as ToolCallMessage} />
+          </div>
+        );
+      }
+      
+      if (msg.type === 'tool_result') {
+        return (
+          <div key={key} style={{ marginBottom: '16px' }}>
+            <ToolResultMessageItem message={msg as ToolResultMessage} />
+          </div>
+        );
+      }
+      
+      // Default agent message
+      return (
+        <div key={key} style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>
+            {(msg as { agentName?: string }).agentName || 'AI Agent'}
+          </div>
+          <div style={agentMessageContainerStyle}>
+            <MarkdownMessage content={(msg as { content: string }).content} />
+          </div>
+        </div>
+      );
+    });
+  }, [safeMessages, isProcessing, onToggleThinking]);
+
+  const renderPMMessages = useMemo(() => {
     if (safePmMessages.length === 0) {
       return (
         <div style={{ color: '#888', textAlign: 'center', marginTop: '40px' }}>
@@ -253,102 +349,40 @@ export const MessageList: React.FC<MessageListProps> = ({
       );
     }
 
-    return (
-      <>
-        {safePmMessages.map((msg, index) => (
-          <div key={index} style={{ marginBottom: '16px' }}>
-            {msg.type === 'user' ? (
-              <div style={{ textAlign: 'right' }}>
-                <div
-                  style={{
-                    display: 'inline-block',
-                    backgroundColor: '#1890ff',
-                    color: '#fff',
-                    padding: '8px 12px',
-                    borderRadius: '4px',
-                    maxWidth: '70%',
-                    wordBreak: 'break-word',
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    textAlign: 'left',
-                  }}
-                >
-                  {(msg as { content: string }).content}
-                </div>
-              </div>
-            ) : msg.type === 'pm_agent' ? (
-              <PMAgentMessageItem message={msg as PMAgentMessage} onActionClick={onActionClick} />
-            ) : (
-              <div style={{ color: '#f44336', padding: '12px', backgroundColor: '#ffebee', borderRadius: '4px' }}>
-                {(msg as { content: string }).content}
-              </div>
-            )}
+    return safePmMessages.map((msg, index) => {
+      const key = `pm-${getMessageKey(msg, index)}`;
+      
+      if (msg.type === 'user') {
+        return (
+          <div key={key} style={{ marginBottom: '16px', textAlign: 'right' }}>
+            <div style={userMessageStyle}>
+              {(msg as { content: string }).content}
+            </div>
           </div>
-        ))}
-      </>
-    );
-  }
-
-  if (safeMessages.length === 0) {
-    return (
-      <div style={{ color: '#888', textAlign: 'center', marginTop: '40px' }}>
-        {isProcessing ? 'Waiting for agent response...' : 'No messages yet. Start the iteration to begin chatting.'}
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {safeMessages.map((msg, index) => (
-        <div key={index} style={{ marginBottom: '16px' }}>
-          {msg.type === 'user' ? (
-            <div style={{ textAlign: 'right' }}>
-              <div
-                style={{
-                  display: 'inline-block',
-                  backgroundColor: '#1890ff',
-                  color: '#fff',
-                  padding: '8px 12px',
-                  borderRadius: '4px',
-                  maxWidth: '70%',
-                  wordBreak: 'break-word',
-                  maxHeight: '200px',
-                  overflowY: 'auto',
-                  textAlign: 'left',
-                }}
-              >
-                {(msg as { content: string }).content}
-              </div>
-            </div>
-          ) : msg.type === 'thinking' ? (
-            <ThinkingMessageItem message={msg as ThinkingMessage} onToggle={() => onToggleThinking(index)} />
-          ) : msg.type === 'tool_call' ? (
-            <ToolCallMessageItem message={msg as ToolCallMessage} />
-          ) : msg.type === 'tool_result' ? (
-            <ToolResultMessageItem message={msg as ToolResultMessage} />
-          ) : (
-            <div>
-              <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>
-                {(msg as { agentName?: string }).agentName || 'AI Agent'}
-              </div>
-              <div
-                style={{
-                  backgroundColor: '#fff',
-                  padding: '12px 16px',
-                  borderRadius: '4px',
-                  border: '1px solid #e8e8e8',
-                  maxWidth: '70%',
-                  wordBreak: 'break-word',
-                  maxHeight: '300px',
-                  overflowY: 'auto',
-                }}
-              >
-                <MarkdownMessage content={(msg as { content: string }).content} />
-              </div>
-            </div>
-          )}
+        );
+      }
+      
+      if (msg.type === 'pm_agent') {
+        return (
+          <div key={key} style={{ marginBottom: '16px' }}>
+            <PMAgentMessageItem message={msg as PMAgentMessage} onActionClick={onActionClick} />
+          </div>
+        );
+      }
+      
+      return (
+        <div key={key} style={{ marginBottom: '16px', color: '#f44336', padding: '12px', backgroundColor: '#ffebee', borderRadius: '4px' }}>
+          {(msg as { content: string }).content}
         </div>
-      ))}
-    </>
-  );
+      );
+    });
+  }, [safePmMessages, onActionClick]);
+
+  if (mode === 'pm_agent') {
+    return <>{renderPMMessages}</>;
+  }
+
+  return <>{renderPipelineMessages}</>;
 };
+
+export const MessageList = memo(MessageListInner);
