@@ -1657,6 +1657,7 @@ impl IterationExecutor {
     }
 
     /// Inject project knowledge into iteration memory (for evolution iterations)
+    /// Falls back to loading artifacts directly if knowledge summary is not available
     pub async fn inject_project_knowledge(&self, iteration: &Iteration) -> anyhow::Result<()> {
         let base_iteration_id = iteration
             .base_iteration_id
@@ -1669,42 +1670,83 @@ impl IterationExecutor {
         );
 
         let memory_store = crate::persistence::MemoryStore::new();
-
-        // Load base iteration knowledge
         let project_memory = memory_store.load_project_memory()?;
-        let base_knowledge = project_memory
-            .get_iteration_knowledge(base_iteration_id)
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "No knowledge found for base iteration {}",
-                    base_iteration_id
-                )
-            })?;
+        let base_knowledge = project_memory.get_iteration_knowledge(base_iteration_id);
 
         // Inject into iteration memory
         let mut iter_memory = memory_store.load_iteration_memory(&iteration.id)?;
 
-        iter_memory.add_insight(
-            "project_context",
-            format!(
-                "## Base Iteration Knowledge (#{})\n\n\
-                **Iteration ID**: {}\n\n\
-                **Tech Stack**: {}\n\n\
-                **Project Vision**: {}\n\n\
-                **Key Requirements**: {}\n\n\
-                **System Design**: {}\n\n\
-                **Implementation**: {}\n\n\
-                **Key Decisions**: {}",
-                base_knowledge.iteration_number,
-                base_knowledge.iteration_id,
-                base_knowledge.tech_stack.join(", "),
-                base_knowledge.idea_summary,
-                base_knowledge.prd_summary,
-                base_knowledge.design_summary,
-                base_knowledge.plan_summary,
-                base_knowledge.key_decisions.join("; ")
-            ),
-        );
+        if let Some(knowledge) = base_knowledge {
+            // Use knowledge summary (preferred)
+            iter_memory.add_insight(
+                "project_context",
+                format!(
+                    "## Base Iteration Knowledge (#{})\n\n\
+                    **Iteration ID**: {}\n\n\
+                    **Tech Stack**: {}\n\n\
+                    **Project Vision**: {}\n\n\
+                    **Key Requirements**: {}\n\n\
+                    **System Design**: {}\n\n\
+                    **Implementation**: {}\n\n\
+                    **Key Decisions**: {}",
+                    knowledge.iteration_number,
+                    knowledge.iteration_id,
+                    knowledge.tech_stack.join(", "),
+                    knowledge.idea_summary,
+                    knowledge.prd_summary,
+                    knowledge.design_summary,
+                    knowledge.plan_summary,
+                    knowledge.key_decisions.join("; ")
+                ),
+            );
+        } else {
+            // Fallback: Load artifacts directly from base iteration
+            println!(
+                "[Executor] Knowledge summary not found, loading artifacts directly from base iteration..."
+            );
+
+            let base_workspace = self.iteration_store.workspace_path(base_iteration_id)?;
+            let artifacts_dir = base_workspace.parent()
+                .map(|p| p.join("artifacts"))
+                .unwrap_or_else(|| base_workspace.join("artifacts"));
+
+            let mut context_parts = vec![
+                format!("## Base Iteration Context (#{})\n\n", base_iteration_id),
+            ];
+
+            // Load key artifacts
+            for (artifact_name, label) in [
+                ("idea.md", "Project Vision"),
+                ("prd.md", "Key Requirements"),
+                ("design.md", "System Design"),
+                ("plan.md", "Implementation Summary"),
+            ] {
+                let artifact_path = artifacts_dir.join(artifact_name);
+                if artifact_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&artifact_path) {
+                        let truncated: String = content.chars().take(2000).collect();
+                        context_parts.push(format!("### {}\n\n{}\n\n", label, truncated));
+                    }
+                }
+            }
+
+            if context_parts.len() > 1 {
+                iter_memory.add_insight("project_context", context_parts.join(""));
+            } else {
+                println!(
+                    "[Executor] Warning: No artifacts found in base iteration {}",
+                    base_iteration_id
+                );
+                // Add minimal context
+                iter_memory.add_insight(
+                    "project_context",
+                    format!(
+                        "## Base Iteration Reference\n\nBase iteration '{}' ({}) is the foundation for this iteration.",
+                        iteration.title, base_iteration_id
+                    ),
+                );
+            }
+        }
 
         // Mark as critical
         if let Some(last_insight) = iter_memory.insights.last_mut() {

@@ -191,15 +191,11 @@ impl Iteration {
             InheritanceMode::Partial => "partial",
         };
         
-        // Get stage from mapping, or use smart defaults
+        // Get stage from mapping (mapping always contains all keys from get_stage_mapping_from_flow)
         stage_mapping
             .get(mode_key)
             .cloned()
-            .unwrap_or_else(|| match self.inheritance {
-                InheritanceMode::None => "idea".to_string(),
-                InheritanceMode::Full => analyze_change_scope(&self.description),
-                InheritanceMode::Partial => "plan".to_string(),
-            })
+            .unwrap_or_else(|| "idea".to_string())
     }
     
     /// Get stage mapping from default flow configuration
@@ -209,10 +205,10 @@ impl Iteration {
         if let Some(flow) = global_registry().get_default_flow() {
             flow.config.inheritance.stage_mapping
         } else {
-            // Default mapping
+            // Default mapping when no flow configuration exists
             let mut mapping = std::collections::HashMap::new();
             mapping.insert("none".to_string(), "idea".to_string());
-            mapping.insert("partial".to_string(), "plan".to_string());
+            mapping.insert("partial".to_string(), "idea".to_string());
             mapping.insert("full".to_string(), "idea".to_string());
             mapping
         }

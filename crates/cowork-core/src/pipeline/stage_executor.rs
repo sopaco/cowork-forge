@@ -301,6 +301,33 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
 
     prompt.push_str(&format!("Iteration ID: {}\n\n", ctx.iteration.id));
 
+    // For evolution iterations, inject project background at the beginning
+    if let Some(_base_id) = &ctx.iteration.base_iteration_id {
+        if let Ok(iter_memory) = crate::persistence::MemoryStore::new()
+            .load_iteration_memory(&ctx.iteration.id)
+        {
+            for insight in &iter_memory.insights {
+                if insight.stage == "project_context" {
+                    prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                    prompt.push_str("📋 PROJECT BACKGROUND (Evolution Iteration)\n");
+                    prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                    prompt.push_str("This is an EVOLUTION iteration. The project already exists.\n");
+                    prompt.push_str("Build upon the existing codebase, do NOT rewrite from scratch.\n\n");
+                    prompt.push_str(&truncate_content(&insight.content, 2000));
+                    prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
+                    break;
+                }
+            }
+        }
+    }
+
+    // Inject iteration goal/description for ALL stages (not just idea)
+    prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+    prompt.push_str("🎯 ITERATION GOAL\n");
+    prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+    prompt.push_str(&ctx.iteration.description);
+    prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
+
     // Pre-inject artifacts from previous stages (Optimization: reduces tool calls)
     let mut injected_artifacts = Vec::new();
 
@@ -385,12 +412,11 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
     match stage_name {
         "idea" => {
             prompt.push_str("========================================\n");
-            prompt.push_str("USER'S PROJECT IDEA (ALREADY PROVIDED):\n");
+            prompt.push_str("STAGE: Idea\n");
             prompt.push_str("========================================\n");
-            prompt.push_str(&ctx.iteration.description);
-            prompt.push_str("\n========================================\n\n");
+            prompt.push_str("The iteration goal is provided above.\n\n");
             prompt.push_str("YOUR TASK:\n");
-            prompt.push_str("1. Read and understand the project idea above\n");
+            prompt.push_str("1. Read and understand the iteration goal\n");
             prompt.push_str("2. Generate a structured idea document\n");
             prompt.push_str("3. SAVE IT using the save_idea() tool (MANDATORY)\n\n");
         }
@@ -407,10 +433,6 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             }
             prompt.push_str("2. Analyze the idea and create requirements\n");
             prompt.push_str("3. SAVE PRD using save_prd_doc() tool (MANDATORY)\n\n");
-            prompt.push_str(&format!(
-                "Original request: {}\n\n",
-                ctx.iteration.description
-            ));
         }
         "design" => {
             prompt.push_str("========================================\n");
