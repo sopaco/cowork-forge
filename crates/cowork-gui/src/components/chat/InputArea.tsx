@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useCallback } from 'react';
 import { Button, Space, Input } from 'antd';
 import type { InputRequest, InputOption } from '../../stores';
 
@@ -14,7 +14,7 @@ interface InputAreaProps {
   mode: 'pipeline' | 'pm_agent';
 }
 
-export const InputArea: React.FC<InputAreaProps> = ({
+const InputAreaInner: React.FC<InputAreaProps> = ({
   userInput,
   onUserInputChange,
   onSend,
@@ -25,12 +25,16 @@ export const InputArea: React.FC<InputAreaProps> = ({
   disabled,
   mode,
 }) => {
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onUserInputChange(e.target.value);
+  }, [onUserInputChange]);
+
   if (mode === 'pm_agent') {
     return (
       <div style={{ display: 'flex', gap: '8px' }}>
         <Input
           value={userInput}
-          onChange={(e) => onUserInputChange(e.target.value)}
+          onChange={handleInputChange}
           onPressEnter={onSend}
           placeholder="Ask about the project or request changes..."
           disabled={disabled}
@@ -75,7 +79,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
       <div style={{ display: 'flex', gap: '8px' }}>
         <Input
           value={userInput}
-          onChange={(e) => onUserInputChange(e.target.value)}
+          onChange={handleInputChange}
           onPressEnter={onSend}
           placeholder={inputRequest ? 'Type your response...' : 'Type a message...'}
           disabled={disabled && !inputRequest}
@@ -96,3 +100,5 @@ export const InputArea: React.FC<InputAreaProps> = ({
     </>
   );
 };
+
+export const InputArea = memo(InputAreaInner);

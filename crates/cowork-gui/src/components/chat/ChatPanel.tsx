@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, memo } from 'react';
 import { Spin, Tag } from 'antd';
 import { TeamOutlined } from '@ant-design/icons';
 import { MessageList } from './MessageList';
@@ -29,7 +29,7 @@ interface ChatPanelProps {
   onActionClick?: (action: PMAction) => void;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({
+const ChatPanelInner: React.FC<ChatPanelProps> = ({
   messages = [],
   pmMessages = [],
   mode,
@@ -194,3 +194,5 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     </div>
   );
 };
+
+export const ChatPanel = memo(ChatPanelInner);
