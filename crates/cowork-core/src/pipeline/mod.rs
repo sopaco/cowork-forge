@@ -157,3 +157,119 @@ pub fn get_flow_config() -> crate::config_definition::flow_definition::FlowConfi
 pub fn is_critical_stage(stage_name: &str) -> bool {
     matches!(stage_name, "idea" | "prd" | "design" | "plan" | "coding")
 }
+
+// ============================================================================
+// Unit Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_all_stages_order() {
+        let stages = get_all_stages();
+        
+        assert_eq!(stages.len(), 7);
+        assert_eq!(stages[0].name(), "idea");
+        assert_eq!(stages[1].name(), "prd");
+        assert_eq!(stages[2].name(), "design");
+        assert_eq!(stages[3].name(), "plan");
+        assert_eq!(stages[4].name(), "coding");
+        assert_eq!(stages[5].name(), "check");
+        assert_eq!(stages[6].name(), "delivery");
+    }
+
+    #[test]
+    fn test_get_stages_from_beginning() {
+        let stages = get_stages_from("idea");
+        assert_eq!(stages.len(), 7);
+        assert_eq!(stages[0].name(), "idea");
+    }
+
+    #[test]
+    fn test_get_stages_from_middle() {
+        let stages = get_stages_from("plan");
+        assert_eq!(stages.len(), 4);
+        assert_eq!(stages[0].name(), "plan");
+        assert_eq!(stages[1].name(), "coding");
+        assert_eq!(stages[2].name(), "check");
+        assert_eq!(stages[3].name(), "delivery");
+    }
+
+    #[test]
+    fn test_get_stages_from_end() {
+        let stages = get_stages_from("delivery");
+        assert_eq!(stages.len(), 1);
+        assert_eq!(stages[0].name(), "delivery");
+    }
+
+    #[test]
+    fn test_get_stages_from_unknown() {
+        // Unknown stage should default to index 0 (idea)
+        let stages = get_stages_from("unknown");
+        assert_eq!(stages.len(), 7);
+        assert_eq!(stages[0].name(), "idea");
+    }
+
+    #[test]
+    fn test_create_stage_by_id_valid() {
+        assert!(create_stage_by_id("idea").is_some());
+        assert!(create_stage_by_id("prd").is_some());
+        assert!(create_stage_by_id("design").is_some());
+        assert!(create_stage_by_id("plan").is_some());
+        assert!(create_stage_by_id("coding").is_some());
+        assert!(create_stage_by_id("check").is_some());
+        assert!(create_stage_by_id("delivery").is_some());
+    }
+
+    #[test]
+    fn test_create_stage_by_id_invalid() {
+        assert!(create_stage_by_id("unknown").is_none());
+        assert!(create_stage_by_id("").is_none());
+    }
+
+    #[test]
+    fn test_is_critical_stage() {
+        // Critical stages
+        assert!(is_critical_stage("idea"));
+        assert!(is_critical_stage("prd"));
+        assert!(is_critical_stage("design"));
+        assert!(is_critical_stage("plan"));
+        assert!(is_critical_stage("coding"));
+
+        // Non-critical stages
+        assert!(!is_critical_stage("check"));
+        assert!(!is_critical_stage("delivery"));
+        assert!(!is_critical_stage("unknown"));
+    }
+
+    #[test]
+    fn test_pipeline_context_new() {
+        let project = Project::new("test-project");
+        let iteration = crate::domain::Iteration::create_genesis(
+            &project,
+            "Test".to_string(),
+            "Test description".to_string(),
+        );
+        let workspace = std::path::PathBuf::from("/tmp/workspace");
+
+        let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
+
+        assert_eq!(ctx.project.name, "test-project");
+        assert_eq!(ctx.iteration.title, "Test");
+        assert_eq!(ctx.workspace_path, workspace);
+    }
+
+    #[test]
+    fn test_stage_names_and_descriptions() {
+        let stages = get_all_stages();
+        
+        for stage in &stages {
+            // Every stage should have a non-empty name
+            assert!(!stage.name().is_empty());
+            // Every stage should have a non-empty description
+            assert!(!stage.description().is_empty());
+        }
+    }
+}

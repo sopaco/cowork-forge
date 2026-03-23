@@ -35,6 +35,6 @@ export default defineConfig({
       },
     },
     // Increase chunk size warning limit since we're splitting intentionally
-    chunkSizeWarningLimit: 1024,
+    chunkSizeWarningLimit: 1536,
   },
 });

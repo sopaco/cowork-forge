@@ -173,6 +173,8 @@ pub struct AppState {
     pub pending_requests: Arc<Mutex<HashMap<String, oneshot::Sender<InputResponse>>>>,
     pub project_registry_manager: Arc<Mutex<ProjectRegistryManager>>,
     pub workspace_path: Arc<Mutex<Option<String>>>,
+    /// Tracks whether config registry has finished loading
+    pub config_ready: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl AppState {
@@ -184,6 +186,7 @@ impl AppState {
             pending_requests: Arc::new(Mutex::new(HashMap::new())),
             project_registry_manager: Arc::new(Mutex::new(project_registry_manager)),
             workspace_path: Arc::new(Mutex::new(None)),
+            config_ready: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })
     }
 }
@@ -454,6 +457,13 @@ async fn has_open_project(
 }
 
 #[tauri::command]
+async fn is_config_ready(
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    Ok(state.config_ready.load(std::sync::atomic::Ordering::Acquire))
+}
+
+#[tauri::command]
 async fn open_project_in_current_window(
     project_id: String,
     state: State<'_, AppState>,
@@ -646,12 +656,28 @@ pub fn run() {
             // Initialize system locale at startup
             system::init_system_locale();
             
-            // Initialize V3 config registry with built-in configurations
-            if let Err(e) = cowork_core::config_definition::initialize_config_registry() {
-                eprintln!("[GUI] Failed to initialize config registry: {}", e);
-            } else {
-                println!("[GUI] Config registry initialized successfully");
-            }
+            // Get config_ready flag for async initialization
+            let config_ready = app.state::<AppState>().config_ready.clone();
+            
+            // Initialize V3 config registry asynchronously to avoid blocking startup
+            // Use tauri::async_runtime::spawn instead of tokio::spawn for Tauri 2.x compatibility
+            tauri::async_runtime::spawn(async move {
+                println!("[GUI] Starting async config registry initialization...");
+                let start = std::time::Instant::now();
+                
+                match cowork_core::config_definition::initialize_config_registry() {
+                    Ok(()) => {
+                        let elapsed = start.elapsed();
+                        println!("[GUI] Config registry initialized in {:?}", elapsed);
+                        config_ready.store(true, std::sync::atomic::Ordering::Release);
+                    }
+                    Err(e) => {
+                        eprintln!("[GUI] Failed to initialize config registry: {}", e);
+                        // Still mark as ready so the app doesn't hang
+                        config_ready.store(true, std::sync::atomic::Ordering::Release);
+                    }
+                }
+            });
 
             // Initialize tool notification callback
             let app_handle = app.handle().clone();
@@ -760,6 +786,7 @@ pub fn run() {
             set_workspace,
             get_workspace,
             has_open_project,
+            is_config_ready,
             // PM Agent commands
             pm::pm_send_message,
             pm::pm_restart_iteration,

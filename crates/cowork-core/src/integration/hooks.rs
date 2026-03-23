@@ -256,7 +256,7 @@ impl Default for HookManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config_definition::{HookPoint, IntegrationType};
+    use crate::config_definition::HookPoint;
     
     #[test]
     fn test_hook_context() {
