@@ -7,6 +7,7 @@ use anyhow::{Context, Result};
 use tokio::sync::mpsc;
 
 use crate::acp::{AcpClient, AcpTaskResult, AgentMessage};
+use crate::domain::{InheritanceMode, Iteration};
 use crate::instructions::coding::CODING_ACTOR_INSTRUCTION;
 use crate::llm::config::{load_config, CodingAgentConfig};
 
@@ -24,6 +25,8 @@ pub struct ExternalCodingAgent {
     workspace: PathBuf,
     /// Whether the agent is ready
     ready: bool,
+    /// Optional iteration context for evolution iterations
+    iteration: Option<Iteration>,
 }
 
 /// Result of starting a streaming task
@@ -37,7 +40,16 @@ pub struct StreamingTask {
 impl ExternalCodingAgent {
     /// Create a new External Coding Agent
     pub async fn new(workspace: &PathBuf) -> Result<Self> {
-        eprintln!("DEBUG: ExternalCodingAgent::new called with workspace: {}", workspace.display());
+        Self::new_with_iteration(workspace, None).await
+    }
+
+    /// Create a new External Coding Agent with iteration context
+    pub async fn new_with_iteration(workspace: &PathBuf, iteration: Option<Iteration>) -> Result<Self> {
+        eprintln!("DEBUG: ExternalCodingAgent::new_with_iteration called with workspace: {}", workspace.display());
+        if let Some(ref iter) = iteration {
+            eprintln!("DEBUG: Iteration context: id={}, base_id={:?}, inheritance={:?}", 
+                iter.id, iter.base_iteration_id, iter.inheritance);
+        }
         
         let config = load_config()
             .context("Failed to load config")?;
@@ -52,6 +64,7 @@ impl ExternalCodingAgent {
             config: config.coding_agent,
             workspace: workspace.clone(),
             ready: false,
+            iteration,
         })
     }
 
@@ -121,7 +134,55 @@ impl ExternalCodingAgent {
 
     /// Build a comprehensive prompt for the external agent
     fn build_prompt(&self, task_description: &str, project_context: &str) -> String {
-        format!(
+        let mut prompt = String::new();
+
+        // Check if this is an evolution iteration
+        let is_evolution = self.iteration.as_ref()
+            .map(|i| i.base_iteration_id.is_some())
+            .unwrap_or(false);
+        
+        let inheritance_mode = self.iteration.as_ref()
+            .map(|i| i.inheritance)
+            .unwrap_or(InheritanceMode::None);
+
+        if is_evolution {
+            prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+            prompt.push_str("🚨 CRITICAL: THIS IS AN EVOLUTION ITERATION\n");
+            prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+            prompt.push_str("\n");
+            prompt.push_str("⚠️ DO NOT DELETE EXISTING CODE! ⚠️\n");
+            prompt.push_str("\n");
+            prompt.push_str("This iteration builds upon an EXISTING project.\n");
+            prompt.push_str("The workspace directory already contains code from a previous iteration.\n");
+            prompt.push_str("\n");
+            
+            match inheritance_mode {
+                InheritanceMode::Partial => {
+                    prompt.push_str("📋 INHERITANCE MODE: PARTIAL\n");
+                    prompt.push_str("- Code files from the base iteration have been copied to the workspace\n");
+                    prompt.push_str("- Artifacts (PRD, Design, Plan) are regenerated fresh\n");
+                    prompt.push_str("- You MUST preserve existing code and add new features incrementally\n");
+                }
+                InheritanceMode::Full => {
+                    prompt.push_str("📋 INHERITANCE MODE: FULL\n");
+                    prompt.push_str("- All files (code + artifacts) from base iteration are available\n");
+                    prompt.push_str("- You MUST preserve existing code and only make necessary modifications\n");
+                }
+                InheritanceMode::None => {}
+            }
+            
+            prompt.push_str("\n");
+            prompt.push_str("🎯 YOUR TASK:\n");
+            prompt.push_str("1. FIRST, list the existing files in the workspace to understand the current structure\n");
+            prompt.push_str("2. Read relevant existing code files before making changes\n");
+            prompt.push_str("3. Add new features incrementally - DO NOT rewrite from scratch\n");
+            prompt.push_str("4. Only modify files that need changes for the new features\n");
+            prompt.push_str("5. Preserve all existing functionality\n");
+            prompt.push_str("\n");
+            prompt.push_str("═══════════════════════════════════════════════════════════════\n\n");
+        }
+
+        prompt.push_str(&format!(
             r#"# Coding Task
 
 ## Project Context
@@ -147,7 +208,9 @@ Please start implementing the task."#,
             CODING_ACTOR_INSTRUCTION,
             task_description,
             self.workspace.display()
-        )
+        ));
+
+        prompt
     }
 
     /// Check if the agent is ready

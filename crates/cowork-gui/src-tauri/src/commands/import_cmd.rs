@@ -404,6 +404,14 @@ pub async fn import_project(
     
     eprintln!("[IMPORT] Iteration directory: {:?}", iteration_dir);
     eprintln!("[IMPORT] Artifacts directory: {:?}", artifacts_dir);
+    
+    // CRITICAL: Copy project source files to workspace
+    // This ensures that partial iterations have access to the existing code
+    emit_progress(&app_handle, "copy", "Copying project files to workspace...", 28);
+    copy_project_to_workspace(&project_path, &workspace_dir).map_err(|e| {
+        format!("Failed to copy project files: {}", e)
+    })?;
+    eprintln!("[IMPORT] Project files copied to workspace");
 
     // Step 6: Analyze project (35%)
     emit_progress(&app_handle, "analyze", "Analyzing project structure and technology stack...", 35);

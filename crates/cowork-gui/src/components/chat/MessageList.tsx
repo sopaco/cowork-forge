@@ -104,7 +104,7 @@ const ToolCallMessageItem = memo<{ message: ToolCallMessage }>(({ message }) => 
     <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
       🔧 Calling tool: <code style={{ backgroundColor: 'rgba(0,0,0,0.05)', padding: '1px 4px', borderRadius: '2px' }}>{message.toolName}</code>
     </div>
-    {Object.keys(message.arguments).length > 0 && (
+    {message.arguments && Object.keys(message.arguments).length > 0 && (
       <pre
         style={{
           margin: '4px 0 0 0',

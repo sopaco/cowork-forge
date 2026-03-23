@@ -1,11 +1,13 @@
 import React, { memo, useCallback } from 'react';
 import { Button, Space, Input } from 'antd';
+import { CopyOutlined } from '@ant-design/icons';
 import type { InputRequest, InputOption } from '../../stores';
 
 interface InputAreaProps {
   userInput: string;
   onUserInputChange: (value: string) => void;
   onSend: () => void;
+  onDumpChat: () => void;
   inputRequest?: InputRequest | null;
   onSelectOption: (option: InputOption) => void;
   onSubmitFeedback: () => void;
@@ -18,6 +20,7 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
   userInput,
   onUserInputChange,
   onSend,
+  onDumpChat,
   inputRequest,
   onSelectOption,
   onSubmitFeedback,
@@ -41,6 +44,9 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
         />
         <Button onClick={onSend} type="primary" disabled={!userInput.trim() || disabled}>
           Send
+        </Button>
+        <Button onClick={onDumpChat} icon={<CopyOutlined />} title="Copy chat to clipboard">
+          Dump
         </Button>
       </div>
     );
@@ -93,6 +99,9 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
             Send
           </Button>
         )}
+        <Button onClick={onDumpChat} icon={<CopyOutlined />} title="Copy chat to clipboard">
+          Dump
+        </Button>
         {inputRequest && inputRequest.isFeedbackMode && (
           <Button onClick={onCancelFeedback}>Cancel</Button>
         )}
