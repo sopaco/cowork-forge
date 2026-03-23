@@ -513,3 +513,63 @@ pub async fn import_project(
 pub fn get_default_artifact_options() -> ArtifactOptions {
     ArtifactOptions::default()
 }
+
+/// Copy project files to workspace, excluding unnecessary directories
+fn copy_project_to_workspace(project_path: &PathBuf, workspace_dir: &PathBuf) -> Result<(), String> {
+    // Directories to skip (common build/cache/dependency directories)
+    const SKIP_DIRS: &[&str] = &[
+        "node_modules",
+        "target",
+        "dist",
+        "build",
+        ".git",
+        ".cowork-v2",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".idea",
+        ".vscode",
+        "coverage",
+        ".next",
+        ".nuxt",
+        "vendor",
+        "Pods",
+        ".gradle",
+        "out",
+    ];
+    
+    fn should_skip(name: &str) -> bool {
+        SKIP_DIRS.iter().any(|&skip| name == skip) || name.starts_with('.')
+    }
+    
+    fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf, skip_hidden: bool) -> Result<(), String> {
+        if !dst.exists() {
+            std::fs::create_dir_all(dst).map_err(|e| e.to_string())?;
+        }
+        
+        for entry in std::fs::read_dir(src).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let name = entry.file_name().to_string_lossy().to_string();
+            
+            // Skip hidden files and excluded directories
+            if skip_hidden && should_skip(&name) {
+                continue;
+            }
+            
+            let src_path = entry.path();
+            let dst_path = dst.join(&name);
+            
+            let ty = entry.file_type().map_err(|e| e.to_string())?;
+            
+            if ty.is_dir() {
+                copy_dir_recursive(&src_path, &dst_path, true)?;
+            } else {
+                std::fs::copy(&src_path, &dst_path).map_err(|e| e.to_string())?;
+            }
+        }
+        
+        Ok(())
+    }
+    
+    copy_dir_recursive(project_path, workspace_dir, true)
+}
