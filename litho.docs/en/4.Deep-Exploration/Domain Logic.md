@@ -177,7 +177,7 @@ The domain implements three inheritance strategies enabling iterative developmen
 flowchart LR
     A[Change Description] --> B{Inheritance Mode}
     B -->|None| C[Genesis Iteration<br/>Fresh Start]
-    B -->|Partial| D[Code Only<br/>Incremental Development]
+    B -->|Partial| D[Code Only<br/>Regenerate Artifacts]
     B -->|Full| E[Complete Transfer<br/>Major Refactoring]
 ```
 
@@ -188,8 +188,9 @@ flowchart LR
 
 **Partial**:
 - **Use Case**: Adding features to existing codebase
-- **Behavior**: Transfers code files only; regenerates all documentation artifacts (PRD, Design, etc.)
+- **Behavior**: Transfers code files only; regenerates all documentation artifacts (Idea, PRD, Design, Plan)
 - **Stage Selection**: Always returns "idea" (full regeneration of artifacts)
+- **Note**: Partial inheritance ensures documentation stays synchronized with code changes by fully regenerating artifacts to capture new functionality
 
 **Full**:
 - **Use Case**: Architectural refactoring or major redesigns
