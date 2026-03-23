@@ -172,34 +172,18 @@ impl Iteration {
     /// Determine the starting stage based on inheritance mode
     /// Uses Flow configuration's stage_mapping if provided, otherwise falls back to defaults
     pub fn determine_start_stage(&self) -> String {
-        // Try to get stage mapping from default flow configuration
         let stage_mapping = self.get_stage_mapping_from_flow();
         
         let mode_key = match self.inheritance {
             InheritanceMode::None => "none",
-            InheritanceMode::Full => {
-                // Full inheritance: use smart analysis to determine scope
-                // But respect stage_mapping as the final decision
-                let analyzed = analyze_change_scope(&self.description);
-                // If stage_mapping has an entry for "full", use it; otherwise use analyzed result
-                if stage_mapping.contains_key("full") {
-                    "full"
-                } else {
-                    return analyzed;
-                }
-            }
+            InheritanceMode::Full => "full",
             InheritanceMode::Partial => "partial",
         };
         
-        // Get stage from mapping, or use smart defaults
         stage_mapping
             .get(mode_key)
             .cloned()
-            .unwrap_or_else(|| match self.inheritance {
-                InheritanceMode::None => "idea".to_string(),
-                InheritanceMode::Full => analyze_change_scope(&self.description),
-                InheritanceMode::Partial => "plan".to_string(),
-            })
+            .unwrap_or_else(|| "idea".to_string())
     }
     
     /// Get stage mapping from default flow configuration
@@ -209,10 +193,10 @@ impl Iteration {
         if let Some(flow) = global_registry().get_default_flow() {
             flow.config.inheritance.stage_mapping
         } else {
-            // Default mapping
+            // Default mapping when no flow configuration exists
             let mut mapping = std::collections::HashMap::new();
             mapping.insert("none".to_string(), "idea".to_string());
-            mapping.insert("partial".to_string(), "plan".to_string());
+            mapping.insert("partial".to_string(), "idea".to_string());
             mapping.insert("full".to_string(), "idea".to_string());
             mapping
         }
@@ -243,47 +227,6 @@ impl Default for InheritanceMode {
     fn default() -> Self {
         InheritanceMode::Full
     }
-}
-
-/// Change scope for determining start stage
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChangeScope {
-    Code,         // Start from plan
-    Design,       // Start from design
-    Requirement,  // Start from prd
-    Architecture, // Start from idea
-}
-
-/// Analyze change description to determine scope
-fn analyze_change_scope(description: &str) -> String {
-    let desc_lower = description.to_lowercase();
-
-    // Keywords indicating architecture changes
-    let arch_keywords = ["架构", "architecture", "重构", "rewrite", "重新设计", "redesign"];
-    for kw in &arch_keywords {
-        if desc_lower.contains(kw) {
-            return "idea".to_string();
-        }
-    }
-
-    // Keywords indicating requirement changes
-    let req_keywords = ["需求", "requirement", "功能", "feature", "添加", "add"];
-    for kw in &req_keywords {
-        if desc_lower.contains(kw) {
-            return "prd".to_string();
-        }
-    }
-
-    // Keywords indicating design changes
-    let design_keywords = ["设计", "design", "数据库", "database", "接口", "api"];
-    for kw in &design_keywords {
-        if desc_lower.contains(kw) {
-            return "design".to_string();
-        }
-    }
-
-    // Default: code changes only
-    "plan".to_string()
 }
 
 /// Artifacts produced by an iteration
@@ -320,5 +263,211 @@ impl Artifacts {
             "delivery" => self.delivery = Some(path),
             _ => {}
         }
+    }
+}
+
+// ============================================================================
+// Unit Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_project() -> Project {
+        Project::new("test-project")
+    }
+
+    #[test]
+    fn test_create_genesis_iteration() {
+        let project = create_test_project();
+        let iteration = Iteration::create_genesis(
+            &project,
+            "Test Iteration".to_string(),
+            "Test description".to_string(),
+        );
+
+        assert!(iteration.id.starts_with("iter-1-"));
+        assert_eq!(iteration.number, 1);
+        assert_eq!(iteration.title, "Test Iteration");
+        assert_eq!(iteration.description, "Test description");
+        assert!(iteration.base_iteration_id.is_none());
+        assert_eq!(iteration.inheritance, InheritanceMode::None);
+        assert_eq!(iteration.status, IterationStatus::Draft);
+        assert!(iteration.current_stage.is_none());
+        assert!(iteration.completed_stages.is_empty());
+    }
+
+    #[test]
+    fn test_create_evolution_iteration() {
+        let project = create_test_project();
+        let iteration = Iteration::create_evolution(
+            &project,
+            "Evolution Iteration".to_string(),
+            "Evolution description".to_string(),
+            "iter-0-123".to_string(),
+            InheritanceMode::Partial,
+        );
+
+        assert_eq!(iteration.base_iteration_id, Some("iter-0-123".to_string()));
+        assert_eq!(iteration.inheritance, InheritanceMode::Partial);
+    }
+
+    #[test]
+    fn test_iteration_status_transitions() {
+        let project = create_test_project();
+        let mut iteration = Iteration::create_genesis(
+            &project,
+            "Test".to_string(),
+            "Test".to_string(),
+        );
+
+        // Draft -> Running
+        iteration.start();
+        assert_eq!(iteration.status, IterationStatus::Running);
+
+        // Running -> Paused
+        iteration.pause();
+        assert_eq!(iteration.status, IterationStatus::Paused);
+
+        // Paused -> Running
+        iteration.resume();
+        assert_eq!(iteration.status, IterationStatus::Running);
+
+        // Running -> Completed
+        iteration.complete();
+        assert_eq!(iteration.status, IterationStatus::Completed);
+        assert!(iteration.completed_at.is_some());
+        assert!(iteration.current_stage.is_none());
+    }
+
+    #[test]
+    fn test_iteration_fail() {
+        let project = create_test_project();
+        let mut iteration = Iteration::create_genesis(
+            &project,
+            "Test".to_string(),
+            "Test".to_string(),
+        );
+
+        iteration.start();
+        iteration.set_stage("coding");
+        iteration.fail();
+
+        assert_eq!(iteration.status, IterationStatus::Failed);
+        // current_stage should be preserved for retry
+        assert_eq!(iteration.current_stage, Some("coding".to_string()));
+    }
+
+    #[test]
+    fn test_set_and_complete_stage() {
+        let project = create_test_project();
+        let mut iteration = Iteration::create_genesis(
+            &project,
+            "Test".to_string(),
+            "Test".to_string(),
+        );
+
+        iteration.set_stage("idea");
+        assert_eq!(iteration.current_stage, Some("idea".to_string()));
+
+        iteration.complete_stage("idea", Some("/path/to/idea.md".to_string()));
+        assert!(iteration.completed_stages.contains(&"idea".to_string()));
+        assert_eq!(iteration.artifacts.idea, Some("/path/to/idea.md".to_string()));
+    }
+
+    #[test]
+    fn test_determine_start_stage_none_mode() {
+        let project = create_test_project();
+        let iteration = Iteration::create_genesis(
+            &project,
+            "Test".to_string(),
+            "Test".to_string(),
+        );
+
+        // None mode should map to "idea" (default)
+        let stage = iteration.determine_start_stage();
+        assert_eq!(stage, "idea");
+    }
+
+    #[test]
+    fn test_determine_start_stage_partial_mode() {
+        let project = create_test_project();
+        let iteration = Iteration::create_evolution(
+            &project,
+            "Test".to_string(),
+            "Test".to_string(),
+            "iter-0-123".to_string(),
+            InheritanceMode::Partial,
+        );
+
+        // Partial mode should map to "idea" (default)
+        let stage = iteration.determine_start_stage();
+        assert_eq!(stage, "idea");
+    }
+
+    #[test]
+    fn test_determine_start_stage_full_mode() {
+        let project = create_test_project();
+        let iteration = Iteration::create_evolution(
+            &project,
+            "Test".to_string(),
+            "Test".to_string(),
+            "iter-0-123".to_string(),
+            InheritanceMode::Full,
+        );
+
+        // Full mode should map to "idea" (default)
+        let stage = iteration.determine_start_stage();
+        assert_eq!(stage, "idea");
+    }
+
+    #[test]
+    fn test_artifacts_get_set() {
+        let mut artifacts = Artifacts::default();
+
+        // Test set
+        artifacts.set("idea", "/path/to/idea.md".to_string());
+        artifacts.set("prd", "/path/to/prd.md".to_string());
+
+        // Test get
+        assert_eq!(artifacts.get("idea"), Some(&"/path/to/idea.md".to_string()));
+        assert_eq!(artifacts.get("prd"), Some(&"/path/to/prd.md".to_string()));
+        assert_eq!(artifacts.get("unknown"), None);
+    }
+
+    #[test]
+    fn test_to_summary() {
+        let project = create_test_project();
+        let mut iteration = Iteration::create_genesis(
+            &project,
+            "Test Iteration".to_string(),
+            "Test".to_string(),
+        );
+        iteration.start();
+        iteration.complete_stage("idea", None);
+
+        let summary = iteration.to_summary();
+
+        assert_eq!(summary.title, "Test Iteration");
+        assert_eq!(summary.status, IterationStatus::Running);
+        assert!(summary.completed_stages.contains(&"idea".to_string()));
+    }
+
+    #[test]
+    fn test_inheritance_mode_default() {
+        assert_eq!(InheritanceMode::default(), InheritanceMode::Full);
+    }
+
+    #[test]
+    fn test_inheritance_mode_serde() {
+        // Test serialization
+        assert_eq!(serde_json::to_string(&InheritanceMode::None).unwrap(), "\"none\"");
+        assert_eq!(serde_json::to_string(&InheritanceMode::Full).unwrap(), "\"full\"");
+        assert_eq!(serde_json::to_string(&InheritanceMode::Partial).unwrap(), "\"partial\"");
+
+        // Test deserialization
+        let mode: InheritanceMode = serde_json::from_str("\"none\"").unwrap();
+        assert_eq!(mode, InheritanceMode::None);
     }
 }

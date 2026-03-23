@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
-import { Spin, Tag } from 'antd';
-import { TeamOutlined } from '@ant-design/icons';
+import React, { useMemo, memo, useCallback } from 'react';
+import { Spin, Tag, message } from 'antd';
+import { TeamOutlined, CopyOutlined } from '@ant-design/icons';
 import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
 import type { ChatMessage, InputRequest, InputOption, PMAction } from '../../stores';
@@ -29,7 +29,7 @@ interface ChatPanelProps {
   onActionClick?: (action: PMAction) => void;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({
+const ChatPanelInner: React.FC<ChatPanelProps> = ({
   messages = [],
   pmMessages = [],
   mode,
@@ -63,6 +63,49 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     // Fallback: capitalize stage id
     return currentStage.charAt(0).toUpperCase() + currentStage.slice(1);
   }, [currentStage, flows, default_flow_id]);
+
+  // Dump chat messages to clipboard
+  const handleDumpChat = useCallback(() => {
+    const currentMessages = mode === 'pm_agent' ? pmMessages : messages;
+    
+    if (currentMessages.length === 0) {
+      message.info('No messages to copy');
+      return;
+    }
+
+    const formatMessage = (msg: ChatMessage): string => {
+      const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleString() : '';
+      const timePrefix = timestamp ? `[${timestamp}] ` : '';
+      
+      switch (msg.type) {
+        case 'user':
+          return `${timePrefix}User: ${msg.content || ''}`;
+        case 'agent':
+          return `${timePrefix}${msg.agentName || 'Agent'}: ${msg.content || ''}`;
+        case 'thinking':
+          return `${timePrefix}[Thinking] ${msg.agentName || 'Agent'}: ${msg.content || ''}`;
+        case 'tool_call':
+          return `${timePrefix}[Tool Call] ${msg.toolName || 'unknown'}: ${JSON.stringify(msg.arguments || {}, null, 2)}`;
+        case 'tool_result':
+          return `${timePrefix}[Tool Result] ${msg.toolName || 'unknown'}: ${msg.result || ''}`;
+        case 'pm_agent':
+          return `${timePrefix}PM Agent: ${msg.content || ''}`;
+        case 'status':
+          return `${timePrefix}[Status] ${msg.content || ''}`;
+        case 'error':
+          return `${timePrefix}[Error] ${msg.content || ''}`;
+        default:
+          return `${timePrefix}${JSON.stringify(msg)}`;
+      }
+    };
+
+    const header = `=== Chat Export ===\nIteration: ${iterationTitle}\nMode: ${mode}\nExported at: ${new Date().toLocaleString()}\n\n`;
+    const content = currentMessages.map(formatMessage).join('\n\n');
+    
+    navigator.clipboard.writeText(header + content)
+      .then(() => message.success('Chat copied to clipboard'))
+      .catch(() => message.error('Failed to copy to clipboard'));
+  }, [mode, pmMessages, messages, iterationTitle]);
 
   if (mode === 'disabled') {
     return (
@@ -184,6 +227,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         userInput={userInput}
         onUserInputChange={onUserInputChange}
         onSend={onSend}
+        onDumpChat={handleDumpChat}
         inputRequest={inputRequest}
         onSelectOption={onSelectOption}
         onSubmitFeedback={onSubmitFeedback}
@@ -194,3 +238,5 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     </div>
   );
 };
+
+export const ChatPanel = memo(ChatPanelInner);

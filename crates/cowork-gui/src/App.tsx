@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback, Suspense, lazy } from 'react';
 import { Layout, Menu, Button, Empty, App as AntApp, Tag, Spin } from 'antd';
 import {
 	FolderOutlined,
@@ -20,21 +20,26 @@ import {
 
 import { useProjectStore, useAgentStore, useUIStore } from './stores';
 import { LoadingScreen, StatusBadge } from './components/common';
-import { ChatPanel } from './components/chat';
 import { useAppEvents, usePMAgent, useIterationActions, useChatInput } from './hooks';
 
 import type { ChatMode, PMAction, PMAgentMessage, ChatMessage } from './stores';
 
-import ArtifactsViewer from './components/ArtifactsViewer';
-import CodeEditor from './components/CodeEditor';
-import RunnerPanel from './components/RunnerPanel';
+// Synchronous import for first-screen component
 import ProjectsPanel from './components/ProjectsPanel';
-import MemoryPanel from './components/MemoryPanel';
-import KnowledgePanel from './components/KnowledgePanel';
-import CommandPalette from './components/CommandPalette';
-import IterationsPanel from './components/IterationsPanel';
-import SettingsPanel from './components/SettingsPanel';
-import { AgentsSetupPanel } from './components/config';
+
+// Lazy load heavy components to improve startup performance
+const ArtifactsViewer = lazy(() => import('./components/ArtifactsViewer'));
+const CodeEditor = lazy(() => import('./components/CodeEditor'));
+const RunnerPanel = lazy(() => import('./components/RunnerPanel'));
+const MemoryPanel = lazy(() => import('./components/MemoryPanel'));
+const KnowledgePanel = lazy(() => import('./components/KnowledgePanel'));
+const CommandPalette = lazy(() => import('./components/CommandPalette'));
+const IterationsPanel = lazy(() => import('./components/IterationsPanel'));
+const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
+// ChatPanel is a named export, need to wrap it
+const ChatPanel = lazy(() => import('./components/chat').then(m => ({ default: m.ChatPanel })));
+// AgentsSetupPanel is the default export
+const AgentsSetupPanel = lazy(() => import('./components/config').then(m => ({ default: m.AgentsSetupPanel })));
 
 const { Sider, Content, Header, Footer } = Layout;
 
@@ -141,15 +146,24 @@ function App() {
 		handlePMAction(action, pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]);
 	}, [handlePMAction, pmMessages]);
 
+	// Loading fallback for lazy components
+	const loadingFallback = (
+		<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+			<Spin size="large" tip="Loading..." />
+		</div>
+	);
+
 	// Render content based on active view
 	const renderContent = () => (
 		<div style={{ height: '100%' }}>
 			<div style={{ height: '100%', display: activeView === 'iterations' ? 'block' : 'none' }}>
-				<IterationsPanel
-					key="iterations"
-					onSelectIteration={handleSelectIteration}
-					selectedIterationId={currentIteration?.id}
-				/>
+				<Suspense fallback={loadingFallback}>
+					<IterationsPanel
+						key="iterations"
+						onSelectIteration={handleSelectIteration}
+						selectedIterationId={currentIteration?.id}
+					/>
+				</Suspense>
 			</div>
 
 			<div style={{ height: '100%', display: activeView === 'projects' ? 'block' : 'none' }}>
@@ -158,13 +172,15 @@ function App() {
 
 			<div style={{ height: '100%', display: activeView === 'artifacts' ? 'block' : 'none' }}>
 				{currentIteration ? (
-					<ArtifactsViewer
-						key={`artifacts-${currentIteration.id}`}
-						iterationId={currentIteration.id}
-						activeTab={activeArtifactTab}
-						onTabChange={setActiveArtifactTab}
-						refreshTrigger={artifactsRefreshTrigger}
-					/>
+					<Suspense fallback={loadingFallback}>
+						<ArtifactsViewer
+							key={`artifacts-${currentIteration.id}`}
+							iterationId={currentIteration.id}
+							activeTab={activeArtifactTab}
+							onTabChange={setActiveArtifactTab}
+							refreshTrigger={artifactsRefreshTrigger}
+						/>
+					</Suspense>
 				) : (
 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
 				)}
@@ -172,11 +188,13 @@ function App() {
 
 			<div style={{ height: '100%', display: activeView === 'code' ? 'block' : 'none' }}>
 				{currentIteration ? (
-					<CodeEditor
-						key={`code-${currentIteration.id}`}
-						iterationId={currentIteration.id}
-						refreshTrigger={codeRefreshTrigger}
-					/>
+					<Suspense fallback={loadingFallback}>
+						<CodeEditor
+							key={`code-${currentIteration.id}`}
+							iterationId={currentIteration.id}
+							refreshTrigger={codeRefreshTrigger}
+						/>
+					</Suspense>
 				) : (
 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
 				)}
@@ -184,61 +202,73 @@ function App() {
 
 			<div style={{ height: '100%', display: activeView === 'run' ? 'block' : 'none' }}>
 				{currentIteration ? (
-					<RunnerPanel key={`run-${currentIteration.id}`} iterationId={currentIteration.id} />
+					<Suspense fallback={loadingFallback}>
+						<RunnerPanel key={`run-${currentIteration.id}`} iterationId={currentIteration.id} />
+					</Suspense>
 				) : (
 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
 				)}
 			</div>
 
 			<div style={{ height: '100%', display: activeView === 'execution-memory' ? 'block' : 'none' }}>
-				<MemoryPanel
-					key={`memory-${memoryRefreshTrigger}`}
-					currentSession={currentIteration?.id}
-					refreshTrigger={memoryRefreshTrigger}
-				/>
+				<Suspense fallback={loadingFallback}>
+					<MemoryPanel
+						key={`memory-${memoryRefreshTrigger}`}
+						currentSession={currentIteration?.id}
+						refreshTrigger={memoryRefreshTrigger}
+					/>
+				</Suspense>
 			</div>
 
 			<div style={{ height: '100%', display: activeView === 'project-knowledge' ? 'block' : 'none' }}>
-				<KnowledgePanel
-					key={`knowledge-${knowledgeRefreshTrigger}`}
-					currentSession={project?.id}
-					currentIterationId={currentIteration?.id}
-					refreshTrigger={knowledgeRefreshTrigger}
-				/>
+				<Suspense fallback={loadingFallback}>
+					<KnowledgePanel
+						key={`knowledge-${knowledgeRefreshTrigger}`}
+						currentSession={project?.id}
+						currentIterationId={currentIteration?.id}
+						refreshTrigger={knowledgeRefreshTrigger}
+					/>
+				</Suspense>
 			</div>
 
 			<div style={{ height: '100%', display: activeView === 'settings' ? 'block' : 'none', overflow: 'auto' }}>
-				<SettingsPanel />
+				<Suspense fallback={loadingFallback}>
+					<SettingsPanel />
+				</Suspense>
 			</div>
 
 			<div style={{ height: '100%', display: activeView === 'config' ? 'block' : 'none', overflow: 'auto' }}>
-				<AgentsSetupPanel />
+				<Suspense fallback={loadingFallback}>
+					<AgentsSetupPanel />
+				</Suspense>
 			</div>
 
 			<div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
 				{currentIteration ? (
-					<ChatPanel
-						messages={messages}
-						pmMessages={pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]}
-						mode={chatMode}
-						isProcessing={isProcessing}
-						pmProcessing={pmProcessing}
-						currentAgent={currentAgent}
-						iterationTitle={currentIteration.title}
-						iterationDescription={currentIteration.description}
-						currentStage={currentStage}
-						inputRequest={inputRequest}
-						userInput={userInput}
-						messagesContainerRef={messagesContainerRef as React.RefObject<HTMLDivElement>}
-						pmMessagesContainerRef={pmMessagesContainerRef as React.RefObject<HTMLDivElement>}
-						onUserInputChange={setUserInput}
-						onSend={handleSend}
-						onSelectOption={handleSelectOptionWrapper}
-						onSubmitFeedback={handleSubmitFeedbackWrapper}
-						onCancelFeedback={handleCancelFeedback}
-						onToggleThinking={handleToggleThinking}
-						onActionClick={handlePMActionWrapper}
-					/>
+					<Suspense fallback={loadingFallback}>
+						<ChatPanel
+							messages={messages}
+							pmMessages={pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]}
+							mode={chatMode}
+							isProcessing={isProcessing}
+							pmProcessing={pmProcessing}
+							currentAgent={currentAgent}
+							iterationTitle={currentIteration.title}
+							iterationDescription={currentIteration.description}
+							currentStage={currentStage}
+							inputRequest={inputRequest}
+							userInput={userInput}
+							messagesContainerRef={messagesContainerRef as React.RefObject<HTMLDivElement>}
+							pmMessagesContainerRef={pmMessagesContainerRef as React.RefObject<HTMLDivElement>}
+							onUserInputChange={setUserInput}
+							onSend={handleSend}
+							onSelectOption={handleSelectOptionWrapper}
+							onSubmitFeedback={handleSubmitFeedbackWrapper}
+							onCancelFeedback={handleCancelFeedback}
+							onToggleThinking={handleToggleThinking}
+							onActionClick={handlePMActionWrapper}
+						/>
+					</Suspense>
 				) : (
 					<Empty description="Select an iteration to view chat" style={{ marginTop: '40px' }} />
 				)}

@@ -172,6 +172,37 @@ Implements custom traits to bridge the domain model with the agent framework:
 - `SimpleSession`: Manages conversation history and state persistence
 - `SimpleState`: Key-value storage for agent state across streaming chunks
 
+### 3.4 Iteration Executor (Modular Architecture)
+
+The `IterationExecutor` adopts a modular architecture located in `pipeline/executor/`:
+
+```
+executor/
+├── mod.rs              # Main executor entry, iteration lifecycle management
+├── interaction_ext.rs  # Interaction extensions (ConfirmationAction enum)
+├── knowledge.rs        # Knowledge generation and injection logic
+└── workspace.rs        # Workspace preparation and inheritance management
+```
+
+**Module Responsibilities:**
+
+| Module | Responsibility |
+|--------|----------------|
+| **mod.rs** | Iteration lifecycle management, stage execution loop, error handling and retry logic |
+| **interaction_ext.rs** | `ConfirmationAction` enum definition, extending `InteractiveBackend` confirmation capabilities |
+| **knowledge.rs** | Document summary generation, iteration knowledge generation, project knowledge injection, knowledge regeneration |
+| **workspace.rs** | Workspace preparation, inheritance mode implementation (Full/Partial/None), artifact existence checking |
+
+**Knowledge Injection Mechanism (knowledge.rs):**
+- Preferred: Use knowledge summary when available
+- Fallback: Load artifacts directly from base iteration if knowledge summary is missing
+- Supports project context injection into evolution iterations
+
+**Inheritance Workflow (workspace.rs):**
+- `InheritanceMode::None`: Fresh start, no file inheritance
+- `InheritanceMode::Partial`: Copy only code files, skip artifacts directory
+- `InheritanceMode::Full`: Complete copy of all files and artifacts
+
 ### 3.4 Agent Instructions
 
 Located in `crates/cowork-core/src/instructions/`, this subsystem contains approximately **2,000 lines of prompt engineering** defining AI agent behavior:
@@ -480,14 +511,11 @@ assert!(path.starts_with(&ctx.workspace_path));
 crates/cowork-core/src/pipeline/
 ├── mod.rs                    # Pipeline controller and stage orchestration
 ├── stage_executor.rs         # ADK integration and execution framework
-├── stages/
-│   ├── idea.rs              # Idea stage implementation
-│   ├── prd.rs               # PRD stage (Actor-Critic)
-│   ├── design.rs            # Design stage (Actor-Critic)
-│   ├── plan.rs              # Plan stage (Actor-Critic)
-│   ├── coding.rs            # Coding stage (Actor-Critic)
-│   ├── check.rs             # Quality check stage
-│   └── delivery.rs          # Final delivery stage
+├── executor/                 # Modular iteration executor
+│   ├── mod.rs               # Main executor entry, iteration lifecycle management
+│   ├── interaction_ext.rs   # Interaction extensions, ConfirmationAction enum
+│   ├── knowledge.rs         # Knowledge generation and injection logic
+│   └── workspace.rs         # Workspace preparation and inheritance management
 └── ...
 
 crates/cowork-core/src/instructions/
@@ -498,6 +526,7 @@ crates/cowork-core/src/instructions/
 ├── coding.rs                # Coding Actor/Critic prompts
 ├── check.rs                 # Check agent prompts
 ├── delivery.rs              # Delivery agent prompts
+├── legacy_project_analyzer.rs  # Legacy Project Analyzer prompts
 └── ...
 ```
 

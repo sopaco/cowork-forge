@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactElement, useMemo } from "react";
+import { useState, useEffect, ReactElement, useMemo, memo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   App,
@@ -90,7 +90,7 @@ const formatDate = (dateString?: string): string => {
   return new Date(dateString).toLocaleString();
 };
 
-const IterationsPanel: React.FC<IterationsPanelProps> = ({
+const IterationsPanelInner: React.FC<IterationsPanelProps> = ({
   onSelectIteration,
   selectedIterationId,
   onExecuteStatusChange,
@@ -360,4 +360,4 @@ const IterationsPanel: React.FC<IterationsPanelProps> = ({
   );
 };
 
-export default IterationsPanel;
+export default memo(IterationsPanelInner);

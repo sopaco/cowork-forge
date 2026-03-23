@@ -42,6 +42,9 @@ tracing = "0.1"
 # File system
 dirs = { workspace = true }
 
+# System locale (lightweight, no external process)
+sys-locale = "0.3"
+
 # Cowork Core
 cowork-core = { path = "../../cowork-core" }
 

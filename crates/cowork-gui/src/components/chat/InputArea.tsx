@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { memo, useCallback } from 'react';
 import { Button, Space, Input } from 'antd';
+import { CopyOutlined } from '@ant-design/icons';
 import type { InputRequest, InputOption } from '../../stores';
 
 interface InputAreaProps {
   userInput: string;
   onUserInputChange: (value: string) => void;
   onSend: () => void;
+  onDumpChat: () => void;
   inputRequest?: InputRequest | null;
   onSelectOption: (option: InputOption) => void;
   onSubmitFeedback: () => void;
@@ -14,10 +16,11 @@ interface InputAreaProps {
   mode: 'pipeline' | 'pm_agent';
 }
 
-export const InputArea: React.FC<InputAreaProps> = ({
+const InputAreaInner: React.FC<InputAreaProps> = ({
   userInput,
   onUserInputChange,
   onSend,
+  onDumpChat,
   inputRequest,
   onSelectOption,
   onSubmitFeedback,
@@ -25,18 +28,25 @@ export const InputArea: React.FC<InputAreaProps> = ({
   disabled,
   mode,
 }) => {
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onUserInputChange(e.target.value);
+  }, [onUserInputChange]);
+
   if (mode === 'pm_agent') {
     return (
       <div style={{ display: 'flex', gap: '8px' }}>
         <Input
           value={userInput}
-          onChange={(e) => onUserInputChange(e.target.value)}
+          onChange={handleInputChange}
           onPressEnter={onSend}
           placeholder="Ask about the project or request changes..."
           disabled={disabled}
         />
         <Button onClick={onSend} type="primary" disabled={!userInput.trim() || disabled}>
           Send
+        </Button>
+        <Button onClick={onDumpChat} icon={<CopyOutlined />} title="Copy chat to clipboard">
+          Dump
         </Button>
       </div>
     );
@@ -75,7 +85,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
       <div style={{ display: 'flex', gap: '8px' }}>
         <Input
           value={userInput}
-          onChange={(e) => onUserInputChange(e.target.value)}
+          onChange={handleInputChange}
           onPressEnter={onSend}
           placeholder={inputRequest ? 'Type your response...' : 'Type a message...'}
           disabled={disabled && !inputRequest}
@@ -89,6 +99,9 @@ export const InputArea: React.FC<InputAreaProps> = ({
             Send
           </Button>
         )}
+        <Button onClick={onDumpChat} icon={<CopyOutlined />} title="Copy chat to clipboard">
+          Dump
+        </Button>
         {inputRequest && inputRequest.isFeedbackMode && (
           <Button onClick={onCancelFeedback}>Cancel</Button>
         )}
@@ -96,3 +109,5 @@ export const InputArea: React.FC<InputAreaProps> = ({
     </>
   );
 };
+
+export const InputArea = memo(InputAreaInner);

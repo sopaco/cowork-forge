@@ -6,3 +6,6 @@
 @import './styles/markdown.css';
 @import './styles/components.css';
 @import './styles/layout.css';
+
+/* Code highlighting - loaded once globally */
+@import 'highlight.js/styles/github.css';

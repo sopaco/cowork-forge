@@ -168,7 +168,7 @@ impl Default for InheritanceConfig {
     fn default() -> Self {
         let mut stage_mapping = HashMap::new();
         stage_mapping.insert("none".to_string(), "idea".to_string());
-        stage_mapping.insert("partial".to_string(), "plan".to_string());
+        stage_mapping.insert("partial".to_string(), "idea".to_string());
         stage_mapping.insert("full".to_string(), "idea".to_string());
 
         Self {

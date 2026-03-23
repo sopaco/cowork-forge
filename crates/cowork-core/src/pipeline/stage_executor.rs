@@ -301,6 +301,72 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
 
     prompt.push_str(&format!("Iteration ID: {}\n\n", ctx.iteration.id));
 
+    // For evolution iterations, inject strong EVOLUTION context at the beginning
+    // This is CRITICAL for agents to understand they should NOT rewrite from scratch
+    if let Some(base_id) = &ctx.iteration.base_iteration_id {
+        let inheritance_mode_name = match ctx.iteration.inheritance {
+            crate::domain::InheritanceMode::None => "None",
+            crate::domain::InheritanceMode::Full => "Full",
+            crate::domain::InheritanceMode::Partial => "Partial",
+        };
+
+        prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+        prompt.push_str("🚨🚨🚨 CRITICAL: THIS IS AN EVOLUTION ITERATION 🚨🚨🚨\n");
+        prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+        prompt.push_str("\n");
+        prompt.push_str("⚠️ DO NOT CREATE NEW PROJECT - BUILD ON EXISTING CODE ⚠️\n\n");
+        prompt.push_str(&format!("Base Iteration: {}\n", base_id));
+        prompt.push_str(&format!("Inheritance Mode: {}\n\n", inheritance_mode_name));
+        
+        match ctx.iteration.inheritance {
+            crate::domain::InheritanceMode::Partial => {
+                prompt.push_str("📋 PARTIAL INHERITANCE:\n");
+                prompt.push_str("- Code files from the base iteration have been COPIED to the workspace\n");
+                prompt.push_str("- You MUST preserve existing code and add new features incrementally\n");
+                prompt.push_str("- DO NOT rewrite the project from scratch\n");
+                prompt.push_str("- DO NOT delete existing files unless absolutely necessary\n\n");
+            }
+            crate::domain::InheritanceMode::Full => {
+                prompt.push_str("📋 FULL INHERITANCE:\n");
+                prompt.push_str("- All files (code + artifacts) from base iteration are available\n");
+                prompt.push_str("- You MUST preserve existing code and only make necessary modifications\n");
+                prompt.push_str("- DO NOT rewrite the project from scratch\n\n");
+            }
+            crate::domain::InheritanceMode::None => {}
+        }
+        
+        prompt.push_str("🎯 YOUR APPROACH FOR THIS ITERATION:\n");
+        prompt.push_str("1. FIRST: Use list_files() to see the existing project structure\n");
+        prompt.push_str("2. Read relevant existing files before making ANY changes\n");
+        prompt.push_str("3. Identify where new features should be added\n");
+        prompt.push_str("4. Add new features incrementally - DO NOT regenerate existing code\n");
+        prompt.push_str("5. Only modify files that need changes for the new features\n\n");
+        prompt.push_str("═══════════════════════════════════════════════════════════════\n\n");
+        
+        // Also try to load project_context insight if available
+        if let Ok(iter_memory) = crate::persistence::MemoryStore::new()
+            .load_iteration_memory(&ctx.iteration.id)
+        {
+            for insight in &iter_memory.insights {
+                if insight.stage == "project_context" {
+                    prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                    prompt.push_str("📋 PROJECT CONTEXT (from base iteration)\n");
+                    prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+                    prompt.push_str(&truncate_content(&insight.content, 2000));
+                    prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
+                    break;
+                }
+            }
+        }
+    }
+
+    // Inject iteration goal/description for ALL stages (not just idea)
+    prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+    prompt.push_str("🎯 ITERATION GOAL\n");
+    prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+    prompt.push_str(&ctx.iteration.description);
+    prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
+
     // Pre-inject artifacts from previous stages (Optimization: reduces tool calls)
     let mut injected_artifacts = Vec::new();
 
@@ -385,12 +451,11 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
     match stage_name {
         "idea" => {
             prompt.push_str("========================================\n");
-            prompt.push_str("USER'S PROJECT IDEA (ALREADY PROVIDED):\n");
+            prompt.push_str("STAGE: Idea\n");
             prompt.push_str("========================================\n");
-            prompt.push_str(&ctx.iteration.description);
-            prompt.push_str("\n========================================\n\n");
+            prompt.push_str("The iteration goal is provided above.\n\n");
             prompt.push_str("YOUR TASK:\n");
-            prompt.push_str("1. Read and understand the project idea above\n");
+            prompt.push_str("1. Read and understand the iteration goal\n");
             prompt.push_str("2. Generate a structured idea document\n");
             prompt.push_str("3. SAVE IT using the save_idea() tool (MANDATORY)\n\n");
         }
@@ -407,10 +472,6 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             }
             prompt.push_str("2. Analyze the idea and create requirements\n");
             prompt.push_str("3. SAVE PRD using save_prd_doc() tool (MANDATORY)\n\n");
-            prompt.push_str(&format!(
-                "Original request: {}\n\n",
-                ctx.iteration.description
-            ));
         }
         "design" => {
             prompt.push_str("========================================\n");

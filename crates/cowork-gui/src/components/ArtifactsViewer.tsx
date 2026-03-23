@@ -7,7 +7,6 @@ import rehypeRaw from 'rehype-raw';
 import JsonView from 'react-json-view';
 import { App, Tabs, Spin, Alert, Empty, Button, Space, Tooltip } from 'antd';
 import { FileTextOutlined, ProjectOutlined, DatabaseOutlined, BuildOutlined, CheckCircleOutlined, FileMarkdownOutlined, FolderOpenOutlined, ReloadOutlined } from '@ant-design/icons';
-import 'highlight.js/styles/atom-one-dark.css';
 
 interface ArtifactsData {
   iteration_id?: string;

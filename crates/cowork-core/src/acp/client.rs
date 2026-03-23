@@ -217,13 +217,24 @@ fn run_acp_in_thread(
         let _ = message_tx.send(AgentMessage::Status("Starting agent process...".to_string()));
 
         // Spawn the agent process
-        let mut child = Command::new(&config.command)
-            .args(&config.args)
+        let mut cmd = Command::new(&config.command);
+        cmd.args(&config.args)
             .current_dir(&workspace)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .kill_on_drop(true)
+            .kill_on_drop(true);
+
+        // On Windows, use CREATE_NO_WINDOW to prevent console window from appearing
+        #[cfg(target_os = "windows")]
+        {
+            #[allow(unused_imports)]
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+
+        let mut child = cmd
             .spawn()
             .with_context(|| format!("Failed to spawn agent: {}", config.command))?;
 

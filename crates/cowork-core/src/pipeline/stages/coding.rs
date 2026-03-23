@@ -99,9 +99,11 @@ impl CodingStage {
             ctx.iteration.description
         );
 
-        // Create external agent
+        // Create external agent with iteration context for evolution iterations
         eprintln!("DEBUG: Creating ExternalCodingAgent for workspace: {}", workspace.display());
-        let agent = match ExternalCodingAgent::new(&workspace).await {
+        eprintln!("DEBUG: Iteration id={}, base_id={:?}, inheritance={:?}", 
+            ctx.iteration.id, ctx.iteration.base_iteration_id, ctx.iteration.inheritance);
+        let agent = match ExternalCodingAgent::new_with_iteration(&workspace, Some(ctx.iteration.clone())).await {
             Ok(agent) => agent,
             Err(e) => {
                 interaction

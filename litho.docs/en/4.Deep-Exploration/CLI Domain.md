@@ -65,7 +65,20 @@ flowchart TB
 ```
 crates/cowork-cli/
 ├── src/
-│   └── main.rs          # CLI entry point, command routing, and orchestration
+│   ├── main.rs          # CLI entry point, command routing, and orchestration
+│   ├── utils.rs         # Shared utility functions
+│   └── commands/        # Command modules (modular architecture)
+│       ├── mod.rs       # Command module exports
+│       ├── iter.rs      # Create iteration command
+│       ├── list.rs      # List iterations command
+│       ├── show.rs      # Show iteration details command
+│       ├── continue_cmd.rs  # Continue iteration command
+│       ├── init.rs      # Initialize project command
+│       ├── status.rs    # Project status command
+│       ├── delete.rs    # Delete iteration command
+│       ├── knowledge.rs # Regenerate knowledge command
+│       ├── import.rs    # Import existing project command
+│       └── config.rs    # Configuration management command
 ├── Cargo.toml           # Dependencies: clap, tokio, anyhow, tracing, cowork-core
 └── README.md
 ```
@@ -210,6 +223,62 @@ Regenerates the knowledge snapshot for a completed iteration, useful when manual
 cowork regenerate-knowledge <ITERATION_ID>
 ```
 
+#### 3.2.9 `import` — Import Existing Project
+
+Imports any existing project into Cowork Forge, automatically analyzing project structure and generating documentation artifacts.
+
+**Syntax:**
+```bash
+cowork import <PATH> [OPTIONS]
+```
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| `--name <NAME>` | Project name (defaults to directory name) |
+| `--idea` | Generate idea.md document |
+| `--prd` | Generate prd.md document |
+| `--design` | Generate design.md document |
+| `--plan` | Generate plan.md document |
+| `--template-only` | Use template-only generation (skip LLM) |
+
+**Examples:**
+```bash
+# Import project with all documentation
+cowork import /path/to/existing/project --idea --prd --design --plan
+
+# Generate only idea and prd documents
+cowork import ./my-app --idea --prd
+
+# Template-only mode (no LLM config required)
+cowork import ./my-app --idea --template-only
+```
+
+**Workflow:**
+1. Validate project path
+2. Initialize Cowork Forge project structure
+3. Analyze project structure and technology stack
+4. Generate requested artifact documents
+5. Create initial iteration record
+
+#### 3.2.10 `config` — Configuration Management
+
+Manages Cowork Forge configuration including LLM settings.
+
+**Syntax:**
+```bash
+cowork config [OPTIONS]
+```
+
+**Examples:**
+```bash
+# Show current configuration
+cowork config
+
+# Interactive configuration wizard
+cowork config --setup
+```
+
 ---
 
 ## 4. Implementation Details
@@ -258,6 +327,10 @@ enum Commands {
     Delete(DeleteArgs),
     /// Regenerate knowledge for completed iteration
     RegenerateKnowledge(RegenerateArgs),
+    /// Import existing project into Cowork Forge
+    Import(ImportArgs),
+    /// Manage configuration
+    Config(ConfigArgs),
 }
 ```
 
