@@ -398,6 +398,7 @@ pub fn create_check_agent(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent
         .tool(Arc::new(CheckLintTool))
         .tool(Arc::new(ProvideFeedbackTool))
         .tool(Arc::new(GotoStageTool))
+        .tool(Arc::new(SaveCheckReportTool))
         .include_contents(IncludeContents::None)
         .build()?;
 
@@ -424,6 +425,7 @@ pub fn create_check_agent_with_id(model: Arc<dyn Llm>, iteration_id: String) -> 
         .tool(Arc::new(CheckLintTool))
         .tool(Arc::new(ProvideFeedbackTool))
         .tool(Arc::new(GotoStageTool))
+        .tool(Arc::new(SaveCheckReportTool))
         .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
         .tool(Arc::new(SaveInsightTool::new(iteration_id.clone())))
         .tool(Arc::new(SaveIssueTool::new(iteration_id.clone())))

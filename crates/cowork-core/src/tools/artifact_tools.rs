@@ -104,6 +104,51 @@ impl Tool for SaveDeliveryReportTool {
 }
 
 // ============================================================================
+// SaveCheckReportTool
+// ============================================================================
+
+pub struct SaveCheckReportTool;
+
+#[async_trait]
+impl Tool for SaveCheckReportTool {
+    fn name(&self) -> &str {
+        "save_check_report"
+    }
+
+    fn description(&self) -> &str {
+        "MUST USE THIS TOOL to save the Check Report markdown document. Call save_check_report(content=<markdown>) to save your check results to artifacts/check_report.md. This is REQUIRED to complete the check stage."
+    }
+
+    fn parameters_schema(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "Markdown content of the check report"
+                }
+            },
+            "required": ["content"]
+        }))
+    }
+
+    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        super::notify_tool_call("save_check_report", &json!({"file": "check_report.md"}));
+
+        let content = get_required_string_param(&args, "content")?;
+
+        save_check_report(content)
+            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+
+        Ok(json!({
+            "status": "success",
+            "message": "Check report saved successfully",
+            "file_path": "artifacts/check_report.md"
+        }))
+    }
+}
+
+// ============================================================================
 // SavePlanDocTool
 // ============================================================================
 

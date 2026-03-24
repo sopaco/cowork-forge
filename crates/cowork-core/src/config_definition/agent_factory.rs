@@ -312,6 +312,7 @@ fn create_tool_from_reference(tool_id: &str, iteration_id: &str) -> Result<Arc<d
         "save_design_doc" => Arc::new(SaveDesignDocTool),
         "save_plan_doc" => Arc::new(SavePlanDocTool),
         "save_delivery_report" => Arc::new(SaveDeliveryReportTool),
+        "save_check_report" => Arc::new(SaveCheckReportTool),
         
         // Design tools
         "create_design_component" => Arc::new(CreateDesignComponentTool),

@@ -361,6 +361,19 @@ pub fn save_delivery_report(content: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn save_check_report(content: &str) -> Result<()> {
+    let path = artifact_path("check_report.md")?;
+
+    // Ensure parent directory exists
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory {:?}", parent))?;
+    }
+
+    fs::write(&path, content)?;
+    Ok(())
+}
+
 // ============================================================================
 // Helpers
 // ============================================================================
