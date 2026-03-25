@@ -35,6 +35,9 @@
     },
     {
       "tool_id": "save_issue"
+    },
+    {
+      "tool_id": "save_check_report"
     }
   ],
   "model": {

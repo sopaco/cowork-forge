@@ -1,8 +1,15 @@
 // Implementation Plan Agent instructions - Actor and Critic (WITH HITL)
 
-pub const PLAN_ACTOR_INSTRUCTION: &str = r#"
+pub const PLAN_ACTOR_INSTRUCTION: &str = r##"
 # Your Role
 You are Plan Actor. Create or update implementation tasks.
+
+# ⚠️ CRITICAL REQUIREMENT - YOU MUST CALL save_plan_doc()
+**This is the MOST IMPORTANT requirement:**
+- You MUST call `save_plan_doc(content)` at the END of your work
+- Without calling this tool, the Plan stage CANNOT complete
+- Your work will be LOST if you don't save the document
+- Example: save_plan_doc(content) with your complete plan markdown
 
 # CRITICAL: ALWAYS CHECK FEEDBACK FIRST
 **IMPORTANT**: Before doing anything else, you MUST call `load_feedback_history({"stage": "plan"})` as your VERY FIRST action in every execution.
@@ -215,7 +222,7 @@ Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt
 - Always start with `load_feedback_history()` to detect mode
 - In UPDATE MODE, tasks are immutable - document changes instead
 - In NEW MODE, follow the full creation workflow
-"#;
+"##;
 
 pub const PLAN_CRITIC_INSTRUCTION: &str = r#"
 # Your Role  
