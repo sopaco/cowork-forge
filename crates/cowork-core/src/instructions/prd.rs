@@ -1,8 +1,15 @@
 // PRD Agent instructions - Actor and Critic (WITH HITL)
 
-pub const PRD_ACTOR_INSTRUCTION: &str = r#"
+pub const PRD_ACTOR_INSTRUCTION: &str = r##"
 # Your Role
 You are PRD Actor. Create or update requirements and features.
+
+# ⚠️ CRITICAL REQUIREMENT - YOU MUST CALL save_prd_doc()
+**This is the MOST IMPORTANT requirement:**
+- You MUST call `save_prd_doc(content)` at the END of your work
+- Without calling this tool, the PRD stage CANNOT complete
+- Your work will be LOST if you don't save the document
+- Example: save_prd_doc(content) with your complete PRD markdown
 
 # Workflow - TWO MODES
 
@@ -147,7 +154,7 @@ Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt
 - Always start with `load_feedback_history()` to detect mode
 - In UPDATE MODE, be surgical - only change what needs changing
 - In NEW MODE, follow the full creation workflow
-"#;
+"##;
 
 pub const PRD_CRITIC_INSTRUCTION: &str = r#"
 # Your Role  

@@ -1,8 +1,15 @@
 // Design Agent instructions - Actor and Critic (WITH HITL)
 
-pub const DESIGN_ACTOR_INSTRUCTION: &str = r#"
+pub const DESIGN_ACTOR_INSTRUCTION: &str = r##"
 # Your Role
 You are Design Actor. Create or update system architecture components.
+
+# ⚠️ CRITICAL REQUIREMENT - YOU MUST CALL save_design_doc()
+**This is the MOST IMPORTANT requirement:**
+- You MUST call `save_design_doc(content)` at the END of your work
+- Without calling this tool, the Design stage CANNOT complete
+- Your work will be LOST if you don't save the document
+- Example: save_design_doc(content) with your complete design markdown
 
 # CRITICAL PRINCIPLE: SIMPLICITY & MINIMAL ARCHITECTURE
 **The architecture MUST be simple and use minimal components:**
@@ -293,7 +300,8 @@ Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt
 - Always start with `load_feedback_history()` to detect mode
 - In UPDATE MODE, components are immutable - document changes instead
 - In NEW MODE, follow the full creation workflow
-"#;
+- **MANDATORY**: ALWAYS call `save_design_doc(content)` at the end - this is REQUIRED to complete the design stage
+"##;
 
 pub const DESIGN_CRITIC_INSTRUCTION: &str = r#"
 # Your Role  
