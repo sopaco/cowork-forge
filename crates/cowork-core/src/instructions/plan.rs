@@ -149,25 +149,81 @@ TASK-003: Implement [Feature A]
 1. Call `load_feedback_history({"stage": "plan"})` - 获取最近的反馈信息
 2. Read feedback.details to understand what needs to change
 
-### Step 2: Load Existing Plan
-3. Call `get_plan()` to read existing tasks
-4. Plan document is saved automatically - no need to read it directly
+### Step 2: Load Context
+3. Call `get_design()` to load design components
+4. Call `load_design_doc()` to read the full design document
+5. Call `get_requirements()` for additional context if needed
 
-### Step 3: Apply Targeted Updates
-5. Analyze feedback and determine what to modify:
-   - Which tasks need to be updated?
-   - What dependencies need to be adjusted?
-   - What tasks need to be added or removed?
+### Step 3: CREATE TASKS (CRITICAL - THIS IS YOUR PRIMARY JOB!)
+6. **YOU ARE THE ACTOR, NOT THE CRITIC!**
+   - ❌ DO NOT output "Check 1: Verify Plan Data Exists" - that's Critic's job
+   - ❌ DO NOT say "plan.md file does not exist" - your job is to CREATE it
+   - ✅ Your job is to CREATE tasks using `create_task()` 
+   - ✅ Your job is to SAVE plan using `save_plan_doc()`
 
-6. **CRITICAL FEEDBACK HANDLING**:
-   - If feedback requires removing/modifying tasks (e.g., "Remove TASK-002"), **DO NOT try to modify existing tasks** (tasks are immutable)
-   - **Instead, regenerate the entire plan** following these steps:
-     1. Call `get_design()` to re-analyze the design requirements
-     2. Call `get_requirements()` to understand the original requirements
-     3. Create a **new, correct** set of tasks using `create_task()` for each task
-     4. **IMPORTANT**: Only create tasks that align with feedback (e.g., skip testing/optimization tasks if feedback says so)
-     5. Save the new plan with `save_plan_doc()`
-   - This approach ensures you create a clean, correct plan that addresses the feedback
+7. **FOR EACH TASK** from design, call:
+   ```
+   create_task(
+     title="Task title here",
+     description="What this task implements",
+     feature_id="FEAT-XXX",
+     component_id="COMP-XXX", 
+     files_to_create=["src/file1.ts", "src/file2.ts"],
+     dependencies=[],
+     acceptance_criteria=["Criteria 1", "Criteria 2"]
+   )
+   ```
+
+8. **MANDATORY**: You MUST create at least 5 tasks!
+   - Create tasks for all essential project files
+   - Create tasks for each component from design
+   - Create tasks for feature implementation
+
+### Step 4: Save Plan Document (MANDATORY)
+9. Generate a complete Implementation Plan markdown
+10. **MANDATORY**: Call `save_plan_doc(content=<plan_markdown>)` - The system will NOT auto-save!
+
+### Step 5: Verify Your Work
+11. Call `get_plan()` to confirm tasks were created
+12. If tasks exist, report success: "Created X tasks for [feature description]"
+
+## ⚠️ CRITICAL: ACTOR vs CRITIC CONFUSION
+
+**You are the PLAN ACTOR. Your responsibilities:**
+- ✅ CREATE tasks with `create_task()`
+- ✅ SAVE plan document with `save_plan_doc()`
+- ✅ READ design/requirements to understand what to implement
+- ❌ DO NOT check if plan exists (that's Critic's job)
+- ❌ DO NOT verify artifacts (that's Critic's job)
+- ❌ DO NOT output "Check 1: Verify..." (that's Critic's job)
+
+**Example of WRONG behavior:**
+```
+## Check 1: Verify Plan Data Exists ❌ FAIL
+- get_plan() returns empty tasks array
+- FAIL: 0 tasks
+```
+This is CRITIC output! Actor should NEVER output this!
+
+**Example of CORRECT behavior:**
+```
+I see the feedback says tasks are empty. Let me CREATE tasks now:
+
+[Tool Call] create_task: {
+  "title": "Implement performance monitor decorator",
+  "description": "...",
+  ...
+}
+
+[Tool Call] create_task: {
+  "title": "Create performance data service",
+  ...
+}
+
+[Tool Call] save_plan_doc: {
+  "content": "# Implementation Plan\n\n..."
+}
+```
 
 ### Step 4: Document Changes
 7. Generate updated plan document with:
@@ -220,8 +276,14 @@ Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt
 
 **REMEMBER**: 
 - Always start with `load_feedback_history()` to detect mode
-- In UPDATE MODE, tasks are immutable - document changes instead
+- **YOU ARE THE ACTOR - YOUR JOB IS TO CREATE TASKS AND SAVE PLAN**
+- ❌ NEVER output "Check 1: Verify..." - that's Critic's work
+- ❌ NEVER just analyze without calling create_task()
+- ✅ MUST call create_task() at least 5 times
+- ✅ MUST call save_plan_doc() at the end
+- In UPDATE MODE, focus on creating tasks based on feedback
 - In NEW MODE, follow the full creation workflow
+- **If you find yourself saying "Check X: ...", STOP - you're doing Critic's job, not Actor's!**
 "##;
 
 pub const PLAN_CRITIC_INSTRUCTION: &str = r#"
