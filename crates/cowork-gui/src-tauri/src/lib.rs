@@ -717,8 +717,17 @@ pub fn run() {
                         // Store in app state
                         if let Some(state) = app.try_state::<AppState>() {
                             if let Ok(mut ws) = state.workspace_path.lock() {
-                                *ws = Some(workspace);
+                                *ws = Some(workspace.clone());
                             }
+                        }
+                        
+                        // Reset any "running" iterations to "paused" since there's no actual execution after reopening
+                        reset_running_iterations();
+                        
+                        // Emit project_loaded event to notify frontend to navigate to iterations page
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.emit("project_loaded", ());
+                            eprintln!("[GUI] Emitted project_loaded event for workspace: {}", workspace);
                         }
                     }
                 } else {

@@ -414,6 +414,19 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 
 			// Wait for all listeners to be registered in parallel
 			await Promise.all(listenerPromises);
+
+			// Check if there's already an open project (e.g., when launched with --workspace)
+			// This handles the timing issue where backend emits project_loaded before frontend listeners are ready
+			try {
+				const hasOpenProject = await API.workspace.hasOpen();
+				if (hasOpenProject) {
+					console.log('[App] Detected open project on startup, loading project...');
+					await loadProject();
+					setActiveView('iterations');
+				}
+			} catch (error) {
+				console.error('[App] Failed to check for open project:', error);
+			}
 		};
 
 		setupListeners();
