@@ -153,17 +153,59 @@ Manages iteration entities and their associated workspace artifacts. Implements 
 │           └── knowledge.json
 ```
 
-### 3.3 Storage Utilities
+### 3.3 Iteration Data Storage
 
-**Location:** `crates/cowork-core/src/storage/*.rs`
+**Location:** `crates/cowork-core/src/persistence/iteration_data.rs`
 
-Provides low-level storage primitives and cross-cutting concerns for persistence operations.
+Provides iteration-scoped data storage for artifacts, session data, and stage-specific content. This module was consolidated from the former `storage` module, centralizing all persistence operations within the persistence domain.
 
 **Key Functions:**
 
-- **`get_cowork_dir()`**: Resolves the `.cowork-v2` directory path relative to project root with platform-specific path normalization (handles UNC paths on Windows)
-- **`get_iteration_id()`**: Retrieves current active iteration identifier from global state or filesystem
-- **Path Validation**: Ensures all file operations remain within project workspace boundaries (security containment)
+| Category | Functions | Description |
+|----------|-----------|-------------|
+| **Iteration Context** | `set_iteration_id()`, `get_iteration_id()`, `clear_iteration_id()` | Manage global iteration context via thread-safe static storage |
+| **Directory Management** | `get_iteration_dir()`, `artifact_path()`, `data_path()`, `session_path()` | Resolve iteration-specific paths for data, artifacts, and session files |
+| **Stage Data** | `load/save_requirements()`, `load/save_feature_list()`, `load/save_design_spec()`, `load/save_implementation_plan()` | Persist structured data models for each pipeline stage |
+| **Artifacts** | `load/save_idea()`, `save_plan_doc()`, `save_prd_doc()`, `save_design_doc()`, `save_check_report()`, `save_delivery_report()` | Manage markdown artifact files |
+| **Session State** | `load/save_session_meta()`, `load/save_feedback_history()`, `append_feedback()`, `clear_stage_feedback()` | Track execution state and user feedback |
+| **Workspace Utils** | `get_cowork_dir()`, `is_project_initialized()`, `init_project_structure()` | Global workspace path resolution and initialization |
+
+**Iteration Directory Structure:**
+```
+.cowork-v2/
+├── project.json
+├── iterations/
+│   └── {iteration_id}/
+│       ├── data/                    # Structured JSON data
+│       │   ├── requirements.json
+│       │   ├── feature_list.json
+│       │   ├── design_spec.json
+│       │   ├── implementation_plan.json
+│       │   └── code_metadata.json
+│       ├── artifacts/               # Markdown documents
+│       │   ├── idea.md
+│       │   ├── prd.md
+│       │   ├── design.md
+│       │   ├── plan.md
+│       │   ├── check_report.md
+│       │   └── delivery_report.md
+│       ├── session/                 # Execution state
+│       │   ├── meta.json
+│       │   └── feedback.json
+│       └── logs/                    # Execution logs
+└── memory/
+    ├── project/
+    └── iterations/
+```
+
+**Global State Management:**
+
+The module uses global static storage for iteration context, enabling tools and pipeline stages to access current iteration data without explicit parameter passing:
+
+```rust
+static CURRENT_ITERATION_ID: Mutex<Option<String>> = Mutex::new(None);
+static GLOBAL_WORKSPACE_PATH: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
+```
 
 ---
 
