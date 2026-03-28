@@ -2,7 +2,6 @@ import { useCallback } from 'react';
 import { App as AntApp } from 'antd';
 import { useProjectStore, useAgentStore, useUIStore } from '../stores';
 import API from '../api';
-import type { Iteration } from '../stores';
 
 /**
  * Hook for handling iteration-related actions
@@ -12,7 +11,7 @@ export function useIterationActions() {
 	const { message } = AntApp.useApp();
 
 	// Project store
-	const { iterations, currentIteration, setCurrentIteration, setIsExecuting } = useProjectStore();
+	const { currentIteration, setCurrentIteration, setIsExecuting } = useProjectStore();
 
 	// Agent store
 	const { setProcessing } = useAgentStore();
@@ -22,23 +21,26 @@ export function useIterationActions() {
 
 	/**
 	 * Handle selecting an iteration
+	 * Directly fetches iteration data via API without depending on local iterations array
 	 */
 	const handleSelectIteration = useCallback(
-		(iterationId: string) => {
-			const iteration = iterations.find((i: Iteration) => i.id === iterationId);
-			if (iteration) {
+		async (iterationId: string) => {
+			try {
 				const { currentIteration, isExecuting } = useProjectStore.getState();
-				API.iteration.get(iterationId).then((full) => {
-					if (isExecuting && currentIteration?.id === iterationId) {
-						setCurrentIteration({ ...full, status: currentIteration.status });
-					} else {
-						setCurrentIteration(full);
-					}
-				});
+				const fullIteration = await API.iteration.get(iterationId);
+				
+				if (isExecuting && currentIteration?.id === iterationId) {
+					setCurrentIteration({ ...fullIteration, status: currentIteration.status });
+				} else {
+					setCurrentIteration(fullIteration);
+				}
 				setActiveView('chat');
+			} catch (error) {
+				console.error('Failed to load iteration:', error);
+				message.error('Failed to load iteration: ' + error);
 			}
 		},
-		[iterations, setCurrentIteration, setActiveView]
+		[setCurrentIteration, setActiveView, message]
 	);
 
 	/**

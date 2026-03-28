@@ -41,12 +41,14 @@ interface ProjectState {
   currentIteration: Iteration | null;
   loading: boolean;
   isExecuting: boolean;
+  iterationsLoaded: boolean;
   
   loadProject: () => Promise<void>;
   loadIterations: () => Promise<void>;
   setCurrentIteration: (iteration: Iteration | null) => void;
   updateCurrentIterationStatus: (status: string) => void;
   setIsExecuting: (executing: boolean) => void;
+  setIterationsLoaded: (loaded: boolean) => void;
   clearProject: () => void;
 }
 
@@ -56,6 +58,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   currentIteration: null,
   loading: false,
   isExecuting: false,
+  iterationsLoaded: false,
   
   loadProject: async () => {
     try {
@@ -65,7 +68,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       
       if (project) {
         const iterations = await API.iteration.list();
-        set({ iterations: iterations || [] });
+        set({ iterations: iterations || [], iterationsLoaded: true });
         
         const { currentIteration, isExecuting } = get();
         if (currentIteration) {
@@ -88,16 +91,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       }
     } catch (error) {
       console.error('Failed to load project:', error);
-      set({ loading: false });
+      set({ loading: false, iterationsLoaded: false });
     }
   },
   
   loadIterations: async () => {
     try {
       const iterations = await API.iteration.list();
-      set({ iterations: iterations || [] });
+      set({ iterations: iterations || [], iterationsLoaded: true });
     } catch (error) {
       console.error('Failed to load iterations:', error);
+      set({ iterationsLoaded: false });
     }
   },
   
@@ -116,12 +120,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ isExecuting: executing });
   },
   
+  setIterationsLoaded: (loaded) => {
+    set({ iterationsLoaded: loaded });
+  },
+  
   clearProject: () => {
     set({
       project: null,
       iterations: [],
       currentIteration: null,
       isExecuting: false,
+      iterationsLoaded: false,
     });
   },
 }));

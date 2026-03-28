@@ -377,25 +377,25 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 				}),
 
 				// Project events
-				listen('project_loaded', () => {
+				listen('project_loaded', async () => {
 					setProcessing(false);
 					setCurrentAgent(null);
 					setInputRequest(null);
 					clearMessages();
 					setCurrentIteration(null);
+					await loadProject();
 					setActiveView('iterations');
-					loadProject();
 					message.success('Project loaded');
 				}),
 
-				listen('project_initialized', () => {
+				listen('project_initialized', async () => {
 					setProcessing(false);
 					setCurrentAgent(null);
 					setInputRequest(null);
 					clearMessages();
 					setCurrentIteration(null);
+					await loadProject();
 					setActiveView('iterations');
-					loadProject();
 					message.success('Project initialized');
 				}),
 
