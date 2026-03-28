@@ -1,5 +1,5 @@
 <p align="center">
-  <img height="200" src="./assets/blend_banner.png">
+    <img height="200" src="./assets/icon_cowork.png">
 </p>
 
 <h1 align="center">Cowork Forge</h1>
