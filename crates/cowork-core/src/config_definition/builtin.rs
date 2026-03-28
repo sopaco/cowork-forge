@@ -7,7 +7,7 @@ use anyhow::Result;
 use include_dir::{include_dir, Dir};
 
 use super::registry::ConfigRegistry;
-use super::loader::LoadReport;
+use super::registry::LoadReport;
 
 // Embed the default configurations directory
 static DEFAULT_CONFIGS: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/config_definition/default_configs");

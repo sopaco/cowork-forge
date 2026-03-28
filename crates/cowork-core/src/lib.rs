@@ -3,7 +3,7 @@
 // Global configuration
 pub mod config;
 
-// V3 Configuration Definition Layer
+// Configuration Definition Layer
 pub mod config_definition;
 
 // ACP (Agent Client Protocol) for external coding agent integration
@@ -75,7 +75,7 @@ pub use config_definition::{
     StageDefinition, StageType, HookConfig, HookPoint, ArtifactConfig, StageRetryConfig,
     FlowDefinition, StageReference, FlowConfig, MemoryScope, InheritanceConfig, InheritanceMode,
     IntegrationDefinition, IntegrationType, ConnectionConfig, AuthConfig, IntegrationEvent,
-    ConfigRegistry, global_registry, ConfigLoader, LoadReport, ConfigValidator, ValidationResult,
+    ConfigRegistry, global_registry, LoadReport, ConfigValidator, ValidationResult,
     create_agent_for_stage, create_agent_from_config, initialize_config_registry,
 };
 

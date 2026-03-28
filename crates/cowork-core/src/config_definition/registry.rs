@@ -630,6 +630,27 @@ pub struct LoadUserReport {
     pub errors: Vec<String>,
 }
 
+/// Report of loading configurations (used by builtin loader)
+#[derive(Debug, Clone, Default)]
+pub struct LoadReport {
+    pub agents_loaded: usize,
+    pub stages_loaded: usize,
+    pub flows_loaded: usize,
+    pub integrations_loaded: usize,
+    pub default_flow_set: bool,
+    pub errors: Vec<String>,
+}
+
+impl LoadReport {
+    pub fn total_loaded(&self) -> usize {
+        self.agents_loaded + self.stages_loaded + self.flows_loaded + self.integrations_loaded
+    }
+
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+}
+
 /// Settings that persist across sessions
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {

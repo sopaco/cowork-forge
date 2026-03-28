@@ -1,10 +1,9 @@
 /**
- * V3 Configuration Types
  * Matches the Rust backend config_definition types
  */
 
 // Agent Types
-export type AgentType = 'simple' | { loop: { max_iterations?: number } };
+export type AgentType = "simple" | { loop: { max_iterations?: number } };
 
 export interface ModelConfig {
   model_id?: string;
@@ -18,7 +17,7 @@ export interface ToolReference {
   config?: Record<string, unknown>;
 }
 
-export type IncludeContentsMode = 'none' | 'all' | { selected: string[] };
+export type IncludeContentsMode = "none" | "all" | { selected: string[] };
 
 export interface AgentDefinition {
   id: string;
@@ -36,9 +35,21 @@ export interface AgentDefinition {
 }
 
 // Stage Types
-export type StageType = 'idea' | 'prd' | 'design' | 'plan' | 'coding' | 'check' | 'delivery';
+export type StageType =
+  | "idea"
+  | "prd"
+  | "design"
+  | "plan"
+  | "coding"
+  | "check"
+  | "delivery";
 
-export type HookPoint = 'pre_execute' | 'post_execute' | 'pre_confirmation' | 'post_confirmation' | 'on_failure';
+export type HookPoint =
+  | "pre_execute"
+  | "post_execute"
+  | "pre_confirmation"
+  | "post_confirmation"
+  | "on_failure";
 
 export interface HookConfig {
   integration_id: string;
@@ -47,7 +58,7 @@ export interface HookConfig {
   params?: Record<string, unknown>;
   blocking?: boolean;
   timeout_secs?: number;
-  on_failure?: 'ignore' | 'warn' | 'abort';
+  on_failure?: "ignore" | "warn" | "abort";
 }
 
 export interface ArtifactConfig {
@@ -78,9 +89,9 @@ export interface StageDefinition {
 }
 
 // Flow Types
-export type MemoryScope = 'project' | 'iteration' | 'merged';
+export type MemoryScope = "project" | "iteration" | "merged";
 
-export type InheritanceMode = 'none' | 'partial' | 'full';
+export type InheritanceMode = "none" | "partial" | "full";
 
 export interface InheritanceConfig {
   default_mode: InheritanceMode;
@@ -143,11 +154,20 @@ export interface SkillInfo {
 }
 
 // Integration Types
-export type IntegrationType = 'rest_api' | 'webhook' | 'message_queue' | 'database';
+export type IntegrationType =
+  | "rest_api"
+  | "webhook"
+  | "message_queue"
+  | "database";
 
-export type AuthType = 'none' | 'api_key' | 'bearer_token' | 'basic_auth' | 'oauth2';
+export type AuthType =
+  | "none"
+  | "api_key"
+  | "bearer_token"
+  | "basic_auth"
+  | "oauth2";
 
-export type CredentialSource = 'env' | 'config' | 'prompt';
+export type CredentialSource = "env" | "config" | "prompt";
 
 export interface AuthConfig {
   auth_type: AuthType;
@@ -163,7 +183,12 @@ export interface ConnectionConfig {
   retry_delay_ms?: number;
 }
 
-export type IntegrationEvent = 'on_stage_start' | 'on_stage_complete' | 'on_flow_start' | 'on_flow_complete' | 'on_error';
+export type IntegrationEvent =
+  | "on_stage_start"
+  | "on_stage_complete"
+  | "on_flow_start"
+  | "on_flow_complete"
+  | "on_error";
 
 export interface IntegrationDefinition {
   id: string;
@@ -181,7 +206,7 @@ export interface IntegrationDefinition {
 export interface ValidationIssue {
   path: string;
   message: string;
-  severity: 'error' | 'warning';
+  severity: "error" | "warning";
 }
 
 export interface ValidationResult {
@@ -208,4 +233,4 @@ export interface BuiltinInstruction {
 }
 
 // Instruction type for form
-export type InstructionType = 'builtin' | 'file' | 'inline';
+export type InstructionType = "builtin" | "file" | "inline";
