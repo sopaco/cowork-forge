@@ -8,7 +8,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-// Thread-local storage for current iteration ID
+// Global static storage for current iteration ID
 static CURRENT_ITERATION_ID: Mutex<Option<String>> = Mutex::new(None);
 
 /// Set the current iteration ID for data operations
