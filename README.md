@@ -243,7 +243,7 @@ Multi-layer security checks prevent:
 
 ## Agents Team Configuration System
 
-Cowork Forge V3 introduces a **data-driven configuration system** that transforms hardcoded Agent, Stage, Flow, and Skill definitions into configurable JSON formats, enabling unprecedented flexibility without code modifications.
+Cowork Forge introduces a **data-driven configuration system** that transforms hardcoded Agent, Stage, Flow, and Skill definitions into configurable JSON formats, enabling unprecedented flexibility without code modifications.
 
 ### Custom Workflows (Flow)
 
