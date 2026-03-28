@@ -13,7 +13,7 @@ use crate::interaction::{InteractiveBackend, MessageContext};
 use crate::llm::{create_llm_client};
 use crate::llm::config::load_config;
 use crate::pipeline::{PipelineContext, StageResult};
-use crate::storage::set_iteration_id;
+use crate::persistence::set_iteration_id;
 use adk_core::{Content, Event};
 use futures::StreamExt;
 use std::sync::Arc;
@@ -55,7 +55,7 @@ pub async fn execute_stage_with_instruction(
     set_iteration_id(ctx.iteration.id.clone());
 
     // Check for restart mode (GotoStage mechanism)
-    if let Ok(Some(session_meta)) = crate::storage::load_session_meta() {
+    if let Ok(Some(session_meta)) = crate::persistence::load_session_meta() {
         if let Some(restart_reason) = session_meta.restart_reason {
             // This is a restart from a previous stage
             interaction
@@ -69,10 +69,10 @@ pub async fn execute_stage_with_instruction(
                 .await;
 
             // Clear the restart reason after displaying it
-            if let Ok(mut meta) = crate::storage::load_session_meta() {
+            if let Ok(mut meta) = crate::persistence::load_session_meta() {
                 if let Some(ref mut m) = meta {
                     m.restart_reason = None;
-                    let _ = crate::storage::save_session_meta(m);
+                    let _ = crate::persistence::save_session_meta(m);
                 }
             }
         }

@@ -5,7 +5,7 @@ use crate::data::*;
 use crate::data::models::Stage;
 use crate::domain::{Iteration, memory::Decision};
 use crate::persistence::{IterationStore, ProjectStore};
-use crate::storage::{append_feedback, save_session_meta, load_session_meta};
+use crate::persistence::{append_feedback, save_session_meta, load_session_meta};
 use crate::data::models::SessionMeta;
 use adk_core::{Tool, ToolContext};
 use async_trait::async_trait;
@@ -79,7 +79,7 @@ impl Tool for PMGotoStageTool {
         };
 
         // Set iteration ID for storage operations BEFORE saving feedback
-        crate::storage::set_iteration_id(self.current_iteration_id.clone());
+        crate::persistence::set_iteration_id(self.current_iteration_id.clone());
 
         // Save feedback for the target stage (not "pm_agent")
         // This allows the target stage to find its feedback when loading from storage

@@ -160,7 +160,7 @@ impl IterationExecutor {
         let total_stages = stages.len();
         let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
         
-        crate::storage::set_iteration_id(iteration.id.clone());
+        crate::persistence::set_iteration_id(iteration.id.clone());
 
         for (stage_idx, stage) in stages.into_iter().enumerate() {
             let stage_name = stage.name().to_string();
@@ -210,7 +210,7 @@ impl IterationExecutor {
                 let mut current_feedback: Option<String> = None;
                 let mut feedback_loop_count: u32 = 0;
 
-                if let Ok(feedback_history) = crate::storage::load_feedback_history() {
+                if let Ok(feedback_history) = crate::persistence::load_feedback_history() {
                     if let Some(fb) = feedback_history
                         .feedbacks
                         .iter()
@@ -245,7 +245,7 @@ impl IterationExecutor {
                                 )
                                 .await;
 
-                            if let Err(e) = crate::storage::clear_stage_feedback(&stage_name) {
+                            if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
                                 eprintln!("[Warning] Failed to clear feedback for stage '{}': {}", stage_name, e);
                             }
 
@@ -294,7 +294,7 @@ impl IterationExecutor {
                                 break;
                             }
 
-                            if let Err(e) = crate::storage::clear_stage_feedback(&stage_name) {
+                            if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
                                 eprintln!("[Warning] Failed to clear feedback for stage '{}': {}", stage_name, e);
                             }
 
