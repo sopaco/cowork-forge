@@ -608,14 +608,17 @@ impl SimpleInvocationContext {
             branch: "main".to_string(),
             user_content: content.clone(),
             agent,
-            memory: None, // TODO: implement memory
+            // Memory and Artifacts are accessed via Tools (QueryMemoryTool, LoadArtifactTool, etc.)
+            // rather than through InvocationContext. This is intentional - tools provide more
+            // flexible access with proper validation and error handling.
+            memory: None,
             session: Box::new(SimpleSession::new(&ctx.iteration.id, content.clone())),
             run_config: adk_core::RunConfig {
                 streaming_mode: adk_core::StreamingMode::SSE,
                 ..adk_core::RunConfig::default()
             },
             ended: std::sync::atomic::AtomicBool::new(false),
-            artifacts: None, // TODO: implement artifacts
+            artifacts: None,
         }
     }
 }
