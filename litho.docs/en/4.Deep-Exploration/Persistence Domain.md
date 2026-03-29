@@ -374,7 +374,7 @@ flowchart LR
 
 The V2 architecture (current) maintains backward compatibility considerations:
 - Schema evolution handled through serde's `default` attributes for new fields
-- Directory structure versioned via `.cowork-v2` naming convention (allows future V3 alongside)
+- Directory structure versioned via `.cowork-v2` naming convention
 - No automated migration tools currently implemented; manual migration scripts for major version upgrades
 
 ### 8.3 Configuration

@@ -1,9 +1,9 @@
 # AI Context Manifest
-# Version: 2.0.0
+# Version: 2.1.0
 # Updated: 2026-03-29
 # Project: cowork-forge v2.5.0
 
-manifest_version: "2.0"
+manifest_version: "2.1"
 project:
   name: cowork-forge
   version: "2.5.0"
@@ -11,92 +11,68 @@ project:
   edition: "2024"
 
 documents:
-  # Core documents (minimal, high-value)
   - path: project.snapshot
-    type: overview
-    purpose: Project structure, storage, core concepts
-    token_estimate: 1500
+    purpose: Project structure, storage, config
+    tokens: ~800
     
   - path: core/modules.map
-    type: reference
-    purpose: Module dependencies and navigation
-    token_estimate: 1500
+    purpose: Module dependencies, navigation
+    tokens: ~800
     
   - path: core/constraints.md
-    type: rules
-    purpose: Security, rate limits, HITL, interaction layer
-    token_estimate: 1500
+    purpose: Security, limits, HITL rules
+    tokens: ~400
 
-  # Domain knowledge (concise)
   - path: domains/pipeline.md
-    type: domain
-    purpose: Pipeline + Agents orchestration
-    token_estimate: 1200
+    purpose: Pipeline + Agents
+    tokens: ~500
     
   - path: domains/domain-logic.md
-    type: domain
-    purpose: Core entities and relationships
-    token_estimate: 800
+    purpose: Core entities, relationships
+    tokens: ~400
     
   - path: domains/tools.md
-    type: domain
-    purpose: Tool ecosystem reference
-    token_estimate: 1500
+    purpose: Tool categories reference
+    tokens: ~400
 
-  # Architecture decisions (counter-intuitive only)
   - path: architecture-decisions.md
-    type: decisions
     purpose: Non-obvious design decisions
-    token_estimate: 600
+    tokens: ~500
 
-  # Task templates
   - path: prompts/coding-context.md
-    type: template
-    purpose: Code style and common patterns
-    token_estimate: 800
+    purpose: Code style, common patterns
+    tokens: ~500
 
 usage:
-  # For coding tasks (recommended)
   coding_context:
     - project.snapshot
     - core/modules.map
     - core/constraints.md
-    - domains/pipeline.md (if modifying pipeline/agents)
-    - domains/tools.md (if modifying tools)
+    - domains/pipeline.md
+    - domains/tools.md
     - architecture-decisions.md
   
-  # For debugging
   debug_context:
     - project.snapshot
     - core/constraints.md
     - architecture-decisions.md
 
-  # For code review
-  review_context:
-    - core/constraints.md
-    - architecture-decisions.md
-
-total_token_estimate: 9400
+total_tokens: ~4300
 
 # =============================================================================
-# MAINTENANCE GUIDE - When to update .ai-context files
+# MAINTENANCE GUIDE
 # =============================================================================
 #
-# | Code Change | Action | Update File |
-# |-------------|--------|-------------|
-# | New tool added | Add to table | domains/tools.md |
-# | New stage added | Add to table | domains/pipeline.md |
-# | New module created | Add to reference | core/modules.map |
-# | New security rule | Add constraint | core/constraints.md |
-# | New architecture decision | Add ADR entry | architecture-decisions.md |
-# | New crate created | Add section | project.snapshot |
-# |
-# | NO UPDATE NEEDED: struct fields, function signatures, line numbers, refactoring |
+# | Code Change              | Update File            |
+# |--------------------------|------------------------|
+# | New tool                 | domains/tools.md       |
+# | New stage                | domains/pipeline.md    |
+# | New module               | core/modules.map       |
+# | New constraint           | core/constraints.md    |
+# | Architecture decision    | architecture-decisions.md |
+# | New crate                | project.snapshot       |
 #
-# Update command for Agent:
-#   "Update .ai-context based on changes to [specific files]"
+# | NO UPDATE: struct fields, function signatures, refactoring |
 #
-# Example:
-#   "Update .ai-context because I added a new tool ValidateSchemaTool"
-#   → Agent reads tools.md, adds entry to appropriate table
+# Command: "Update .ai-context because I [added/changed] [specific thing]"
 # =============================================================================

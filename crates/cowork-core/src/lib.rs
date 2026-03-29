@@ -35,7 +35,7 @@ pub mod interaction;
 // Skills ecosystem (agentskills.io standard via adk-skill)
 pub mod skills;
 
-// Integration system (V3)
+// Integration system
 pub mod integration;
 
 // Project importer for legacy projects
@@ -67,7 +67,7 @@ pub use config::{get_system_locale, set_system_locale, get_language_instruction}
 // Re-exports for ACP module
 pub use acp::{AcpClient, AcpTaskResult};
 
-// Re-exports for config_definition (V3)
+// Re-exports for config_definition
 pub use config_definition::{
     AgentDefinition, AgentType, ModelConfig, ToolReference, IncludeContentsMode,
     StageDefinition, StageType, HookConfig, HookPoint, ArtifactConfig, StageRetryConfig,
@@ -95,7 +95,7 @@ pub use skills::{
     SkillError, SkillResult,
 };
 
-// Re-exports for integration (V3)
+// Re-exports for integration
 pub use integration::{
     HookManager, HookExecutionContext, HookExecutionResult,
     IntegrationAdapter, AdapterError, RestAdapter,

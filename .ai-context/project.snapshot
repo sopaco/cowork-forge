@@ -13,8 +13,6 @@ description: AI-native iterative software development platform with multi-agent 
 
 ### cowork-core
 path: crates/cowork-core/
-role: domain-logic-core
-description: Core library with domain entities, pipeline orchestration, tools, persistence
 key_modules:
   - pipeline: 7-stage workflow orchestration
   - domain: Project, Iteration, Memory aggregates (DDD)
@@ -23,38 +21,15 @@ key_modules:
   - interaction: CLI/GUI abstraction
   - agents: Agent builders
   - instructions: Prompts for each stage
+  - config_definition: data-driven configuration system
 
 ### cowork-cli
 path: crates/cowork-cli/
-role: cli-adapter
 commands: [init, iter, list, show, continue, status, delete, import, knowledge, config]
 
 ### cowork-gui
 path: crates/cowork-gui/
-role: gui-adapter
 description: Tauri + React desktop application
-
-## CORE CONCEPTS
-
-### 7-Stage Pipeline
-
-| Stage | HITL | Output |
-|-------|------|--------|
-| idea | No | idea.md |
-| prd | Yes | prd.md |
-| design | Yes | design.md |
-| plan | Yes | plan.md |
-| coding | Yes | workspace/ |
-| check | No | check_report.md |
-| delivery | No | delivery_report.md |
-
-### Iteration Types
-- **Genesis**: First iteration, fresh start
-- **Evolution**: Build upon previous iteration
-
-### Actor-Critic Pattern
-Critical stages use Actor-Critic loop:
-Actor generates → Critic validates → HITL confirms
 
 ---
 
@@ -69,16 +44,10 @@ Actor generates → Critic validates → HITL confirms
         ├── iteration.json    # Iteration metadata
         ├── memory.json       # IterationKnowledge
         ├── artifacts/
-        │   ├── idea.md
-        │   ├── prd.md
-        │   ├── design.md
-        │   ├── plan.md
-        │   └── delivery_report.md
+        │   ├── idea.md, prd.md, design.md, plan.md, delivery_report.md
         ├── workspace/        # Generated code
         └── summaries/        # Document summaries
 ```
-
-### Store Implementations
 
 | Store | File | Purpose |
 |-------|------|---------|
@@ -86,47 +55,30 @@ Actor generates → Critic validates → HITL confirms
 | IterationStore | `persistence/iteration_store.rs` | iterations/* |
 | MemoryStore | `persistence/memory_store.rs` | memory.json |
 
-### Workspace Preparation (Evolution)
-
-| Inheritance | What's Copied |
-|-------------|---------------|
-| None | Fresh workspace |
-| Partial | Artifacts only |
-| Full | Artifacts + workspace |
-
 ---
 
 ## CONFIGURATION
 
 ### LLM Config (config.toml)
-- llm.api_base_url
-- llm.api_key
-- llm.model_name
-- embedding.*
+Location: Platform-specific app data directory
+- Windows: `%APPDATA%/cowork-forge/config.toml`
+- macOS: `~/Library/Application Support/cowork-forge/config.toml`
+- Linux: `~/.config/cowork-forge/config.toml`
 
-### V3 Config Registry
-`config_definition/` - Data-driven configuration for agents, stages, flows
+Fields: llm.api_base_url, llm.api_key, llm.model_name, embedding.*
+
+### Config Registry
+`config_definition/` - Data-driven configuration:
+- AgentDefinition: Custom agent config
+- StageDefinition: Stage behavior config
+- FlowDefinition: Workflow pipeline config
 
 ---
 
 ## EXTERNAL INTEGRATIONS
 
-### ACP (Agent Communication Protocol)
-`acp/` - External coding agent integration (opencode, iflow, codex, gemini, claude)
-
-### Skills (agentskills.io)
-`skills/` - Domain-specific capability injection
-
----
-
-## CRITICAL PATHS
-
-| Task | Entry Point |
-|------|-------------|
-| Execute iteration | `IterationExecutor::execute()` |
-| Stage execution | `Stage::execute()` |
-| HITL confirmation | `InteractiveBackend::request_input()` |
-| Tool registry | `tools/mod.rs` |
+- **ACP**: `acp/` - External coding agent integration (opencode, iflow, codex, etc.)
+- **Skills**: `skills/` - Domain-specific capability injection (agentskills.io)
 
 ---
 **Note**: For detailed implementations, see corresponding source files.
