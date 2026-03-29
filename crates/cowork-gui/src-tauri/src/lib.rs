@@ -659,7 +659,7 @@ pub fn run() {
             // Get config_ready flag for async initialization
             let config_ready = app.state::<AppState>().config_ready.clone();
             
-            // Initialize V3 config registry asynchronously to avoid blocking startup
+            // Initialize config registry asynchronously to avoid blocking startup
             // Use tauri::async_runtime::spawn instead of tokio::spawn for Tauri 2.x compatibility
             tauri::async_runtime::spawn(async move {
                 println!("[GUI] Starting async config registry initialization...");
@@ -816,7 +816,7 @@ pub fn run() {
             config_commands::open_config_folder,
             config_commands::test_llm_connection,
             config_commands::has_valid_config,
-            // V3 Config commands
+            // Config commands
             config_commands::gui_get_config_registry,
             config_commands::gui_reset_config_registry,
             config_commands::gui_save_agent_config,

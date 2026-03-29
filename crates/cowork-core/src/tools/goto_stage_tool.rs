@@ -1,6 +1,6 @@
 // Goto Stage tool for Check Agent
 use crate::data::*;
-use crate::storage::*;
+use crate::persistence::*;
 use adk_core::{Tool, ToolContext};
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -66,7 +66,7 @@ impl Tool for GotoStageTool {
             timestamp: chrono::Utc::now(),
         };
 
-        if let Err(e) = crate::storage::append_feedback(&feedback) {
+        if let Err(e) = crate::persistence::append_feedback(&feedback) {
             // Log warning but don't fail the operation
             eprintln!("[GotoStageTool] Warning: Failed to save feedback: {}", e);
         }

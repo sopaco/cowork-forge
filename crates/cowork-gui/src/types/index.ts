@@ -44,7 +44,7 @@ export type {
   KnowledgeListResult,
 } from './knowledge';
 
-// V3 Config types
+// Config types
 export type {
   AgentType,
   ModelConfig,

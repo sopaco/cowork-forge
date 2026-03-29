@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::fs;
 
 use crate::persistence::IterationStore;
-use crate::storage::get_iteration_id;
+use crate::persistence::get_iteration_id;
 
 /// Helper function to strip UNC path prefix on Windows
 fn strip_unc_prefix(path: &std::path::Path) -> std::path::PathBuf {

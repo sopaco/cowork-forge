@@ -1,0 +1,123 @@
+# Module Dependency Map
+# Purpose: Quick navigation for AI agents to locate code and understand relationships
+# Note: For detailed function signatures, grep the code directly
+
+## ARCHITECTURE LAYERS
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    PRESENTATION LAYER                            │
+│  ┌─────────────────┐         ┌─────────────────────────────┐    │
+│  │   cowork-cli    │         │       cowork-gui            │    │
+│  │   (clap CLI)    │         │  (Tauri + React + Ant D)    │    │
+│  └────────┬────────┘         └──────────────┬──────────────┘    │
+└───────────┼──────────────────────────────────┼──────────────────┘
+            │                                  │
+            ▼                                  ▼
+┌───────────────────────────────────────────────────────────────────┐
+│                    APPLICATION LAYER                              │
+│   ┌─────────────────────────────────────────────────────────┐    │
+│   │              InteractiveBackend Trait                    │    │
+│   └─────────────────────────────────────────────────────────┘    │
+│                              ▼                                    │
+│   ┌─────────────────────────────────────────────────────────┐    │
+│   │                  IterationExecutor                       │    │
+│   └─────────────────────────────────────────────────────────┘    │
+└───────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌───────────────────────────────────────────────────────────────────┐
+│                    DOMAIN LAYER (cowork-core)                     │
+│   Project (Aggregate) │ Iteration (Entity) │ ProjectMemory       │
+│   Stage Trait → [Idea, PRD, Design, Plan, Coding, Check, Delivery]│
+└───────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌───────────────────────────────────────────────────────────────────┐
+│                    INFRASTRUCTURE LAYER                           │
+│   LLM Client │ Stores (JSON) │ Tools (30+) │ ACP │ Skills        │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+## MODULE DEPENDENCY FLOW
+
+```
+CLI/GUI → InteractiveBackend → IterationExecutor → Pipeline → Stages → Agents → Tools → LLM/Persistence
+```
+
+## KEY TRAITS
+
+| Trait | Location | Purpose |
+|-------|----------|---------|
+| `InteractiveBackend` | `interaction/mod.rs` | CLI/GUI abstraction |
+| `Stage` | `pipeline/mod.rs` | Stage execution behavior |
+| `Tool` | adk-rust | Tool execution interface |
+
+## CORE FLOWS
+
+### Genesis Iteration
+```
+create_genesis_iteration() → execute() → stages[idea→delivery] → generate_knowledge()
+```
+
+### Actor-Critic Loop (critical stages)
+```
+Actor generates artifact → Critic validates → HITL confirmation → [Pass|Feedback|Cancel]
+```
+
+### Evolution Iteration
+```
+create_evolution_iteration() → prepare_workspace(inheritance) → inject_knowledge() → stages
+```
+
+## MODULE FILES REFERENCE
+
+### Pipeline Module
+`crates/cowork-core/src/pipeline/`
+- `mod.rs` - Stage trait, stage factory
+- `executor/mod.rs` - IterationExecutor (main orchestrator)
+- `executor/interaction_ext.rs` - HITL flow
+- `stages/*.rs` - Individual stage implementations
+
+### Domain Module
+`crates/cowork-core/src/domain/`
+- `project.rs` - Project, ProjectMetadata
+- `iteration.rs` - Iteration, Artifacts, InheritanceMode
+- `memory.rs` - ProjectMemory, IterationKnowledge
+
+### Tools Module
+`crates/cowork-core/src/tools/`
+- `file_tools.rs` - ReadFile, WriteFile, ListFiles
+- `data_tools.rs` - Requirement/Feature/Task CRUD
+- `hitl_tools.rs` - Review, Feedback
+- `memory_tools.rs` - Query, Save, Promote
+- `artifact_tools.rs` - Save stage artifacts
+- `pm_tools.rs` - PM Agent tools
+
+### Persistence Module
+`crates/cowork-core/src/persistence/`
+- `project_store.rs` - ProjectStore
+- `iteration_store.rs` - IterationStore
+- `memory_store.rs` - MemoryStore
+
+### Agents Module
+`crates/cowork-core/src/agents/`
+- `mod.rs` - All agent builders
+- `external_coding_agent.rs` - ACP integration
+
+### Instructions Module
+`crates/cowork-core/src/instructions/`
+- `*.rs` - Prompts for each stage
+
+## QUICK NAVIGATION BY TASK
+
+| Task | Location |
+|------|----------|
+| Modify pipeline execution | `pipeline/executor/mod.rs` |
+| Add new stage | `pipeline/stages/` + register in `mod.rs` |
+| Add new tool | `tools/` + re-export in `mod.rs` |
+| Modify HITL | `interaction/mod.rs` |
+| Add agent instruction | `instructions/` |
+| Modify storage | `persistence/` + `domain/` |
+| Add CLI command | `cowork-cli/src/commands/` |
+| Modify GUI | `cowork-gui/src/` (frontend) or `src-tauri/` (backend) |

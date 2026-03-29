@@ -133,7 +133,7 @@ pub async fn generate_iteration_knowledge(
     )?;
 
     println!("[Executor] Setting iteration ID for tool context...");
-    crate::storage::set_iteration_id(iteration.id.clone());
+    crate::persistence::set_iteration_id(iteration.id.clone());
 
     let prompt = "Please analyze this iteration and generate a comprehensive knowledge snapshot. Use the available tools to load document summaries, examine the codebase structure, and extract meaningful knowledge.";
 

@@ -1,6 +1,6 @@
 // Load artifact tools - Load specific artifact files with path restrictions
 
-use crate::storage::artifact_path;
+use crate::persistence::artifact_path;
 use adk_core::{Tool, ToolContext};
 use async_trait::async_trait;
 use serde_json::{json, Value};

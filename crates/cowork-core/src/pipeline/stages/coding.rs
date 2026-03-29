@@ -35,7 +35,7 @@ impl CodingStage {
         feedback: Option<&str>,
     ) -> StageResult {
         // Set iteration ID for storage operations (must be set before any storage access)
-        crate::storage::set_iteration_id(ctx.iteration.id.clone());
+        crate::persistence::set_iteration_id(ctx.iteration.id.clone());
         
         let workspace = ctx.workspace_path.clone();
         
@@ -66,7 +66,7 @@ impl CodingStage {
             )
         } else {
             // Try to load feedback from storage as fallback (for edge cases)
-            let stored_feedback = crate::storage::load_feedback_history()
+            let stored_feedback = crate::persistence::load_feedback_history()
                 .ok()
                 .and_then(|history| {
                     history.feedbacks

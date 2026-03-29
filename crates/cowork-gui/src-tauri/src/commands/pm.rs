@@ -214,11 +214,11 @@ pub async fn pm_restart_iteration(
     // This allows the coding stage to read it via load_feedback_history
     if let Some(ref fb) = feedback {
         // Set iteration ID for storage operations
-        cowork_core::storage::set_iteration_id(iteration_id.clone());
+        cowork_core::persistence::set_iteration_id(iteration_id.clone());
         println!("[PM] Set iteration_id for storage: {}", iteration_id);
         
         // Debug: print the storage path
-        if let Ok(iter_dir) = cowork_core::storage::get_iteration_dir() {
+        if let Ok(iter_dir) = cowork_core::persistence::get_iteration_dir() {
             println!("[PM] Storage iteration dir: {}", iter_dir.display());
         }
         
@@ -231,7 +231,7 @@ pub async fn pm_restart_iteration(
             timestamp: chrono::Utc::now(),
         };
         
-        if let Err(e) = cowork_core::storage::append_feedback(&feedback_entry) {
+        if let Err(e) = cowork_core::persistence::append_feedback(&feedback_entry) {
             eprintln!("[PM] Warning: Failed to save feedback: {}", e);
         } else {
             println!("[PM] Saved feedback to storage ({} chars): {}", fb.len(), fb.chars().take(50).collect::<String>());

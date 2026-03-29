@@ -41,7 +41,7 @@ impl From<&adk_skill::ParsedSkill> for SkillInfo {
     }
 }
 
-/// V3 Config Registry state for frontend
+/// Config Registry state for frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigRegistryState {
     pub agents: HashMap<String, AgentDefinition>,
@@ -56,7 +56,7 @@ pub struct ConfigRegistryState {
 pub async fn gui_get_config_registry() -> Result<ConfigRegistryState, String> {
     // Get the global registry
     let registry = cowork_core::config_definition::global_registry();
-    
+
     // Extract all configurations
     let mut agents = HashMap::new();
     for id in registry.list_agents() {
@@ -64,21 +64,21 @@ pub async fn gui_get_config_registry() -> Result<ConfigRegistryState, String> {
             agents.insert(id, agent);
         }
     }
-    
+
     let mut stages = HashMap::new();
     for id in registry.list_stages() {
         if let Some(stage) = registry.get_stage(&id) {
             stages.insert(id, stage);
         }
     }
-    
+
     let mut flows = HashMap::new();
     for id in registry.list_flows() {
         if let Some(flow) = registry.get_flow(&id) {
             flows.insert(id, flow);
         }
     }
-    
+
     // Get skills from SkillManager (using current directory as project root)
     let skills = match SkillManager::for_project(".") {
         Ok(manager) => manager.list_skills().iter().map(SkillInfo::from).collect(),
@@ -87,17 +87,17 @@ pub async fn gui_get_config_registry() -> Result<ConfigRegistryState, String> {
             Vec::new()
         }
     };
-    
+
     let mut integrations = HashMap::new();
     for id in registry.list_integrations() {
         if let Some(integration) = registry.get_integration(&id) {
             integrations.insert(id, integration);
         }
     }
-    
+
     // Get default flow ID
     let default_flow_id = registry.get_default_flow_id();
-    
+
     Ok(ConfigRegistryState {
         agents,
         stages,
@@ -112,20 +112,20 @@ pub async fn gui_get_config_registry() -> Result<ConfigRegistryState, String> {
 #[tauri::command]
 pub async fn gui_reset_config_registry() -> Result<ConfigRegistryState, String> {
     let registry = cowork_core::config_definition::global_registry();
-    
+
     // Clear existing configurations
     registry.clear()
         .map_err(|e| format!("Failed to clear registry: {}", e))?;
-    
+
     // Reload built-in configurations
     let report = cowork_core::config_definition::load_builtin_configs(&registry)
         .map_err(|e| format!("Failed to load built-in configs: {}", e))?;
-    
+
     tracing::info!(
         "Reset config registry: {} agents, {} stages, {} flows",
         report.agents_loaded, report.stages_loaded, report.flows_loaded
     );
-    
+
     // Return the reset state
     gui_get_config_registry().await
 }
@@ -227,36 +227,36 @@ pub async fn gui_get_builtin_instructions() -> Result<Vec<BuiltinInstruction>, S
             content: PROJECT_MANAGER_AGENT_INSTRUCTION.to_string(),
         },
     ];
-    
+
     Ok(instructions)
 }
 
 #[tauri::command]
 pub async fn gui_save_agent_config(agent: AgentDefinition) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
-    
+
     // Register in memory
     registry.register_agent(agent.clone())
         .map_err(|e| format!("Failed to save agent: {}", e))?;
-    
+
     // Persist to file
     registry.save_agent_to_file(&agent)
         .map_err(|e| format!("Failed to persist agent to file: {}", e))?;
-    
+
     Ok(())
 }
 
 #[tauri::command]
 pub async fn gui_delete_agent_config(agent_id: String) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
-    
+
     // Remove from memory
     let removed = registry.unregister_agent(&agent_id);
-    
+
     // Delete from file (regardless of memory removal result)
     registry.delete_agent_file(&agent_id)
         .map_err(|e| format!("Failed to delete agent file: {}", e))?;
-    
+
     if removed {
         Ok(())
     } else {
@@ -269,96 +269,96 @@ pub async fn gui_delete_agent_config(agent_id: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn gui_save_stage_config(stage: StageDefinition) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
-    
+
     // Register in memory
     registry.register_stage(stage.clone())
         .map_err(|e| format!("Failed to save stage: {}", e))?;
-    
+
     // Persist to file
     registry.save_stage_to_file(&stage)
         .map_err(|e| format!("Failed to persist stage to file: {}", e))?;
-    
+
     Ok(())
 }
 
 #[tauri::command]
 pub async fn gui_delete_stage_config(stage_id: String) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
-    
+
     // Delete from file
     registry.delete_stage_file(&stage_id)
         .map_err(|e| format!("Failed to delete stage file: {}", e))?;
-    
+
     Ok(())
 }
 
 #[tauri::command]
 pub async fn gui_save_flow_config(flow: FlowDefinition) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
-    
+
     // Check if trying to modify a built-in flow
     if let Some(existing) = registry.get_flow(&flow.id) {
         if existing.is_builtin {
             return Err("Cannot modify built-in flow. Create a new flow instead.".to_string());
         }
     }
-    
+
     // Ensure user flows are not marked as builtin
     let mut flow = flow;
     flow.is_builtin = false;
-    
+
     // Register in memory
     registry.register_flow(flow.clone())
         .map_err(|e| format!("Failed to save flow: {}", e))?;
-    
+
     // Persist to file
     registry.save_flow_to_file(&flow)
         .map_err(|e| format!("Failed to persist flow to file: {}", e))?;
-    
+
     Ok(())
 }
 
 #[tauri::command]
 pub async fn gui_delete_flow_config(flow_id: String) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
-    
+
     // Check if trying to delete a built-in flow
     if let Some(flow) = registry.get_flow(&flow_id) {
         if flow.is_builtin {
             return Err("Cannot delete built-in flow.".to_string());
         }
     }
-    
+
     // Remove from memory
     registry.unregister_flow(&flow_id);
-    
+
     // Delete from file
     registry.delete_flow_file(&flow_id)
         .map_err(|e| format!("Failed to delete flow file: {}", e))?;
-    
+
     // If this was the default flow, clear the default setting
     if registry.get_default_flow_id().as_deref() == Some(&flow_id) {
         registry.set_default_flow(None)
             .map_err(|e| format!("Failed to clear default flow: {}", e))?;
     }
-    
+
     Ok(())
 }
 
 #[tauri::command]
 pub async fn gui_set_default_flow(flow_id: String) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
-    
+
     // Verify the flow exists
     if registry.get_flow(&flow_id).is_none() {
         return Err(format!("Flow not found: {}", flow_id));
     }
-    
+
     // Set as default
     let flow_id_clone = flow_id.clone();
     registry.set_default_flow(Some(flow_id))
         .map_err(|e| format!("Failed to set default flow: {}", e))?;
-    
+
     tracing::info!("Set default flow to: {}", flow_id_clone);
     Ok(())
 }
@@ -367,36 +367,36 @@ pub async fn gui_set_default_flow(flow_id: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn gui_install_skill(skill_path: String) -> Result<SkillInfo, String> {
     use std::path::Path;
-    
+
     // Strip @ prefix if present (Tauri dialog may add this)
     let skill_path = skill_path.strip_prefix('@').unwrap_or(&skill_path);
     let path = Path::new(skill_path);
-    
+
     // Read and parse SKILL.md first to get skill info
     let skill_md_path = path.join("SKILL.md");
     if !skill_md_path.exists() {
         return Err(format!("Source directory does not contain SKILL.md: {:?}", path));
     }
-    
+
     let content = std::fs::read_to_string(&skill_md_path)
         .map_err(|e| format!("Failed to read SKILL.md: {}", e))?;
-    
+
     let parsed = adk_skill::parse_skill_markdown(&skill_md_path, &content)
         .map_err(|e| format!("Failed to parse SKILL.md: {}", e))?;
-    
+
     let skill_name = parsed.name.clone();
-    
+
     // Create target directory and copy skill files
     let target_dir = Path::new(".").join(".skills").join(&skill_name);
     std::fs::create_dir_all(&target_dir)
         .map_err(|e| format!("Failed to create target directory: {}", e))?;
-    
+
     // Copy all files from source to target
     copy_dir_all(path, &target_dir)
         .map_err(|e| format!("Failed to copy skill files: {}", e))?;
-    
+
     tracing::info!("Installed skill '{}' to {:?}", skill_name, target_dir);
-    
+
     // Return SkillInfo from the parsed skill document
     Ok(SkillInfo::from(&parsed))
 }
@@ -405,14 +405,14 @@ pub async fn gui_install_skill(skill_path: String) -> Result<SkillInfo, String> 
 fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> Result<(), String> {
     std::fs::create_dir_all(dst)
         .map_err(|e| format!("Failed to create directory: {}", e))?;
-    
+
     for entry in std::fs::read_dir(src)
-        .map_err(|e| format!("Failed to read directory: {}", e))? 
+        .map_err(|e| format!("Failed to read directory: {}", e))?
     {
         let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
         let ty = entry.file_type()
             .map_err(|e| format!("Failed to get file type: {}", e))?;
-        
+
         if ty.is_dir() {
             copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
         } else {
@@ -420,7 +420,7 @@ fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> Result<(), Stri
                 .map_err(|e| format!("Failed to copy file: {}", e))?;
         }
     }
-    
+
     Ok(())
 }
 
@@ -428,10 +428,10 @@ fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> Result<(), Stri
 #[tauri::command]
 pub async fn gui_uninstall_skill(skill_name: String) -> Result<(), String> {
     use std::path::Path;
-    
+
     // Get skills directory
     let skills_dir = Path::new(".").join(".skills").join(&skill_name);
-    
+
     if skills_dir.exists() {
         std::fs::remove_dir_all(&skills_dir)
             .map_err(|e| format!("Failed to remove skill directory: {}", e))?;
@@ -439,33 +439,33 @@ pub async fn gui_uninstall_skill(skill_name: String) -> Result<(), String> {
     } else {
         tracing::warn!("Skill directory not found: {:?}", skills_dir);
     }
-    
+
     Ok(())
 }
 
 #[tauri::command]
 pub async fn gui_save_integration_config(integration: IntegrationDefinition) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
-    
+
     // Register in memory
     registry.register_integration(integration.clone())
         .map_err(|e| format!("Failed to save integration: {}", e))?;
-    
+
     // Persist to file
     registry.save_integration_to_file(&integration)
         .map_err(|e| format!("Failed to persist integration to file: {}", e))?;
-    
+
     Ok(())
 }
 
 #[tauri::command]
 pub async fn gui_delete_integration_config(integration_id: String) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
-    
+
     // Delete from file
     registry.delete_integration_file(&integration_id)
         .map_err(|e| format!("Failed to delete integration file: {}", e))?;
-    
+
     Ok(())
 }
 
@@ -499,7 +499,7 @@ impl From<cowork_core::config_definition::validator::ValidationResult> for Valid
                     severity: "warning".to_string(),
                 }))
             .collect();
-        
+
         Self {
             valid: result.is_valid,
             issues,
@@ -526,7 +526,7 @@ pub async fn gui_validate_flow_config(flow: FlowDefinition) -> Result<Validation
 #[tauri::command]
 pub async fn gui_export_config(config_type: String, config_id: String) -> Result<String, String> {
     let registry = cowork_core::config_definition::global_registry();
-    
+
     let json = match config_type.as_str() {
         "agent" => {
             let agent = registry.get_agent(&config_id)
@@ -548,14 +548,14 @@ pub async fn gui_export_config(config_type: String, config_id: String) -> Result
         }
         _ => return Err(format!("Unknown config type: {}", config_type)),
     };
-    
+
     Ok(json)
 }
 
 #[tauri::command]
 pub async fn gui_import_config(config_type: String, json_data: String) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
-    
+
     match config_type.as_str() {
         "agent" => {
             let agent: AgentDefinition = serde_json::from_str(&json_data)
@@ -577,7 +577,7 @@ pub async fn gui_import_config(config_type: String, json_data: String) -> Result
         }
         _ => return Err(format!("Unknown config type: {}", config_type)),
     };
-    
+
     Ok(())
 }
 
@@ -612,10 +612,10 @@ pub async fn get_default_config() -> ModelConfig {
 pub async fn open_config_folder() -> Result<(), String> {
     let config_path = config::get_config_path()
         .map_err(|e| format!("Failed to get config path: {}", e))?;
-    
+
     let parent = config_path.parent()
         .ok_or_else(|| "Failed to get config directory".to_string())?;
-    
+
     open_folder_in_explorer(parent)
 }
 
@@ -631,22 +631,22 @@ pub async fn test_llm_connection(llm_config: LlmConfig) -> Result<bool, String> 
 
     let client = create_llm_client(&llm_config)
         .map_err(|e| format!("Failed to create LLM client: {}", e))?;
-    
+
     let contents = vec![Content {
         role: "user".to_string(),
         parts: vec![Part::Text { text: "Hello, this is a connection test. Please respond with 'OK'.".to_string() }],
     }];
-    
+
     let test_request = LlmRequest {
         model: llm_config.model_name.clone(),
         contents,
         config: None,
         tools: Default::default(),
     };
-    
+
     let mut stream = client.generate_content(test_request, false).await
         .map_err(|e| format!("Connection test failed: {}", e))?;
-    
+
     let mut response_text = String::new();
     while let Some(chunk) = stream.next().await {
         if let Ok(r) = chunk {
@@ -659,11 +659,11 @@ pub async fn test_llm_connection(llm_config: LlmConfig) -> Result<bool, String> 
             }
         }
     }
-    
+
     if response_text.is_empty() {
         return Err("Connection test failed: Empty response from API".to_string());
     }
-    
+
     Ok(true)
 }
 
@@ -680,7 +680,7 @@ fn open_folder_in_explorer(path: &std::path::Path) -> Result<(), String> {
             .spawn()
             .map_err(|e| format!("Failed to open folder: {}", e))?;
     }
-    
+
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
@@ -688,7 +688,7 @@ fn open_folder_in_explorer(path: &std::path::Path) -> Result<(), String> {
             .spawn()
             .map_err(|e| format!("Failed to open folder: {}", e))?;
     }
-    
+
     #[cfg(target_os = "linux")]
     {
         std::process::Command::new("xdg-open")
@@ -696,6 +696,6 @@ fn open_folder_in_explorer(path: &std::path::Path) -> Result<(), String> {
             .spawn()
             .map_err(|e| format!("Failed to open folder: {}", e))?;
     }
-    
+
     Ok(())
 }

@@ -263,7 +263,7 @@ Cowork Forge 的专业智能体像真实开发团队一样协同工作:
 
 ## Agents Team配置系统
 
-Cowork Forge V3 引入了**数据驱动的配置系统**，将原本硬编码的 Agent、Stage、Flow、Skill 和 Integration 定义转为可配置的 JSON 格式，无需修改代码即可实现前所未有的灵活性。
+Cowork Forge 引入了**数据驱动的配置系统**，将原本硬编码的 Agent、Stage、Flow、Skill 和 Integration 定义转为可配置的 JSON 格式，无需修改代码即可实现前所未有的灵活性。
 
 ### 自定义工作流程 (Flow)
 

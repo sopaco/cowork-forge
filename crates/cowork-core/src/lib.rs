@@ -13,9 +13,8 @@ pub mod acp;
 pub mod domain;
 pub mod persistence;
 
-// Data models and storage
+// Data models
 pub mod data;
-pub mod storage;
 
 // Tech stack configuration
 pub mod tech_stack;
@@ -36,7 +35,7 @@ pub mod interaction;
 // Skills ecosystem (agentskills.io standard via adk-skill)
 pub mod skills;
 
-// Integration system (V3)
+// Integration system
 pub mod integration;
 
 // Project importer for legacy projects
@@ -46,7 +45,6 @@ pub mod importer;
 pub use domain::*;
 pub use persistence::*;
 pub use data::*;
-pub use storage::*;
 pub use llm::*;
 pub use agents::{create_project_manager_agent, execute_pm_agent_message, execute_pm_agent_message_streaming, PMAgentResult, PMAgentAction, PMAgentStreamCallback, create_legacy_project_analyzer, create_legacy_project_analyzer_with_context};
 pub use tech_stack::*;
@@ -69,7 +67,7 @@ pub use config::{get_system_locale, set_system_locale, get_language_instruction}
 // Re-exports for ACP module
 pub use acp::{AcpClient, AcpTaskResult};
 
-// Re-exports for config_definition (V3)
+// Re-exports for config_definition
 pub use config_definition::{
     AgentDefinition, AgentType, ModelConfig, ToolReference, IncludeContentsMode,
     StageDefinition, StageType, HookConfig, HookPoint, ArtifactConfig, StageRetryConfig,
@@ -97,7 +95,7 @@ pub use skills::{
     SkillError, SkillResult,
 };
 
-// Re-exports for integration (V3)
+// Re-exports for integration
 pub use integration::{
     HookManager, HookExecutionContext, HookExecutionResult,
     IntegrationAdapter, AdapterError, RestAdapter,

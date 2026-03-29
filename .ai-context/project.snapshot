@@ -1,0 +1,84 @@
+# Cowork Forge - AI Context Snapshot
+# Purpose: Minimal context for AI agents to understand project structure
+
+## PROJECT OVERVIEW
+
+name: cowork-forge
+type: rust-workspace
+edition: "2024"
+version: "2.5.0"
+description: AI-native iterative software development platform with multi-agent orchestration
+
+## CRATES STRUCTURE
+
+### cowork-core
+path: crates/cowork-core/
+key_modules:
+  - pipeline: 7-stage workflow orchestration
+  - domain: Project, Iteration, Memory aggregates (DDD)
+  - tools: 30+ ADK tools
+  - persistence: JSON-based storage
+  - interaction: CLI/GUI abstraction
+  - agents: Agent builders
+  - instructions: Prompts for each stage
+  - config_definition: data-driven configuration system
+
+### cowork-cli
+path: crates/cowork-cli/
+commands: [init, iter, list, show, continue, status, delete, import, knowledge, config]
+
+### cowork-gui
+path: crates/cowork-gui/
+description: Tauri + React desktop application
+
+---
+
+## STORAGE STRUCTURE
+
+```
+.cowork-v2/
+├── project.json              # Project metadata
+├── memory.json               # ProjectMemory
+└── iterations/
+    └── iter-<number>-<timestamp>/
+        ├── iteration.json    # Iteration metadata
+        ├── memory.json       # IterationKnowledge
+        ├── artifacts/
+        │   ├── idea.md, prd.md, design.md, plan.md, delivery_report.md
+        ├── workspace/        # Generated code
+        └── summaries/        # Document summaries
+```
+
+| Store | File | Purpose |
+|-------|------|---------|
+| ProjectStore | `persistence/project_store.rs` | project.json |
+| IterationStore | `persistence/iteration_store.rs` | iterations/* |
+| MemoryStore | `persistence/memory_store.rs` | memory.json |
+
+---
+
+## CONFIGURATION
+
+### LLM Config (config.toml)
+Location: Platform-specific app data directory
+- Windows: `%APPDATA%/cowork-forge/config.toml`
+- macOS: `~/Library/Application Support/cowork-forge/config.toml`
+- Linux: `~/.config/cowork-forge/config.toml`
+
+Fields: llm.api_base_url, llm.api_key, llm.model_name, embedding.*
+
+### Config Registry
+`config_definition/` - Data-driven configuration:
+- AgentDefinition: Custom agent config
+- StageDefinition: Stage behavior config
+- FlowDefinition: Workflow pipeline config
+
+---
+
+## EXTERNAL INTEGRATIONS
+
+- **ACP**: `acp/` - External coding agent integration (opencode, iflow, codex, etc.)
+- **Skills**: `skills/` - Domain-specific capability injection (agentskills.io)
+
+---
+**Note**: For detailed implementations, see corresponding source files.

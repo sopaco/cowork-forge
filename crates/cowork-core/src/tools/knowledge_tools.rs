@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::fs;
 
 use crate::persistence::{IterationStore, MemoryStore};
-use crate::storage::get_iteration_id;
+use crate::persistence::get_iteration_id;
 use crate::domain::IterationKnowledge;
 
 // ============================================================================

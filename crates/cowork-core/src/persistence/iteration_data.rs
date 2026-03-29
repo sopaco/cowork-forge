@@ -1,12 +1,14 @@
-// Storage layer for .cowork-v2/iterations/{iteration_id}/ directory
+// Iteration-specific data storage
+// Handles data, artifacts, and session files within .cowork-v2/iterations/{iteration_id}/
+
 use crate::data::*;
-use crate::persistence::get_cowork_dir;
+use super::get_cowork_dir;
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-// Thread-local storage for current iteration ID
+// Global static storage for current iteration ID
 static CURRENT_ITERATION_ID: Mutex<Option<String>> = Mutex::new(None);
 
 /// Set the current iteration ID for data operations
