@@ -6,7 +6,7 @@
 
 ## Project Overview
 
-**Cowork Forge** is an AI-native iterative software development platform that orchestrates autonomous multi-agent workflows through a 7-stage development pipeline.
+**Cowork Forge** is an AI-native iterative software development platform with multi-agent orchestration.
 
 ### Technology Stack
 - **Language**: Rust (edition 2024)
@@ -27,16 +27,9 @@ crates/
 ## Setup Commands
 
 ```bash
-# Build the project
 cargo build
-
-# Run tests
 cargo test
-
-# Run CLI
 cargo run --package cowork-cli -- <command>
-
-# Run GUI (development)
 cd crates/cowork-gui && cargo tauri dev
 ```
 
@@ -44,7 +37,7 @@ cd crates/cowork-gui && cargo tauri dev
 
 ## Context Files
 
-This project uses `.ai-context/` for detailed AI-friendly documentation. Load based on task:
+Load `.ai-context/` based on task type:
 
 ### For Coding Tasks
 ```
@@ -53,52 +46,24 @@ Read: .ai-context/core/modules.map
 Read: .ai-context/core/constraints.md
 Read: .ai-context/domains/tools.md (if working with tools)
 Read: .ai-context/domains/pipeline.md (if working with pipeline)
+Read: .ai-context/architecture-decisions.md
 ```
 
 ### For Debugging
 ```
 Read: .ai-context/project.snapshot
-Read: .ai-context/core/modules.map
-Read: .ai-context/prompts/debug-context.md
-```
-
-### For Code Review
-```
 Read: .ai-context/core/constraints.md
-Read: .ai-context/domains/domain-logic.md
-Read: .ai-context/prompts/review-context.md
+Read: .ai-context/architecture-decisions.md
 ```
 
 ---
 
 ## Code Style
 
-### Error Handling
-```rust
-use anyhow::Result;
-
-fn my_function() -> Result<()> {
-    let data = std::fs::read_to_string("file.txt")?;
-    Ok(())
-}
-```
-
-### Async Traits
-```rust
-use async_trait::async_trait;
-
-#[async_trait]
-pub trait MyTrait: Send + Sync {
-    async fn do_something(&self) -> Result<()>;
-}
-```
-
-### Rules
-1. Use `anyhow::Result` for error handling
-2. No `unwrap()` in production code - use `?` or proper error types
-3. Validate all file paths within workspace boundaries
-4. Use `async_trait` for async trait methods
-5. snake_case for functions, PascalCase for types
+- Use `anyhow::Result` for error handling
+- No `unwrap()` in production code
+- Use `async_trait` for async trait methods
+- snake_case for functions, PascalCase for types
 
 ---
 
@@ -111,32 +76,48 @@ pub trait MyTrait: Send + Sync {
 | Tool implementations | `crates/cowork-core/src/tools/*.rs` |
 | Domain entities | `crates/cowork-core/src/domain/*.rs` |
 | HITL interface | `crates/cowork-core/src/interaction/mod.rs` |
-| Agent builders | `crates/cowork-core/src/agents/mod.rs` |
-| Instructions/Prompts | `crates/cowork-core/src/instructions/*.rs` |
 
 ---
 
-## Testing Instructions
+## Testing
 
 ```bash
-# Run all tests
 cargo test
-
-# Run tests for specific crate
 cargo test -p cowork-core
-
-# Run specific test
-cargo test test_create_genesis_iteration
 ```
 
 ---
 
-## PR Instructions
+## Updating AI Context
 
-1. Run `cargo test` before committing
-2. Run `cargo clippy` for linting
-3. Ensure all tests pass
-4. Follow conventional commit format
+### When Agent Should Remind User
+
+At start of coding session, check recent changes:
+```bash
+git diff --name-only HEAD~10
+```
+
+If changed files include:
+- `crates/cowork-core/src/tools/*.rs` → Remind: "Tools changed, update tools.md?"
+- `crates/cowork-core/src/pipeline/stages/*.rs` → Remind: "Stages changed, update pipeline.md?"
+- `crates/cowork-core/src/domain/*.rs` → Remind: "Domain entities changed, update domain-logic.md?"
+
+### Manual Update Command
+
+When making significant changes, ask the agent to update context:
+
+```
+"Update .ai-context because I [added/changed] [specific thing]"
+```
+
+Examples:
+- "Update .ai-context because I added a new tool"
+- "Update .ai-context because I added a new stage"
+- "Update .ai-context because I made an architecture decision"
+
+The agent will read `manifest.yaml` for maintenance guide.
+
+**No update needed for**: struct fields, function signatures, refactoring.
 
 ---
 
@@ -144,16 +125,11 @@ cargo test test_create_genesis_iteration
 
 | File | Purpose |
 |------|---------|
-| `.ai-context/project.snapshot` | Project structure overview |
-| `.ai-context/core/modules.map` | Module dependencies, code locations |
-| `.ai-context/core/constraints.md` | Security, rate limits, constraints |
-| `.ai-context/domains/pipeline.md` | Pipeline orchestration |
-| `.ai-context/domains/domain-logic.md` | DDD entities |
-| `.ai-context/domains/tools.md` | Tool ecosystem |
-| `.ai-context/domains/interaction.md` | User interaction abstraction |
-| `.ai-context/domains/persistence.md` | Storage layer |
-| `.ai-context/domains/agents.md` | Agent builders |
-| `.ai-context/api/traits.md` | Key trait definitions |
-| `.ai-context/prompts/coding-context.md` | Coding task template |
-| `.ai-context/prompts/debug-context.md` | Debug template |
-| `.ai-context/prompts/review-context.md` | Review template |
+| `project.snapshot` | Project structure, storage, core concepts |
+| `core/modules.map` | Module dependencies, navigation |
+| `core/constraints.md` | Security, rate limits, HITL, interaction |
+| `domains/pipeline.md` | Pipeline + Agents |
+| `domains/domain-logic.md` | Core entities and relationships |
+| `domains/tools.md` | Tool ecosystem |
+| `architecture-decisions.md` | Non-obvious design decisions |
+| `prompts/coding-context.md` | Code style and patterns |

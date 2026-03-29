@@ -1,9 +1,9 @@
 # AI Context Manifest
-# Version: 1.0.0
-# Generated: 2026-03-28
+# Version: 2.0.0
+# Updated: 2026-03-29
 # Project: cowork-forge v2.5.0
 
-manifest_version: "1.0"
+manifest_version: "2.0"
 project:
   name: cowork-forge
   version: "2.5.0"
@@ -11,92 +11,92 @@ project:
   edition: "2024"
 
 documents:
+  # Core documents (minimal, high-value)
   - path: project.snapshot
     type: overview
-    purpose: Minimal context for understanding project structure
-    token_estimate: 2500
+    purpose: Project structure, storage, core concepts
+    token_estimate: 1500
     
   - path: core/modules.map
     type: reference
     purpose: Module dependencies and navigation
-    token_estimate: 3000
+    token_estimate: 1500
     
   - path: core/constraints.md
     type: rules
-    purpose: Security, rate limits, and behavioral constraints
-    token_estimate: 2000
-    
+    purpose: Security, rate limits, HITL, interaction layer
+    token_estimate: 1500
+
+  # Domain knowledge (concise)
   - path: domains/pipeline.md
     type: domain
-    purpose: Pipeline orchestration domain knowledge
-    token_estimate: 1500
+    purpose: Pipeline + Agents orchestration
+    token_estimate: 1200
     
   - path: domains/domain-logic.md
     type: domain
-    purpose: Core business entities (DDD)
-    token_estimate: 1500
+    purpose: Core entities and relationships
+    token_estimate: 800
     
   - path: domains/tools.md
     type: domain
     purpose: Tool ecosystem reference
-    token_estimate: 2000
-    
-  - path: domains/interaction.md
-    type: domain
-    purpose: User interaction abstraction
-    token_estimate: 1000
-    
-  - path: domains/persistence.md
-    type: domain
-    purpose: Storage layer reference
-    token_estimate: 1000
-    
-  - path: domains/agents.md
-    type: domain
-    purpose: Agent builders reference
-    token_estimate: 2000
-    
-  - path: api/traits.md
-    type: api
-    purpose: Key trait definitions
     token_estimate: 1500
-    
+
+  # Architecture decisions (counter-intuitive only)
+  - path: architecture-decisions.md
+    type: decisions
+    purpose: Non-obvious design decisions
+    token_estimate: 600
+
+  # Task templates
   - path: prompts/coding-context.md
     type: template
-    purpose: Pre-generated context for coding tasks
-    token_estimate: 1000
-    
-  - path: prompts/debug-context.md
-    type: template
-    purpose: Pre-generated context for debugging
-    token_estimate: 1000
-    
-  - path: prompts/review-context.md
-    type: template
-    purpose: Pre-generated context for code review
-    token_estimate: 1000
+    purpose: Code style and common patterns
+    token_estimate: 800
 
 usage:
-  # For coding tasks
-  recommended_context:
+  # For coding tasks (recommended)
+  coding_context:
     - project.snapshot
     - core/modules.map
-    - domains/pipeline.md (if modifying pipeline)
-    - domains/tools.md (if adding/modifying tools)
     - core/constraints.md
-    - prompts/coding-context.md
+    - domains/pipeline.md (if modifying pipeline/agents)
+    - domains/tools.md (if modifying tools)
+    - architecture-decisions.md
   
   # For debugging
   debug_context:
     - project.snapshot
-    - core/modules.map
     - core/constraints.md
-    - prompts/debug-context.md
-  
+    - architecture-decisions.md
+
   # For code review
   review_context:
     - core/constraints.md
-    - domains/domain-logic.md
-    - prompts/review-context.md
+    - architecture-decisions.md
 
-total_token_estimate: 22000
+total_token_estimate: 9400
+
+# =============================================================================
+# MAINTENANCE GUIDE - When to update .ai-context files
+# =============================================================================
+#
+# | Code Change | Action | Update File |
+# |-------------|--------|-------------|
+# | New tool added | Add to table | domains/tools.md |
+# | New stage added | Add to table | domains/pipeline.md |
+# | New module created | Add to reference | core/modules.map |
+# | New security rule | Add constraint | core/constraints.md |
+# | New architecture decision | Add ADR entry | architecture-decisions.md |
+# | New crate created | Add section | project.snapshot |
+# |
+# | NO UPDATE NEEDED: struct fields, function signatures, line numbers, refactoring |
+#
+# Update command for Agent:
+#   "Update .ai-context based on changes to [specific files]"
+#
+# Example:
+#   "Update .ai-context because I added a new tool ValidateSchemaTool"
+#   → Agent reads tools.md, adds entry to appropriate table
+# =============================================================================

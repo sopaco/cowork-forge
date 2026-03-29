@@ -1,5 +1,4 @@
 # Cowork Forge - AI Context Snapshot
-# Generated: 2026-03-28
 # Purpose: Minimal context for AI agents to understand project structure
 
 ## PROJECT OVERVIEW
@@ -15,283 +14,119 @@ description: AI-native iterative software development platform with multi-agent 
 ### cowork-core
 path: crates/cowork-core/
 role: domain-logic-core
-description: Core library with domain entities, pipeline orchestration, tools, and persistence
-entry_points:
-  - src/lib.rs
+description: Core library with domain entities, pipeline orchestration, tools, persistence
 key_modules:
   - pipeline: 7-stage workflow orchestration
   - domain: Project, Iteration, Memory aggregates (DDD)
-  - tools: 30+ ADK tools for file/memory/HITL operations
-  - persistence: JSON-based storage layer
-  - interaction: InteractiveBackend trait for CLI/GUI abstraction
-  - agents: Agent builders using adk-rust framework
-  - instructions: ~2000 lines of prompt engineering
-  - config_definition: V3 data-driven configuration system
-  - skills: agentskills.io standard integration
-  - acp: External coding agent protocol client
+  - tools: 30+ ADK tools
+  - persistence: JSON-based storage
+  - interaction: CLI/GUI abstraction
+  - agents: Agent builders
+  - instructions: Prompts for each stage
 
 ### cowork-cli
 path: crates/cowork-cli/
 role: cli-adapter
-description: Command-line interface with clap
-entry: src/main.rs
 commands: [init, iter, list, show, continue, status, delete, import, knowledge, config]
 
 ### cowork-gui
 path: crates/cowork-gui/
 role: gui-adapter
-description: Tauri-based desktop application with React frontend
-backend_entry: src-tauri/src/main.rs
-frontend_entry: src/main.tsx
-features: [project-dashboard, iteration-management, artifact-viewer, chat-interface, app-preview]
+description: Tauri + React desktop application
 
 ## CORE CONCEPTS
 
 ### 7-Stage Pipeline
-stages:
-  - id: idea
-    description: Capture and structure requirements
-    artifact: idea.md
-    hitl: false
-  - id: prd
-    description: Generate Product Requirements Document
-    artifact: prd.md
-    hitl: true
-    pattern: actor-critic
-  - id: design
-    description: Create technical architecture
-    artifact: design.md
-    hitl: true
-    pattern: actor-critic
-  - id: plan
-    description: Break down implementation tasks
-    artifact: plan.md
-    hitl: true
-    pattern: actor-critic
-  - id: coding
-    description: Implement code with tests
-    artifact: workspace/
-    hitl: true
-    pattern: actor-critic
-  - id: check
-    description: Verify quality and completeness
-    artifact: check_report.md
-    hitl: false
-  - id: delivery
-    description: Generate final delivery report
-    artifact: delivery_report.md
-    hitl: false
+
+| Stage | HITL | Output |
+|-------|------|--------|
+| idea | No | idea.md |
+| prd | Yes | prd.md |
+| design | Yes | design.md |
+| plan | Yes | plan.md |
+| coding | Yes | workspace/ |
+| check | No | check_report.md |
+| delivery | No | delivery_report.md |
 
 ### Iteration Types
-types:
-  - name: genesis
-    description: First iteration, fresh start
-    inheritance: none
-  - name: evolution
-    description: Build upon previous iteration
-    inheritance_modes: [full, partial, none]
-
-### Inheritance Modes
-modes:
-  - name: none
-    description: Fresh start, no inheritance
-    start_stage: idea
-  - name: partial
-    description: Copy artifacts only, regenerate code
-    start_stage: idea (configurable)
-  - name: full
-    description: Copy all code and artifacts
-    start_stage: configurable
+- **Genesis**: First iteration, fresh start
+- **Evolution**: Build upon previous iteration
 
 ### Actor-Critic Pattern
-description: Each critical stage uses Actor-Critic loop
-flow:
-  - actor: Generates artifacts based on instructions
-  - critic: Validates quality, suggests improvements
-  - hitl: Human confirms or provides feedback
-  - revision: Actor regenerates with feedback if needed
+Critical stages use Actor-Critic loop:
+Actor generates → Critic validates → HITL confirms
 
-## KEY DATA STRUCTURES
-
-### Project (Aggregate Root)
-location: crates/cowork-core/src/domain/project.rs
-fields:
-  - id: String
-  - name: String
-  - metadata: ProjectMetadata (tech_stack, project_type, language)
-  - current_iteration_id: Option<String>
-  - iterations: Vec<IterationSummary>
-
-### Iteration
-location: crates/cowork-core/src/domain/iteration.rs
-fields:
-  - id: String
-  - number: u32
-  - title: String
-  - description: String
-  - base_iteration_id: Option<String>
-  - inheritance: InheritanceMode
-  - status: IterationStatus (Draft/Running/Paused/Completed/Failed)
-  - current_stage: Option<String>
-  - completed_stages: Vec<String>
-  - artifacts: Artifacts
-
-### Artifacts
-location: crates/cowork-core/src/domain/iteration.rs
-fields:
-  - idea: Option<String> (path to idea.md)
-  - prd: Option<String> (path to prd.md)
-  - design: Option<String> (path to design.md)
-  - plan: Option<String> (path to plan.md)
-  - coding: Option<String> (workspace path)
-  - delivery: Option<String> (path to delivery_report.md)
-
-### ProjectMemory
-location: crates/cowork-core/src/domain/memory.rs
-fields:
-  - decisions: Vec<Decision>
-  - patterns: Vec<Pattern>
-  - issues: Vec<Issue>
-  - learnings: Vec<Learning>
-
-### IterationKnowledge
-location: crates/cowork-core/src/domain/memory.rs
-fields:
-  - iteration_id: String
-  - decisions: Vec<Decision>
-  - patterns: Vec<Pattern>
-  - issues: Vec<Issue>
-  - learnings: Vec<Learning>
-  - tech_stack: Vec<String>
-
-## CRITICAL PATHS
-
-### Iteration Execution Entry
-file: crates/cowork-core/src/pipeline/executor/mod.rs
-function: IterationExecutor::execute()
-flow:
-  1. Load iteration from IterationStore
-  2. Prepare workspace (inherit if evolution)
-  3. Determine start stage from inheritance mode
-  4. Execute stages sequentially
-  5. Handle HITL gates at critical stages
-  6. Complete iteration and generate knowledge
-
-### Stage Execution
-file: crates/cowork-core/src/pipeline/stage_executor.rs
-trait: Stage
-methods:
-  - name(): &str
-  - description(): &str
-  - needs_confirmation(): bool
-  - execute(ctx, interaction): StageResult
-  - execute_with_feedback(ctx, interaction, feedback): StageResult
-
-### HITL Flow
-file: crates/cowork-core/src/interaction/mod.rs
-trait: InteractiveBackend
-methods:
-  - show_message(level, content)
-  - send_streaming(content, agent_name, is_thinking)
-  - send_tool_call(tool_name, arguments, agent_name)
-  - request_input(prompt, options, initial_content): InputResponse
-  - show_progress(task_id, progress)
-
-### Tool Registry
-file: crates/cowork-core/src/tools/mod.rs
-categories:
-  - file_tools: ReadFileTool, WriteFileTool, ListFilesTool
-  - data_tools: CreateRequirementTool, AddFeatureTool, GetRequirementsTool, CreateTaskTool
-  - hitl_tools: ReviewWithFeedbackContentTool, ProvideFeedbackTool
-  - memory_tools: QueryMemoryTool, SaveInsightTool, SaveIssueTool
-  - validation_tools: CheckFeatureCoverageTool, CheckTaskDependenciesTool
-  - control_tools: GotoStageTool
-  - artifact_tools: SaveIdeaTool, SavePrdDocTool, SaveDesignDocTool
-
-## CONFIGURATION
-
-### LLM Config
-location: config.toml (platform-specific app data dir)
-fields:
-  - llm.api_base_url: String
-  - llm.api_key: String
-  - llm.model_name: String
-  - embedding.api_base_url: Option<String>
-  - embedding.api_key: Option<String>
-  - embedding.model_name: Option<String>
-
-### V3 Config Registry
-location: crates/cowork-core/src/config_definition/registry.rs
-features:
-  - AgentDefinition: Custom agent configuration
-  - StageDefinition: Stage behavior configuration
-  - FlowDefinition: Workflow pipeline configuration
-  - SkillDefinition: agentskills.io integration
-  - IntegrationDefinition: External system hooks
+---
 
 ## STORAGE STRUCTURE
 
-### .cowork-v2/ Directory
-location: <project-root>/.cowork-v2/
-structure:
-  - project.json: Project metadata
-  - memory.json: ProjectMemory (cross-iteration knowledge)
-  - iterations/
-    - iter-<number>-<timestamp>/
-      - iteration.json: Iteration metadata
-      - memory.json: IterationKnowledge
-      - artifacts/
-        - idea.md
-        - prd.md
-        - design.md
-        - plan.md
-        - delivery_report.md
-      - workspace/: Generated code files
+```
+.cowork-v2/
+├── project.json              # Project metadata
+├── memory.json               # ProjectMemory
+└── iterations/
+    └── iter-<number>-<timestamp>/
+        ├── iteration.json    # Iteration metadata
+        ├── memory.json       # IterationKnowledge
+        ├── artifacts/
+        │   ├── idea.md
+        │   ├── prd.md
+        │   ├── design.md
+        │   ├── plan.md
+        │   └── delivery_report.md
+        ├── workspace/        # Generated code
+        └── summaries/        # Document summaries
+```
+
+### Store Implementations
+
+| Store | File | Purpose |
+|-------|------|---------|
+| ProjectStore | `persistence/project_store.rs` | project.json |
+| IterationStore | `persistence/iteration_store.rs` | iterations/* |
+| MemoryStore | `persistence/memory_store.rs` | memory.json |
+
+### Workspace Preparation (Evolution)
+
+| Inheritance | What's Copied |
+|-------------|---------------|
+| None | Fresh workspace |
+| Partial | Artifacts only |
+| Full | Artifacts + workspace |
+
+---
+
+## CONFIGURATION
+
+### LLM Config (config.toml)
+- llm.api_base_url
+- llm.api_key
+- llm.model_name
+- embedding.*
+
+### V3 Config Registry
+`config_definition/` - Data-driven configuration for agents, stages, flows
+
+---
 
 ## EXTERNAL INTEGRATIONS
 
 ### ACP (Agent Communication Protocol)
-location: crates/cowork-core/src/acp/
-purpose: External coding agent integration
-supported_agents: [opencode, iflow, codex, gemini, claude]
-transport: [stdio, websocket]
+`acp/` - External coding agent integration (opencode, iflow, codex, gemini, claude)
 
 ### Skills (agentskills.io)
-location: crates/cowork-core/src/skills/
-purpose: Domain-specific capability injection
-discovery: .skills/ directory
-categories: [web_frontend, web_backend, mobile, devops, testing, security]
+`skills/` - Domain-specific capability injection
 
-## IMPORTANT CONSTRAINTS
+---
 
-### Rate Limiting
-- LLM API: 30 requests/minute, concurrency=1
-- Implementation: Semaphore + 2s delay decorator
+## CRITICAL PATHS
 
-### Security
-- Path validation for all file operations
-- Workspace containment (no access outside project)
-- Command sanitization for shell execution
-- Dangerous commands blocked (rm -rf, sudo, etc.)
+| Task | Entry Point |
+|------|-------------|
+| Execute iteration | `IterationExecutor::execute()` |
+| Stage execution | `Stage::execute()` |
+| HITL confirmation | `InteractiveBackend::request_input()` |
+| Tool registry | `tools/mod.rs` |
 
-### HITL Gates
-- Critical stages (idea, prd, design, plan, coding) require human confirmation
-- Max revision loops: 5 per stage
-- Max stage retries: 3
-
-## DEPENDENCIES
-
-### Core Framework
-- adk-rust: Agent framework (v0.4.0)
-- tokio: Async runtime
-- serde/serde_json: Serialization
-
-### UI
-- clap: CLI argument parsing
-- tauri: Desktop application framework
-- react: GUI frontend
-- ant-design: UI components
-
-### LLM
-- OpenAI-compatible APIs
-- Streaming response support
+---
+**Note**: For detailed implementations, see corresponding source files.
