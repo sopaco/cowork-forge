@@ -33,12 +33,41 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
   const [expanded, setExpanded] = useState(false);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const modalTextAreaRef = useRef<HTMLTextAreaElement>(null);
+  // 跟踪 IME 输入法组合状态，用于中文输入法等场景
+  const isComposingRef = useRef(false);
+  // 记录 compositionend 触发的时间，用于防止在 IME 刚结束时误触发发送
+  const compositionEndTimeRef = useRef(0);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onUserInputChange(e.target.value);
   }, [onUserInputChange]);
 
+  const handleCompositionStart = useCallback(() => {
+    isComposingRef.current = true;
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    // 延迟设置状态，防止在同一个事件循环中被 keydown 误判
+    compositionEndTimeRef.current = Date.now();
+    // 使用 setTimeout 确保在当前事件循环之后再重置状态
+    setTimeout(() => {
+      isComposingRef.current = false;
+    }, 0);
+  }, []);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // 检查原生事件的 isComposing 属性，这是最可靠的 IME 检测方式
+    if (e.nativeEvent.isComposing) {
+      return;
+    }
+    // 如果刚刚结束 composition（50ms 内），也跳过，防止 IME 确认时误触发发送
+    if (Date.now() - compositionEndTimeRef.current < 50) {
+      return;
+    }
+    // 如果正在使用输入法组合输入（如中文输入法），不处理快捷键
+    if (isComposingRef.current) {
+      return;
+    }
     // Shift + Enter: 展开输入框
     if (e.shiftKey && e.key === 'Enter') {
       e.preventDefault();
@@ -86,6 +115,18 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
   }, [expanded, userInput]);
 
   const handleModalKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // 检查原生事件的 isComposing 属性，这是最可靠的 IME 检测方式
+    if (e.nativeEvent.isComposing) {
+      return;
+    }
+    // 如果刚刚结束 composition（50ms 内），也跳过，防止 IME 确认时误触发发送
+    if (Date.now() - compositionEndTimeRef.current < 50) {
+      return;
+    }
+    // 如果正在使用输入法组合输入（如中文输入法），不处理快捷键
+    if (isComposingRef.current) {
+      return;
+    }
     // Shift + Enter: 在展开模式下输入换行
     if (e.shiftKey && e.key === 'Enter') {
       // 默认行为，输入换行
@@ -113,6 +154,8 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
         value={userInput}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
         placeholder={placeholder}
         disabled={disabled}
         autoSize={{ minRows: 1, maxRows: 4 }}
@@ -172,6 +215,8 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
             value={userInput}
             onChange={handleInputChange}
             onKeyDown={handleModalKeyDown}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
             placeholder="输入内容，按 Ctrl+Enter 发送，按 Escape 关闭..."
             disabled={disabled}
             autoSize={{ minRows: 8, maxRows: 20 }}
@@ -272,6 +317,8 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
           value={userInput}
           onChange={handleInputChange}
           onKeyDown={handleModalKeyDown}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           placeholder={inputRequest ? 'Type your response...' : '输入内容，按 Ctrl+Enter 发送，按 Escape 关闭...'}
           disabled={disabled && !inputRequest}
           autoSize={{ minRows: 8, maxRows: 20 }}
