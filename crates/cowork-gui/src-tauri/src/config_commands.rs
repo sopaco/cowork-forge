@@ -699,3 +699,313 @@ fn open_folder_in_explorer(path: &std::path::Path) -> Result<(), String> {
 
     Ok(())
 }
+
+/// Tool info for frontend display
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolInfo {
+    pub id: String,
+    pub name: String,
+    pub category: String,
+    pub description: String,
+}
+
+/// Get all available tools that can be assigned to agents
+#[tauri::command]
+pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
+    // This list should match the tools supported in agent_factory.rs
+    let tools = vec![
+        // Idea tools
+        ToolInfo {
+            id: "save_idea".to_string(),
+            name: "Save Idea".to_string(),
+            category: "Idea".to_string(),
+            description: "Save the initial project idea document".to_string(),
+        },
+        
+        // Data tools
+        ToolInfo {
+            id: "create_requirement".to_string(),
+            name: "Create Requirement".to_string(),
+            category: "Data".to_string(),
+            description: "Create a new requirement".to_string(),
+        },
+        ToolInfo {
+            id: "update_requirement".to_string(),
+            name: "Update Requirement".to_string(),
+            category: "Data".to_string(),
+            description: "Update an existing requirement".to_string(),
+        },
+        ToolInfo {
+            id: "delete_requirement".to_string(),
+            name: "Delete Requirement".to_string(),
+            category: "Data".to_string(),
+            description: "Delete a requirement".to_string(),
+        },
+        ToolInfo {
+            id: "get_requirements".to_string(),
+            name: "Get Requirements".to_string(),
+            category: "Data".to_string(),
+            description: "Retrieve all requirements".to_string(),
+        },
+        ToolInfo {
+            id: "add_feature".to_string(),
+            name: "Add Feature".to_string(),
+            category: "Data".to_string(),
+            description: "Add a feature to a requirement".to_string(),
+        },
+        ToolInfo {
+            id: "update_feature".to_string(),
+            name: "Update Feature".to_string(),
+            category: "Data".to_string(),
+            description: "Update an existing feature".to_string(),
+        },
+        ToolInfo {
+            id: "create_task".to_string(),
+            name: "Create Task".to_string(),
+            category: "Data".to_string(),
+            description: "Create a new task in the plan".to_string(),
+        },
+        ToolInfo {
+            id: "update_task_status".to_string(),
+            name: "Update Task Status".to_string(),
+            category: "Data".to_string(),
+            description: "Update the status of a task".to_string(),
+        },
+        ToolInfo {
+            id: "get_design".to_string(),
+            name: "Get Design".to_string(),
+            category: "Data".to_string(),
+            description: "Retrieve the current design specification".to_string(),
+        },
+        ToolInfo {
+            id: "get_implementation_plan".to_string(),
+            name: "Get Implementation Plan".to_string(),
+            category: "Data".to_string(),
+            description: "Retrieve the implementation plan (alias: get_plan)".to_string(),
+        },
+        
+        // File tools
+        ToolInfo {
+            id: "read_file".to_string(),
+            name: "Read File".to_string(),
+            category: "File".to_string(),
+            description: "Read the contents of a file in the workspace".to_string(),
+        },
+        ToolInfo {
+            id: "write_file".to_string(),
+            name: "Write File".to_string(),
+            category: "File".to_string(),
+            description: "Write content to a file in the workspace".to_string(),
+        },
+        ToolInfo {
+            id: "list_files".to_string(),
+            name: "List Files".to_string(),
+            category: "File".to_string(),
+            description: "List files in a directory within the workspace".to_string(),
+        },
+        ToolInfo {
+            id: "run_command".to_string(),
+            name: "Run Command".to_string(),
+            category: "File".to_string(),
+            description: "Execute a shell command in the workspace".to_string(),
+        },
+        ToolInfo {
+            id: "read_file_truncated".to_string(),
+            name: "Read File Truncated".to_string(),
+            category: "File".to_string(),
+            description: "Read a file with intelligent truncation for large files".to_string(),
+        },
+        
+        // Document tools (Project Iteration Files)
+        ToolInfo {
+            id: "load_idea".to_string(),
+            name: "Load Idea".to_string(),
+            category: "Document".to_string(),
+            description: "Load the idea document from current iteration".to_string(),
+        },
+        ToolInfo {
+            id: "load_prd_doc".to_string(),
+            name: "Load PRD Doc".to_string(),
+            category: "Document".to_string(),
+            description: "Load the PRD document from current iteration".to_string(),
+        },
+        ToolInfo {
+            id: "load_design_doc".to_string(),
+            name: "Load Design Doc".to_string(),
+            category: "Document".to_string(),
+            description: "Load the design document from current iteration".to_string(),
+        },
+        ToolInfo {
+            id: "load_plan_doc".to_string(),
+            name: "Load Plan Doc".to_string(),
+            category: "Document".to_string(),
+            description: "Load the implementation plan document from current iteration".to_string(),
+        },
+        ToolInfo {
+            id: "save_prd_doc".to_string(),
+            name: "Save PRD Doc".to_string(),
+            category: "Document".to_string(),
+            description: "Save the PRD document to the artifacts directory".to_string(),
+        },
+        ToolInfo {
+            id: "save_design_doc".to_string(),
+            name: "Save Design Doc".to_string(),
+            category: "Document".to_string(),
+            description: "Save the design document to the artifacts directory".to_string(),
+        },
+        ToolInfo {
+            id: "save_plan_doc".to_string(),
+            name: "Save Plan Doc".to_string(),
+            category: "Document".to_string(),
+            description: "Save the implementation plan document to the artifacts directory".to_string(),
+        },
+        ToolInfo {
+            id: "save_delivery_report".to_string(),
+            name: "Save Delivery Report".to_string(),
+            category: "Document".to_string(),
+            description: "Save the delivery report to the artifacts directory".to_string(),
+        },
+        ToolInfo {
+            id: "save_check_report".to_string(),
+            name: "Save Check Report".to_string(),
+            category: "Document".to_string(),
+            description: "Save the check report to the artifacts directory".to_string(),
+        },
+        
+        // Design tools
+        ToolInfo {
+            id: "create_design_component".to_string(),
+            name: "Create Design Component".to_string(),
+            category: "Design".to_string(),
+            description: "Create a new design component".to_string(),
+        },
+        
+        // Validation tools
+        ToolInfo {
+            id: "check_feature_coverage".to_string(),
+            name: "Check Feature Coverage".to_string(),
+            category: "Validation".to_string(),
+            description: "Validate that all features are covered in the design".to_string(),
+        },
+        ToolInfo {
+            id: "check_task_dependencies".to_string(),
+            name: "Check Task Dependencies".to_string(),
+            category: "Validation".to_string(),
+            description: "Validate task dependencies in the plan".to_string(),
+        },
+        ToolInfo {
+            id: "check_tests".to_string(),
+            name: "Check Tests".to_string(),
+            category: "Validation".to_string(),
+            description: "Run tests in the workspace".to_string(),
+        },
+        ToolInfo {
+            id: "check_lint".to_string(),
+            name: "Check Lint".to_string(),
+            category: "Validation".to_string(),
+            description: "Run linting in the workspace".to_string(),
+        },
+        ToolInfo {
+            id: "check_data_format".to_string(),
+            name: "Check Data Format".to_string(),
+            category: "Validation".to_string(),
+            description: "Validate data format consistency".to_string(),
+        },
+        
+        // HITL tools
+        ToolInfo {
+            id: "provide_feedback".to_string(),
+            name: "Provide Feedback".to_string(),
+            category: "HITL".to_string(),
+            description: "Provide feedback to the user for review".to_string(),
+        },
+        ToolInfo {
+            id: "load_feedback_history".to_string(),
+            name: "Load Feedback History".to_string(),
+            category: "HITL".to_string(),
+            description: "Load history of feedback from previous iterations".to_string(),
+        },
+        
+        // Memory tools
+        ToolInfo {
+            id: "query_memory".to_string(),
+            name: "Query Memory".to_string(),
+            category: "Memory".to_string(),
+            description: "Query the project memory for relevant context".to_string(),
+        },
+        ToolInfo {
+            id: "save_insight".to_string(),
+            name: "Save Insight".to_string(),
+            category: "Memory".to_string(),
+            description: "Save an insight to the iteration memory".to_string(),
+        },
+        ToolInfo {
+            id: "save_issue".to_string(),
+            name: "Save Issue".to_string(),
+            category: "Memory".to_string(),
+            description: "Save an issue to the iteration memory".to_string(),
+        },
+        ToolInfo {
+            id: "save_learning".to_string(),
+            name: "Save Learning".to_string(),
+            category: "Memory".to_string(),
+            description: "Save a learning to the iteration memory".to_string(),
+        },
+        ToolInfo {
+            id: "promote_to_decision".to_string(),
+            name: "Promote to Decision".to_string(),
+            category: "Memory".to_string(),
+            description: "Promote an insight to a project-level decision".to_string(),
+        },
+        ToolInfo {
+            id: "promote_to_pattern".to_string(),
+            name: "Promote to Pattern".to_string(),
+            category: "Memory".to_string(),
+            description: "Promote a learning to a project-level pattern".to_string(),
+        },
+        
+        // Deployment tools
+        ToolInfo {
+            id: "copy_workspace_to_project".to_string(),
+            name: "Copy Workspace to Project".to_string(),
+            category: "Deployment".to_string(),
+            description: "Copy generated workspace files to the project directory".to_string(),
+        },
+        
+        // Flow control tools
+        ToolInfo {
+            id: "goto_stage".to_string(),
+            name: "Goto Stage".to_string(),
+            category: "Flow Control".to_string(),
+            description: "Jump to a specific stage in the flow".to_string(),
+        },
+        
+        // PM tools
+        ToolInfo {
+            id: "pm_goto_stage".to_string(),
+            name: "PM Goto Stage".to_string(),
+            category: "PM".to_string(),
+            description: "PM agent: Jump to a specific stage".to_string(),
+        },
+        ToolInfo {
+            id: "pm_create_iteration".to_string(),
+            name: "PM Create Iteration".to_string(),
+            category: "PM".to_string(),
+            description: "PM agent: Create a new iteration".to_string(),
+        },
+        ToolInfo {
+            id: "pm_respond".to_string(),
+            name: "PM Respond".to_string(),
+            category: "PM".to_string(),
+            description: "PM agent: Respond to user".to_string(),
+        },
+        ToolInfo {
+            id: "pm_save_decision".to_string(),
+            name: "PM Save Decision".to_string(),
+            category: "PM".to_string(),
+            description: "PM agent: Save a decision to memory".to_string(),
+        },
+    ];
+    
+    Ok(tools)
+}

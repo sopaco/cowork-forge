@@ -234,3 +234,11 @@ export interface BuiltinInstruction {
 
 // Instruction type for form
 export type InstructionType = "builtin" | "file" | "inline";
+
+// Tool Info for agent configuration
+export interface ToolInfo {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+}

@@ -16,6 +16,9 @@
       "tool_id": "list_files"
     },
     {
+      "tool_id": "read_file_truncated"
+    },
+    {
       "tool_id": "save_delivery_report"
     },
     {

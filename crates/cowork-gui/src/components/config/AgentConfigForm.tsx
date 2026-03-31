@@ -37,7 +37,7 @@ import {
   FolderOpenOutlined,
 } from '@ant-design/icons';
 import { useConfigStore } from '../../stores/configStore';
-import type { AgentDefinition, ToolReference, AgentType, ModelConfig, BuiltinInstruction, InstructionType } from '../../types/config';
+import type { AgentDefinition, ToolReference, AgentType, ModelConfig, BuiltinInstruction, InstructionType, ToolInfo } from '../../types/config';
 import { open } from '@tauri-apps/plugin-dialog';
 
 const { Title, Text, Paragraph } = Typography;
@@ -55,6 +55,9 @@ const AgentConfigForm: React.FC = () => {
     exportConfig,
     importConfig,
     getBuiltinInstructions,
+    availableTools,
+    loadAvailableTools,
+    getToolsByCategory,
   } = useConfigStore();
 
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -74,7 +77,8 @@ const AgentConfigForm: React.FC = () => {
   // Load builtin instructions on mount
   useEffect(() => {
     getBuiltinInstructions().then(setBuiltinInstructions);
-  }, [getBuiltinInstructions]);
+    loadAvailableTools();  // Load available tools from backend
+  }, [getBuiltinInstructions, loadAvailableTools]);
 
   const handleCreate = () => {
     setEditingAgent(null);
@@ -299,13 +303,6 @@ const AgentConfigForm: React.FC = () => {
       }
     }
   };
-
-  const availableTools = [
-    'read_file', 'write_file', 'edit_file', 'delete_file',
-    'execute_command', 'search_file', 'search_content',
-    'list_dir', 'create_dir', 'move_file', 'copy_file',
-    'query_memory', 'save_memory', 'web_search', 'web_fetch',
-  ];
 
   const availableSkills = Object.keys(skills);
 
@@ -586,9 +583,27 @@ const AgentConfigForm: React.FC = () => {
                 children: (
                   <>
                     <Form.Item name="tools" label="Available Tools">
-                      <Select mode="multiple" placeholder="Select tools">
-                        {availableTools.map(tool => (
-                          <Select.Option key={tool} value={tool}>{tool}</Select.Option>
+                      <Select 
+                        mode="multiple" 
+                        placeholder="Select tools"
+                        optionFilterProp="label"
+                        showSearch
+                        listHeight={400}
+                      >
+                        {Object.entries(getToolsByCategory()).map(([category, tools]) => (
+                          <Select.OptGroup key={category} label={category}>
+                            {tools.map(tool => (
+                              <Select.Option 
+                                key={tool.id} 
+                                value={tool.id}
+                                label={tool.name}
+                              >
+                                <Tooltip title={tool.description}>
+                                  <span>{tool.name}</span>
+                                </Tooltip>
+                              </Select.Option>
+                            ))}
+                          </Select.OptGroup>
                         ))}
                       </Select>
                     </Form.Item>

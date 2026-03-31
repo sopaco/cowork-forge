@@ -835,6 +835,7 @@ pub fn run() {
             config_commands::gui_export_config,
             config_commands::gui_import_config,
             config_commands::gui_get_builtin_instructions,
+            config_commands::gui_get_available_tools,
             // Project creation commands
             path_exists,
             create_project_at_path,

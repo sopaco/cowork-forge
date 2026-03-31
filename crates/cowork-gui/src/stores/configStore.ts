@@ -9,6 +9,7 @@ import type {
   ConfigRegistryState,
   ValidationResult,
   BuiltinInstruction,
+  ToolInfo,
 } from '../types/config';
 
 interface ConfigState extends ConfigRegistryState {
@@ -19,6 +20,7 @@ interface ConfigState extends ConfigRegistryState {
   selectedStage: string | null;
   selectedSkill: string | null;  // skill name
   selectedIntegration: string | null;
+  availableTools: ToolInfo[];  // Available tools for agent configuration
 
   // Actions
   loadConfigs: () => Promise<void>;
@@ -52,6 +54,10 @@ interface ConfigState extends ConfigRegistryState {
 
   // Builtin Instructions
   getBuiltinInstructions: () => Promise<BuiltinInstruction[]>;
+  
+  // Available Tools
+  loadAvailableTools: () => Promise<void>;
+  getToolsByCategory: () => Record<string, ToolInfo[]>;
 }
 
 export const useConfigStore = create<ConfigState>((set, get) => ({
@@ -69,6 +75,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   selectedStage: null,
   selectedSkill: null,
   selectedIntegration: null,
+  availableTools: [],
 
   // Load all configs from backend
   loadConfigs: async () => {
@@ -301,5 +308,30 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       set({ error: error instanceof Error ? error.message : 'Failed to get builtin instructions' });
       return [];
     }
+  },
+  
+  // Load available tools from backend
+  loadAvailableTools: async () => {
+    try {
+      const tools = await invoke<ToolInfo[]>('gui_get_available_tools');
+      set({ availableTools: tools });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to load available tools' });
+    }
+  },
+  
+  // Get tools grouped by category
+  getToolsByCategory: () => {
+    const tools = get().availableTools;
+    const grouped: Record<string, ToolInfo[]> = {};
+    
+    for (const tool of tools) {
+      if (!grouped[tool.category]) {
+        grouped[tool.category] = [];
+      }
+      grouped[tool.category].push(tool);
+    }
+    
+    return grouped;
   },
 }));
