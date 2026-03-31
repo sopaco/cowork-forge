@@ -219,6 +219,7 @@ fn run_acp_in_thread(
         // Spawn the agent process
         let mut cmd = Command::new(&config.command);
         cmd.args(&config.args)
+            .env("PATH", std::env::var("PATH").unwrap_or_default())
             .current_dir(&workspace)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
