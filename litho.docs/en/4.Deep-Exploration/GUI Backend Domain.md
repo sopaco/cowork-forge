@@ -14,7 +14,7 @@ The **GUI Backend Domain** serves as the infrastructure bridge between the React
 The domain implements the **Adapter** pattern within the Hexagonal Architecture, adapting the core domain's `InteractiveBackend` trait to Tauri's event-driven desktop runtime. It maintains strict separation between presentation concerns (React frontend) and business logic (cowork-core), ensuring the core domain remains agnostic of GUI-specific implementation details.
 
 **Key Responsibilities:**
-- **Command Handling**: Expose 24+ JSON-RPC endpoints for frontend invocation
+- **Command Handling**: Expose 25+ JSON-RPC endpoints for frontend invocation
 - **Event Streaming**: Real-time bidirectional communication via Tauri's event emission system
 - **Process Management**: Cross-platform development server lifecycle management
 - **State Bridging**: Thread-safe shared state management between async tasks and UI thread
@@ -84,7 +84,9 @@ The command handlers serve as the API surface for the React frontend, implementi
 | `start_iteration_preview` | ProcessRunner activation | Child process management |
 | `pm_send_message` | Project Manager Agent message processing | Context-aware with history |
 | `pm_restart_iteration` | Re-execute from specified stage | Pipeline jump |
-| `get_system_locale` | Get system language setting | Synchronous return |
+| `get_system_locale` |
+| `gui_get_available_tools` | Get available tools list | Tool ID, name, category, description |
+| `gui_reset_config_registry` | Reset config registry | All built-in configs | Get system language setting | Synchronous return |
 
 **Implementation Pattern:**
 ```rust

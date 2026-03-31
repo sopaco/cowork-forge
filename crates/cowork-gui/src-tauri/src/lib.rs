@@ -22,7 +22,7 @@ mod config_commands;
 use project_manager::*;
 
 // Re-export commands from new module structure
-use commands::{init_app_handle, file, preview, runner, memory, template, pm, system, import_cmd};
+use commands::{init_app_handle, init_path_for_app_bundle, file, preview, runner, memory, template, pm, system, import_cmd};
 
 
 
@@ -633,6 +633,11 @@ async fn submit_input_response(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize PATH for macOS App Bundle compatibility
+    // This MUST be called first, before any other initialization
+    // On macOS, GUI apps launched from Finder have a limited PATH
+    init_path_for_app_bundle();
+    
     let app_state = AppState::new()
         .expect("Failed to initialize application state");
 
@@ -835,6 +840,7 @@ pub fn run() {
             config_commands::gui_export_config,
             config_commands::gui_import_config,
             config_commands::gui_get_builtin_instructions,
+            config_commands::gui_get_available_tools,
             // Project creation commands
             path_exists,
             create_project_at_path,

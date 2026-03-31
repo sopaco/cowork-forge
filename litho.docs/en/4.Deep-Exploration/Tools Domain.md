@@ -10,7 +10,7 @@
 
 ## 1. Executive Overview
 
-The **Tools Domain** provides the comprehensive operational interface between AI agents and the host system within Cowork Forge. Acting as the execution layer for the 7-stage AI pipeline, this domain implements 30+ specialized tools adhering to the ADK (Agent Development Kit) `Tool` trait specification. These tools enable AI agents to perform secure file operations, manage structured project data, interact with human users through validation gates, query institutional memory, and execute deployment workflows.
+The **Tools Domain** provides the comprehensive operational interface between AI agents and the host system within Cowork Forge. Acting as the execution layer for the 7-stage AI pipeline, this domain implements 40+ specialized tools adhering to the ADK (Agent Development Kit) `Tool` trait specification. These tools enable AI agents to perform secure file operations, manage structured project data, interact with human users through validation gates, query institutional memory, and execute deployment workflows.
 
 **Key Architectural Value:**
 - **Security-First Design**: Enforces strict workspace containment with path traversal prevention and UNC path normalization
@@ -61,7 +61,7 @@ flowchart TB
 
 ## 3. Tool Taxonomy
 
-The domain organizes tools into eight functional categories, each addressing specific operational concerns within the AI-driven development lifecycle.
+The domain organizes tools into nine functional categories, each addressing specific operational concerns within the AI-driven development lifecycle.
 
 ### 3.1 File Tools (`file_tools.rs`)
 **Purpose**: Secure filesystem operations within workspace boundaries
@@ -72,7 +72,22 @@ The domain organizes tools into eight functional categories, each addressing spe
 - **WriteFileTool**: Atomic file writes with parent directory creation
 - **RunCommandTool**: Shell execution with 30-second timeout and blocking command detection (prevents interactive commands like `vim`)
 
-### 3.2 Data Tools (`data_tools.rs`)
+### 3.2 Document Tools (`load_artifacts.rs`, `artifact_tools.rs`)
+**Purpose**: Project iteration document loading and saving operations
+- **LoadIdeaTool**: Load the idea document from current iteration
+- **LoadPrdDocTool**: Load the PRD document from current iteration
+- **LoadDesignDocTool**: Load the design document from current iteration
+- **LoadPlanDocTool**: Load the implementation plan document from current iteration
+- **SavePrdDocTool**: Save PRD document to artifacts directory
+- **SaveDesignDocTool**: Save design document to artifacts directory
+- **SavePlanDocTool**: Save implementation plan document to artifacts directory
+- **SaveDeliveryReportTool**: Save delivery report to artifacts directory
+- **SaveCheckReportTool**: Save check report to artifacts directory
+- **SaveIdeaTool**: Save initial idea document
+
+> **Note**: Document tools enable all Agents to read project iteration files on-demand during task execution, understanding project context. These tools are now configured for all built-in Agents.
+
+### 3.3 Data Tools (`data_tools.rs`)
 **Purpose**: Structured data management for requirements, features, and tasks
 - **Requirements Management**: `CreateRequirementTool`, `GetRequirementsTool` (REQ-ID prefixed)
 - **Feature Management**: `AddFeatureTool`, `UpdateFeatureStatusTool`, `GetDesignDocumentTool` (FEAT-ID prefixed)
@@ -80,26 +95,26 @@ The domain organizes tools into eight functional categories, each addressing spe
 - **Component Management**: `AddComponentTool`, `GetImplementationPlanTool` (COMP-ID prefixed)
 - **Status Workflow**: Enforces valid state transitions and dependency tracking
 
-### 3.3 HITL Tools (`hitl_tools.rs`, `hitl_content_tools.rs`)
+### 3.4 HITL Tools (`hitl_tools.rs`, `hitl_content_tools.rs`)
 **Purpose**: Human-agent interaction for validation and refinement
 - **ReviewAndEditFileTool**: Binary workflow (pass/edit) for file review with external editor integration
 - **ReviewWithFeedbackFileTool**: Ternary workflow (pass/edit/feedback) enabling agent regeneration with human comments
 - **ReviewAndEditContentTool**: Content-level review for generated artifacts (PRD, Design docs)
 - **ReviewWithFeedbackContentTool**: Feedback-driven content refinement
 
-### 3.4 Validation Tools (`validation_tools.rs`)
+### 3.5 Validation Tools (`validation_tools.rs`)
 **Purpose**: Data integrity and consistency verification
 - **CheckDataFormatTool**: JSON Schema validation for structured data files
 - **CheckFeatureCoverageTool**: Bidirectional coverage analysis between features and requirements
 - **CheckTaskDependenciesTool**: Circular dependency detection using Depth-First Search (DFS) algorithm
 
-### 3.5 Deployment Tools (`deployment_tools.rs`)
+### 3.6 Deployment Tools (`deployment_tools.rs`)
 **Purpose**: Safe promotion of workspace artifacts to project root
 - **CopyWorkspaceToProjectTool**: Two-phase deployment strategy:
   - **Phase 1**: Orphaned file cleanup (removes files not in workspace, with protected paths: `.git/`, `config.toml`, `README.md`)
   - **Phase 2**: Extension-filtered copy (whitelist: `.html`, `.css`, `.js`, `.ts`, `.tsx`, `.json`, `.md`, images, fonts)
 
-### 3.6 Memory Tools (`memory_tools.rs`)
+### 3.7 Memory Tools (`memory_tools.rs`)
 **Purpose**: Knowledge persistence and retrieval across iterations
 - **QueryMemoryTool**: Fuzzy keyword search across three scopes (project, iteration, smart-merged)
 - **SaveInsightTool**: Capture iteration insights with categorization
@@ -108,7 +123,7 @@ The domain organizes tools into eight functional categories, each addressing spe
 - **PromoteToDecisionTool**: Elevate insights to architectural decisions
 - **PromoteToPatternTool**: Elevate insights to reusable design patterns
 
-### 3.7 PM Tools (`pm_tools.rs`)
+### 3.8 PM Tools (`pm_tools.rs`)
 **Purpose**: Project Manager Agent operational tools, supporting post-delivery user interaction
 - **PMGotoStageTool**: Allows user to return to previous stages (idea, prd, design, plan, coding) for re-execution
 - **PMCreateIterationTool**: Create new iteration for handling new requirements or modifications
@@ -117,25 +132,25 @@ The domain organizes tools into eight functional categories, each addressing spe
 
 > **Note**: PM tools are only available when iteration status is `Completed` (after Delivery stage), used for post-delivery project maintenance and requirement change scenarios.
 
-### 3.8 Test & Lint Tools (`test_lint_tools.rs`)
+### 3.9 Test & Lint Tools (`test_lint_tools.rs`)
 **Purpose**: Code quality verification and testing automation
 - **ExecuteShellCommandTool**: Run shell commands for testing and linting with timeout control
 
-### 3.9 Control Tools (`control_tools.rs`)
+### 3.10 Control Tools (`control_tools.rs`)
 **Purpose**: Pipeline flow control and stage management
 - **GotoStageTool**: Control flow for jumping to specific pipeline stages
 
-### 3.10 Artifact Tools (`artifact_tools.rs`)
+### 3.11 Artifact Tools (`artifact_tools.rs`)
 **Purpose**: Artifact loading and management
 - **LoadArtifactSummaryTool**: Load summaries of generated artifacts
 - **LoadArtifactTool**: Load full artifact content
 
-### 3.11 Load Artifacts Tools (`load_artifacts.rs`)
+### 3.12 Load Artifacts Tools (`load_artifacts.rs`)
 **Purpose**: Document and artifact loading utilities
 - **LoadDocumentSummaryTool**: Load compressed stage summaries (idea, PRD, design, plan)
 - **LoadBaseKnowledgeTool**: Load historical knowledge from base iterations
 
-### 3.12 Goto Stage Tool (`goto_stage_tool.rs`)
+### 3.13 Goto Stage Tool (`goto_stage_tool.rs`)
 **Purpose**: Stage navigation for PM Agent
 - **PMGotoStageTool**: Navigate to specific stages for re-execution
 

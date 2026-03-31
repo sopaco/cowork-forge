@@ -1,6 +1,7 @@
 use crate::gui_types::*;
 use crate::static_server;
 use crate::commands::PROJECT_RUNNER;
+use crate::commands::path_utils;
 use crate::AppState;
 use cowork_core::RuntimeType;
 use std::path::PathBuf;
@@ -63,9 +64,14 @@ async fn install_deps_if_needed(workspace: &std::path::Path) -> Result<(), Strin
     let pkg = workspace.join("package.json");
     let mods = workspace.join("node_modules");
     if pkg.exists() && !mods.exists() {
-        let (cmd, args) = if which::which("bun").is_ok() { ("bun", vec!["install"]) }
-        else if which::which("npm").is_ok() { ("npm", vec!["install"]) }
-        else { return Ok(()) };
+        // Use our path_utils instead of which::which for macOS App Bundle compatibility
+        let (cmd, args) = if path_utils::has_bun() { 
+            ("bun", vec!["install"]) 
+        } else if path_utils::has_npm() { 
+            ("npm", vec!["install"]) 
+        } else { 
+            return Ok(()) 
+        };
         
         eprintln!("[Runner] Installing dependencies with {} {:?}", cmd, args);
         let out = std::process::Command::new(cmd).args(&args).current_dir(workspace).output();
@@ -145,7 +151,7 @@ fn detect_npm_start_command(dir: &std::path::Path) -> Option<String> {
                 // Try common start scripts in order
                 for script_name in &["dev", "start", "serve"] {
                     if scripts.get(*script_name).and_then(|s| s.as_str()).is_some() {
-                        let pkg_manager = if which::which("bun").is_ok() { "bun" } else { "npm" };
+                        let pkg_manager = if path_utils::has_bun() { "bun" } else { "npm" };
                         let command = format!("{} run {}", pkg_manager, script_name);
                         eprintln!("[Runner] Detected start command from package.json: {}", command);
                         return Some(command);
@@ -325,7 +331,7 @@ pub async fn start_iteration_project(
         }
         
         // No start script but has package.json - try common defaults
-        let pkg_manager = if which::which("bun").is_ok() { "bun" } else { "npm" };
+        let pkg_manager = if path_utils::has_bun() { "bun" } else { "npm" };
         let default_cmd = format!("{} run dev", pkg_manager);
         eprintln!("[Runner] Fallback: trying default command: {}", default_cmd);
         

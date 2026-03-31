@@ -10,6 +10,12 @@
       "tool_id": "save_idea"
     },
     {
+      "tool_id": "read_file"
+    },
+    {
+      "tool_id": "list_files"
+    },
+    {
       "tool_id": "query_memory"
     },
     {

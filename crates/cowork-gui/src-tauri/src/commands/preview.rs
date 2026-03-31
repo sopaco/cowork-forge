@@ -1,6 +1,7 @@
 use crate::gui_types::*;
 use crate::static_server;
 use crate::commands::PROJECT_RUNNER;
+use crate::commands::path_utils;
 use crate::AppState;
 use std::path::PathBuf;
 use tauri::State;
@@ -37,8 +38,8 @@ async fn install_dependencies_if_needed(workspace: &std::path::Path) -> Result<(
     let node_modules = workspace.join("node_modules");
 
     if package_json.exists() && !node_modules.exists() {
-        let use_bun = which::which("bun").is_ok();
-        let use_npm = which::which("npm").is_ok();
+        let use_bun = path_utils::has_bun();
+        let use_npm = path_utils::has_npm();
 
         let (cmd, args) = if use_bun { ("bun", vec!["install"]) }
         else if use_npm { ("npm", vec!["install"]) }

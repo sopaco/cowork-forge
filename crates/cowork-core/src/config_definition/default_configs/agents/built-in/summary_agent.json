@@ -11,6 +11,12 @@
     },
     {
       "tool_id": "write_file"
+    },
+    {
+      "tool_id": "list_files"
+    },
+    {
+      "tool_id": "read_file_truncated"
     }
   ],
   "model": {

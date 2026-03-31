@@ -6,6 +6,7 @@ pub mod template;
 pub mod pm;
 pub mod system;
 pub mod import_cmd;
+pub mod path_utils;
 
 use lazy_static::lazy_static;
 use std::sync::Mutex;
@@ -19,4 +20,10 @@ lazy_static! {
 
 pub fn init_app_handle(handle: tauri::AppHandle) {
     PROJECT_RUNNER.set_app_handle(handle);
+}
+
+/// Initialize PATH for macOS App Bundle compatibility
+/// Must be called very early in the application lifecycle
+pub fn init_path_for_app_bundle() {
+    path_utils::init_extended_path();
 }
