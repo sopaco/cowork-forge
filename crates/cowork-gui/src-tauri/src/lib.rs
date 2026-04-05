@@ -669,7 +669,7 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 println!("[GUI] Starting async config registry initialization...");
                 let start = std::time::Instant::now();
-                
+
                 match cowork_core::config_definition::initialize_config_registry() {
                     Ok(()) => {
                         let elapsed = start.elapsed();
@@ -680,6 +680,23 @@ pub fn run() {
                         eprintln!("[GUI] Failed to initialize config registry: {}", e);
                         // Still mark as ready so the app doesn't hang
                         config_ready.store(true, std::sync::atomic::Ordering::Release);
+                    }
+                }
+            });
+
+            // Initialize MCP asynchronously
+            tauri::async_runtime::spawn(async move {
+                println!("[GUI] Starting MCP initialization...");
+                match cowork_core::initialize_mcp_toolsets().await {
+                    Ok(count) => {
+                        if count > 0 {
+                            println!("[GUI] MCP initialized with {} toolset(s)", count);
+                        } else {
+                            println!("[GUI] No MCP servers configured");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[GUI] Failed to initialize MCP: {}", e);
                     }
                 }
             });
@@ -841,6 +858,11 @@ pub fn run() {
             config_commands::gui_import_config,
             config_commands::gui_get_builtin_instructions,
             config_commands::gui_get_available_tools,
+            // MCP commands
+            config_commands::gui_get_mcp_config,
+            config_commands::gui_update_mcp_config,
+            config_commands::gui_test_tavily_connection,
+            config_commands::gui_test_deepwiki_connection,
             // Project creation commands
             path_exists,
             create_project_at_path,

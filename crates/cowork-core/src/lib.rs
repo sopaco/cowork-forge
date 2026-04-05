@@ -75,6 +75,7 @@ pub use config_definition::{
     IntegrationDefinition, IntegrationType, ConnectionConfig, AuthConfig, IntegrationEvent,
     ConfigRegistry, global_registry, LoadReport, ConfigValidator, ValidationResult,
     create_agent_for_stage, create_agent_from_config, initialize_config_registry,
+    initialize_mcp_toolsets, is_mcp_initialized,
 };
 
 // Re-exports for skills (agentskills.io standard via adk-skill)

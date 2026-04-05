@@ -1,4 +1,4 @@
-use cowork_core::llm::config::{self, ModelConfig, LlmConfig};
+use cowork_core::llm::config::{self, ModelConfig, LlmConfig, McpConfig};
 use cowork_core::config_definition::{AgentDefinition, StageDefinition, FlowDefinition};
 use cowork_core::config_definition::validator::ConfigValidator;
 use cowork_core::skills::SkillManager;
@@ -1009,3 +1009,73 @@ pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
     
     Ok(tools)
 }
+
+// ============================================================================
+// MCP Configuration Commands
+// ============================================================================
+
+/// Get current MCP configuration
+#[tauri::command]
+pub async fn gui_get_mcp_config() -> Result<McpConfig, String> {
+    let config = config::load_config()
+        .map_err(|e| format!("Failed to load config: {}", e))?;
+    Ok(config.mcp)
+}
+
+/// Update MCP configuration
+#[tauri::command]
+pub async fn gui_update_mcp_config(mcp_config: McpConfig) -> Result<String, String> {
+    let mut config = config::load_config()
+        .map_err(|e| format!("Failed to load config: {}", e))?;
+    
+    config.mcp = mcp_config;
+    
+    let path = config::save_config(&config)
+        .map_err(|e| format!("Failed to save config: {}", e))?;
+    
+    Ok(path.to_string_lossy().to_string())
+}
+
+/// Test Tavily MCP connection
+#[tauri::command]
+#[allow(non_snake_case)]
+pub async fn gui_test_tavily_connection(apiKey: String) -> Result<bool, String> {
+    use adk_tool::McpHttpClientBuilder;
+    use std::time::Duration;
+    
+    if apiKey.is_empty() {
+        return Err("Tavily API key is required".to_string());
+    }
+    
+    let endpoint = format!("https://mcp.tavily.com/mcp?tavilyApiKey={}", apiKey);
+    
+    tracing::info!("Testing Tavily MCP connection to: {}", endpoint);
+    
+    let builder: McpHttpClientBuilder = McpHttpClientBuilder::new(&endpoint)
+        .timeout(Duration::from_secs(30));
+    
+    builder.connect()
+        .await
+        .map(|_| true)
+        .map_err(|e| format!("Failed to connect to Tavily MCP: {}", e))
+}
+
+/// Test DeepWiki MCP connection
+#[tauri::command]
+pub async fn gui_test_deepwiki_connection() -> Result<bool, String> {
+    use adk_tool::McpHttpClientBuilder;
+    use std::time::Duration;
+    
+    let endpoint = "https://mcp.deepwiki.com/mcp";
+    
+    tracing::info!("Testing DeepWiki MCP connection to: {}", endpoint);
+    
+    let builder: McpHttpClientBuilder = McpHttpClientBuilder::new(endpoint)
+        .timeout(Duration::from_secs(30));
+    
+    builder.connect()
+        .await
+        .map(|_| true)
+        .map_err(|e| format!("Failed to connect to DeepWiki MCP: {}", e))
+}
+

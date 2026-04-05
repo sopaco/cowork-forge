@@ -16,6 +16,109 @@ use crate::skills::{SkillManager, SelectionPolicy};
 use adk_agent::{LlmAgentBuilder, LoopAgent};
 use adk_core::{Llm, Agent, IncludeContents};
 use adk_skill::select_skill_prompt_block;
+use crate::llm::config::McpConfig;
+use crate::tools::{create_mcp_toolsets_from_config, ConnectedMcpToolset};
+
+/// Global MCP toolsets (initialized once at startup)
+static GLOBAL_MCP_TOOLSETS: once_cell::sync::Lazy<std::sync::Mutex<Vec<ConnectedMcpToolset>>> = 
+    once_cell::sync::Lazy::new(|| std::sync::Mutex::new(Vec::new()));
+
+/// Global flag to track if MCP has been initialized
+static GLOBAL_MCP_INITIALIZED: once_cell::sync::Lazy<std::sync::atomic::AtomicBool> = 
+    once_cell::sync::Lazy::new(|| std::sync::atomic::AtomicBool::new(false));
+
+/// Initialize MCP toolsets from configuration file
+/// This should be called once at application startup after loading config
+pub async fn initialize_mcp_toolsets() -> Result<usize> {
+    tracing::info!("[MCP] Starting MCP initialization...");
+    
+    // Try to load config from file
+    let mcp_config = match crate::llm::config::load_config() {
+        Ok(config) => {
+            tracing::info!("[MCP] Config loaded successfully");
+            config.mcp
+        }
+        Err(e) => {
+            tracing::warn!("[MCP] Failed to load config: {}", e);
+            McpConfig::default()
+        }
+    };
+    
+    tracing::info!("[MCP] Config: tavily_api_key={}, deepwiki_enabled={}", 
+        if mcp_config.tavily_api_key.is_empty() { "empty" } else { "configured" },
+        mcp_config.deepwiki_enabled);
+    
+    if !mcp_config.is_any_enabled() {
+        tracing::info!("[MCP] No MCP servers enabled in config (tavily_api_key is empty and deepwiki is disabled)");
+        return Ok(0);
+    }
+    
+    let toolsets = create_mcp_toolsets_from_config(&mcp_config).await?;
+    let count = toolsets.len();
+    
+    tracing::info!("[MCP] Created {} toolset(s) from config", count);
+    
+    if count > 0 {
+        // Store in global static
+        {
+            let mut guard = GLOBAL_MCP_TOOLSETS.lock().unwrap();
+            *guard = toolsets;
+            tracing::info!("[MCP] Stored {} toolset(s) in GLOBAL_MCP_TOOLSETS", guard.len());
+        }
+        tracing::info!("[MCP] MCP initialization completed with {} toolset(s)", count);
+        GLOBAL_MCP_INITIALIZED.store(true, std::sync::atomic::Ordering::SeqCst);
+    } else {
+        tracing::warn!("[MCP] MCP config enabled but no servers connected");
+    }
+    
+    Ok(count)
+}
+
+/// Check if MCP has been initialized
+pub fn is_mcp_initialized() -> bool {
+    GLOBAL_MCP_INITIALIZED.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+/// Add MCP toolsets to an agent builder if they are available
+pub fn add_mcp_toolsets_to_builder(builder: LlmAgentBuilder) -> LlmAgentBuilder {
+    tracing::info!("[MCP] add_mcp_toolsets_to_builder called, attempting to acquire lock...");
+    
+    // Wait for lock (blocks if MCP is initializing)
+    let guard = match GLOBAL_MCP_TOOLSETS.lock() {
+        Ok(g) => {
+            tracing::info!("[MCP] Lock acquired, toolsets count: {}", g.len());
+            g
+        }
+        Err(e) => {
+            tracing::error!("[MCP] Failed to acquire MCP lock: {}", e);
+            return builder;
+        }
+    };
+    
+    if guard.is_empty() {
+        tracing::warn!("[MCP] GLOBAL_MCP_TOOLSETS is empty! This is unexpected if MCP was configured.");
+        tracing::warn!("[MCP] MCP initialized flag: {}", GLOBAL_MCP_INITIALIZED.load(std::sync::atomic::Ordering::SeqCst));
+        return builder;
+    }
+    
+    // Add all MCP toolsets to the agent using .toolset() method
+    let mut current_builder = builder;
+    for connected in guard.iter() {
+        tracing::info!("[MCP] Adding MCP toolset '{}' to agent", connected.name);
+        current_builder = current_builder.toolset(connected.toolset.clone());
+    }
+    
+    tracing::info!("[MCP] Successfully added {} MCP toolset(s) to agent", guard.len());
+    current_builder
+}
+
+/// Get a list of configured MCP server names (for injecting into agent instructions)
+pub fn get_mcp_server_names() -> Vec<String> {
+    match GLOBAL_MCP_TOOLSETS.lock() {
+        Ok(guard) => guard.iter().map(|t| t.name.clone()).collect(),
+        Err(_) => Vec::new(),
+    }
+}
 
 /// Default max characters to inject from skill body
 const DEFAULT_MAX_SKILL_CHARS: usize = 4000;
@@ -122,16 +225,19 @@ pub fn create_agent_from_config_with_stage(
         let tool = create_tool_from_reference(&tool_ref.tool_id, &iteration_id)?;
         builder = builder.tool(tool);
     }
-    
+
+    // Add MCP toolsets if available
+    builder = add_mcp_toolsets_to_builder(builder);
+
     // Set content inclusion mode
     // Note: Current adk_core only supports None, LastN, All variants may not be available
     let include_contents = IncludeContents::None; // All agents use None for now
     builder = builder.include_contents(include_contents);
-    
+
     // Build the agent
     let agent = builder.build()
         .with_context(|| format!("Failed to build agent: {}", definition.id))?;
-    
+
     Ok(Arc::new(agent))
 }
 
@@ -209,15 +315,18 @@ fn create_simple_agent_from_config_with_stage(
         let tool = create_tool_from_reference(&tool_ref.tool_id, &iteration_id)?;
         builder = builder.tool(tool);
     }
-    
+
+    // Add MCP toolsets if available
+    builder = add_mcp_toolsets_to_builder(builder);
+
     // Set content inclusion mode
     // Note: Current adk_core only supports None, LastN, All variants may not be available
     let include_contents = IncludeContents::None; // All agents use None for now
     builder = builder.include_contents(include_contents);
-    
+
     let agent = builder.build()
         .with_context(|| format!("Failed to build agent: {}", definition.id))?;
-    
+
     Ok(Arc::new(agent))
 }
 

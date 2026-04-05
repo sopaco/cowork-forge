@@ -22,4 +22,4 @@ pub use integration_definition::*;
 pub use registry::*;
 pub use validator::*;
 pub use builtin::load_builtin_configs;
-pub use agent_factory::{create_agent_for_stage, create_agent_from_config, initialize_config_registry};
+pub use agent_factory::{create_agent_for_stage, create_agent_from_config, initialize_config_registry, initialize_mcp_toolsets, is_mcp_initialized};

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Form, Input, Button, Switch, Select, Card, App, Spin, Typography, Space, Tag } from "antd";
-import { SaveOutlined, FolderOpenOutlined, ApiOutlined, RobotOutlined, CloudOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { Form, Input, Button, Switch, Select, Card, App, Spin, Typography, Space, Tag, Divider } from "antd";
+import { SaveOutlined, FolderOpenOutlined, ApiOutlined, RobotOutlined, CloudOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SearchOutlined, BookOutlined } from "@ant-design/icons";
 
 const { Title, Text, Paragraph } = Typography;
 const { Password } = Input;
@@ -46,6 +46,12 @@ interface AppConfig {
   llm: LLMConfig;
   embedding?: EmbeddingConfig;
   coding_agent?: CodingAgentConfig;
+  mcp?: McpConfig;
+}
+
+interface McpConfig {
+  tavily_api_key: string;
+  deepwiki_enabled: boolean;
 }
 
 const SettingsPanel: React.FC = () => {
@@ -55,6 +61,8 @@ const SettingsPanel: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [configPath, setConfigPath] = useState("");
   const [hasConfig, setHasConfig] = useState(false);
+  const [testingTavily, setTestingTavily] = useState(false);
+  const [testingDeepWiki, setTestingDeepWiki] = useState(false);
 
   useEffect(() => {
     loadConfig();
@@ -108,6 +116,42 @@ const SettingsPanel: React.FC = () => {
       await invoke("open_config_folder");
     } catch (error) {
       message.error("Failed to open folder: " + error);
+    }
+  };
+
+  const handleTestTavily = async () => {
+    try {
+      const mcpConfig = form.getFieldValue("mcp");
+      if (!mcpConfig?.tavily_api_key) {
+        message.warning("Please input Tavily API key first");
+        return;
+      }
+
+      setTestingTavily(true);
+      await invoke("gui_test_tavily_connection", { apiKey: mcpConfig.tavily_api_key });
+      message.success("Tavily MCP connection test successful!");
+    } catch (error) {
+      message.error("Tavily connection test failed: " + error);
+    } finally {
+      setTestingTavily(false);
+    }
+  };
+
+  const handleTestDeepWiki = async () => {
+    try {
+      const mcpConfig = form.getFieldValue("mcp");
+      if (!mcpConfig?.deepwiki_enabled) {
+        message.warning("Please enable DeepWiki first");
+        return;
+      }
+
+      setTestingDeepWiki(true);
+      await invoke("gui_test_deepwiki_connection");
+      message.success("DeepWiki MCP connection test successful!");
+    } catch (error) {
+      message.error("DeepWiki connection test failed: " + error);
+    } finally {
+      setTestingDeepWiki(false);
     }
   };
 
@@ -166,6 +210,7 @@ const SettingsPanel: React.FC = () => {
         layout="vertical"
         initialValues={{
           coding_agent: { enabled: false, agent_type: "opencode", command: "bun", args: ["x", "opencode-ai", "acp"], transport: "stdio" },
+          mcp: { tavily_api_key: "", deepwiki_enabled: false },
         }}
       >
         <Card title={<Space><CloudOutlined /><span>LLM Configuration</span><Tag color="red">Required</Tag></Space>} style={{ marginBottom: "24px" }}>
@@ -190,6 +235,60 @@ const SettingsPanel: React.FC = () => {
           </Form.Item>
           <Form.Item name={["embedding", "model_name"]} label="Model Name">
             <Input placeholder="text-embedding-3-small" />
+          </Form.Item>
+        </Card>
+
+        <Card title={<Space><SearchOutlined /><span>MCP Services</span><Tag>Optional</Tag></Space>} style={{ marginBottom: "24px" }}>
+          <Paragraph type="secondary" style={{ marginBottom: "16px" }}>
+            Configure remote Model Context Protocol (MCP) services to extend agent capabilities.
+          </Paragraph>
+          
+          <Form.Item name={["mcp", "tavily_api_key"]} label={
+            <Space>
+              <SearchOutlined />
+              <span>Tavily API Key</span>
+              <Tag color="blue">Web Search</Tag>
+            </Space>
+          }>
+            <Password placeholder="tvly-dev-your-api-key" />
+          </Form.Item>
+          <Form.Item>
+            <Button 
+              icon={<CheckCircleOutlined />} 
+              onClick={handleTestTavily} 
+              loading={testingTavily}
+              size="small"
+            >
+              Test Tavily Connection
+            </Button>
+          </Form.Item>
+
+          <Divider style={{ margin: "16px 0" }} />
+
+          <Form.Item name={["mcp", "deepwiki_enabled"]} label={
+            <Space>
+              <BookOutlined />
+              <span>DeepWiki</span>
+              <Tag color="purple">Code Docs</Tag>
+            </Space>
+          } valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.mcp?.deepwiki_enabled !== cur.mcp?.deepwiki_enabled}>
+            {({ getFieldValue }) =>
+              getFieldValue(["mcp", "deepwiki_enabled"]) ? (
+                <Form.Item>
+                  <Button 
+                    icon={<CheckCircleOutlined />} 
+                    onClick={handleTestDeepWiki} 
+                    loading={testingDeepWiki}
+                    size="small"
+                  >
+                    Test DeepWiki Connection
+                  </Button>
+                </Form.Item>
+              ) : null
+            }
           </Form.Item>
         </Card>
 

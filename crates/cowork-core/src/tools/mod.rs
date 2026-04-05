@@ -140,6 +140,9 @@ pub mod pm_tools;
 // Legacy Project Analyzer tools
 pub mod legacy_project_analyzer_tools;
 
+// MCP (Model Context Protocol) tools - remote MCP server integration
+pub mod mcp_tools;
+
 // Re-exports
 pub use file_tools::*;
 pub use hitl_tools::*;
@@ -157,3 +160,4 @@ pub use memory_tools::*;
 pub use knowledge_tools::*;
 pub use pm_tools::*;
 pub use legacy_project_analyzer_tools::*;
+pub use mcp_tools::*;
