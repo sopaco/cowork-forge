@@ -61,7 +61,7 @@ flowchart TB
 
 ## 3. Tool Taxonomy
 
-The domain organizes tools into nine functional categories, each addressing specific operational concerns within the AI-driven development lifecycle.
+The domain organizes tools into ten functional categories, each addressing specific operational concerns within the AI-driven development lifecycle.
 
 ### 3.1 File Tools (`file_tools.rs`)
 **Purpose**: Secure filesystem operations within workspace boundaries
@@ -155,6 +155,17 @@ The domain organizes tools into nine functional categories, each addressing spec
 - **PMGotoStageTool**: Navigate to specific stages for re-execution
 
 ---
+### 3.14 MCP Tools (`mcp_tools.rs`)
+**Purpose**: Integration with external Model Context Protocol (MCP) servers to extend agent capabilities with remote tool sets
+- **McpManager**: Manages connections to configured MCP servers, handles toolset aggregation
+- **McpServerConfig**: Configuration for remote MCP server endpoints and timeouts
+- **Connection Lifecycle**: Asynchronous initialization at application startup, global toolset storage, automatic injection into all agents via `add_mcp_toolsets_to_builder`
+- **Supported Servers**:
+  - **Tavily**: Web search and AI-powered research (requires API key)
+  - **DeepWiki**: Code documentation and knowledge base queries (enable flag)
+
+> **Note**: MCP toolsets are not directly invocable as individual tools; instead, their toolsets are merged into the agent's tool set during agent construction, making remote tools appear as native tools to the agent.
+
 
 ## 4. Core Implementation Patterns
 

@@ -76,8 +76,10 @@ create_evolution_iteration() → prepare_workspace(inheritance) → inject_knowl
 `crates/cowork-core/src/pipeline/`
 - `mod.rs` - Stage trait, stage factory
 - `executor/mod.rs` - IterationExecutor (main orchestrator)
-- `executor/interaction_ext.rs` - HITL flow
-- `stages/*.rs` - Individual stage implementations
+- `executor/interaction_ext.rs` - HITL flow, ConfirmationAction enum
+- `executor/knowledge.rs` - Knowledge generation and injection
+- `executor/workspace.rs` - Workspace preparation and inheritance
+- `stages/*.rs` - Individual stage implementations (idea, prd, design, plan, coding, check, delivery)
 
 ### Domain Module
 `crates/cowork-core/src/domain/`
@@ -90,9 +92,19 @@ create_evolution_iteration() → prepare_workspace(inheritance) → inject_knowl
 - `file_tools.rs` - ReadFile, WriteFile, ListFiles
 - `data_tools.rs` - Requirement/Feature/Task CRUD
 - `hitl_tools.rs` - Review, Feedback
+- `hitl_content_tools.rs` - Content review and editing
+- `test_lint_tools.rs` - RunCommand, ExecuteShellCommand, CheckTests, CheckLint
 - `memory_tools.rs` - Query, Save, Promote
 - `artifact_tools.rs` - Save stage artifacts
+- `load_artifacts.rs` - LoadIdea, LoadPrdDoc, LoadFeedbackHistory
+- `control_tools.rs` - Pipeline control
+- `goto_stage_tool.rs` - GotoStage (backward only)
+- `validation_tools.rs` - CheckFeatureCoverage, CheckTaskDependencies
+- `knowledge_tools.rs` - LoadBaseKnowledge, SaveKnowledgeSnapshot
 - `pm_tools.rs` - PM Agent tools
+- `deployment_tools.rs` - CopyWorkspaceToProject
+- `legacy_project_analyzer_tools.rs` - ImportProject
+- `mcp_tools.rs` - MCP (Model Context Protocol) remote server integration
 
 ### Persistence Module
 `crates/cowork-core/src/persistence/`
@@ -102,12 +114,51 @@ create_evolution_iteration() → prepare_workspace(inheritance) → inject_knowl
 
 ### Agents Module
 `crates/cowork-core/src/agents/`
-- `mod.rs` - All agent builders
+- `mod.rs` - Agent exports
+- `iterative_assistant.rs` - Main ADK-based assistant
 - `external_coding_agent.rs` - ACP integration
+- `legacy_project_analyzer.rs` - Legacy project import agent
 
 ### Instructions Module
 `crates/cowork-core/src/instructions/`
-- `*.rs` - Prompts for each stage
+- `*.rs` - Prompts for each stage (Actor/Critic pairs for critical stages)
+
+### Config Definition Module
+`crates/cowork-core/src/config_definition/`
+- `agent_definition.rs` - AgentDefinition, AgentType
+- `stage_definition.rs` - StageDefinition, StageType, HookConfig
+- `flow_definition.rs` - FlowDefinition, StageReference
+- `integration_definition.rs` - IntegrationDefinition, IntegrationType
+- `registry.rs` - ConfigRegistry, global registry singleton
+- `validator.rs` - ConfigValidator
+- `agent_factory.rs` - create_agent_for_stage, create_agent_from_config
+- `default_configs/` - Built-in JSON configurations
+
+### Skills Module
+`crates/cowork-core/src/skills/`
+- `manager.rs` - SkillManager, SkillIndex, SkillMatch
+- Skill discovery, selection, and injection (agentskills.io standard)
+
+### Integration Module
+`crates/cowork-core/src/integration/`
+- `hooks.rs` - HookManager, HookExecutionContext
+- `adapters.rs` - IntegrationAdapter, AdapterError
+- `rest_adapter.rs` - RestAdapter for HTTP integrations
+
+### Importer Module
+`crates/cowork-core/src/importer/`
+- Project analysis, artifact generation, import configuration
+
+### ACP Module
+`crates/cowork-core/src/acp/`
+- Agent Client Protocol for external coding agent communication
+
+### Runtime Modules
+`crates/cowork-core/src/`
+- `project_runtime.rs` - Runtime configuration for generated projects
+- `runtime_analyzer.rs` - Runtime analysis and framework detection
+- `runtime_security.rs` - Security checking for runtime operations
+- `tech_stack.rs` - Technology stack detection
 
 ## QUICK NAVIGATION BY TASK
 
@@ -121,3 +172,8 @@ create_evolution_iteration() → prepare_workspace(inheritance) → inject_knowl
 | Modify storage | `persistence/` + `domain/` |
 | Add CLI command | `cowork-cli/src/commands/` |
 | Modify GUI | `cowork-gui/src/` (frontend) or `src-tauri/` (backend) |
+| Add config definition | `config_definition/` + `default_configs/` |
+| Add skill | `skills/` or external `.skills/` directory |
+| Add integration | `integration/` + IntegrationDefinition |
+| Modify external agent | `acp/` + `agents/external_coding_agent.rs` |
+| Import legacy project | `importer/` + `agents/legacy_project_analyzer.rs` |

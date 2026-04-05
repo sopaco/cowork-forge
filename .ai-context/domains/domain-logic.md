@@ -40,12 +40,36 @@ Draft → Running → [Paused] → Completed | Failed
 
 ## Knowledge Types
 
-| Type | Scope |
-|------|-------|
-| Decision | Project-level |
-| Pattern | Project-level |
-| Issue | Iteration → Project |
-| Learning | Iteration-level |
+| Type | Scope | Description |
+|------|-------|-------------|
+| Decision | Project-level | Architecture decisions with rationale |
+| Pattern | Project-level | Reusable patterns with tags and usage |
+| Issue | Iteration → Project | Known issues and tech debt |
+| Learning | Iteration-level | Session-specific learnings |
+| Insight | Stage-level | Observations during execution |
+
+## Memory Management
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| ProjectMemory | `domain/memory.rs` | Cross-iteration knowledge aggregate |
+| IterationKnowledge | `domain/memory.rs` | Single iteration knowledge snapshot |
+| MemoryStore | `persistence/memory_store.rs` | JSON-based memory persistence |
+| Knowledge Tools | `tools/knowledge_tools.rs` | Load, save, promote knowledge |
+| Knowledge Generator | `pipeline/executor/knowledge.rs` | Post-delivery knowledge extraction |
+
+### Knowledge Promotion Flow
+```
+Insight (during execution) 
+  → SaveInsightTool 
+  → PromoteToDecisionTool / PromoteToPatternTool 
+  → ProjectMemory (decision/pattern)
+```
+
+### Knowledge Query Scopes
+- `project`: Historical project-level knowledge
+- `iteration`: Current iteration-specific knowledge
+- `latest`: Merged view with context aggregation
 
 ---
 **Note**: For struct fields, read `domain/*.rs` directly.
