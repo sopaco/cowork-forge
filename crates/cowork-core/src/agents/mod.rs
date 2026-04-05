@@ -548,7 +548,7 @@ pub fn create_knowledge_generation_agent(
 pub fn create_project_manager_agent(model: Arc<dyn Llm>, iteration_id: String) -> Result<Arc<dyn adk_core::Agent>> {
     let instruction = PROJECT_MANAGER_AGENT_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
 
-    let agent = LlmAgentBuilder::new("project_manager_agent")
+    let mut builder = LlmAgentBuilder::new("project_manager_agent")
         .instruction(&instruction)
         .model(model)
         .tool(Arc::new(PMGotoStageTool::new(iteration_id.clone())))
@@ -558,8 +558,12 @@ pub fn create_project_manager_agent(model: Arc<dyn Llm>, iteration_id: String) -
         .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
         .tool(Arc::new(ListFilesTool))  // Allow PM to see project files
         .tool(Arc::new(ReadFileTool))   // Allow PM to read files
-        .include_contents(IncludeContents::None)
-        .build()?;
+        .include_contents(IncludeContents::None);
+    
+    // Add MCP toolsets if available
+    builder = crate::config_definition::agent_factory::add_mcp_toolsets_to_builder(builder);
+    
+    let agent = builder.build()?;
 
     Ok(Arc::new(agent))
 }

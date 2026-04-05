@@ -13,7 +13,7 @@ adk-rust = { workspace = true }
 adk-core = { workspace = true }
 adk-agent = { workspace = true }
 adk-model = { workspace = true, features = ["openai"] }
-adk-tool = { workspace = true }
+adk-tool = { workspace = true, features = ["http-transport"] }
 adk-skill = { workspace = true }
 
 # Async runtime

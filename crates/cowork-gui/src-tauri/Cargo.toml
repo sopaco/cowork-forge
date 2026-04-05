@@ -53,4 +53,5 @@ adk-core = { workspace = true }
 adk-runner = { workspace = true }
 adk-session = { workspace = true }
 adk-skill = { workspace = true }
+adk-tool = { workspace = true, features = ["http-transport"] }
 which = "8.0.0"

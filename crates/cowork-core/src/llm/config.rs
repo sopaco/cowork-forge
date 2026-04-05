@@ -9,6 +9,32 @@ const CONFIG_FILENAME: &str = "config.toml";
 const APP_DIR_NAME: &str = "CoworkCreative";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct McpConfig {
+    /// Tavily MCP server API key (leave empty to disable)
+    #[serde(default)]
+    pub tavily_api_key: String,
+    /// DeepWiki MCP server enabled
+    #[serde(default)]
+    pub deepwiki_enabled: bool,
+}
+
+impl Default for McpConfig {
+    fn default() -> Self {
+        Self {
+            tavily_api_key: String::new(),
+            deepwiki_enabled: false,
+        }
+    }
+}
+
+impl McpConfig {
+    /// Check if any MCP server is configured
+    pub fn is_any_enabled(&self) -> bool {
+        !self.tavily_api_key.is_empty() || self.deepwiki_enabled
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmConfig {
     pub api_base_url: String,
     pub api_key: String,
@@ -75,6 +101,8 @@ pub struct ModelConfig {
     pub embedding: EmbeddingConfig,
     #[serde(default)]
     pub coding_agent: ExternalAgentConfig,
+    #[serde(default)]
+    pub mcp: McpConfig,
 }
 
 impl Default for ModelConfig {
@@ -87,6 +115,7 @@ impl Default for ModelConfig {
             },
             embedding: EmbeddingConfig::default(),
             coding_agent: ExternalAgentConfig::default(),
+            mcp: McpConfig::default(),
         }
     }
 }
@@ -123,6 +152,7 @@ impl ModelConfig {
             },
             embedding: EmbeddingConfig::default(),
             coding_agent: ExternalAgentConfig::default(),
+            mcp: McpConfig::default(),
         })
     }
 
