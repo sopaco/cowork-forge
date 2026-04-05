@@ -16,12 +16,22 @@ path: crates/cowork-core/
 key_modules:
   - pipeline: 7-stage workflow orchestration
   - domain: Project, Iteration, Memory aggregates (DDD)
-  - tools: 30+ ADK tools
+  - tools: 35+ ADK tools (file, data, HITL, memory, MCP, validation, etc.)
   - persistence: JSON-based storage
   - interaction: CLI/GUI abstraction
-  - agents: Agent builders
+  - agents: Agent builders (iterative_assistant, external_coding_agent, legacy_project_analyzer)
   - instructions: Prompts for each stage
-  - config_definition: data-driven configuration system
+  - config_definition: data-driven configuration system (Agent, Stage, Flow, Skill, Integration)
+  - skills: agentskills.io standard skill management and injection
+  - integration: external system integration with hooks and REST adapter
+  - importer: legacy project analysis and import
+  - acp: Agent Client Protocol for external coding agents
+  - llm: rate-limited LLM client factory
+  - data: data models and types
+  - project_runtime: runtime configuration for generated projects
+  - runtime_analyzer: runtime analysis and configuration detection
+  - runtime_security: security checking for runtime operations
+  - tech_stack: technology stack detection and configuration
 
 ### cowork-cli
 path: crates/cowork-cli/
@@ -77,8 +87,20 @@ Fields: llm.api_base_url, llm.api_key, llm.model_name, embedding.*
 
 ## EXTERNAL INTEGRATIONS
 
-- **ACP**: `acp/` - External coding agent integration (opencode, iflow, codex, etc.)
-- **Skills**: `skills/` - Domain-specific capability injection (agentskills.io)
+- **ACP**: `acp/` - External coding agent integration (opencode, iflow, codex, gemini, claude)
+  - Agent Client Protocol for process-based communication
+  - Configurable via config.toml `[coding_agent]` section
+  - Supports stdio and websocket transports
+  
+- **Skills**: `skills/` - Domain-specific capability injection (agentskills.io standard)
+  - SkillManager for discovery, indexing, and selection
+  - SkillInjector for prompt and tool injection
+  - Markdown-based skill definitions with semantic matching
+
+- **Integration**: `integration/` - External system integration framework
+  - HookManager for lifecycle event hooks
+  - REST adapter for HTTP-based integrations
+  - Configurable via IntegrationDefinition
 
 ---
 **Note**: For detailed implementations, see corresponding source files.
