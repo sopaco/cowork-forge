@@ -6,9 +6,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use adk_tool::McpHttpClientBuilder;
 use adk_core::Toolset;
-use anyhow::{Result, Context};
+use adk_tool::McpHttpClientBuilder;
+use anyhow::{Context, Result};
 use tracing;
 
 use crate::llm::config::McpConfig;
@@ -67,19 +67,23 @@ impl McpManager {
         let mut connected_toolsets = Vec::new();
 
         for config in &self.configs {
-            tracing::info!("Connecting to MCP server: {} at {}", config.name, config.endpoint);
+            tracing::info!(
+                "Connecting to MCP server: {} at {}",
+                config.name,
+                config.endpoint
+            );
 
             let toolset = Self::connect_to_server(config).await?;
             let connected = ConnectedMcpToolset {
                 name: config.name.clone(),
                 toolset,
             };
-            
+
             tracing::info!(
                 "Successfully connected to MCP server: {}, tools available",
                 config.name
             );
-            
+
             connected_toolsets.push(connected.clone());
             self.toolsets.push(connected);
         }
@@ -99,7 +103,8 @@ impl McpManager {
         };
 
         // Connect to the MCP server
-        let toolset = builder.connect()
+        let toolset = builder
+            .connect()
             .await
             .with_context(|| format!("Failed to connect to MCP server: {}", config.name))?;
 
@@ -132,7 +137,7 @@ pub fn create_mcp_configs_from_config(mcp_config: &McpConfig) -> Vec<McpServerCo
         configs.push(McpServerConfig {
             name: "tavily".to_string(),
             endpoint: format!(
-                "https://mcp.tavily.com/mcp?tavilyApiKey={}",
+                "https://mcp.tavily.com/mcp/?tavilyApiKey={}",
                 mcp_config.tavily_api_key
             ),
             timeout_secs: Some(60),
@@ -154,9 +159,11 @@ pub fn create_mcp_configs_from_config(mcp_config: &McpConfig) -> Vec<McpServerCo
 }
 
 /// Create MCP toolsets from configuration
-pub async fn create_mcp_toolsets_from_config(mcp_config: &McpConfig) -> Result<Vec<ConnectedMcpToolset>> {
+pub async fn create_mcp_toolsets_from_config(
+    mcp_config: &McpConfig,
+) -> Result<Vec<ConnectedMcpToolset>> {
     let configs = create_mcp_configs_from_config(mcp_config);
-    
+
     if configs.is_empty() {
         tracing::debug!("No MCP servers configured in config");
         return Ok(Vec::new());
