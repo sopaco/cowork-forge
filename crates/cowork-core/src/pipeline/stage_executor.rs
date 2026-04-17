@@ -32,15 +32,17 @@ fn get_save_tool_name(stage_name: &str) -> &'static str {
 }
 
 /// Map stage name to the artifact filename used by save_* tools in persistence/iteration_data.rs
-fn get_artifact_filename(stage_name: &str) -> &'static str {
+/// Returns None for stages that don't have a single artifact file (e.g., coding)
+fn get_artifact_filename(stage_name: &str) -> Option<&'static str> {
     match stage_name {
-        "idea" => "idea.md",
-        "prd" => "prd.md",
-        "design" => "design.md",
-        "plan" => "plan.md",
-        "check" => "check_report.md",
-        "delivery" => "delivery_report.md",
-        _ => "idea.md", // fallback
+        "idea" => Some("idea.md"),
+        "prd" => Some("prd.md"),
+        "design" => Some("design.md"),
+        "plan" => Some("plan.md"),
+        "check" => Some("check_report.md"),
+        "delivery" => Some("delivery_report.md"),
+        "coding" => None, // Coding stage doesn't have a single artifact file
+        _ => None,
     }
 }
 
@@ -119,8 +121,9 @@ pub async fn execute_stage_with_instruction(
 
         // Prepare artifact path - V2 architecture: .cowork-v2/iterations/{iteration_id}/artifacts/{artifact_filename}
         // Must match the filename used by the save_* tools in persistence/iteration_data.rs
+        // Some stages (e.g., coding) don't have a single artifact file
         let artifact_filename = get_artifact_filename(stage_name);
-        let artifact_path = artifacts_dir.join(artifact_filename);
+        let artifact_path = artifact_filename.map(|f| artifacts_dir.join(f));
 
         // Load LLM client
         let llm_config = load_config().map_err(|e| format!("Failed to load config: {}", e))?;
@@ -277,24 +280,33 @@ pub async fn execute_stage_with_instruction(
     if generated_text.is_empty() {
         // Check if the agent saved the artifact via a tool call (e.g., save_idea)
         // even though it didn't produce any text output in the stream
-        if artifact_path.exists() {
-            if let Ok(content) = std::fs::read_to_string(&artifact_path) {
-                if !content.trim().is_empty() {
-                    tracing::info!(
-                        "[StageExecutor] Agent produced no text in stream, but artifact was saved via tool call ({:?}, {} chars)",
-                        artifact_path, content.len()
-                    );
-                    // Artifact exists and has content — stage is successful
-                    interaction
-                        .show_message_with_context(
-                            crate::interaction::MessageLevel::Success,
-                            format!("✓ Completed (artifact saved via tool, {} chars)", content.len()),
-                            MessageContext::new(&display_name).with_stage(stage_name),
-                        )
-                        .await;
-                    return StageResult::Success(Some(artifact_path.to_string_lossy().to_string()));
+        if let Some(ref path) = artifact_path {
+            if path.exists() {
+                if let Ok(content) = std::fs::read_to_string(path) {
+                    if !content.trim().is_empty() {
+                        tracing::info!(
+                            "[StageExecutor] Agent produced no text in stream, but artifact was saved via tool call ({:?}, {} chars)",
+                            path, content.len()
+                        );
+                        // Artifact exists and has content — stage is successful
+                        interaction
+                            .show_message_with_context(
+                                crate::interaction::MessageLevel::Success,
+                                format!("✓ Completed (artifact saved via tool, {} chars)", content.len()),
+                                MessageContext::new(&display_name).with_stage(stage_name),
+                            )
+                            .await;
+                        return StageResult::Success(Some(path.to_string_lossy().to_string()));
+                    }
                 }
             }
+        } else {
+            // No artifact expected (e.g., coding stage) — just check that agent ran
+            tracing::info!(
+                "[StageExecutor] Stage '{}' has no artifact file, treating empty output as acceptable",
+                stage_name
+            );
+            return StageResult::Success(None);
         }
 
         tracing::warn!(
@@ -318,6 +330,19 @@ pub async fn execute_stage_with_instruction(
             MessageContext::new(&display_name).with_stage(stage_name),
         )
         .await;
+
+    // Stages without a single artifact file (e.g., coding) are considered successful
+    // once they produce text output
+    let artifact_path = match artifact_path {
+        Some(p) => p,
+        None => {
+            tracing::info!(
+                "[StageExecutor] Stage '{}' has no artifact file, text output is sufficient",
+                stage_name
+            );
+            return StageResult::Success(None);
+        }
+    };
 
     // Check if artifact was saved via tool call (e.g., save_idea)
     if artifact_path.exists() {
