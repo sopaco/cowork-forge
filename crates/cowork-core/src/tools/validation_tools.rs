@@ -144,8 +144,8 @@ impl Tool for CheckFeatureCoverageTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
-        let features = load_feature_list().map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
-        let design = load_design_spec().map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+        let features = load_feature_list().map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
+        let design = load_design_spec().map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
         let uncovered: Vec<String> = features
             .features
@@ -196,7 +196,7 @@ impl Tool for CheckTaskDependenciesTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
-        let plan = load_implementation_plan().map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+        let plan = load_implementation_plan().map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
         // Build dependency graph
         let mut graph: std::collections::HashMap<String, Vec<String>> =

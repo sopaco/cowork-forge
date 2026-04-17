@@ -1,6 +1,6 @@
 import React, { useMemo, memo, useCallback } from 'react';
 import { Spin, Tag, message } from 'antd';
-import { TeamOutlined, CopyOutlined } from '@ant-design/icons';
+import { TeamOutlined } from '@ant-design/icons';
 import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
 import type { ChatMessage, InputRequest, InputOption, PMAction } from '../../stores';
@@ -51,7 +51,6 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
   onToggleThinking,
   onActionClick,
 }) => {
-  // Get stage display name from flow config
   const { flows, default_flow_id } = useConfigStore();
   const stageDisplayName = useMemo(() => {
     if (!currentStage) return null;
@@ -60,11 +59,9 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
       const stage = flow.stages.find(s => s.stage_id === currentStage);
       if (stage?.alias) return stage.alias;
     }
-    // Fallback: capitalize stage id
     return currentStage.charAt(0).toUpperCase() + currentStage.slice(1);
   }, [currentStage, flows, default_flow_id]);
 
-  // Dump chat messages to clipboard
   const handleDumpChat = useCallback(() => {
     const currentMessages = mode === 'pm_agent' ? pmMessages : messages;
     
@@ -90,8 +87,6 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
           return `${timePrefix}[Tool Result] ${msg.toolName || 'unknown'}: ${msg.result || ''}`;
         case 'pm_agent':
           return `${timePrefix}PM Agent: ${msg.content || ''}`;
-        case 'status':
-          return `${timePrefix}[Status] ${msg.content || ''}`;
         case 'error':
           return `${timePrefix}[Error] ${msg.content || ''}`;
         default:
@@ -116,101 +111,53 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '16px' }}>
-      {mode === 'pm_agent' ? (
-        <>
-          <div style={{ marginBottom: '16px' }}>
-            <h3 style={{ margin: 0 }}>
-              <TeamOutlined style={{ marginRight: '8px' }} />
-              Project Manager Agent
-            </h3>
-            <p style={{ margin: '4px 0 0 0', color: '#888', fontSize: '12px' }}>
-              {iterationTitle} - Ask questions, request changes, or discuss next steps
-            </p>
-            <Tag color="green" style={{ marginTop: '8px' }}>
-              Post-Delivery Chat
-            </Tag>
-          </div>
-          
-          {pmProcessing && (
-            <div
-              style={{
-                padding: '12px 16px',
-                backgroundColor: '#f6ffed',
-                border: '1px solid #b7eb8f',
-                borderRadius: '6px',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-              }}
-            >
-              <Spin size="small" />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '14px', fontWeight: 500, color: '#52c41a', marginBottom: '4px' }}>
-                  Project Manager Agent is thinking...
-                </div>
-              </div>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg-base)' }}>
+      {/* Chat Header */}
+      <div className="chat-header">
+        {mode === 'pm_agent' ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <TeamOutlined style={{ color: 'var(--success)' }} />
+              <h3 className="chat-header-title">Project Manager</h3>
+              <Tag color="green" style={{ marginLeft: '4px', fontSize: '11px' }}>Post-Delivery</Tag>
             </div>
-          )}
-        </>
-      ) : (
-        <>
-          <div style={{ marginBottom: '16px' }}>
-            <h3 style={{ margin: 0 }}>Chat - {iterationTitle}</h3>
+            <p className="chat-header-desc">{iterationTitle}</p>
+          </>
+        ) : (
+          <>
+            <h3 className="chat-header-title">{iterationTitle}</h3>
             {iterationDescription && (
-              <p style={{ 
-                margin: '4px 0 0 0', 
-                color: '#888', 
-                fontSize: '12px',
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                lineHeight: '1.4',
-              }}>{iterationDescription}</p>
+              <p className="chat-header-desc">{iterationDescription}</p>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Processing Indicator */}
+      {mode === 'pm_agent' ? (
+        pmProcessing && (
+          <div className="chat-processing-bar" style={{ background: 'var(--success-light)', color: 'var(--success)', borderBottomColor: 'var(--success)' }}>
+            <Spin size="small" />
+            <span>Project Manager is thinking...</span>
+          </div>
+        )
+      ) : (
+        isProcessing && currentAgent && (
+          <div className="chat-processing-bar">
+            <Spin size="small" />
+            <span>{currentAgent}</span>
+            {stageDisplayName && (
+              <span className="chat-processing-stage">Stage: {stageDisplayName}</span>
             )}
           </div>
-
-          {isProcessing && currentAgent && (
-            <div
-              style={{
-                padding: '12px 16px',
-                backgroundColor: '#e6f7ff',
-                border: '1px solid #91d5ff',
-                borderRadius: '6px',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-              }}
-            >
-              <Spin size="small" />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '14px', fontWeight: 500, color: '#1890ff', marginBottom: '4px' }}>
-                  {currentAgent} is working...
-                </div>
-                <div style={{ fontSize: '12px', color: '#666' }}>
-                  {stageDisplayName ? `Stage: ${stageDisplayName}` : 'Processing...'}
-                </div>
-              </div>
-            </div>
-          )}
-        </>
+        )
       )}
 
+      {/* Messages Area */}
       <div
         ref={mode === 'pm_agent' ? pmMessagesContainerRef : messagesContainerRef}
-        style={{
-          flex: 1,
-          overflow: 'auto',
-          border: '1px solid #e8e8e8',
-          borderRadius: '4px',
-          padding: '16px',
-          marginBottom: '16px',
-          backgroundColor: '#fafafa',
-        }}
+        className="chat-messages"
+        style={{ flex: 1, overflow: 'auto' }}
       >
         <MessageList
           messages={messages}
@@ -223,6 +170,7 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
         />
       </div>
 
+      {/* Input Area */}
       <InputArea
         userInput={userInput}
         onUserInputChange={onUserInputChange}

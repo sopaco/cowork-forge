@@ -51,7 +51,7 @@ impl Tool for ScanProjectTool {
 
         let path = Path::new(project_path);
         if !path.exists() {
-            return Err(adk_core::AdkError::Tool(format!(
+            return Err(adk_core::AdkError::tool(format!(
                 "Project path does not exist: {}",
                 project_path
             )));
@@ -312,7 +312,7 @@ impl Tool for ReadProjectFileTool {
         }
 
         let content = fs::read_to_string(&path)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read file: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to read file: {}", e)))?;
 
         let lines: Vec<&str> = content.lines().take(max_lines).collect();
         let truncated = lines.join("\n");
@@ -378,7 +378,7 @@ impl Tool for ListProjectDirectoryTool {
         }
 
         let entries = fs::read_dir(&dir_path)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read directory: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to read directory: {}", e)))?;
 
         let mut items = Vec::new();
         for entry in entries.filter_map(|e| e.ok()) {
@@ -438,7 +438,7 @@ impl Tool for SaveArtifactTool {
         // Validate filename
         let valid_filenames = ["idea.md", "prd.md", "design.md", "plan.md"];
         if !valid_filenames.contains(&filename) {
-            return Err(adk_core::AdkError::Tool(format!(
+            return Err(adk_core::AdkError::tool(format!(
                 "Invalid artifact filename: {}. Must be one of: {:?}",
                 filename, valid_filenames
             )));
@@ -539,11 +539,11 @@ impl Tool for SaveArtifactTool {
         });
 
         std::fs::create_dir_all(&artifacts_dir)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to create artifacts dir: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to create artifacts dir: {}", e)))?;
 
         let artifact_path = artifacts_dir.join(filename);
         std::fs::write(&artifact_path, content)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to write artifact: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to write artifact: {}", e)))?;
 
         eprintln!("[SaveArtifactTool] Saved {} to {:?}", filename, artifact_path);
 

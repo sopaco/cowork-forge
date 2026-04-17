@@ -18,6 +18,32 @@ use adk_core::{Content, Event};
 use futures::StreamExt;
 use std::sync::Arc;
 
+/// Map stage name to the corresponding save tool name
+fn get_save_tool_name(stage_name: &str) -> &'static str {
+    match stage_name {
+        "idea" => "save_idea",
+        "prd" => "save_prd_doc",
+        "design" => "save_design_doc",
+        "plan" => "save_plan_doc",
+        "check" => "save_check_report",
+        "delivery" => "save_delivery_report",
+        _ => "save_idea", // fallback
+    }
+}
+
+/// Map stage name to the artifact filename used by save_* tools in persistence/iteration_data.rs
+fn get_artifact_filename(stage_name: &str) -> &'static str {
+    match stage_name {
+        "idea" => "idea.md",
+        "prd" => "prd.md",
+        "design" => "design.md",
+        "plan" => "plan.md",
+        "check" => "check_report.md",
+        "delivery" => "delivery_report.md",
+        _ => "idea.md", // fallback
+    }
+}
+
 /// Map internal agent names to user-friendly display names
 fn get_display_name(agent_name: &str) -> String {
     // Try to get agent name from registry first
@@ -91,8 +117,10 @@ pub async fn execute_stage_with_instruction(
             return Err(format!("Failed to create artifacts directory: {}", e));
         }
 
-        // Prepare artifact path - V2 architecture: .cowork-v2/iterations/{iteration_id}/artifacts/{stage_name}.md
-        let artifact_path = artifacts_dir.join(format!("{}.md", stage_name));
+        // Prepare artifact path - V2 architecture: .cowork-v2/iterations/{iteration_id}/artifacts/{artifact_filename}
+        // Must match the filename used by the save_* tools in persistence/iteration_data.rs
+        let artifact_filename = get_artifact_filename(stage_name);
+        let artifact_path = artifacts_dir.join(artifact_filename);
 
         // Load LLM client
         let llm_config = load_config().map_err(|e| format!("Failed to load config: {}", e))?;
@@ -107,7 +135,7 @@ pub async fn execute_stage_with_instruction(
     }
     .await;
 
-    let (agent, _artifact_path) = match result {
+    let (agent, artifact_path) = match result {
         Ok(v) => v,
         Err(e) => return StageResult::Failed(e),
     };
@@ -171,25 +199,38 @@ pub async fn execute_stage_with_instruction(
     };
 
     let mut generated_text = String::new();
+    let mut event_count = 0u32;
+    let mut text_event_count = 0u32;
+    let mut tool_call_count = 0u32;
 
     let mut stream = std::pin::pin!(stream);
     while let Some(result) = stream.next().await {
         match result {
             Ok(event) => {
+                event_count += 1;
                 // Extract content from the event using the event's content() method
                 if let Some(content) = event.content() {
                     if let Some(text) = extract_text_from_content(content) {
                         if !text.trim().is_empty() {
+                            text_event_count += 1;
                             generated_text.push_str(&text);
                             // Send content in real-time with display name
                             interaction
                                 .send_streaming(text.clone(), &display_name, false)
                                 .await;
                         }
+                    } else {
+                        // Content exists but no text part — likely a function call
+                        tool_call_count += 1;
+                        tracing::debug!(
+                            "[StageExecutor] Event #{} has content but no text part (likely tool call)",
+                            event_count
+                        );
                     }
                 } else if let Some(text) = extract_text_from_event(&event) {
                     // Fallback: use helper function
                     if !text.trim().is_empty() {
+                        text_event_count += 1;
                         generated_text.push_str(&text);
                         interaction.send_streaming(text, &display_name, false).await;
                     }
@@ -234,7 +275,37 @@ pub async fn execute_stage_with_instruction(
 
     // Send completion notification
     if generated_text.is_empty() {
-        return StageResult::Failed("Agent produced no output".to_string());
+        // Check if the agent saved the artifact via a tool call (e.g., save_idea)
+        // even though it didn't produce any text output in the stream
+        if artifact_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&artifact_path) {
+                if !content.trim().is_empty() {
+                    tracing::info!(
+                        "[StageExecutor] Agent produced no text in stream, but artifact was saved via tool call ({:?}, {} chars)",
+                        artifact_path, content.len()
+                    );
+                    // Artifact exists and has content — stage is successful
+                    interaction
+                        .show_message_with_context(
+                            crate::interaction::MessageLevel::Success,
+                            format!("✓ Completed (artifact saved via tool, {} chars)", content.len()),
+                            MessageContext::new(&display_name).with_stage(stage_name),
+                        )
+                        .await;
+                    return StageResult::Success(Some(artifact_path.to_string_lossy().to_string()));
+                }
+            }
+        }
+
+        tracing::warn!(
+            "[StageExecutor] Agent produced no text output and no artifact was saved. total_events={}, text_events={}, tool_calls={}. \
+             The LLM likely only made tool calls without generating any text content or saving artifacts.",
+            event_count, text_event_count, tool_call_count
+        );
+        return StageResult::Failed(format!(
+            "Agent produced no text output and no artifact was saved ({} events, {} tool calls)",
+            event_count, tool_call_count
+        ));
     }
 
     // Show summary of what was generated
@@ -248,7 +319,108 @@ pub async fn execute_stage_with_instruction(
         )
         .await;
 
-    StageResult::Success(None)
+    // Check if artifact was saved via tool call (e.g., save_idea)
+    if artifact_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&artifact_path) {
+            if !content.trim().is_empty() {
+                tracing::info!(
+                    "[StageExecutor] Artifact saved via tool call ({:?}, {} chars)",
+                    artifact_path, content.len()
+                );
+                return StageResult::Success(Some(artifact_path.to_string_lossy().to_string()));
+            }
+        }
+    }
+
+    // Agent produced text output but didn't call the save tool.
+    // Send a follow-up message to the same agent to save the artifact.
+    tracing::warn!(
+        "[StageExecutor] Agent completed but artifact not saved. Sending follow-up to prompt save tool call."
+    );
+
+    interaction
+        .show_message_with_context(
+            crate::interaction::MessageLevel::Warning,
+            "⚠️ Artifact not saved, prompting agent to save...".to_string(),
+            MessageContext::new(&display_name).with_stage(stage_name),
+        )
+        .await;
+
+    // Build follow-up prompt
+    let save_tool_name = get_save_tool_name(stage_name);
+    let followup_prompt = format!(
+        "CRITICAL: You completed the {} stage but did NOT call the {} tool to save your artifact. \
+         Your work will be LOST unless you call {} now. \
+         Call {}(content=<your complete {} document in markdown>) IMMEDIATELY. \
+         Do NOT output any more text — just call the save tool with your complete document content.",
+        stage_name, save_tool_name, save_tool_name, save_tool_name, stage_name
+    );
+
+    let followup_content = Content::new("user").with_text(followup_prompt);
+    let followup_ctx = Arc::new(SimpleInvocationContext::new(
+        ctx,
+        &followup_content,
+        agent.clone(),
+    ));
+
+    let followup_stream = match agent.run(followup_ctx).await {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!("[StageExecutor] Follow-up agent run failed: {}", e);
+            return StageResult::Failed(format!(
+                "Agent completed but did not save artifact, and follow-up failed: {}", e
+            ));
+        }
+    };
+
+    // Process follow-up stream (only look for save tool execution, don't collect text)
+    let mut followup_stream = std::pin::pin!(followup_stream);
+    while let Some(result) = followup_stream.next().await {
+        match result {
+            Ok(event) => {
+                // Stream any text content from the follow-up
+                if let Some(content) = event.content() {
+                    if let Some(text) = extract_text_from_content(content) {
+                        if !text.trim().is_empty() {
+                            interaction.send_streaming(text, &display_name, false).await;
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::debug!("[StageExecutor] Follow-up stream error: {}", e);
+            }
+        }
+    }
+
+    // Check artifact again after follow-up
+    if artifact_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&artifact_path) {
+            if !content.trim().is_empty() {
+                tracing::info!(
+                    "[StageExecutor] Artifact saved after follow-up ({:?}, {} chars)",
+                    artifact_path, content.len()
+                );
+                interaction
+                    .show_message_with_context(
+                        crate::interaction::MessageLevel::Success,
+                        format!("✓ Artifact saved ({} chars)", content.len()),
+                        MessageContext::new(&display_name).with_stage(stage_name),
+                    )
+                    .await;
+                return StageResult::Success(Some(artifact_path.to_string_lossy().to_string()));
+            }
+        }
+    }
+
+    tracing::warn!(
+        "[StageExecutor] Agent still did not save artifact after follow-up. Artifact path: {:?}",
+        artifact_path
+    );
+    StageResult::Failed(format!(
+        "Agent completed but did not save artifact via {} tool",
+        save_tool_name
+    ))
 }
 
 /// Maximum characters for pre-injected artifacts (to avoid token limits)

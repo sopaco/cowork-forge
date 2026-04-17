@@ -45,7 +45,7 @@ impl Tool for ReviewAndEditFileTool {
 
         // Read current file content
         let content = fs::read_to_string(file_path)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read file {}: {}", file_path, e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to read file {}: {}", file_path, e)))?;
 
         // Show preview
         println!("\n📝 {} - {}", title, file_path);
@@ -64,7 +64,7 @@ impl Tool for ReviewAndEditFileTool {
             .with_prompt("Do you want to edit this file? (y/n)")
             .default(false)
             .interact()
-            .map_err(|e| adk_core::AdkError::Tool(format!("Interaction error: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Interaction error: {}", e)))?;
 
         if !should_edit {
             return Ok(json!({
@@ -78,13 +78,13 @@ impl Tool for ReviewAndEditFileTool {
         let edited = Editor::new()
             .require_save(true)
             .edit(&content)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Editor error: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Editor error: {}", e)))?;
 
         match edited {
             Some(new_content) if new_content.trim() != content.trim() => {
                 // Save changes
                 fs::write(file_path, &new_content)
-                    .map_err(|e| adk_core::AdkError::Tool(format!("Failed to write file: {}", e)))?;
+                    .map_err(|e| adk_core::AdkError::tool(format!("Failed to write file: {}", e)))?;
 
                 println!("✅ File updated successfully");
                 Ok(json!({
@@ -152,7 +152,7 @@ impl Tool for ReviewWithFeedbackTool {
 
         // Read current file content
         let content = fs::read_to_string(file_path)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read file {}: {}", file_path, e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to read file {}: {}", file_path, e)))?;
 
         // Show preview
         println!("\n📝 {} - {}", title, file_path);
@@ -171,7 +171,7 @@ impl Tool for ReviewWithFeedbackTool {
             .with_prompt(prompt)
             .allow_empty(true)
             .interact_text()
-            .map_err(|e| adk_core::AdkError::Tool(format!("Interaction error: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Interaction error: {}", e)))?;
 
         let user_input = user_input.trim();
 
@@ -183,12 +183,12 @@ impl Tool for ReviewWithFeedbackTool {
                 let edited = Editor::new()
                     .require_save(true)
                     .edit(&content)
-                    .map_err(|e| adk_core::AdkError::Tool(format!("Editor error: {}", e)))?;
+                    .map_err(|e| adk_core::AdkError::tool(format!("Editor error: {}", e)))?;
 
                 match edited {
                     Some(new_content) if new_content.trim() != content.trim() => {
                         fs::write(file_path, &new_content)
-                            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to write file: {}", e)))?;
+                            .map_err(|e| adk_core::AdkError::tool(format!("Failed to write file: {}", e)))?;
 
                         println!("✅ File updated successfully");
                         Ok(json!({

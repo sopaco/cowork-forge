@@ -77,7 +77,7 @@ impl Tool for ProvideFeedbackTool {
             timestamp: chrono::Utc::now(),
         };
 
-        append_feedback(&feedback).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+        append_feedback(&feedback).map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
         Ok(json!({
             "status": "feedback_recorded",
@@ -130,7 +130,7 @@ impl Tool for AskUserTool {
                     .with_prompt(question)
                     .default(false)
                     .interact()
-                    .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+                    .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
                 Ok(json!({
                     "answer": answer,
@@ -141,7 +141,7 @@ impl Tool for AskUserTool {
                 let answer: String = Input::new()
                     .with_prompt(question)
                     .interact_text()
-                    .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+                    .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
                 Ok(json!({
                     "answer": answer,

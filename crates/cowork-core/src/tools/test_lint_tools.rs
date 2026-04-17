@@ -59,7 +59,7 @@ impl Tool for CheckTestsTool {
             .current_dir(path)
             .output()
             .await
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to run tests: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to run tests: {}", e)))?;
 
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -141,7 +141,7 @@ impl Tool for CheckLintTool {
             .current_dir(path)
             .output()
             .await
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to run linter: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to run linter: {}", e)))?;
 
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -191,7 +191,7 @@ fn detect_test_command(path: &str) -> adk_core::Result<String> {
         return Ok("go test ./...".to_string());
     }
 
-    Err(adk_core::AdkError::Tool(
+    Err(adk_core::AdkError::tool(
         "Could not detect project type. Please specify test_command manually.".to_string()
     ))
 }
@@ -232,7 +232,7 @@ fn detect_lint_command(path: &str, fix: bool) -> adk_core::Result<String> {
         return Ok("golangci-lint run".to_string());
     }
 
-    Err(adk_core::AdkError::Tool(
+    Err(adk_core::AdkError::tool(
         "Could not detect project type. Please specify lint_command manually.".to_string()
     ))
 }

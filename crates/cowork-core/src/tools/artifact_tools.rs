@@ -51,8 +51,8 @@ impl Tool for SaveIdeaTool {
                 }))
             }
             Err(e) => {
-                super::notify_tool_result("save_idea", &Err(adk_core::AdkError::Tool(e.to_string())));
-                Err(adk_core::AdkError::Tool(e.to_string()))
+                super::notify_tool_result("save_idea", &Err(adk_core::AdkError::tool(e.to_string())));
+                Err(adk_core::AdkError::tool(e.to_string()))
             }
         }
     }
@@ -93,7 +93,7 @@ impl Tool for SaveDeliveryReportTool {
         let content = get_required_string_param(&args, "content")?;
 
         save_delivery_report(content)
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+            .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
         Ok(json!({
             "status": "success",
@@ -138,7 +138,7 @@ impl Tool for SaveCheckReportTool {
         let content = get_required_string_param(&args, "content")?;
 
         save_check_report(content)
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+            .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
         Ok(json!({
             "status": "success",
@@ -183,7 +183,7 @@ impl Tool for SavePlanDocTool {
         let content = get_required_string_param(&args, "content")?;
 
         save_plan_doc(content)
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+            .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
         Ok(json!({
             "status": "success",
@@ -238,8 +238,8 @@ impl Tool for SavePrdDocTool {
                 }))
             }
             Err(e) => {
-                super::notify_tool_result("save_prd_doc", &Err(adk_core::AdkError::Tool(e.to_string())));
-                Err(adk_core::AdkError::Tool(e.to_string()))
+                super::notify_tool_result("save_prd_doc", &Err(adk_core::AdkError::tool(e.to_string())));
+                Err(adk_core::AdkError::tool(e.to_string()))
             }
         }
     }
@@ -280,7 +280,7 @@ impl Tool for SaveDesignDocTool {
         let content = get_required_string_param(&args, "content")?;
 
         save_design_doc(content)
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+            .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
         Ok(json!({
             "status": "success",
@@ -322,10 +322,10 @@ impl Tool for LoadFeedbackHistoryTool {
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let stage = args["stage"].as_str()
-            .ok_or_else(|| adk_core::AdkError::Tool("Missing required parameter: stage".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("Missing required parameter: stage".to_string()))?;
 
         let history = load_feedback_history()
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+            .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
         // Filter feedbacks by stage and get the most recent one
         let most_recent_feedback = history.feedbacks

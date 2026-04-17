@@ -51,11 +51,11 @@ impl Tool for LoadDocumentSummaryTool {
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let doc_type = args.get("doc_type")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("doc_type is required".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("doc_type is required".to_string()))?;
 
         let iteration_store = IterationStore::new();
         let iteration_dir = iteration_store.iteration_path(&self.iteration_id)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get iteration path: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to get iteration path: {}", e)))?;
 
         let summary_dir = iteration_dir.join("summaries");
         let file_path = summary_dir.join(format!("{}.md", doc_type));
@@ -69,7 +69,7 @@ impl Tool for LoadDocumentSummaryTool {
         }
 
         let content = fs::read_to_string(&file_path)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read summary: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to read summary: {}", e)))?;
 
         Ok(json!({
             "exists": true,
@@ -115,7 +115,7 @@ impl Tool for LoadBaseKnowledgeTool {
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
         let memory_store = MemoryStore::new();
         let project_memory = memory_store.load_project_memory()
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to load project memory: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to load project memory: {}", e)))?;
 
         let base_knowledge = project_memory.get_iteration_knowledge(&self.base_iteration_id);
 
@@ -188,11 +188,11 @@ impl Tool for SaveKnowledgeSnapshotTool {
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let knowledge_json = args.get("knowledge_json")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("knowledge_json is required".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("knowledge_json is required".to_string()))?;
 
         // Parse the JSON
         let mut knowledge: IterationKnowledge = serde_json::from_str(knowledge_json)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to parse knowledge JSON: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to parse knowledge JSON: {}", e)))?;
 
         // Ensure iteration_id and iteration_number are set correctly
         knowledge.iteration_id = self.iteration_id.clone();
@@ -201,11 +201,11 @@ impl Tool for SaveKnowledgeSnapshotTool {
         // Save to project memory
         let memory_store = MemoryStore::new();
         let mut project_memory = memory_store.load_project_memory()
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to load project memory: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to load project memory: {}", e)))?;
 
         project_memory.save_iteration_knowledge(knowledge);
         memory_store.save_project_memory(&project_memory)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to save project memory: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to save project memory: {}", e)))?;
 
         Ok(json!({
             "success": true,
@@ -260,11 +260,11 @@ impl Tool for ListFilesWorkspaceTool {
             .unwrap_or(true);
 
         let iteration_id = get_iteration_id()
-            .ok_or_else(|| adk_core::AdkError::Tool("Iteration ID not set".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("Iteration ID not set".to_string()))?;
 
         let iteration_store = IterationStore::new();
         let workspace_dir = iteration_store.workspace_path(&iteration_id)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get workspace: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to get workspace: {}", e)))?;
 
         let target_path = workspace_dir.join(path);
 

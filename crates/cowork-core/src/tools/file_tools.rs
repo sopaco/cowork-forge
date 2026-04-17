@@ -150,19 +150,19 @@ impl Tool for ListFilesTool {
 
         // Get iteration workspace path
         let iteration_id = get_iteration_id().ok_or_else(|| {
-            adk_core::AdkError::Tool(
+            adk_core::AdkError::tool(
                 "Iteration ID not set. Cannot list files without an active iteration.".to_string(),
             )
         })?;
 
         let iteration_store = IterationStore::new();
         let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
-            adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e))
+            adk_core::AdkError::tool(format!("Failed to get workspace path: {}", e))
         })?;
 
         // Ensure workspace exists
         fs::create_dir_all(&workspace_dir)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to create workspace: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to create workspace: {}", e)))?;
 
         // Handle the case where Agent passes the workspace path itself
         // If the path equals the workspace directory, treat it as "."
@@ -253,11 +253,11 @@ impl Tool for ListFilesTool {
         } else {
             // Non-recursive listing
             let entries = fs::read_dir(&full_path).map_err(|e| {
-                adk_core::AdkError::Tool(format!("Failed to read directory: {}", e))
+                adk_core::AdkError::tool(format!("Failed to read directory: {}", e))
             })?;
 
             for entry in entries {
-                let entry = entry.map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+                let entry = entry.map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
                 // Skip hidden at top-level
                 if let Some(name) = entry.file_name().to_str() {
@@ -369,14 +369,14 @@ impl Tool for ReadFileTool {
 
         // Get iteration workspace path
         let iteration_id = get_iteration_id().ok_or_else(|| {
-            adk_core::AdkError::Tool(
+            adk_core::AdkError::tool(
                 "Iteration ID not set. Cannot read files without an active iteration.".to_string(),
             )
         })?;
 
         let iteration_store = IterationStore::new();
         let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
-            adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e))
+            adk_core::AdkError::tool(format!("Failed to get workspace path: {}", e))
         })?;
 
         // Security check - ensure path is within workspace
@@ -459,19 +459,19 @@ impl Tool for WriteFileTool {
 
         // Get iteration workspace path
         let iteration_id = get_iteration_id().ok_or_else(|| {
-            adk_core::AdkError::Tool(
+            adk_core::AdkError::tool(
                 "Iteration ID not set. Cannot write files without an active iteration.".to_string(),
             )
         })?;
 
         let iteration_store = IterationStore::new();
         let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
-            adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e))
+            adk_core::AdkError::tool(format!("Failed to get workspace path: {}", e))
         })?;
 
         // Ensure workspace exists
         fs::create_dir_all(&workspace_dir)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to create workspace: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to create workspace: {}", e)))?;
 
         // Security check - ensure path is within workspace
         let safe_path = match validate_path_security_within_workspace(path, &workspace_dir) {
@@ -479,7 +479,7 @@ impl Tool for WriteFileTool {
             Err(e) => {
                 super::notify_tool_result(
                     "write_file",
-                    &Err(adk_core::AdkError::Tool("security error".to_string())),
+                    &Err(adk_core::AdkError::tool("security error".to_string())),
                 );
                 return Ok(json!({
                     "status": "security_error",
@@ -493,7 +493,7 @@ impl Tool for WriteFileTool {
 
         // Create parent directories if needed
         if let Some(parent) = full_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+            fs::create_dir_all(parent).map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
         }
 
         let result = match fs::write(&full_path, content) {
@@ -525,7 +525,7 @@ impl Tool for WriteFileTool {
         } else {
             super::notify_tool_result(
                 "write_file",
-                &Err(adk_core::AdkError::Tool("error".to_string())),
+                &Err(adk_core::AdkError::tool("error".to_string())),
             );
         }
 
@@ -610,14 +610,14 @@ impl Tool for RunCommandTool {
 
         // Get iteration workspace path
         let iteration_id = get_iteration_id().ok_or_else(|| {
-            adk_core::AdkError::Tool(
+            adk_core::AdkError::tool(
                 "Iteration ID not set. Cannot run command without an active iteration.".to_string(),
             )
         })?;
 
         let iteration_store = IterationStore::new();
         let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
-            adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e))
+            adk_core::AdkError::tool(format!("Failed to get workspace path: {}", e))
         })?;
 
         // Execute command with timeout in workspace directory
@@ -722,23 +722,23 @@ impl Tool for ReadFileTruncatedTool {
 
         // Get iteration workspace path
         let iteration_id = get_iteration_id()
-            .ok_or_else(|| adk_core::AdkError::Tool("Iteration ID not set".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("Iteration ID not set".to_string()))?;
 
         let iteration_store = IterationStore::new();
         let workspace_dir = iteration_store
             .workspace_path(&iteration_id)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get workspace: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to get workspace: {}", e)))?;
 
         // Validate path security
         let safe_path = validate_path_security_within_workspace(&path, &workspace_dir)
-            .map_err(|e| adk_core::AdkError::Tool(e))?;
+            .map_err(|e| adk_core::AdkError::tool(e))?;
 
         // Construct full path in workspace
         let full_path = workspace_dir.join(&safe_path);
 
         // Read file content
         let content = fs::read_to_string(&full_path)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read file: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to read file: {}", e)))?;
         let file_ext = full_path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
         let is_code_file = matches!(
@@ -861,23 +861,23 @@ impl Tool for ReadFileWithLimitTool {
 
         // Get iteration workspace path
         let iteration_id = get_iteration_id()
-            .ok_or_else(|| adk_core::AdkError::Tool("Iteration ID not set".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("Iteration ID not set".to_string()))?;
 
         let iteration_store = IterationStore::new();
         let workspace_dir = iteration_store
             .workspace_path(&iteration_id)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get workspace: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to get workspace: {}", e)))?;
 
         // Validate path security
         let safe_path = validate_path_security_within_workspace(&path, &workspace_dir)
-            .map_err(|e| adk_core::AdkError::Tool(e))?;
+            .map_err(|e| adk_core::AdkError::tool(e))?;
 
         // Construct full path in workspace
         let full_path = workspace_dir.join(&safe_path);
 
         // Read file content
         let content = fs::read_to_string(&full_path)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to read file: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to read file: {}", e)))?;
 
         // Smart truncation
         let truncated_content = if content.len() <= max_chars {

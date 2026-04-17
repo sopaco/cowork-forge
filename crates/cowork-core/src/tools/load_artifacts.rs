@@ -32,10 +32,10 @@ impl Tool for LoadIdeaTool {
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
         let path = artifact_path("idea.md")
-            .map_err(|e: anyhow::Error| adk_core::AdkError::Tool(e.to_string()))?;
+            .map_err(|e: anyhow::Error| adk_core::AdkError::tool(e.to_string()))?;
 
         let content = std::fs::read_to_string(&path)
-            .map_err(|e: std::io::Error| adk_core::AdkError::Tool(format!("Failed to read idea.md: {}", e)))?;
+            .map_err(|e: std::io::Error| adk_core::AdkError::tool(format!("Failed to read idea.md: {}", e)))?;
 
         Ok(json!({
             "status": "success",
@@ -71,10 +71,10 @@ impl Tool for LoadPrdDocTool {
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
         let path = artifact_path("prd.md")
-            .map_err(|e: anyhow::Error| adk_core::AdkError::Tool(e.to_string()))?;
+            .map_err(|e: anyhow::Error| adk_core::AdkError::tool(e.to_string()))?;
 
         let content = std::fs::read_to_string(&path)
-            .map_err(|e: std::io::Error| adk_core::AdkError::Tool(format!("Failed to read prd.md: {}", e)))?;
+            .map_err(|e: std::io::Error| adk_core::AdkError::tool(format!("Failed to read prd.md: {}", e)))?;
 
         Ok(json!({
             "status": "success",
@@ -110,10 +110,10 @@ impl Tool for LoadDesignDocTool {
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
         let path = artifact_path("design.md")
-            .map_err(|e: anyhow::Error| adk_core::AdkError::Tool(e.to_string()))?;
+            .map_err(|e: anyhow::Error| adk_core::AdkError::tool(e.to_string()))?;
 
         let content = std::fs::read_to_string(&path)
-            .map_err(|e: std::io::Error| adk_core::AdkError::Tool(format!("Failed to read design.md: {}", e)))?;
+            .map_err(|e: std::io::Error| adk_core::AdkError::tool(format!("Failed to read design.md: {}", e)))?;
 
         Ok(json!({
             "status": "success",
@@ -149,10 +149,10 @@ impl Tool for LoadPlanDocTool {
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
         let path = artifact_path("plan.md")
-            .map_err(|e: anyhow::Error| adk_core::AdkError::Tool(e.to_string()))?;
+            .map_err(|e: anyhow::Error| adk_core::AdkError::tool(e.to_string()))?;
 
         let content = std::fs::read_to_string(&path)
-            .map_err(|e: std::io::Error| adk_core::AdkError::Tool(format!("Failed to read plan.md: {}", e)))?;
+            .map_err(|e: std::io::Error| adk_core::AdkError::tool(format!("Failed to read plan.md: {}", e)))?;
 
         Ok(json!({
             "status": "success",
