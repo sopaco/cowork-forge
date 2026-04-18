@@ -254,6 +254,22 @@ pub async fn get_project_runtime_info(
 
         let start_command = generate_start_command(&config);
 
+        // For runtime types like NodeTool that have no frontend/backend config,
+        // check if HTML files exist — these projects can still be served via static server
+        if !has_frontend && !has_backend && (is_vanilla_html || has_html_files(&code_dir)) {
+            let (url, port) = static_server::get_server_info(&iteration_id)
+                .map(|s| (Some(s.url), Some(s.port)))
+                .unwrap_or((Some("http://localhost:8000".to_string()), Some(8000)));
+            return Ok(ProjectRuntimeInfo {
+                has_frontend: true,
+                has_backend: false,
+                preview_url: url,
+                frontend_port: port,
+                backend_port: None,
+                start_command: Some("(Built-in static server)".to_string()),
+            });
+        }
+
         Ok(ProjectRuntimeInfo { has_frontend, has_backend, preview_url, frontend_port, backend_port, start_command })
     } else {
         // Fallback: check for HTML files
