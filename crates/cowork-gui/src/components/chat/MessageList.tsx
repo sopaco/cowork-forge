@@ -1,8 +1,33 @@
-import React, { memo, useMemo, useCallback } from 'react';
+import React, { memo, useMemo } from 'react';
 import { Spin } from 'antd';
-import { TeamOutlined, RobotOutlined, UserOutlined } from '@ant-design/icons';
+import { RobotOutlined } from '@ant-design/icons';
 import { MarkdownMessage } from '../common';
 import type { ChatMessage, ThinkingMessage, PMAction } from '../../stores';
+
+import avatarPm from '../../assets/avatars/avatar_role_pm.png';
+import avatarDesigner from '../../assets/avatars/avatar_role_designer.png';
+import avatarRd from '../../assets/avatars/avatar_role_rd.png';
+import avatarQa from '../../assets/avatars/avatar_role_qa.png';
+
+// Map agent name / stage name to avatar image
+const getAgentAvatar = (agentName?: string, stageName?: string): string => {
+  // Priority: stage-based mapping
+  const stage = (stageName || '').toLowerCase();
+  if (stage === 'idea' || stage === 'prd') return avatarPm;
+  if (stage === 'design') return avatarDesigner;
+  if (stage === 'plan' || stage === 'coding') return avatarRd;
+  if (stage === 'check' || stage === 'delivery') return avatarQa;
+
+  // Fallback: agent-name keyword matching
+  const name = (agentName || '').toLowerCase();
+  if (name.includes('idea') || name.includes('prd') || name.includes('product manager') || name.includes('pm agent')) return avatarPm;
+  if (name.includes('design') || name.includes('architect')) return avatarDesigner;
+  if (name.includes('plan') || name.includes('project manager') || name.includes('engineer') || name.includes('coding') || name.includes('developer')) return avatarRd;
+  if (name.includes('check') || name.includes('qa') || name.includes('delivery') || name.includes('reviewer')) return avatarQa;
+
+  // Default: PM avatar
+  return avatarPm;
+};
 
 interface ToolCallMessage extends ChatMessage {
   toolName: string;
@@ -40,28 +65,23 @@ const getMessageKey = (msg: ChatMessage, index: number): string => {
   return ts ? `m-${ts}` : `m-${index}`;
 };
 
-// Get initials for agent icon
-const getAgentInitials = (name?: string): string => {
-  if (!name) return 'AI';
-  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-};
-
 // ---- Thinking Message ----
 const ThinkingMessageItem = memo<{ message: ThinkingMessage; onToggle: () => void }>(
-  ({ message, onToggle }) => (
-    <div className={`chat-msg-row chat-msg-thinking ${message.isExpanded ? 'chat-thinking-expanded' : ''}`}>
-      <div className="chat-thinking-toggle" onClick={onToggle}>
-        <span className="chat-thinking-icon">
-          <RobotOutlined />
-        </span>
-        <span className="chat-thinking-label">{message.agentName} thinking...</span>
-        <span className="chat-thinking-chevron">▶</span>
+  ({ message, onToggle }) => {
+    const avatarSrc = getAgentAvatar(message.agentName, (message as { stageName?: string }).stageName);
+    return (
+      <div className={`chat-msg-row chat-msg-thinking ${message.isExpanded ? 'chat-thinking-expanded' : ''}`}>
+        <div className="chat-thinking-toggle" onClick={onToggle}>
+          <img className="chat-agent-avatar" src={avatarSrc} alt={message.agentName || 'Agent'} />
+          <span className="chat-thinking-label">{message.agentName} thinking...</span>
+          <span className="chat-thinking-chevron">▶</span>
+        </div>
+        {message.isExpanded && (
+          <div className="chat-thinking-body">{message.content}</div>
+        )}
       </div>
-      {message.isExpanded && (
-        <div className="chat-thinking-body">{message.content}</div>
-      )}
-    </div>
-  )
+    );
+  }
 );
 
 // ---- Tool Call Message ----
@@ -94,11 +114,12 @@ const AgentMessageItem = memo<{ message: ChatMessage }>(({ message }) => {
   const agentName = (message as { agentName?: string }).agentName || 'AI Agent';
   const stageName = (message as { stageName?: string }).stageName;
   const content = (message as { content: string }).content;
+  const avatarSrc = getAgentAvatar(agentName, stageName);
 
   return (
     <div className="chat-msg-row chat-msg-agent">
       <div className="chat-msg-header">
-        <span className="chat-agent-icon">{getAgentInitials(agentName)}</span>
+        <img className="chat-agent-avatar" src={avatarSrc} alt={agentName} />
         <span className="chat-agent-name">{agentName}</span>
         {stageName && <span className="chat-agent-stage">{stageName}</span>}
       </div>
@@ -123,9 +144,7 @@ const PMAgentMessageItem = memo<{ message: PMAgentMessage; onActionClick?: (acti
   ({ message, onActionClick }) => (
     <div className="chat-msg-row chat-msg-pm-agent">
       <div className="chat-pm-header">
-        <span className="chat-pm-icon">
-          <TeamOutlined style={{ fontSize: '12px' }} />
-        </span>
+        <img className="chat-agent-avatar" src={avatarPm} alt="Project Manager" />
         <span className="chat-pm-name">Project Manager</span>
       </div>
       <div className="chat-msg-content">

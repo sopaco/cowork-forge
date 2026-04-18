@@ -38,17 +38,11 @@
   margin-bottom: 8px;
 }
 
-.chat-msg-agent .chat-agent-icon {
+.chat-msg-agent .chat-agent-avatar {
   width: 24px;
   height: 24px;
   border-radius: 6px;
-  background: var(--primary);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
+  object-fit: cover;
   flex-shrink: 0;
 }
 
@@ -109,8 +103,12 @@
   color: var(--text-secondary);
 }
 
-.chat-msg-thinking .chat-thinking-icon {
-  font-size: 14px;
+.chat-msg-thinking .chat-agent-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
   opacity: 0.7;
 }
 
@@ -234,16 +232,11 @@
   margin-bottom: 8px;
 }
 
-.chat-msg-pm-agent .chat-pm-icon {
+.chat-msg-pm-agent .chat-agent-avatar {
   width: 24px;
   height: 24px;
   border-radius: 6px;
-  background: var(--success);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
+  object-fit: cover;
   flex-shrink: 0;
 }
 

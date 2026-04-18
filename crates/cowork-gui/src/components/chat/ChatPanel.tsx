@@ -1,10 +1,10 @@
 import React, { useMemo, memo, useCallback } from 'react';
 import { Spin, Tag, message } from 'antd';
-import { TeamOutlined } from '@ant-design/icons';
 import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
 import type { ChatMessage, InputRequest, InputOption, PMAction } from '../../stores';
 import { useConfigStore } from '../../stores/configStore';
+import avatarPm from '../../assets/avatars/avatar_role_pm.png';
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -117,7 +117,7 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
         {mode === 'pm_agent' ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <TeamOutlined style={{ color: 'var(--success)' }} />
+              <img src={avatarPm} alt="PM" style={{ width: 20, height: 20, borderRadius: 4 }} />
               <h3 className="chat-header-title">Project Manager</h3>
               <Tag color="green" style={{ marginLeft: '4px', fontSize: '11px' }}>Post-Delivery</Tag>
             </div>
