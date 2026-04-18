@@ -62,15 +62,15 @@ impl Tool for CopyWorkspaceToProjectTool {
 
         // Get iteration workspace path
         let iteration_id = get_iteration_id()
-            .ok_or_else(|| adk_core::AdkError::Tool("Iteration ID not set. Cannot deploy without an active iteration.".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("Iteration ID not set. Cannot deploy without an active iteration.".to_string()))?;
 
         let iteration_store = IterationStore::new();
         let workspace_dir = iteration_store.workspace_path(&iteration_id)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get workspace path: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to get workspace path: {}", e)))?;
 
         // Get project root directory
         let project_root = std::env::current_dir()
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to get project root: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to get project root: {}", e)))?;
 
         // Check if workspace exists
         if !workspace_dir.exists() {
@@ -290,12 +290,12 @@ impl Tool for CopyWorkspaceToProjectTool {
             // Create parent directories if needed
             if let Some(parent) = dest_path.parent() {
                 fs::create_dir_all(parent)
-                    .map_err(|e| adk_core::AdkError::Tool(format!("Failed to create directory: {}", e)))?;
+                    .map_err(|e| adk_core::AdkError::tool(format!("Failed to create directory: {}", e)))?;
             }
 
             // Copy file
             fs::copy(&src_path, &dest_path)
-                .map_err(|e| adk_core::AdkError::Tool(format!("Failed to copy {}: {}", rel_path.display(), e)))?;
+                .map_err(|e| adk_core::AdkError::tool(format!("Failed to copy {}: {}", rel_path.display(), e)))?;
 
             copied_files.push(rel_path.to_string_lossy().to_string());
             println!("[Delivery] Copied: {}", rel_path.display());

@@ -105,7 +105,7 @@ impl Tool for QueryMemoryTool {
         let store = MemoryStore::new();
         
         let result = store.query(&query, Some(&self.iteration_id))
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to query memory: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to query memory: {}", e)))?;
 
         Ok(json!({
             "decisions": result.decisions,
@@ -168,9 +168,9 @@ impl Tool for SaveInsightTool {
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let stage = args.get("stage").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("stage is required".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("stage is required".to_string()))?;
         let content = args.get("content").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("content is required".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("content is required".to_string()))?;
         let importance_str = args.get("importance").and_then(|v| v.as_str()).unwrap_or("important");
 
         let importance = match importance_str {
@@ -192,7 +192,7 @@ impl Tool for SaveInsightTool {
         });
 
         store.save_iteration_memory(&memory)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to save insight: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to save insight: {}", e)))?;
 
         Ok(json!({
             "message": "Insight saved successfully",
@@ -245,9 +245,9 @@ impl Tool for SaveIssueTool {
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let stage = args.get("stage").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("stage is required".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("stage is required".to_string()))?;
         let content = args.get("content").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("content is required".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("content is required".to_string()))?;
 
         let store = MemoryStore::new();
         let mut memory = store.load_iteration_memory(&self.iteration_id)
@@ -262,7 +262,7 @@ impl Tool for SaveIssueTool {
         });
 
         store.save_iteration_memory(&memory)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to save issue: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to save issue: {}", e)))?;
 
         Ok(json!({
             "message": "Issue saved successfully",
@@ -311,7 +311,7 @@ impl Tool for SaveLearningTool {
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let content = args.get("content").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("content is required".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("content is required".to_string()))?;
 
         let store = MemoryStore::new();
         let mut memory = store.load_iteration_memory(&self.iteration_id)
@@ -323,7 +323,7 @@ impl Tool for SaveLearningTool {
         });
 
         store.save_iteration_memory(&memory)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to save learning: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to save learning: {}", e)))?;
 
         Ok(json!({
             "message": "Learning saved successfully",
@@ -386,11 +386,11 @@ impl Tool for PromoteToDecisionTool {
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let title = args.get("title").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("title is required".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("title is required".to_string()))?;
         let context = args.get("context").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("context is required".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("context is required".to_string()))?;
         let decision_str = args.get("decision").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("decision is required".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("decision is required".to_string()))?;
         let consequences: Vec<String> = args.get("consequences")
             .and_then(|v| v.as_array())
             .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
@@ -401,7 +401,7 @@ impl Tool for PromoteToDecisionTool {
 
         let store = MemoryStore::new();
         store.add_decision(new_decision)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to promote to decision: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to promote to decision: {}", e)))?;
 
         Ok(json!({
             "message": "Promoted to project decision successfully",
@@ -470,9 +470,9 @@ impl Tool for PromoteToPatternTool {
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let name = args.get("name").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("name is required".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("name is required".to_string()))?;
         let description = args.get("description").and_then(|v| v.as_str())
-            .ok_or_else(|| adk_core::AdkError::Tool("description is required".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("description is required".to_string()))?;
         let usage: Vec<String> = args.get("usage")
             .and_then(|v| v.as_array())
             .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
@@ -490,7 +490,7 @@ impl Tool for PromoteToPatternTool {
 
         let store = MemoryStore::new();
         store.add_pattern(new_pattern)
-            .map_err(|e| adk_core::AdkError::Tool(format!("Failed to promote to pattern: {}", e)))?;
+            .map_err(|e| adk_core::AdkError::tool(format!("Failed to promote to pattern: {}", e)))?;
 
         Ok(json!({
             "message": "Promoted to project pattern successfully",

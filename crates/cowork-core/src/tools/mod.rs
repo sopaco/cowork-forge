@@ -11,7 +11,7 @@ use std::sync::RwLock;
 pub fn get_required_string_param<'a>(args: &'a Value, key: &str) -> Result<&'a str, AdkError> {
     args.get(key)
         .and_then(|v| v.as_str())
-        .ok_or_else(|| AdkError::Tool(format!("Missing required parameter: {}", key)))
+        .ok_or_else(|| AdkError::tool(format!("Missing required parameter: {}", key)))
 }
 
 /// Safely get an optional string parameter from args
@@ -25,7 +25,7 @@ pub fn get_optional_string_param(args: &Value, key: &str) -> Option<String> {
 pub fn get_required_array_param<'a>(args: &'a Value, key: &str) -> Result<&'a Vec<Value>, AdkError> {
     args.get(key)
         .and_then(|v| v.as_array())
-        .ok_or_else(|| AdkError::Tool(format!("Missing required parameter: {}", key)))
+        .ok_or_else(|| AdkError::tool(format!("Missing required parameter: {}", key)))
 }
 
 // ============================================================================

@@ -1,11 +1,11 @@
-use cowork_core::llm::config::{self, ModelConfig, LlmConfig, McpConfig};
-use cowork_core::config_definition::{AgentDefinition, StageDefinition, FlowDefinition};
-use cowork_core::config_definition::validator::ConfigValidator;
-use cowork_core::skills::SkillManager;
 use cowork_core::config_definition::IntegrationDefinition;
+use cowork_core::config_definition::validator::ConfigValidator;
+use cowork_core::config_definition::{AgentDefinition, FlowDefinition, StageDefinition};
 use cowork_core::instructions::*;
+use cowork_core::llm::config::{self, LlmConfig, McpConfig, ModelConfig};
+use cowork_core::skills::SkillManager;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 /// Skill info for frontend (from adk-skill SkillDocument)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -114,7 +114,8 @@ pub async fn gui_reset_config_registry() -> Result<ConfigRegistryState, String> 
     let registry = cowork_core::config_definition::global_registry();
 
     // Clear existing configurations
-    registry.clear()
+    registry
+        .clear()
         .map_err(|e| format!("Failed to clear registry: {}", e))?;
 
     // Reload built-in configurations
@@ -123,7 +124,9 @@ pub async fn gui_reset_config_registry() -> Result<ConfigRegistryState, String> 
 
     tracing::info!(
         "Reset config registry: {} agents, {} stages, {} flows",
-        report.agents_loaded, report.stages_loaded, report.flows_loaded
+        report.agents_loaded,
+        report.stages_loaded,
+        report.flows_loaded
     );
 
     // Return the reset state
@@ -236,11 +239,13 @@ pub async fn gui_save_agent_config(agent: AgentDefinition) -> Result<(), String>
     let registry = cowork_core::config_definition::global_registry();
 
     // Register in memory
-    registry.register_agent(agent.clone())
+    registry
+        .register_agent(agent.clone())
         .map_err(|e| format!("Failed to save agent: {}", e))?;
 
     // Persist to file
-    registry.save_agent_to_file(&agent)
+    registry
+        .save_agent_to_file(&agent)
         .map_err(|e| format!("Failed to persist agent to file: {}", e))?;
 
     Ok(())
@@ -254,7 +259,8 @@ pub async fn gui_delete_agent_config(agent_id: String) -> Result<(), String> {
     let removed = registry.unregister_agent(&agent_id);
 
     // Delete from file (regardless of memory removal result)
-    registry.delete_agent_file(&agent_id)
+    registry
+        .delete_agent_file(&agent_id)
         .map_err(|e| format!("Failed to delete agent file: {}", e))?;
 
     if removed {
@@ -271,11 +277,13 @@ pub async fn gui_save_stage_config(stage: StageDefinition) -> Result<(), String>
     let registry = cowork_core::config_definition::global_registry();
 
     // Register in memory
-    registry.register_stage(stage.clone())
+    registry
+        .register_stage(stage.clone())
         .map_err(|e| format!("Failed to save stage: {}", e))?;
 
     // Persist to file
-    registry.save_stage_to_file(&stage)
+    registry
+        .save_stage_to_file(&stage)
         .map_err(|e| format!("Failed to persist stage to file: {}", e))?;
 
     Ok(())
@@ -286,7 +294,8 @@ pub async fn gui_delete_stage_config(stage_id: String) -> Result<(), String> {
     let registry = cowork_core::config_definition::global_registry();
 
     // Delete from file
-    registry.delete_stage_file(&stage_id)
+    registry
+        .delete_stage_file(&stage_id)
         .map_err(|e| format!("Failed to delete stage file: {}", e))?;
 
     Ok(())
@@ -308,11 +317,13 @@ pub async fn gui_save_flow_config(flow: FlowDefinition) -> Result<(), String> {
     flow.is_builtin = false;
 
     // Register in memory
-    registry.register_flow(flow.clone())
+    registry
+        .register_flow(flow.clone())
         .map_err(|e| format!("Failed to save flow: {}", e))?;
 
     // Persist to file
-    registry.save_flow_to_file(&flow)
+    registry
+        .save_flow_to_file(&flow)
         .map_err(|e| format!("Failed to persist flow to file: {}", e))?;
 
     Ok(())
@@ -333,12 +344,14 @@ pub async fn gui_delete_flow_config(flow_id: String) -> Result<(), String> {
     registry.unregister_flow(&flow_id);
 
     // Delete from file
-    registry.delete_flow_file(&flow_id)
+    registry
+        .delete_flow_file(&flow_id)
         .map_err(|e| format!("Failed to delete flow file: {}", e))?;
 
     // If this was the default flow, clear the default setting
     if registry.get_default_flow_id().as_deref() == Some(&flow_id) {
-        registry.set_default_flow(None)
+        registry
+            .set_default_flow(None)
             .map_err(|e| format!("Failed to clear default flow: {}", e))?;
     }
 
@@ -356,7 +369,8 @@ pub async fn gui_set_default_flow(flow_id: String) -> Result<(), String> {
 
     // Set as default
     let flow_id_clone = flow_id.clone();
-    registry.set_default_flow(Some(flow_id))
+    registry
+        .set_default_flow(Some(flow_id))
         .map_err(|e| format!("Failed to set default flow: {}", e))?;
 
     tracing::info!("Set default flow to: {}", flow_id_clone);
@@ -375,7 +389,10 @@ pub async fn gui_install_skill(skill_path: String) -> Result<SkillInfo, String> 
     // Read and parse SKILL.md first to get skill info
     let skill_md_path = path.join("SKILL.md");
     if !skill_md_path.exists() {
-        return Err(format!("Source directory does not contain SKILL.md: {:?}", path));
+        return Err(format!(
+            "Source directory does not contain SKILL.md: {:?}",
+            path
+        ));
     }
 
     let content = std::fs::read_to_string(&skill_md_path)
@@ -392,8 +409,7 @@ pub async fn gui_install_skill(skill_path: String) -> Result<SkillInfo, String> 
         .map_err(|e| format!("Failed to create target directory: {}", e))?;
 
     // Copy all files from source to target
-    copy_dir_all(path, &target_dir)
-        .map_err(|e| format!("Failed to copy skill files: {}", e))?;
+    copy_dir_all(path, &target_dir).map_err(|e| format!("Failed to copy skill files: {}", e))?;
 
     tracing::info!("Installed skill '{}' to {:?}", skill_name, target_dir);
 
@@ -403,14 +419,12 @@ pub async fn gui_install_skill(skill_path: String) -> Result<SkillInfo, String> 
 
 /// Recursively copy a directory
 fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> Result<(), String> {
-    std::fs::create_dir_all(dst)
-        .map_err(|e| format!("Failed to create directory: {}", e))?;
+    std::fs::create_dir_all(dst).map_err(|e| format!("Failed to create directory: {}", e))?;
 
-    for entry in std::fs::read_dir(src)
-        .map_err(|e| format!("Failed to read directory: {}", e))?
-    {
+    for entry in std::fs::read_dir(src).map_err(|e| format!("Failed to read directory: {}", e))? {
         let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
-        let ty = entry.file_type()
+        let ty = entry
+            .file_type()
             .map_err(|e| format!("Failed to get file type: {}", e))?;
 
         if ty.is_dir() {
@@ -448,11 +462,13 @@ pub async fn gui_save_integration_config(integration: IntegrationDefinition) -> 
     let registry = cowork_core::config_definition::global_registry();
 
     // Register in memory
-    registry.register_integration(integration.clone())
+    registry
+        .register_integration(integration.clone())
         .map_err(|e| format!("Failed to save integration: {}", e))?;
 
     // Persist to file
-    registry.save_integration_to_file(&integration)
+    registry
+        .save_integration_to_file(&integration)
         .map_err(|e| format!("Failed to persist integration to file: {}", e))?;
 
     Ok(())
@@ -463,7 +479,8 @@ pub async fn gui_delete_integration_config(integration_id: String) -> Result<(),
     let registry = cowork_core::config_definition::global_registry();
 
     // Delete from file
-    registry.delete_integration_file(&integration_id)
+    registry
+        .delete_integration_file(&integration_id)
         .map_err(|e| format!("Failed to delete integration file: {}", e))?;
 
     Ok(())
@@ -486,18 +503,19 @@ pub struct ValidationResult {
 
 impl From<cowork_core::config_definition::validator::ValidationResult> for ValidationResult {
     fn from(result: cowork_core::config_definition::validator::ValidationResult) -> Self {
-        let issues = result.errors.iter()
+        let issues = result
+            .errors
+            .iter()
             .map(|e| ValidationIssue {
                 path: String::new(),
                 message: e.clone(),
                 severity: "error".to_string(),
             })
-            .chain(result.warnings.iter()
-                .map(|w| ValidationIssue {
-                    path: String::new(),
-                    message: w.clone(),
-                    severity: "warning".to_string(),
-                }))
+            .chain(result.warnings.iter().map(|w| ValidationIssue {
+                path: String::new(),
+                message: w.clone(),
+                severity: "warning".to_string(),
+            }))
             .collect();
 
         Self {
@@ -529,19 +547,22 @@ pub async fn gui_export_config(config_type: String, config_id: String) -> Result
 
     let json = match config_type.as_str() {
         "agent" => {
-            let agent = registry.get_agent(&config_id)
+            let agent = registry
+                .get_agent(&config_id)
                 .ok_or_else(|| format!("Agent not found: {}", config_id))?;
             serde_json::to_string_pretty(&agent)
                 .map_err(|e| format!("Failed to serialize agent: {}", e))?
         }
         "stage" => {
-            let stage = registry.get_stage(&config_id)
+            let stage = registry
+                .get_stage(&config_id)
                 .ok_or_else(|| format!("Stage not found: {}", config_id))?;
             serde_json::to_string_pretty(&stage)
                 .map_err(|e| format!("Failed to serialize stage: {}", e))?
         }
         "flow" => {
-            let flow = registry.get_flow(&config_id)
+            let flow = registry
+                .get_flow(&config_id)
                 .ok_or_else(|| format!("Flow not found: {}", config_id))?;
             serde_json::to_string_pretty(&flow)
                 .map_err(|e| format!("Failed to serialize flow: {}", e))?
@@ -560,19 +581,22 @@ pub async fn gui_import_config(config_type: String, json_data: String) -> Result
         "agent" => {
             let agent: AgentDefinition = serde_json::from_str(&json_data)
                 .map_err(|e| format!("Failed to parse agent JSON: {}", e))?;
-            registry.register_agent(agent)
+            registry
+                .register_agent(agent)
                 .map_err(|e| format!("Failed to register agent: {}", e))?;
         }
         "stage" => {
             let stage: StageDefinition = serde_json::from_str(&json_data)
                 .map_err(|e| format!("Failed to parse stage JSON: {}", e))?;
-            registry.register_stage(stage)
+            registry
+                .register_stage(stage)
                 .map_err(|e| format!("Failed to register stage: {}", e))?;
         }
         "flow" => {
             let flow: FlowDefinition = serde_json::from_str(&json_data)
                 .map_err(|e| format!("Failed to parse flow JSON: {}", e))?;
-            registry.register_flow(flow)
+            registry
+                .register_flow(flow)
                 .map_err(|e| format!("Failed to register flow: {}", e))?;
         }
         _ => return Err(format!("Unknown config type: {}", config_type)),
@@ -585,21 +609,19 @@ pub async fn gui_import_config(config_type: String, json_data: String) -> Result
 
 #[tauri::command]
 pub async fn get_app_config() -> Result<ModelConfig, String> {
-    config::load_config()
-        .map_err(|e| format!("Failed to load config: {}", e))
+    config::load_config().map_err(|e| format!("Failed to load config: {}", e))
 }
 
 #[tauri::command]
 pub async fn save_app_config(config: ModelConfig) -> Result<String, String> {
-    let path = config::save_config(&config)
-        .map_err(|e| format!("Failed to save config: {}", e))?;
+    let path = config::save_config(&config).map_err(|e| format!("Failed to save config: {}", e))?;
     Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 pub async fn get_config_path() -> Result<String, String> {
-    let path = config::get_config_path()
-        .map_err(|e| format!("Failed to get config path: {}", e))?;
+    let path =
+        config::get_config_path().map_err(|e| format!("Failed to get config path: {}", e))?;
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -610,10 +632,11 @@ pub async fn get_default_config() -> ModelConfig {
 
 #[tauri::command]
 pub async fn open_config_folder() -> Result<(), String> {
-    let config_path = config::get_config_path()
-        .map_err(|e| format!("Failed to get config path: {}", e))?;
+    let config_path =
+        config::get_config_path().map_err(|e| format!("Failed to get config path: {}", e))?;
 
-    let parent = config_path.parent()
+    let parent = config_path
+        .parent()
         .ok_or_else(|| "Failed to get config directory".to_string())?;
 
     open_folder_in_explorer(parent)
@@ -621,12 +644,17 @@ pub async fn open_config_folder() -> Result<(), String> {
 
 #[tauri::command]
 pub async fn test_llm_connection(llm_config: LlmConfig) -> Result<bool, String> {
+    use adk_core::{Content, LlmRequest, Part};
     use cowork_core::llm::create_llm_client;
-    use adk_core::{Content, Part, LlmRequest};
     use futures::StreamExt;
 
-    if llm_config.api_base_url.is_empty() || llm_config.api_key.is_empty() || llm_config.model_name.is_empty() {
-        return Err("Please fill in all LLM settings (API URL, API Key, and Model Name)".to_string());
+    if llm_config.api_base_url.is_empty()
+        || llm_config.api_key.is_empty()
+        || llm_config.model_name.is_empty()
+    {
+        return Err(
+            "Please fill in all LLM settings (API URL, API Key, and Model Name)".to_string(),
+        );
     }
 
     let client = create_llm_client(&llm_config)
@@ -634,7 +662,9 @@ pub async fn test_llm_connection(llm_config: LlmConfig) -> Result<bool, String> 
 
     let contents = vec![Content {
         role: "user".to_string(),
-        parts: vec![Part::Text { text: "Hello, this is a connection test. Please respond with 'OK'.".to_string() }],
+        parts: vec![Part::Text {
+            text: "Hello, this is a connection test. Please respond with 'OK'.".to_string(),
+        }],
     }];
 
     let test_request = LlmRequest {
@@ -644,7 +674,9 @@ pub async fn test_llm_connection(llm_config: LlmConfig) -> Result<bool, String> 
         tools: Default::default(),
     };
 
-    let mut stream = client.generate_content(test_request, false).await
+    let mut stream = client
+        .generate_content(test_request, false)
+        .await
         .map_err(|e| format!("Connection test failed: {}", e))?;
 
     let mut response_text = String::new();
@@ -721,7 +753,6 @@ pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
             category: "Idea".to_string(),
             description: "Save the initial project idea document".to_string(),
         },
-        
         // Data tools
         ToolInfo {
             id: "create_requirement".to_string(),
@@ -783,7 +814,6 @@ pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
             category: "Data".to_string(),
             description: "Retrieve the implementation plan (alias: get_plan)".to_string(),
         },
-        
         // File tools
         ToolInfo {
             id: "read_file".to_string(),
@@ -815,7 +845,6 @@ pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
             category: "File".to_string(),
             description: "Read a file with intelligent truncation for large files".to_string(),
         },
-        
         // Document tools (Project Iteration Files)
         ToolInfo {
             id: "load_idea".to_string(),
@@ -857,7 +886,8 @@ pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
             id: "save_plan_doc".to_string(),
             name: "Save Plan Doc".to_string(),
             category: "Document".to_string(),
-            description: "Save the implementation plan document to the artifacts directory".to_string(),
+            description: "Save the implementation plan document to the artifacts directory"
+                .to_string(),
         },
         ToolInfo {
             id: "save_delivery_report".to_string(),
@@ -871,7 +901,6 @@ pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
             category: "Document".to_string(),
             description: "Save the check report to the artifacts directory".to_string(),
         },
-        
         // Design tools
         ToolInfo {
             id: "create_design_component".to_string(),
@@ -879,7 +908,6 @@ pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
             category: "Design".to_string(),
             description: "Create a new design component".to_string(),
         },
-        
         // Validation tools
         ToolInfo {
             id: "check_feature_coverage".to_string(),
@@ -911,7 +939,6 @@ pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
             category: "Validation".to_string(),
             description: "Validate data format consistency".to_string(),
         },
-        
         // HITL tools
         ToolInfo {
             id: "provide_feedback".to_string(),
@@ -925,7 +952,6 @@ pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
             category: "HITL".to_string(),
             description: "Load history of feedback from previous iterations".to_string(),
         },
-        
         // Memory tools
         ToolInfo {
             id: "query_memory".to_string(),
@@ -963,7 +989,6 @@ pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
             category: "Memory".to_string(),
             description: "Promote a learning to a project-level pattern".to_string(),
         },
-        
         // Deployment tools
         ToolInfo {
             id: "copy_workspace_to_project".to_string(),
@@ -971,7 +996,6 @@ pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
             category: "Deployment".to_string(),
             description: "Copy generated workspace files to the project directory".to_string(),
         },
-        
         // Flow control tools
         ToolInfo {
             id: "goto_stage".to_string(),
@@ -979,7 +1003,6 @@ pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
             category: "Flow Control".to_string(),
             description: "Jump to a specific stage in the flow".to_string(),
         },
-        
         // PM tools
         ToolInfo {
             id: "pm_goto_stage".to_string(),
@@ -1006,7 +1029,7 @@ pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
             description: "PM agent: Save a decision to memory".to_string(),
         },
     ];
-    
+
     Ok(tools)
 }
 
@@ -1017,22 +1040,19 @@ pub async fn gui_get_available_tools() -> Result<Vec<ToolInfo>, String> {
 /// Get current MCP configuration
 #[tauri::command]
 pub async fn gui_get_mcp_config() -> Result<McpConfig, String> {
-    let config = config::load_config()
-        .map_err(|e| format!("Failed to load config: {}", e))?;
+    let config = config::load_config().map_err(|e| format!("Failed to load config: {}", e))?;
     Ok(config.mcp)
 }
 
 /// Update MCP configuration
 #[tauri::command]
 pub async fn gui_update_mcp_config(mcp_config: McpConfig) -> Result<String, String> {
-    let mut config = config::load_config()
-        .map_err(|e| format!("Failed to load config: {}", e))?;
-    
+    let mut config = config::load_config().map_err(|e| format!("Failed to load config: {}", e))?;
+
     config.mcp = mcp_config;
-    
-    let path = config::save_config(&config)
-        .map_err(|e| format!("Failed to save config: {}", e))?;
-    
+
+    let path = config::save_config(&config).map_err(|e| format!("Failed to save config: {}", e))?;
+
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -1042,19 +1062,20 @@ pub async fn gui_update_mcp_config(mcp_config: McpConfig) -> Result<String, Stri
 pub async fn gui_test_tavily_connection(apiKey: String) -> Result<bool, String> {
     use adk_tool::McpHttpClientBuilder;
     use std::time::Duration;
-    
+
     if apiKey.is_empty() {
         return Err("Tavily API key is required".to_string());
     }
-    
-    let endpoint = format!("https://mcp.tavily.com/mcp?tavilyApiKey={}", apiKey);
-    
+
+    let endpoint = format!("https://mcp.tavily.com/mcp/?tavilyApiKey={}", apiKey);
+
     tracing::info!("Testing Tavily MCP connection to: {}", endpoint);
-    
-    let builder: McpHttpClientBuilder = McpHttpClientBuilder::new(&endpoint)
-        .timeout(Duration::from_secs(30));
-    
-    builder.connect()
+
+    let builder: McpHttpClientBuilder =
+        McpHttpClientBuilder::new(&endpoint).timeout(Duration::from_secs(30));
+
+    builder
+        .connect()
         .await
         .map(|_| true)
         .map_err(|e| format!("Failed to connect to Tavily MCP: {}", e))
@@ -1065,17 +1086,17 @@ pub async fn gui_test_tavily_connection(apiKey: String) -> Result<bool, String> 
 pub async fn gui_test_deepwiki_connection() -> Result<bool, String> {
     use adk_tool::McpHttpClientBuilder;
     use std::time::Duration;
-    
+
     let endpoint = "https://mcp.deepwiki.com/mcp";
-    
+
     tracing::info!("Testing DeepWiki MCP connection to: {}", endpoint);
-    
-    let builder: McpHttpClientBuilder = McpHttpClientBuilder::new(endpoint)
-        .timeout(Duration::from_secs(30));
-    
-    builder.connect()
+
+    let builder: McpHttpClientBuilder =
+        McpHttpClientBuilder::new(endpoint).timeout(Duration::from_secs(30));
+
+    builder
+        .connect()
         .await
         .map(|_| true)
         .map_err(|e| format!("Failed to connect to DeepWiki MCP: {}", e))
 }
-

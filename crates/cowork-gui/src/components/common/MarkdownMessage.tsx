@@ -1,4 +1,4 @@
-import React, { useMemo, memo } from 'react';
+import React, { memo, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -8,98 +8,85 @@ interface MarkdownMessageProps {
   content: string;
 }
 
-// Memoized markdown components to avoid recreation on every render
+// Copy button for code blocks
+const CodeCopyButton: React.FC<{ text: string }> = ({ text }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [text]);
+
+  return (
+    <button className="markdown-code-copy" onClick={handleCopy}>
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  );
+};
+
+// Extract language from className like "language-rust"
+const getLanguage = (className?: string): string => {
+  if (!className) return '';
+  const match = className.match(/language-(\w+)/);
+  return match ? match[1] : '';
+};
+
+// Memoized markdown components
 const markdownComponents = {
   code: ({ className, children, ...props }: React.HTMLAttributes<HTMLElement> & { className?: string }) => {
-    return !className ? (
-      <code
-        style={{
-          backgroundColor: '#f6f8fa',
-          padding: '2px 6px',
-          borderRadius: '3px',
-          fontSize: '0.9em',
-          fontFamily: 'Consolas, Monaco, "Courier New", monospace',
-        }}
-        {...props}
-      >
-        {children}
-      </code>
-    ) : (
-      <div
-        style={{
-          backgroundColor: '#f6f8fa',
-          borderRadius: '6px',
-          padding: '12px',
-          margin: '8px 0',
-          overflowX: 'auto',
-          border: '1px solid #e1e4e8',
-        }}
-      >
-        <code className={className} {...props} style={{ fontSize: '13px' }}>
-          {children}
-        </code>
+    const isBlock = className || (children && String(children).includes('\n'));
+    const codeText = String(children).replace(/\n$/, '');
+
+    if (!isBlock) {
+      // Inline code
+      return <code {...props}>{children}</code>;
+    }
+
+    // Block code with wrapper
+    const lang = getLanguage(className);
+    return (
+      <div className="markdown-code-block">
+        <div className="markdown-code-header">
+          <span>{lang || 'code'}</span>
+          <CodeCopyButton text={codeText} />
+        </div>
+        <pre>
+          <code className={className} {...props}>
+            {children}
+          </code>
+        </pre>
       </div>
     );
   },
   blockquote: ({ children }: { children?: React.ReactNode }) => (
-    <blockquote
-      style={{
-        borderLeft: '4px solid #dfe2e5',
-        margin: '8px 0',
-        padding: '8px 16px',
-        backgroundColor: '#f6f8fa',
-        color: '#6a737d',
-      }}
-    >
-      {children}
-    </blockquote>
+    <blockquote>{children}</blockquote>
   ),
-  h1: ({ children }: { children?: React.ReactNode }) => (
-    <h1 style={{ fontSize: '1.5em', fontWeight: 600, marginBottom: '0.5em', marginTop: '1em' }}>
-      {children}
-    </h1>
-  ),
-  h2: ({ children }: { children?: React.ReactNode }) => (
-    <h2 style={{ fontSize: '1.3em', fontWeight: 600, marginBottom: '0.5em', marginTop: '0.8em' }}>
-      {children}
-    </h2>
-  ),
-  h3: ({ children }: { children?: React.ReactNode }) => (
-    <h3 style={{ fontSize: '1.1em', fontWeight: 600, marginBottom: '0.5em', marginTop: '0.6em' }}>
-      {children}
-    </h3>
-  ),
-  ul: ({ children }: { children?: React.ReactNode }) => <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>{children}</ul>,
-  ol: ({ children }: { children?: React.ReactNode }) => <ol style={{ paddingLeft: '20px', margin: '8px 0' }}>{children}</ol>,
-  li: ({ children }: { children?: React.ReactNode }) => <li style={{ marginBottom: '4px' }}>{children}</li>,
+  h1: ({ children }: { children?: React.ReactNode }) => <h1>{children}</h1>,
+  h2: ({ children }: { children?: React.ReactNode }) => <h2>{children}</h2>,
+  h3: ({ children }: { children?: React.ReactNode }) => <h3>{children}</h3>,
+  h4: ({ children }: { children?: React.ReactNode }) => <h4>{children}</h4>,
+  ul: ({ children }: { children?: React.ReactNode }) => <ul>{children}</ul>,
+  ol: ({ children }: { children?: React.ReactNode }) => <ol>{children}</ol>,
+  li: ({ children }: { children?: React.ReactNode }) => <li>{children}</li>,
   a: ({ children, href }: { children?: React.ReactNode; href?: string }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: '#1890ff', textDecoration: 'underline' }}>
-      {children}
-    </a>
+    <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
   ),
-  table: ({ children }: { children?: React.ReactNode }) => (
-    <table style={{ width: '100%', borderCollapse: 'collapse', margin: '12px 0', fontSize: '13px' }}>
-      {children}
-    </table>
-  ),
-  thead: ({ children }: { children?: React.ReactNode }) => <thead style={{ backgroundColor: '#f6f8fa' }}>{children}</thead>,
-  th: ({ children }: { children?: React.ReactNode }) => (
-    <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '2px solid #e1e4e8', fontWeight: 600 }}>
-      {children}
-    </th>
-  ),
-  td: ({ children }: { children?: React.ReactNode }) => (
-    <td style={{ padding: '8px 12px', borderBottom: '1px solid #e1e4e8' }}>{children}</td>
-  ),
+  table: ({ children }: { children?: React.ReactNode }) => <table>{children}</table>,
+  thead: ({ children }: { children?: React.ReactNode }) => <thead>{children}</thead>,
+  th: ({ children }: { children?: React.ReactNode }) => <th>{children}</th>,
+  td: ({ children }: { children?: React.ReactNode }) => <td>{children}</td>,
+  p: ({ children }: { children?: React.ReactNode }) => <p>{children}</p>,
 };
 
-// Memoized remark/rehype plugins array
+// Memoized plugins
 const remarkPlugins = [remarkGfm];
 const rehypePlugins = [rehypeHighlight, rehypeRaw];
 
 const MarkdownMessageInner: React.FC<MarkdownMessageProps> = ({ content }) => {
   return (
-    <div style={{ lineHeight: '1.6', fontSize: '14px' }}>
+    <div className="markdown-body">
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}
@@ -111,5 +98,4 @@ const MarkdownMessageInner: React.FC<MarkdownMessageProps> = ({ content }) => {
   );
 };
 
-// Export memoized component - only re-renders when content changes
 export const MarkdownMessage = memo(MarkdownMessageInner);

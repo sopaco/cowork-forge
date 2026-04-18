@@ -98,7 +98,7 @@ impl Tool for PMGotoStageTool {
 
         // Load or create session meta
         let mut meta = load_session_meta()
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?
+            .map_err(|e| adk_core::AdkError::tool(e.to_string()))?
             .unwrap_or_else(|| SessionMeta {
                 session_id: uuid::Uuid::new_v4().to_string(),
                 created_at: chrono::Utc::now(),
@@ -112,7 +112,7 @@ impl Tool for PMGotoStageTool {
 
         // Save session meta
         save_session_meta(&meta)
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+            .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
         Ok(json!({
             "status": "success",
@@ -178,8 +178,8 @@ impl Tool for PMCreateIterationTool {
         // Load project
         let project_store = ProjectStore::new();
         let mut project = project_store.load()
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?
-            .ok_or_else(|| adk_core::AdkError::Tool("Project not initialized".to_string()))?;
+            .map_err(|e| adk_core::AdkError::tool(e.to_string()))?
+            .ok_or_else(|| adk_core::AdkError::tool("Project not initialized".to_string()))?;
 
         // Determine inheritance mode
         let inheritance_mode = match inheritance.as_str() {
@@ -202,11 +202,11 @@ impl Tool for PMCreateIterationTool {
         // Save iteration
         let iteration_store = IterationStore::new();
         iteration_store.save(&new_iteration)
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+            .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
         // Update project
         project_store.add_iteration(&mut project, new_iteration.to_summary())
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+            .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
         Ok(json!({
             "status": "success",
@@ -333,7 +333,7 @@ impl Tool for PMSaveDecisionTool {
         );
 
         memory_store.add_decision(memory_decision)
-            .map_err(|e: anyhow::Error| adk_core::AdkError::Tool(e.to_string()))?;
+            .map_err(|e: anyhow::Error| adk_core::AdkError::tool(e.to_string()))?;
 
         Ok(json!({
             "status": "success",

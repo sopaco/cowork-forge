@@ -73,7 +73,7 @@ impl Tool for GotoStageTool {
 
         // Load or create session meta
         let mut meta = load_session_meta()
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?
+            .map_err(|e| adk_core::AdkError::tool(e.to_string()))?
             .unwrap_or_else(|| SessionMeta {
                 session_id: uuid::Uuid::new_v4().to_string(),
                 created_at: chrono::Utc::now(),
@@ -87,11 +87,11 @@ impl Tool for GotoStageTool {
 
         // Save session meta
         save_session_meta(&meta)
-            .map_err(|e| adk_core::AdkError::Tool(e.to_string()))?;
+            .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
         // Signal to stage executor that we need to jump to another stage
         // This will be caught by the executor and trigger a proper stage transition
-        Err(adk_core::AdkError::Tool(format!(
+        Err(adk_core::AdkError::tool(format!(
             "GOTO_STAGE:{}:{}",
             stage_str, reason
         )))

@@ -63,7 +63,7 @@ impl Tool for CreateRequirementTool {
         let title = args.get("title").and_then(|v| v.as_str()).unwrap_or("");
         super::notify_tool_call("create_requirement", &json!({"title": title}));
 
-        let mut reqs = load_requirements().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut reqs = load_requirements().map_err(|e| AdkError::tool(e.to_string()))?;
 
         let req_id = generate_id("REQ", reqs.requirements.len());
 
@@ -95,7 +95,7 @@ impl Tool for CreateRequirementTool {
 
         reqs.requirements.push(requirement.clone());
         reqs.updated_at = chrono::Utc::now();
-        save_requirements(&reqs).map_err(|e| AdkError::Tool(e.to_string()))?;
+        save_requirements(&reqs).map_err(|e| AdkError::tool(e.to_string()))?;
 
         // Log for user visibility
         println!("✅ Created: {} - {}", req_id, requirement.title);
@@ -160,7 +160,7 @@ impl Tool for AddFeatureTool {
         let name = get_required_string_param(&args, "name")?;
         super::notify_tool_call("add_feature", &json!({"name": name}));
 
-        let mut features = load_feature_list().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut features = load_feature_list().map_err(|e| AdkError::tool(e.to_string()))?;
 
         let feat_id = generate_id("FEAT", features.features.len());
 
@@ -184,7 +184,7 @@ impl Tool for AddFeatureTool {
         };
 
         features.features.push(feature);
-        save_feature_list(&features).map_err(|e| AdkError::Tool(e.to_string()))?;
+        save_feature_list(&features).map_err(|e| AdkError::tool(e.to_string()))?;
 
         Ok(json!({
             "status": "success",
@@ -248,14 +248,14 @@ impl Tool for CreateDesignComponentTool {
         let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
         super::notify_tool_call("create_design_component", &json!({"name": name}));
 
-        let mut design = load_design_spec().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut design = load_design_spec().map_err(|e| AdkError::tool(e.to_string()))?;
 
         let comp_id = generate_id("COMP", design.architecture.components.len());
 
         // Parse component_type with error handling
         let component_type = args.get("component_type")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| AdkError::Tool("Missing or invalid 'component_type' parameter".to_string()))?;
+            .ok_or_else(|| AdkError::tool("Missing or invalid 'component_type' parameter".to_string()))?;
         
         let component_type = match component_type {
             "backend_service" => ComponentType::BackendService,
@@ -268,24 +268,24 @@ impl Tool for CreateDesignComponentTool {
         // Parse required fields with error handling
         let name = args.get("name")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| AdkError::Tool("Missing or invalid 'name' parameter".to_string()))?
+            .ok_or_else(|| AdkError::tool("Missing or invalid 'name' parameter".to_string()))?
             .to_string();
 
         let technology = args.get("technology")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| AdkError::Tool("Missing or invalid 'technology' parameter".to_string()))?
+            .ok_or_else(|| AdkError::tool("Missing or invalid 'technology' parameter".to_string()))?
             .to_string();
 
         // Parse responsibilities array with error handling
         let responsibilities = args.get("responsibilities")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| AdkError::Tool("Missing or invalid 'responsibilities' parameter (must be an array)".to_string()))?
+            .ok_or_else(|| AdkError::tool("Missing or invalid 'responsibilities' parameter (must be an array)".to_string()))?
             .iter()
             .filter_map(|v| v.as_str().map(|s| s.to_string()))
             .collect::<Vec<String>>();
 
         if responsibilities.is_empty() {
-            return Err(AdkError::Tool("'responsibilities' array cannot be empty".to_string()));
+            return Err(AdkError::tool("'responsibilities' array cannot be empty".to_string()));
         }
 
         // Parse optional related_features
@@ -305,7 +305,7 @@ impl Tool for CreateDesignComponentTool {
         };
 
         design.architecture.components.push(component.clone());
-        save_design_spec(&design).map_err(|e| AdkError::Tool(e.to_string()))?;
+        save_design_spec(&design).map_err(|e| AdkError::tool(e.to_string()))?;
 
         // Log for user visibility
         println!("🏗️  Created component: {} - {}", comp_id, component.name);
@@ -365,7 +365,7 @@ impl Tool for CreateTaskTool {
         let title = get_required_string_param(&args, "title")?;
         super::notify_tool_call("create_task", &json!({"title": title}));
 
-        let mut plan = load_implementation_plan().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut plan = load_implementation_plan().map_err(|e| AdkError::tool(e.to_string()))?;
 
         let task_id = generate_id("TASK", plan.tasks.len());
 
@@ -395,7 +395,7 @@ impl Tool for CreateTaskTool {
         };
 
         plan.tasks.push(task);
-        save_implementation_plan(&plan).map_err(|e| AdkError::Tool(e.to_string()))?;
+        save_implementation_plan(&plan).map_err(|e| AdkError::tool(e.to_string()))?;
 
         Ok(json!({
             "status": "success",
@@ -441,7 +441,7 @@ impl Tool for UpdateFeatureStatusTool {
         let new_status_str = get_required_string_param(&args, "new_status")?;
         super::notify_tool_call("update_feature_status", &json!({"feature_id": feature_id, "status": new_status_str}));
 
-        let mut features = load_feature_list().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut features = load_feature_list().map_err(|e| AdkError::tool(e.to_string()))?;
 
         let new_status = match new_status_str {
             "pending" => FeatureStatus::Pending,
@@ -456,7 +456,7 @@ impl Tool for UpdateFeatureStatusTool {
             if new_status_str == "completed" {
                 feature.completed_at = Some(chrono::Utc::now());
             }
-            save_feature_list(&features).map_err(|e| AdkError::Tool(e.to_string()))?;
+            save_feature_list(&features).map_err(|e| AdkError::tool(e.to_string()))?;
 
             Ok(json!({
                 "status": "success",
@@ -503,20 +503,20 @@ impl Tool for UpdateTaskStatusTool {
         // Parse parameters with error handling
         let task_id = args.get("task_id")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| AdkError::Tool("Missing or invalid 'task_id' parameter".to_string()))?;
+            .ok_or_else(|| AdkError::tool("Missing or invalid 'task_id' parameter".to_string()))?;
         let new_status_str = args.get("new_status")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| AdkError::Tool("Missing or invalid 'new_status' parameter".to_string()))?;
+            .ok_or_else(|| AdkError::tool("Missing or invalid 'new_status' parameter".to_string()))?;
         super::notify_tool_call("update_task_status", &json!({"task_id": task_id, "status": new_status_str}));
 
-        let mut plan = load_implementation_plan().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut plan = load_implementation_plan().map_err(|e| AdkError::tool(e.to_string()))?;
 
         let new_status = match new_status_str {
             "pending" => TaskStatus::Pending,
             "in_progress" => TaskStatus::InProgress,
             "completed" => TaskStatus::Completed,
             "blocked" => TaskStatus::Blocked,
-            _ => return Err(AdkError::Tool(format!("Invalid status: {}. Must be one of: pending, in_progress, completed, blocked", new_status_str))),
+            _ => return Err(AdkError::tool(format!("Invalid status: {}. Must be one of: pending, in_progress, completed, blocked", new_status_str))),
         };
 
         if let Some(task) = plan.tasks.iter_mut().find(|t| t.id == task_id) {
@@ -526,7 +526,7 @@ impl Tool for UpdateTaskStatusTool {
                 "completed" => task.completed_at = Some(chrono::Utc::now()),
                 _ => {}
             }
-            save_implementation_plan(&plan).map_err(|e| AdkError::Tool(e.to_string()))?;
+            save_implementation_plan(&plan).map_err(|e| AdkError::tool(e.to_string()))?;
 
             // Log for user visibility
             println!("✓ Task {} → {}", task_id, new_status_str);
@@ -569,8 +569,8 @@ impl Tool for GetRequirementsTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
-        let requirements = load_requirements().map_err(|e| AdkError::Tool(e.to_string()))?;
-        let features = load_feature_list().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let requirements = load_requirements().map_err(|e| AdkError::tool(e.to_string()))?;
+        let features = load_feature_list().map_err(|e| AdkError::tool(e.to_string()))?;
 
         Ok(json!({
             "requirements": requirements.requirements,
@@ -596,8 +596,8 @@ impl Tool for GetDesignTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, _args: Value) -> adk_core::Result<Value> {
-        let design = load_design_spec().map_err(|e| AdkError::Tool(e.to_string()))?;
-        Ok(serde_json::to_value(design).map_err(|e| AdkError::Tool(e.to_string()))?)
+        let design = load_design_spec().map_err(|e| AdkError::tool(e.to_string()))?;
+        Ok(serde_json::to_value(design).map_err(|e| AdkError::tool(e.to_string()))?)
     }
 }
 
@@ -627,7 +627,7 @@ impl Tool for GetPlanTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let plan = load_implementation_plan().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let plan = load_implementation_plan().map_err(|e| AdkError::tool(e.to_string()))?;
 
         if let Some(status_filter) = args.get("status_filter").and_then(|v| v.as_str()) {
             let status = match status_filter {
@@ -646,7 +646,7 @@ impl Tool for GetPlanTool {
                 "milestones": plan.milestones
             }))
         } else {
-            Ok(serde_json::to_value(plan).map_err(|e| AdkError::Tool(e.to_string()))?)
+            Ok(serde_json::to_value(plan).map_err(|e| AdkError::tool(e.to_string()))?)
         }
     }
 }
@@ -702,11 +702,11 @@ impl Tool for UpdateRequirementTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let mut requirements = load_requirements().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut requirements = load_requirements().map_err(|e| AdkError::tool(e.to_string()))?;
 
         let id = args.get("id")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| AdkError::Tool("Missing 'id' parameter".to_string()))?;
+            .ok_or_else(|| AdkError::tool("Missing 'id' parameter".to_string()))?;
 
         if let Some(req) = requirements.requirements.iter_mut().find(|r| r.id == id) {
             // Update fields if provided
@@ -730,7 +730,7 @@ impl Tool for UpdateRequirementTool {
                     .collect();
             }
 
-            save_requirements(&requirements).map_err(|e| AdkError::Tool(e.to_string()))?;
+            save_requirements(&requirements).map_err(|e| AdkError::tool(e.to_string()))?;
 
             println!("✅ Updated requirement: {}", id);
 
@@ -775,17 +775,17 @@ impl Tool for DeleteRequirementTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let mut requirements = load_requirements().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut requirements = load_requirements().map_err(|e| AdkError::tool(e.to_string()))?;
 
         let id = args.get("id")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| AdkError::Tool("Missing 'id' parameter".to_string()))?;
+            .ok_or_else(|| AdkError::tool("Missing 'id' parameter".to_string()))?;
 
         let original_len = requirements.requirements.len();
         requirements.requirements.retain(|r| r.id != id);
 
         if requirements.requirements.len() < original_len {
-            save_requirements(&requirements).map_err(|e| AdkError::Tool(e.to_string()))?;
+            save_requirements(&requirements).map_err(|e| AdkError::tool(e.to_string()))?;
 
             println!("🗑️  Deleted requirement: {}", id);
 
@@ -849,11 +849,11 @@ impl Tool for UpdateFeatureTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-        let mut features = load_feature_list().map_err(|e| AdkError::Tool(e.to_string()))?;
+        let mut features = load_feature_list().map_err(|e| AdkError::tool(e.to_string()))?;
 
         let id = args.get("id")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| AdkError::Tool("Missing 'id' parameter".to_string()))?;
+            .ok_or_else(|| AdkError::tool("Missing 'id' parameter".to_string()))?;
 
         if let Some(feature) = features.features.iter_mut().find(|f| f.id == id) {
             // Update fields if provided
@@ -874,7 +874,7 @@ impl Tool for UpdateFeatureTool {
                     .collect();
             }
 
-            save_feature_list(&features).map_err(|e| AdkError::Tool(e.to_string()))?;
+            save_feature_list(&features).map_err(|e| AdkError::tool(e.to_string()))?;
 
             println!("✅ Updated feature: {}", id);
 

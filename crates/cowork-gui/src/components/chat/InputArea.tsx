@@ -33,9 +33,7 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
   const [expanded, setExpanded] = useState(false);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const modalTextAreaRef = useRef<HTMLTextAreaElement>(null);
-  // 跟踪 IME 输入法组合状态，用于中文输入法等场景
   const isComposingRef = useRef(false);
-  // 记录 compositionend 触发的时间，用于防止在 IME 刚结束时误触发发送
   const compositionEndTimeRef = useRef(0);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -47,34 +45,22 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
   }, []);
 
   const handleCompositionEnd = useCallback(() => {
-    // 延迟设置状态，防止在同一个事件循环中被 keydown 误判
     compositionEndTimeRef.current = Date.now();
-    // 使用 setTimeout 确保在当前事件循环之后再重置状态
     setTimeout(() => {
       isComposingRef.current = false;
     }, 0);
   }, []);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // 检查原生事件的 isComposing 属性，这是最可靠的 IME 检测方式
-    if (e.nativeEvent.isComposing) {
-      return;
-    }
-    // 如果刚刚结束 composition（50ms 内），也跳过，防止 IME 确认时误触发发送
-    if (Date.now() - compositionEndTimeRef.current < 50) {
-      return;
-    }
-    // 如果正在使用输入法组合输入（如中文输入法），不处理快捷键
-    if (isComposingRef.current) {
-      return;
-    }
-    // Shift + Enter: 展开输入框
+    if (e.nativeEvent.isComposing) return;
+    if (Date.now() - compositionEndTimeRef.current < 50) return;
+    if (isComposingRef.current) return;
+
     if (e.shiftKey && e.key === 'Enter') {
       e.preventDefault();
       setExpanded(true);
       return;
     }
-    // Enter alone: 发送消息
     if (!e.shiftKey && e.key === 'Enter') {
       e.preventDefault();
       if (userInput.trim() && !disabled) {
@@ -89,7 +75,6 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
 
   const handleCollapse = useCallback(() => {
     setExpanded(false);
-    // 折叠后聚焦回主输入框
     setTimeout(() => {
       textAreaRef.current?.focus();
     }, 100);
@@ -102,12 +87,10 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
     }
   }, [userInput, disabled, onSend]);
 
-  // 展开时聚焦 Modal 内的 TextArea
   useEffect(() => {
     if (expanded) {
       setTimeout(() => {
         modalTextAreaRef.current?.focus();
-        // 将光标移到末尾
         const len = userInput.length;
         modalTextAreaRef.current?.setSelectionRange(len, len);
       }, 100);
@@ -115,24 +98,11 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
   }, [expanded, userInput]);
 
   const handleModalKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // 检查原生事件的 isComposing 属性，这是最可靠的 IME 检测方式
-    if (e.nativeEvent.isComposing) {
-      return;
-    }
-    // 如果刚刚结束 composition（50ms 内），也跳过，防止 IME 确认时误触发发送
-    if (Date.now() - compositionEndTimeRef.current < 50) {
-      return;
-    }
-    // 如果正在使用输入法组合输入（如中文输入法），不处理快捷键
-    if (isComposingRef.current) {
-      return;
-    }
-    // Shift + Enter: 在展开模式下输入换行
-    if (e.shiftKey && e.key === 'Enter') {
-      // 默认行为，输入换行
-      return;
-    }
-    // Ctrl/Cmd + Enter: 发送消息
+    if (e.nativeEvent.isComposing) return;
+    if (Date.now() - compositionEndTimeRef.current < 50) return;
+    if (isComposingRef.current) return;
+
+    if (e.shiftKey && e.key === 'Enter') return;
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       if (userInput.trim() && !disabled) {
@@ -140,7 +110,6 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
         setExpanded(false);
       }
     }
-    // Escape: 关闭展开模式
     if (e.key === 'Escape') {
       e.preventDefault();
       setExpanded(false);
@@ -164,7 +133,8 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
       <Button
         icon={<ExpandOutlined />}
         onClick={handleExpandClick}
-        title="展开输入框 (Shift + Enter)"
+        title="Expand (Shift + Enter)"
+        size="small"
         style={{ flexShrink: 0 }}
       />
     </div>
@@ -173,42 +143,33 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
   if (mode === 'pm_agent') {
     return (
       <>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-          <div style={{ flex: 1 }}>
-            {renderInputWithExpand('Ask about the project or request changes...')}
+        <div className="chat-input-wrapper">
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+            <div style={{ flex: 1 }}>
+              {renderInputWithExpand('Ask about the project or request changes...')}
+            </div>
+            <Button onClick={onSend} type="primary" disabled={!userInput.trim() || disabled} size="small">
+              Send
+            </Button>
+            <Button onClick={onDumpChat} icon={<CopyOutlined />} size="small" title="Copy chat">
+              Dump
+            </Button>
           </div>
-          <Button onClick={onSend} type="primary" disabled={!userInput.trim() || disabled}>
-            Send
-          </Button>
-          <Button onClick={onDumpChat} icon={<CopyOutlined />} title="Copy chat to clipboard">
-            Dump
-          </Button>
         </div>
 
         <Modal
           open={expanded}
           onCancel={handleCollapse}
-          title={
-            <span>
-              <CompressOutlined style={{ marginRight: 8 }} />
-              展开输入
-            </span>
-          }
+          title={<span><CompressOutlined style={{ marginRight: 8 }} />Expanded Input</span>}
           width={700}
           footer={[
-            <Button key="dump" onClick={onDumpChat} icon={<CopyOutlined />}>
-              Dump
-            </Button>,
-            <Button key="cancel" onClick={handleCollapse}>
-              取消
-            </Button>,
+            <Button key="dump" onClick={onDumpChat} icon={<CopyOutlined />}>Dump</Button>,
+            <Button key="cancel" onClick={handleCollapse}>Cancel</Button>,
             <Button key="send" type="primary" onClick={handleModalSend} disabled={!userInput.trim() || disabled}>
-              发送 (Ctrl+Enter)
+              Send (Ctrl+Enter)
             </Button>,
           ]}
-          styles={{
-            body: { padding: '16px' },
-          }}
+          styles={{ body: { padding: '16px' } }}
         >
           <TextArea
             ref={modalTextAreaRef}
@@ -217,13 +178,13 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
             onKeyDown={handleModalKeyDown}
             onCompositionStart={handleCompositionStart}
             onCompositionEnd={handleCompositionEnd}
-            placeholder="输入内容，按 Ctrl+Enter 发送，按 Escape 关闭..."
+            placeholder="Type your message, Ctrl+Enter to send, Escape to close..."
             disabled={disabled}
             autoSize={{ minRows: 8, maxRows: 20 }}
             style={{ resize: 'none' }}
           />
-          <div style={{ marginTop: 8, color: '#888', fontSize: '12px' }}>
-            提示：Shift+Enter 换行，Ctrl+Enter 发送，Escape 关闭
+          <div style={{ marginTop: 8, color: 'var(--text-tertiary)', fontSize: '12px' }}>
+            Shift+Enter for newline, Ctrl+Enter to send, Escape to close
           </div>
         </Modal>
       </>
@@ -233,25 +194,17 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
   return (
     <>
       {inputRequest && (
-        <div
-          style={{
-            padding: '16px',
-            backgroundColor: '#fff7e6',
-            border: '1px solid #ffd591',
-            borderRadius: '4px',
-            marginBottom: '16px',
-          }}
-        >
-          <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
+        <div className="chat-input-request">
+          <div className="chat-input-request-title">
             {inputRequest.isArtifactConfirmation ? `Confirm ${inputRequest.artifactType}` : 'Input Required'}
           </div>
-          <div style={{ marginBottom: '12px', color: '#666' }}>
+          <div className="chat-input-request-prompt">
             {inputRequest.isFeedbackMode ? inputRequest.feedbackPrompt : inputRequest.prompt}
           </div>
           {inputRequest.options && !inputRequest.isFeedbackMode && (
             <Space direction="vertical" style={{ width: '100%' }}>
               {inputRequest.options.map((option) => (
-                <Button key={option.id} onClick={() => onSelectOption(option)} block>
+                <Button key={option.id} onClick={() => onSelectOption(option)} block size="small">
                   {option.label}
                 </Button>
               ))}
@@ -260,57 +213,48 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-        <div style={{ flex: 1 }}>
-          {renderInputWithExpand(inputRequest ? 'Type your response...' : 'Type a message...')}
+      <div className="chat-input-wrapper">
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+          <div style={{ flex: 1 }}>
+            {renderInputWithExpand(inputRequest ? 'Type your response...' : 'Type a message...')}
+          </div>
+          {inputRequest ? (
+            <Button onClick={onSubmitFeedback} type="primary" disabled={!userInput.trim()} size="small">
+              Send Feedback
+            </Button>
+          ) : (
+            <Button onClick={onSend} type="primary" disabled={!userInput.trim()} size="small">
+              Send
+            </Button>
+          )}
+          <Button onClick={onDumpChat} icon={<CopyOutlined />} size="small" title="Copy chat">
+            Dump
+          </Button>
+          {inputRequest && inputRequest.isFeedbackMode && (
+            <Button onClick={onCancelFeedback} size="small">Cancel</Button>
+          )}
         </div>
-        {inputRequest ? (
-          <Button onClick={onSubmitFeedback} type="primary" disabled={!userInput.trim()}>
-            Send Feedback
-          </Button>
-        ) : (
-          <Button onClick={onSend} type="primary" disabled={!userInput.trim()}>
-            Send
-          </Button>
-        )}
-        <Button onClick={onDumpChat} icon={<CopyOutlined />} title="Copy chat to clipboard">
-          Dump
-        </Button>
-        {inputRequest && inputRequest.isFeedbackMode && (
-          <Button onClick={onCancelFeedback}>Cancel</Button>
-        )}
       </div>
 
       <Modal
         open={expanded}
         onCancel={handleCollapse}
-        title={
-          <span>
-            <CompressOutlined style={{ marginRight: 8 }} />
-            展开输入
-          </span>
-        }
+        title={<span><CompressOutlined style={{ marginRight: 8 }} />Expanded Input</span>}
         width={700}
         footer={[
-          <Button key="dump" onClick={onDumpChat} icon={<CopyOutlined />}>
-            Dump
-          </Button>,
-          <Button key="cancel" onClick={handleCollapse}>
-            取消
-          </Button>,
+          <Button key="dump" onClick={onDumpChat} icon={<CopyOutlined />}>Dump</Button>,
+          <Button key="cancel" onClick={handleCollapse}>Cancel</Button>,
           inputRequest ? (
             <Button key="send" type="primary" onClick={() => { onSubmitFeedback(); setExpanded(false); }} disabled={!userInput.trim()}>
               Send Feedback
             </Button>
           ) : (
             <Button key="send" type="primary" onClick={handleModalSend} disabled={!userInput.trim()}>
-              发送 (Ctrl+Enter)
+              Send (Ctrl+Enter)
             </Button>
           ),
         ]}
-        styles={{
-          body: { padding: '16px' },
-        }}
+        styles={{ body: { padding: '16px' } }}
       >
         <TextArea
           ref={modalTextAreaRef}
@@ -319,13 +263,13 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
           onKeyDown={handleModalKeyDown}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
-          placeholder={inputRequest ? 'Type your response...' : '输入内容，按 Ctrl+Enter 发送，按 Escape 关闭...'}
+          placeholder={inputRequest ? 'Type your response...' : 'Type your message, Ctrl+Enter to send, Escape to close...'}
           disabled={disabled && !inputRequest}
           autoSize={{ minRows: 8, maxRows: 20 }}
           style={{ resize: 'none' }}
         />
-        <div style={{ marginTop: 8, color: '#888', fontSize: '12px' }}>
-          提示：Shift+Enter 换行，Ctrl+Enter 发送，Escape 关闭
+        <div style={{ marginTop: 8, color: 'var(--text-tertiary)', fontSize: '12px' }}>
+          Shift+Enter for newline, Ctrl+Enter to send, Escape to close
         </div>
       </Modal>
     </>

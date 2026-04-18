@@ -50,13 +50,13 @@ impl Tool for ReviewAndEditContentTool {
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let title = args["title"].as_str()
-            .ok_or_else(|| adk_core::AdkError::Tool("Missing required parameter: title".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("Missing required parameter: title".to_string()))?;
         let content = args["content"].as_str()
-            .ok_or_else(|| adk_core::AdkError::Tool("Missing required parameter: content".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("Missing required parameter: content".to_string()))?;
 
         // Get InteractiveBackend
         let interaction = get_interaction_backend()
-            .ok_or_else(|| adk_core::AdkError::Tool("InteractiveBackend not set".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("InteractiveBackend not set".to_string()))?;
 
         // Show content to user
         interaction.show_message(
@@ -81,7 +81,7 @@ impl Tool for ReviewAndEditContentTool {
             "Type 'edit' to open editor, 'pass' to continue, or provide feedback:",
             options,
             Some(content.to_string())
-        ).await.map_err(|e| adk_core::AdkError::Tool(format!("Input error: {}", e)))?;
+        ).await.map_err(|e| adk_core::AdkError::tool(format!("Input error: {}", e)))?;
 
         match response {
             InputResponse::Selection(id) => match id.as_str() {
@@ -155,15 +155,15 @@ impl Tool for ReviewWithFeedbackContentTool {
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let title = args["title"].as_str()
-            .ok_or_else(|| adk_core::AdkError::Tool("Missing required parameter: title".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("Missing required parameter: title".to_string()))?;
         let content = args["content"].as_str()
-            .ok_or_else(|| adk_core::AdkError::Tool("Missing required parameter: content".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("Missing required parameter: content".to_string()))?;
         let default_prompt = "Type 'edit' to open editor, 'pass' to continue, or provide feedback:";
         let prompt = args.get("prompt").and_then(|v| v.as_str()).unwrap_or(default_prompt);
 
         // Get InteractiveBackend
         let interaction = get_interaction_backend()
-            .ok_or_else(|| adk_core::AdkError::Tool("InteractiveBackend not set".to_string()))?;
+            .ok_or_else(|| adk_core::AdkError::tool("InteractiveBackend not set".to_string()))?;
 
         // Show content to user
         interaction.show_message(
@@ -185,7 +185,7 @@ impl Tool for ReviewWithFeedbackContentTool {
         ];
 
         let response = interaction.request_input(prompt, options, Some(content.to_string()))
-            .await.map_err(|e| adk_core::AdkError::Tool(format!("Input error: {}", e)))?;
+            .await.map_err(|e| adk_core::AdkError::tool(format!("Input error: {}", e)))?;
 
         match response {
             InputResponse::Selection(id) => match id.as_str() {
