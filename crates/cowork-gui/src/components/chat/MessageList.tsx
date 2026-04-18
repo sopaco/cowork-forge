@@ -8,6 +8,7 @@ import avatarPm from '../../assets/avatars/avatar_role_pm.png';
 import avatarDesigner from '../../assets/avatars/avatar_role_designer.png';
 import avatarRd from '../../assets/avatars/avatar_role_rd.png';
 import avatarQa from '../../assets/avatars/avatar_role_qa.png';
+import avatarController from '../../assets/avatars/avatar_role_controller.png';
 
 // Map agent name / stage name to avatar image
 const getAgentAvatar = (agentName?: string, stageName?: string): string => {
@@ -25,8 +26,8 @@ const getAgentAvatar = (agentName?: string, stageName?: string): string => {
   if (name.includes('plan') || name.includes('project manager') || name.includes('engineer') || name.includes('coding') || name.includes('developer')) return avatarRd;
   if (name.includes('check') || name.includes('qa') || name.includes('delivery') || name.includes('reviewer')) return avatarQa;
 
-  // Default: PM avatar
-  return avatarPm;
+  // Default: controller avatar
+  return avatarController;
 };
 
 interface ToolCallMessage extends ChatMessage {
