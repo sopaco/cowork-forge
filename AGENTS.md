@@ -15,7 +15,6 @@
 | Agent Framework | adk-rust 0.4.0 |
 | GUI | Tauri + React 18 + Ant Design |
 | Architecture | Hexagonal + DDD |
-| Version | 2.5.0 |
 | License | MIT |
 
 ### Workspace Structure

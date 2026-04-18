@@ -286,7 +286,7 @@ fn run_acp_in_thread(
                 acp::InitializeRequest::new(acp::ProtocolVersion::V1)
                     .client_info(acp::Implementation::new(
                         "cowork-forge".to_string(),
-                        "2.5.0".to_string(),
+                        "2.5.1".to_string(),
                     ).title("Cowork Forge".to_string()))
             )
             .await
