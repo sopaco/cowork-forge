@@ -6,7 +6,6 @@
 .artifact-content {
   padding: 24px;
   background: var(--bg-container);
-  border-radius: 12px;
   color: var(--text-primary);
   height: 100%;
   overflow-y: auto;
@@ -16,6 +15,201 @@
   color: var(--text-primary);
   margin-bottom: 16px;
   font-size: 18px;
+}
+
+/* Markdown Content inside Artifacts — relaxed spacing for readability */
+.markdown-content {
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+/* Headings — generous top margin for clear visual hierarchy */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--text-primary);
+  margin-top: 28px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.markdown-content h1 { font-size: 1.5em; }
+.markdown-content h2 {
+  font-size: 1.25em;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 8px;
+}
+.markdown-content h3 { font-size: 1.15em; }
+.markdown-content h4 { font-size: 1.05em; }
+
+/* First heading should not push down */
+.markdown-content > :first-child,
+.markdown-content > h1:first-child,
+.markdown-content > h2:first-child,
+.markdown-content > h3:first-child,
+.markdown-content > h4:first-child {
+  margin-top: 0;
+}
+
+/* Paragraphs */
+.markdown-content p {
+  margin-bottom: 14px;
+}
+
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Strong / Emphasis */
+.markdown-content strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.markdown-content em {
+  color: var(--text-secondary);
+}
+
+/* Inline Code */
+.markdown-content code:not(pre code) {
+  background: var(--bg-elevated);
+  color: var(--primary);
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+  font-size: 0.88em;
+  border: 1px solid var(--border-light);
+}
+
+/* Lists — increased item spacing and indentation */
+.markdown-content ul,
+.markdown-content ol {
+  margin: 16px 0;
+  padding-left: 26px;
+}
+
+.markdown-content li {
+  margin-bottom: 8px;
+  line-height: 1.75;
+}
+
+.markdown-content li:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content ul li::marker {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.markdown-content ol li::marker {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* Nested lists get tighter spacing */
+.markdown-content li > ul,
+.markdown-content li > ol {
+  margin: 6px 0;
+}
+
+/* Blockquote */
+.markdown-content blockquote {
+  border-left: 3px solid var(--primary);
+  padding: 10px 18px;
+  margin: 16px 0;
+  background: var(--bg-elevated);
+  border-radius: 0 8px 8px 0;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.markdown-content blockquote p {
+  margin: 0;
+}
+
+/* Links */
+.markdown-content a {
+  color: var(--primary);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: all 0.15s;
+}
+
+.markdown-content a:hover {
+  border-bottom-color: var(--primary);
+}
+
+/* Tables */
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.markdown-content th {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+}
+
+.markdown-content td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.markdown-content tr:last-child td {
+  border-bottom: none;
+}
+
+.markdown-content tr:hover td {
+  background: var(--bg-container);
+}
+
+/* HR */
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid var(--border-light);
+  margin: 24px 0;
+}
+
+/* Images */
+.markdown-content img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+/* Code blocks */
+.markdown-content pre {
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  background: #1e293b;
+  padding: 14px 16px;
+}
+
+.markdown-content pre code {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  color: #e2e8f0 !important;
+  font-size: 13px;
+  line-height: 1.65;
 }
 
 .artifacts-tabs {
