@@ -113,7 +113,7 @@
 
 | Package | Purpose | Version |
 |---------|---------|---------|
-| adk-rust | Agent framework, tool ecosystem, session management | 0.4.0 |
+| adk-rust | Agent framework, tool ecosystem, session management | 0.5.0 |
 | tokio | Async runtime | 1 |
 | anyhow | Error handling | 1 |
 | serde/serde_json | Serialization | 1 |

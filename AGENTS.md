@@ -12,7 +12,7 @@
 | Aspect | Detail |
 |--------|--------|
 | Language | Rust (edition 2024) |
-| Agent Framework | adk-rust 0.4.0 |
+| Agent Framework | adk-rust 0.5.0 |
 | GUI | Tauri + React 18 + Ant Design |
 | Architecture | Hexagonal + DDD |
 | License | MIT |

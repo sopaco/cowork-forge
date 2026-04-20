@@ -43,7 +43,7 @@ Cowork Forge is an AI-native multi-agent software development platform that simu
 3. **Workspace Containment**: File operations are validated against project boundaries to prevent path traversal
 4. **Security-First**: Command sanitization, build tool whitelisting, and watchdog monitoring
 5. **anyhow::Result**: All error handling uses `anyhow::Result`; no `unwrap()` in production code
-6. **Rust Edition 2024**: Workspace uses Rust edition 2024 with `adk-rust` 0.4.0 framework
+6. **Rust Edition 2024**: Workspace uses Rust edition 2024 with `adk-rust` 0.5.0 framework
 
 ---
 
