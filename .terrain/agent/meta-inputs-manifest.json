@@ -1,0 +1,31 @@
+{
+  "collected_at": "2026-07-04T15:57:13.036855800+00:00",
+  "meta_files": [],
+  "input_count": 4,
+  "sources": [
+    {
+      "label": "Private knowledge (.terrain\\knowledge\\00-glossary.md)",
+      "source": ".terrain/knowledge/00-glossary.md",
+      "chars": 2191,
+      "truncated": false
+    },
+    {
+      "label": "Private knowledge (.terrain\\knowledge\\10-internal-framework.md)",
+      "source": ".terrain/knowledge/10-internal-framework.md",
+      "chars": 3503,
+      "truncated": true
+    },
+    {
+      "label": "Private knowledge (.terrain\\knowledge\\20-api-usage.md)",
+      "source": ".terrain/knowledge/20-api-usage.md",
+      "chars": 3503,
+      "truncated": true
+    },
+    {
+      "label": "Private knowledge (.terrain\\knowledge\\30-scaffolding.md)",
+      "source": ".terrain/knowledge/30-scaffolding.md",
+      "chars": 3503,
+      "truncated": true
+    }
+  ]
+}
