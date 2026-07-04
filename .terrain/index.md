@@ -26,10 +26,12 @@ source: .
     - meta/
     - references/
     - SKILL.md
+  - .codegraph/
+    - .gitignore
+    - codegraph.db
   - .github/
     - workflows/
   - .gitignore
-  - adk-rust-learning.md
   - AGENTS.md
   - assets/
     - blend_banner.png
@@ -48,7 +50,6 @@ source: .
     - cowork-gui/
   - LICENSE
   - litho.docs/
-    - context-aware/
     - en/
     - zh/
   - README.md

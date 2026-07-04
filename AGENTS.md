@@ -1,21 +1,12 @@
 # AGENTS.md — Cowork Forge
 
 > This file provides AI coding agents with the context needed to work effectively on this project.
-> For project knowledge (architecture, decisions, issues), see [`.ai-context/SKILL.md`](.ai-context/SKILL.md).
 
 ---
 
 ## Project Overview
 
 **Cowork Forge** is an AI-native multi-agent software development platform. It orchestrates specialized AI agents (Product Manager, Architect, Project Manager, Engineer) through a 7-stage pipeline to transform ideas into production-ready software.
-
-| Aspect | Detail |
-|--------|--------|
-| Language | Rust (edition 2024) |
-| Agent Framework | adk-rust 0.5.0 |
-| GUI | Tauri + React 18 + Ant Design |
-| Architecture | Hexagonal + DDD |
-| License | MIT |
 
 ### Workspace Structure
 
@@ -162,24 +153,6 @@ npm run dev
 
 ---
 
-## Key Files
-
-When working on specific areas, start from these files:
-
-| Area | Primary File | Related |
-|------|-------------|---------|
-| Pipeline execution | `crates/cowork-core/src/pipeline/executor/mod.rs` | `stage_executor.rs`, `knowledge.rs` |
-| Stage implementations | `crates/cowork-core/src/pipeline/stages/*.rs` | 7 stage files: idea, prd, design, plan, coding, check, delivery |
-| Tool implementations | `crates/cowork-core/src/tools/mod.rs` | `file_tools.rs`, `data_tools.rs`, `hitl_tools.rs`, `pm_tools.rs`, etc. |
-| Domain entities | `crates/cowork-core/src/domain/mod.rs` | `project.rs`, `iteration.rs`, `memory.rs` |
-| HITL interface | `crates/cowork-core/src/interaction/mod.rs` | `cli.rs`, `tauri.rs` |
-| Agent configs | `crates/cowork-core/src/config_definition/` | `default_configs/*.json` |
-| Agent prompts | `crates/cowork-core/src/instructions/*.rs` | 12 instruction modules |
-| External agent | `crates/cowork-core/src/acp/client.rs` | ACP protocol client |
-| Skill system | `crates/cowork-core/src/skills/` | agentskills.io standard |
-
----
-
 ## Security Considerations
 
 - **Path validation**: All file operations are validated against workspace boundaries. Never bypass `validate_path()` checks.
@@ -191,67 +164,6 @@ When working on specific areas, start from these files:
 
 ---
 
-## Project Knowledge (.ai-context)
-
-This project uses a tiered knowledge base in `.ai-context/` for architectural context that code alone cannot convey. **AGENTS.md tells you *how to work*; `.ai-context/` tells you *what the project is*.**
-
-### When to Read `.ai-context`
-
-| Situation | What to Read |
-|-----------|-------------|
-| Starting a new session | `.ai-context/references/PROJECT-ESSENCE.md` |
-| Working across components | `.ai-context/references/ARCHITECTURE.md` |
-| Changing established patterns | `.ai-context/references/DECISIONS.md` |
-| Debugging unexpected behavior | `.ai-context/DYNAMICS.md` |
-| Unsure *why* something is designed a way | `.ai-context/references/DECISIONS.md` |
-
-### Session Start Protocol
-
-```
-1. Read this file (AGENTS.md)
-2. Read .ai-context/references/PROJECT-ESSENCE.md
-3. Scan .ai-context/DYNAMICS.md for active issues
-4. Proceed with code exploration
-```
-
-### Knowledge Tiers
-
-| Tier | File | Update Frequency |
-|------|------|------------------|
-| 0 | `references/PROJECT-ESSENCE.md` | Quarterly / Major version |
-| 1 | `references/ARCHITECTURE.md` | Monthly / Sprint |
-| 2 | `references/DECISIONS.md` | Per decision change |
-| 3 | `DYNAMICS.md` | As needed |
-
-Full entry point: [`.ai-context/SKILL.md`](.ai-context/SKILL.md)
-
-### Updating `.ai-context`
-
-When making significant changes, update the corresponding knowledge file:
-
-| What Changed | Update |
-|-------------|--------|
-| New crate or major component | `.ai-context/references/ARCHITECTURE.md` |
-| Architecture decision | `.ai-context/references/DECISIONS.md` |
-| New active issue / constraint | `.ai-context/DYNAMICS.md` |
-| Project scope change | `.ai-context/references/PROJECT-ESSENCE.md` |
-
-Before updating, read `.ai-context/meta/MAINTENANCE.md` for writing guidelines.
-
-**No update needed for**: struct fields, function signatures, refactoring, bug fixes.
-
----
-
-## PR Guidelines
-
-- Run `cargo test` and `cargo clippy` before committing.
-- Ensure no `unwrap()` in production code paths.
-- If you added a new tool or stage, update `.ai-context/references/ARCHITECTURE.md`.
-- If you made a non-obvious design choice, add an ADR to `.ai-context/references/DECISIONS.md`.
-- Commit messages: use conventional commits format (`feat:`, `fix:`, `refactor:`, etc.).
-
----
-
 ## Common Pitfalls
 
 - **Don't bypass `InteractiveBackend`**: Never call CLI-specific functions (e.g., `dialoguer`) from `cowork-core`. All user interaction must go through the `InteractiveBackend` trait.
@@ -259,7 +171,6 @@ Before updating, read `.ai-context/meta/MAINTENANCE.md` for writing guidelines.
 - **Don't access files outside workspace**: The security layer validates all paths. If you need to access a new path, update the validation logic, don't bypass it.
 - **Don't hardcode stage IDs**: Use `create_stage_by_id()` or flow configuration instead of string matching.
 - **Don't use `unwrap()`**: Use `anyhow::Result` with proper error propagation (`?` operator or `.context()`).
-- **Don't duplicate knowledge**: If information exists in `.ai-context/`, link to it rather than repeating it here.
 
 <!-- terrain:begin env-overview v3 -->
 ## AI 工程环境（Terrain）

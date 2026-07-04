@@ -302,11 +302,6 @@ crates/
     tsconfig.node.json
     vite.config.js
 litho.docs/
-  context-aware/
-    adr-guide.md
-    maintenance.md
-    methodology.md
-    templates.md
   en/
     4.Deep-Exploration/
       CLI Domain.md
@@ -343,6 +338,564 @@ LICENSE
 ```
 
 ## Files
+
+### crates/cowork-core/src/pipeline/stage_executor.rs (553 lines)
+
+```
+1: get_save_tool_name
+2: ⋮----
+3: (stage_name: &str)
+4: ⋮----
+5: get_artifact_filename
+6: ⋮----
+7: (stage_name: &str)
+8: ⋮----
+9: get_display_name
+10: ⋮----
+11: (agent_name: &str)
+12: ⋮----
+13: execute_stage_with_instruction
+14: ⋮----
+15: (
+16:     ctx: &PipelineContext,
+17:     interaction: Arc<dyn InteractiveBackend>,
+18:     stage_name: &str,
+19:     instruction: &str,
+20:     feedback: Option<&str>,
+21: )
+22: ⋮----
+23: execute_stage_with_instruction_and_context
+24: ⋮----
+25: (
+26:     ctx: &PipelineContext,
+27:     interaction: Arc<dyn InteractiveBackend>,
+28:     stage_name: &str,
+29:     _instruction: &str,
+30:     feedback: Option<&str>,
+31:     extra_context: Option<&str>,
+32: )
+33: ⋮----
+34: get_truncated_message
+35: ⋮----
+36: ()
+37: ⋮----
+38: truncate_content
+39: ⋮----
+40: (content: &str, max_chars: usize)
+41: ⋮----
+42: format_artifact_block
+43: ⋮----
+44: (label: &str, content: &str, load_tool: &str)
+45: ⋮----
+46: load_artifact_content
+47: ⋮----
+48: (ctx: &PipelineContext, artifact_name: &str)
+49: ⋮----
+50: build_prompt
+51: ⋮----
+52: (
+53:     ctx: &PipelineContext,
+54:     stage_name: &str,
+55:     feedback: Option<&str>,
+56:     extra_context: Option<&str>,
+57: )
+58: ⋮----
+59: SimpleInvocationContext
+60: ⋮----
+61: {
+62:     invocation_id: String,
+63:     agent_name: String,
+64:     user_id: String,
+65:     app_name: String,
+66:     session_id: String,
+67:     branch: String,
+68:     user_content: Content,
+69:     agent: Arc<dyn adk_core::Agent>,
+70:     memory: Option<Arc<dyn adk_core::Memory>>,
+71:     session: Box<dyn adk_core::Session>,
+72:     run_config: adk_core::RunConfig,
+73:     ended: std::sync::atomic::AtomicBool,
+74:     artifacts: Option<Arc<dyn adk_core::Artifacts>>,
+75: }
+76: ⋮----
+77: SimpleInvocationContext
+78: ⋮----
+79: {
+80:     pub fn new(ctx: &PipelineContext, content: &Content, agent: Arc<dyn adk_core::Agent>) -> Self {
+81:         Self {
+82:             invocation_id: uuid::Uuid::new_v4().to_string(),
+83:             agent_name: agent.name().to_string(),
+84:             user_id: "default_user".to_string(),
+85:             app_name: "cowork_forge".to_string(),
+86:             session_id: ctx.iteration.id.clone(),
+87:             branch: "main".to_string(),
+88:             user_content: content.clone(),
+89:             agent,
+90:             // Memory and Artifacts are ALSO available through dedicated tools
+91:             // (QueryMemoryTool, LoadArtifactTool, etc.). We wire them into the
+92:             // InvocationContext so that framework callbacks, plugins, or future
+93:             // agents that rely on ctx.memory() / ctx.artifacts() work correctly.
+94:             memory: Some(Arc::new(SimpleMemory::new(&ctx.iteration.id))),
+95:             session: Box::new(SimpleSession::new(&ctx.iteration.id, content.clone())),
+96:             run_config: adk_core::RunConfig {
+97:                 streaming_mode: adk_core::StreamingMode::SSE,
+98:                 ..adk_core::RunConfig::default()
+99:             },
+100:             ended: std::sync::atomic::AtomicBool::new(false),
+101:             artifacts: Some(Arc::new(SimpleArtifacts::new(&ctx.iteration.id))),
+102:         }
+103:     }
+104: }
+105: ⋮----
+106: SimpleInvocationContext
+107: ⋮----
+108: {
+109:     fn clone(&self) -> Self {
+110:         Self {
+111:             invocation_id: self.invocation_id.clone(),
+112:             agent_name: self.agent_name.clone(),
+113:             user_id: self.user_id.clone(),
+114:             app_name: self.app_name.clone(),
+115:             session_id: self.session_id.clone(),
+116:             branch: self.branch.clone(),
+117:             user_content: self.user_content.clone(),
+118:             agent: self.agent.clone(),
+119:             memory: self.memory.clone(),
+120:             // session can't be cloned, create a new one
+121:             session: Box::new(SimpleSession::new(
+122:                 &self.session_id,
+123:                 self.user_content.clone(),
+124:             )),
+125:             run_config: self.run_config.clone(),
+126:             ended: std::sync::atomic::AtomicBool::new(
+127:                 self.ended.load(std::sync::atomic::Ordering::SeqCst),
+128:             ),
+129:             artifacts: self.artifacts.clone(),
+130:         }
+131:     }
+132: }
+133: ⋮----
+134: SimpleInvocationContext
+135: ⋮----
+136: {
+137:     fn agent(&self) -> Arc<dyn adk_core::Agent> {
+138:         self.agent.clone()
+139:     }
+140: 
+141:     fn memory(&self) -> Option<Arc<dyn adk_core::Memory>> {
+142:         self.memory.clone()
+143:     }
+144: 
+145:     fn session(&self) -> &dyn adk_core::Session {
+146:         self.session.as_ref()
+147:     }
+148: 
+149:     fn run_config(&self) -> &adk_core::RunConfig {
+150:         &self.run_config
+151:     }
+152: 
+153:     fn end_invocation(&self) {
+154:         self.ended.store(true, std::sync::atomic::Ordering::SeqCst);
+155:     }
+156: 
+157:     fn ended(&self) -> bool {
+158:         self.ended.load(std::sync::atomic::Ordering::SeqCst)
+159:     }
+160: }
+161: ⋮----
+162: SimpleInvocationContext
+163: ⋮----
+164: {
+165:     fn artifacts(&self) -> Option<Arc<dyn adk_core::Artifacts>> {
+166:         self.artifacts.clone()
+167:     }
+168: }
+169: ⋮----
+170: SimpleInvocationContext
+171: ⋮----
+172: {
+173:     fn invocation_id(&self) -> &str {
+174:         &self.invocation_id
+175:     }
+176: 
+177:     fn agent_name(&self) -> &str {
+178:         &self.agent_name
+179:     }
+180: 
+181:     fn user_id(&self) -> &str {
+182:         &self.user_id
+183:     }
+184: 
+185:     fn app_name(&self) -> &str {
+186:         &self.app_name
+187:     }
+188: 
+189:     fn session_id(&self) -> &str {
+190:         &self.session_id
+191:     }
+192: 
+193:     fn banch(&self) -> &str {
+194:         &self.banch
+195:     }
+196: 
+197:     fn user_content(&self) -> &Content {
+198:         &self.user_content
+199:     }
+200: }
+201: ⋮----
+202: SimpleSession
+203: ⋮----
+204: {
+205:     session_id: String,
+206:     app_name: String,
+207:     user_id: String,
+208:     simple_state: SimpleState,
+209:     messages: std::sync::Mutex<Vec<Content>>,
+210:     history_path: std::path::PathBuf,
+211: }
+212: ⋮----
+213: SimpleSession
+214: ⋮----
+215: {
+216:     fn new(session_id: &str, initial_message: Content) -> Self {
+217:         let history_path = crate::persistence::get_cowork_dir()
+218:             .map(|dir| dir.join("iterations").join(session_id).join("session_history.jsonl"))
+219:             .unwrap_or_else(|_| {
+220:                 std::path::PathBuf::from(".cowork-v2")
+221:                     .join("iterations")
+222:                     .join(session_id)
+223:                     .join("session_history.jsonl")
+224:             });
+225: 
+226:         
+227:         let mut messages = Vec::new();
+228:         if let Some(parent) = history_path.parent() {
+229:             let _ = std::fs::create_dir_all(parent);
+230:         }
+231:         if history_path.exists()
+232:             && let Ok(contents) = std::fs::read_to_string(&history_path)
+233:         {
+234:             for line in contents.lines() {
+235:                 if line.trim().is_empty() {
+236:                     continue;
+237:                 }
+238:                 if let Ok(content) = serde_json::from_str::<Content>(line) {
+239:                     messages.push(content);
+240:                 }
+241:             }
+242:         }
+243: 
+244:         
+245:         
+246:         
+247:         messages.push(initial_message.clone());
+248: 
+249:         Self {
+250:             session_id: session_id.to_string(),
+251:             app_name: "cowork_forge".to_string(),
+252:             user_id: "default_user".to_string(),
+253:             simple_state: SimpleState::new(),
+254:             messages: std::sync::Mutex::new(messages),
+255:             history_path,
+256:         }
+257:     }
+258: 
+259:     fn append_message_to_file(
+260:         path: &std::path::PathBuf,
+261:         content: &Content,
+262:     ) -> anyhow::Result<()> {
+263:         let line = serde_json::to_string(content)?;
+264:         use std::io::Write;
+265:         let mut file = std::fs::OpenOptions::new()
+266:             .create(true)
+267:             .append(true)
+268:             .open(path)?;
+269:         writeln!(file, "{}", line)?;
+270:         Ok(())
+271:     }
+272: }
+273: ⋮----
+274: SimpleSession
+275: ⋮----
+276: {
+277:     fn id(&self) -> &str {
+278:         &self.session_id
+279:     }
+280: 
+281:     fn app_name(&self) -> &str {
+282:         &self.app_name
+283:     }
+284: 
+285:     fn user_id(&self) -> &str {
+286:         &self.user_id
+287:     }
+288: 
+289:     fn state(&self) -> &dyn adk_core::State {
+290:         &self.simple_state
+291:     }
+292: 
+293:     fn conversation_history(&self) -> Vec<Content> {
+294:         self.messages.lock().map(|m| m.clone()).unwrap_or_default()
+295:     }
+296: 
+297:     fn append_to_history(&self, content: Content) {
+298:         if let Ok(mut messages) = self.messages.lock() {
+299:             messages.push(content.clone());
+300:         }
+301:         if let Err(e) = Self::append_message_to_file(&self.history_path, &content) {
+302:             tracing::warn!("Failed to persist session history: {}", e);
+303:         }
+304:     }
+305: }
+306: ⋮----
+307: SimpleArtifacts
+308: ⋮----
+309: {
+310:     artifacts_dir: std::path::PathBuf,
+311: }
+312: ⋮----
+313: SimpleArtifacts
+314: ⋮----
+315: {
+316:     fn new(iteration_id: &str) -> Self {
+317:         let artifacts_dir = crate::persistence::get_cowork_dir()
+318:             .map(|dir| dir.join("iterations").join(iteration_id).join("artifacts"))
+319:             .unwrap_or_else(|_| {
+320:                 std::path::PathBuf::from(".cowork-v2")
+321:                     .join("iterations")
+322:                     .join(iteration_id)
+323:                     .join("artifacts")
+324:             });
+325:         let _ = std::fs::create_dir_all(&artifacts_dir);
+326:         Self { artifacts_dir }
+327:     }
+328: 
+329:     fn safe_name(name: &str) -> Option<String> {
+330:         let sanitized: String = name
+331:             .chars()
+332:             .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
+333:             .collect();
+334:         if sanitized.is_empty() || sanitized != name {
+335:             None
+336:         } else {
+337:             Some(sanitized)
+338:         }
+339:     }
+340: 
+341:     fn path_for(&self, name: &str) -> Option<std::path::PathBuf> {
+342:         Self::safe_name(name).map(|n| self.artifacts_dir.join(n))
+343:     }
+344: }
+345: ⋮----
+346: SimpleArtifacts
+347: ⋮----
+348: {
+349:     async fn save(&self, name: &str, data: &adk_core::Part) -> adk_core::Result<i64> {
+350:         let path = self.path_for(name).ok_or_else(|| {
+351:             adk_core::AdkError::tool(format!("Invalid artifact name: {}", name))
+352:         })?;
+353: 
+354:         match data {
+355:             adk_core::Part::Text { text } => {
+356:                 std::fs::write(&path, text).map_err(|e| {
+357:                     adk_core::AdkError::tool(format!("Failed to write artifact {}: {}", name, e))
+358:                 })?;
+359:             }
+360:             adk_core::Part::InlineData { mime_type, data } => {
+361:                 let ext = match mime_type.as_str() {
+362:                     "text/markdown" | "text/plain" => "txt",
+363:                     "application/json" => "json",
+364:                     "image/png" => "png",
+365:                     "image/jpeg" => "jpg",
+366:                     _ => "bin",
+367:                 };
+368:                 let path = path.with_extension(ext);
+369:                 std::fs::write(&path, data).map_err(|e| {
+370:                     adk_core::AdkError::tool(format!("Failed to write artifact {}: {}", name, e))
+371:                 })?;
+372:             }
+373:             adk_core::Part::FileData { file_uri, .. } => {
+374:                 
+375:                 return Err(adk_core::AdkError::tool(format!(
+376:                     "Cannot save FileData artifact with URI: {}",
+377:                     file_uri
+378:                 )));
+379:             }
+380:             _ => {
+381:                 return Err(adk_core::AdkError::tool(
+382:                     "Unsupported artifact part type".to_string(),
+383:                 ));
+384:             }
+385:         }
+386:         Ok(1)
+387:     }
+388: 
+389:     async fn load(&self, name: &str) -> adk_core::Result<adk_core::Part> {
+390:         let path = self.path_for(name).ok_or_else(|| {
+391:             adk_core::AdkError::tool(format!("Invalid artifact name: {}", name))
+392:         })?;
+393: 
+394:         let data = std::fs::read(&path).map_err(|e| {
+395:             adk_core::AdkError::tool(format!("Failed to read artifact {}: {}", name, e))
+396:         })?;
+397: 
+398:         
+399:         if let Ok(text) = String::from_utf8(data.clone()) {
+400:             Ok(adk_core::Part::Text { text })
+401:         } else {
+402:             let mime_type = match path.extension().and_then(|e| e.to_str()) {
+403:                 Some("png") => "image/png",
+404:                 Some("jpg") | Some("jpeg") => "image/jpeg",
+405:                 _ => "application/octet-stream",
+406:             }
+407:             .to_string();
+408:             Ok(adk_core::Part::InlineData { mime_type, data })
+409:         }
+410:     }
+411: 
+412:     async fn list(&self) -> adk_core::Result<Vec<String>> {
+413:         let mut names = Vec::new();
+414:         if self.artifacts_dir.exists() {
+415:             for entry in std::fs::read_dir(&self.artifacts_dir).map_err(|e| {
+416:                 adk_core::AdkError::tool(format!("Failed to list artifacts: {}", e))
+417:             })? {
+418:                 let entry = entry.map_err(|e| adk_core::AdkError::tool(format!("Failed to read artifact entry: {}", e)))?;
+419:                 if entry.file_type().map(|t| t.is_file()).unwrap_or(false)
+420:                     && let Some(name) = entry.file_name().to_str()
+421:                 {
+422:                     names.push(name.to_string());
+423:                 }
+424:             }
+425:         }
+426:         Ok(names)
+427:     }
+428: }
+429: ⋮----
+430: SimpleMemory
+431: ⋮----
+432: {
+433:     iteration_id: String,
+434: }
+435: ⋮----
+436: SimpleMemory
+437: ⋮----
+438: {
+439:     fn new(iteration_id: &str) -> Self {
+440:         Self {
+441:             iteration_id: iteration_id.to_string(),
+442:         }
+443:     }
+444: }
+445: ⋮----
+446: SimpleMemory
+447: ⋮----
+448: {
+449:     async fn search(&self, query: &str) -> adk_core::Result<Vec<adk_core::MemoryEntry>> {
+450:         let store = crate::persistence::MemoryStore::new();
+451:         let memory_query = crate::domain::MemoryQuery {
+452:             scope: crate::domain::MemoryScope::Smart,
+453:             query_type: crate::domain::MemoryQueryType::All,
+454:             keywords: query.split_whitespace().map(|s| s.to_string()).collect(),
+455:             limit: Some(20),
+456:         };
+457: 
+458:         let result = store.query(&memory_query, Some(&self.iteration_id)).map_err(|e| {
+459:             adk_core::AdkError::memory(format!("Failed to query memory: {}", e))
+460:         })?;
+461: 
+462:         let mut entries = Vec::new();
+463:         for decision in result.decisions {
+464:             let decision_text = format!(
+465:                 "Decision: {}\nContext: {}\nOutcome: {}\nConsequences: {}",
+466:                 decision.title,
+467:                 decision.context,
+468:                 decision.decision,
+469:                 if decision.consequences.is_empty() {
+470:                     "None recorded".to_string()
+471:                 } else {
+472:                     decision.consequences.join(", ")
+473:                 }
+474:             );
+475:             entries.push(adk_core::MemoryEntry {
+476:                 content: adk_core::Content::new("model").with_text(decision_text),
+477:                 author: "project".to_string(),
+478:             });
+479:         }
+480:         for pattern in result.patterns {
+481:             let pattern_text = format!(
+482:                 "Pattern: {}\nDescription: {}\nUsage: {}\nTags: {}",
+483:                 pattern.name,
+484:                 pattern.description,
+485:                 if pattern.usage.is_empty() {
+486:                     "Not specified".to_string()
+487:                 } else {
+488:                     pattern.usage.join(", ")
+489:                 },
+490:                 if pattern.tags.is_empty() {
+491:                     "None".to_string()
+492:                 } else {
+493:                     pattern.tags.join(", ")
+494:                 }
+495:             );
+496:             entries.push(adk_core::MemoryEntry {
+497:                 content: adk_core::Content::new("model").with_text(pattern_text),
+498:                 author: "project".to_string(),
+499:             });
+500:         }
+501:         for insight in result.insights {
+502:             entries.push(adk_core::MemoryEntry {
+503:                 content: adk_core::Content::new("model").with_text(insight.content),
+504:                 author: insight.stage,
+505:             });
+506:         }
+507:         Ok(entries)
+508:     }
+509: }
+510: ⋮----
+511: SimpleState
+512: ⋮----
+513: {
+514:     data: std::collections::HashMap<String, serde_json::Value>,
+515: }
+516: ⋮----
+517: SimpleState
+518: ⋮----
+519: {
+520:     fn new() -> Self {
+521:         Self {
+522:             data: std::collections::HashMap::new(),
+523:         }
+524:     }
+525: }
+526: ⋮----
+527: SimpleState
+528: ⋮----
+529: {
+530:     fn get(&self, key: &str) -> Option<serde_json::Value> {
+531:         self.data.get(key).cloned()
+532:     }
+533: 
+534:     fn set(&mut self, key: String, value: serde_json::Value) {
+535:         self.data.insert(key, value);
+536:     }
+537: 
+538:     fn all(&self) -> std::collections::HashMap<String, serde_json::Value> {
+539:         self.data.clone()
+540:     }
+541: }
+542: ⋮----
+543: extract_text_from_content
+544: ⋮----
+545: (content: &Content)
+546: ⋮----
+547: extract_text_from_event
+548: ⋮----
+549: (event: &Event)
+550: ⋮----
+551: validate_artifact_content
+552: ⋮----
+553: (stage_name: &str, content: &str)
+```
 
 ### crates/cowork-gui/src-tauri/src/lib.rs (285 lines)
 
@@ -634,280 +1187,418 @@ LICENSE
 285: ()
 ```
 
-### crates/cowork-core/src/pipeline/stage_executor.rs (271 lines)
+### AGENTS.md (351 lines)
+
+````
+1: # AGENTS.md — Cowork Forge
+2: 
+3: > This file provides AI coding agents with the context needed to work effectively on this project.
+4: > For project knowledge (architecture, decisions, issues), see [`.ai-context/SKILL.md`](.ai-context/SKILL.md).
+5: 
+6: ---
+7: 
+8: ## Project Overview
+9: 
+10: **Cowork Forge** is an AI-native multi-agent software development platform. It orchestrates specialized AI agents (Product Manager, Architect, Project Manager, Engineer) through a 7-stage pipeline to transform ideas into production-ready software.
+11: 
+12: | Aspect | Detail |
+13: |--------|--------|
+14: | Language | Rust (edition 2024) |
+15: | Agent Framework | adk-rust 0.5.0 |
+16: | GUI | Tauri + React 18 + Ant Design |
+17: | Architecture | Hexagonal + DDD |
+18: | License | MIT |
+19: 
+20: ### Workspace Structure
+21: 
+22: ```
+23: crates/
+24: ├── cowork-core/         # Domain logic, pipeline, tools, agents (MAIN crate)
+25: │   └── src/
+26: │       ├── pipeline/    # 7-stage orchestration & stage executor
+27: │       ├── domain/      # Project, Iteration, Memory aggregates
+28: │       ├── tools/       # 40+ ADK tools + MCP integration
+29: │       ├── agents/      # Agent wrappers (iterative, PM, legacy analyzer)
+30: │       ├── interaction/ # InteractiveBackend trait (CLI/GUI abstraction)
+31: │       ├── acp/         # Agent Client Protocol for external agents
+32: │       ├── config_definition/  # Data-driven config (agents, stages, flows)
+33: │       ├── instructions/       # Agent prompt library
+34: │       ├── skills/      # agentskills.io standard skill system
+35: │       ├── integration/ # Hook manager for external integrations
+36: │       └── persistence/ # JSON-based storage
+37: ├── cowork-cli/          # CLI adapter (clap + dialoguer)
+38: └── cowork-gui/          # Tauri + React GUI
+39:     ├── src-tauri/       # Rust backend (Tauri commands + events)
+40:     └── src/             # React frontend (TypeScript + Ant Design)
+41: ```
+42: 
+43: ---
+44: 
+45: ## Dev Environment Setup
+46: 
+47: ### Prerequisites
+48: 
+49: - **Rust** (edition 2024, stable toolchain)
+50: - **Node.js** (for GUI frontend build)
+51: - **LLM API Key** (OpenAI-compatible endpoint)
+52: 
+53: ### Build
+54: 
+55: ```bash
+56: # Build entire workspace
+57: cargo build
+58: 
+59: # Release build
+60: cargo build --release
+61: 
+62: # Build GUI only (installs frontend deps automatically)
+63: cd crates/cowork-gui && cargo tauri dev
+64: ```
+65: 
+66: ### Run
+67: 
+68: ```bash
+69: # CLI
+70: cargo run --package cowork-cli -- <command>
+71: 
+72: # GUI (development mode)
+73: cd crates/cowork-gui && cargo tauri dev
+74: ```
+75: 
+76: ### Configuration
+77: 
+78: Config file location:
+79: 
+80: | Platform | Path |
+81: |----------|------|
+82: | Windows | `%APPDATA%\CoworkCreative\config.toml` |
+83: | macOS | `~/Library/Application Support/CoworkCreative/config.toml` |
+84: | Linux | `~/.config/CoworkCreative/config.toml` |
+85: 
+86: User-facing config directory:
+87: 
+88: | Platform | Path |
+89: |----------|------|
+90: | Windows | `%APPDATA%\com.cowork-forge.app\config\` |
+91: | macOS | `~/Library/Application Support/com.cowork-forge.app/config/` |
+92: | Linux | `~/.config/com.cowork-forge.app/config/` |
+93: 
+94: ---
+95: 
+96: ## Build and Test Commands
+97: 
+98: ```bash
+99: # Run all tests
+100: cargo test
+101: 
+102: # Test a specific crate
+103: cargo test -p cowork-core
+104: 
+105: # Test a specific module
+106: cargo test -p cowork-core pipeline
+107: 
+108: # Run with all features
+109: cargo test --all-features
+110: 
+111: # Check compilation without building
+112: cargo check
+113: 
+114: # Lint (if clippy configured)
+115: cargo clippy
+116: ```
+117: 
+118: ### GUI Frontend
+119: 
+120: ```bash
+121: cd crates/cowork-gui
+122: 
+123: # Install dependencies
+124: npm install    # or: bun install
+125: 
+126: # Build frontend only
+127: npm run build
+128: 
+129: # Development server
+130: npm run dev
+131: ```
+132: 
+133: ---
+134: 
+135: ## Code Style and Conventions
+136: 
+137: ### Rust
+138: 
+139: - **Error handling**: Always use `anyhow::Result`. Never use `unwrap()` in production code.
+140: - **Async traits**: Use `async_trait` for async trait methods.
+141: - **Naming**: `snake_case` for functions/variables, `PascalCase` for types/traits.
+142: - **Architecture**: Follow hexagonal architecture — domain logic has zero external dependencies. Infrastructure adapters implement domain ports.
+143: - **Trait-based abstraction**: `InteractiveBackend` is the key port for CLI/GUI abstraction. All user interaction flows through this trait.
+144: - **Serialization**: `serde` with derive macros for all domain entities.
+145: - **Async runtime**: Tokio with `features = ["full"]`.
+146: 
+147: ### TypeScript / React (GUI)
+148: 
+149: - Component-based architecture with Ant Design.
+150: - Tauri commands for request-response, events for streaming.
+151: - State management via React hooks.
+152: 
+153: ### Key Patterns
+154: 
+155: | Pattern | Where | Purpose |
+156: |---------|-------|---------|
+157: | Actor-Critic | PRD, Design, Plan, Coding stages | Iterative self-refinement |
+158: | Strategy | Stage trait implementations | Pluggable stage behavior |
+159: | Template Method | Pipeline execution flow | Fixed stage sequence with hooks |
+160: | Repository | Persistence stores | Abstract data access |
+161: | Decorator | LLM rate limiting | Transparent cross-cutting concern |
+162: 
+163: ---
+164: 
+165: ## Key Files
+166: 
+167: When working on specific areas, start from these files:
+168: 
+169: | Area | Primary File | Related |
+170: |------|-------------|---------|
+171: | Pipeline execution | `crates/cowork-core/src/pipeline/executor/mod.rs` | `stage_executor.rs`, `knowledge.rs` |
+172: | Stage implementations | `crates/cowork-core/src/pipeline/stages/*.rs` | 7 stage files: idea, prd, design, plan, coding, check, delivery |
+173: | Tool implementations | `crates/cowork-core/src/tools/mod.rs` | `file_tools.rs`, `data_tools.rs`, `hitl_tools.rs`, `pm_tools.rs`, etc. |
+174: | Domain entities | `crates/cowork-core/src/domain/mod.rs` | `project.rs`, `iteration.rs`, `memory.rs` |
+175: | HITL interface | `crates/cowork-core/src/interaction/mod.rs` | `cli.rs`, `tauri.rs` |
+176: | Agent configs | `crates/cowork-core/src/config_definition/` | `default_configs/*.json` |
+177: | Agent prompts | `crates/cowork-core/src/instructions/*.rs` | 12 instruction modules |
+178: | External agent | `crates/cowork-core/src/acp/client.rs` | ACP protocol client |
+179: | Skill system | `crates/cowork-core/src/skills/` | agentskills.io standard |
+180: 
+181: ---
+182: 
+183: ## Security Considerations
+184: 
+185: - **Path validation**: All file operations are validated against workspace boundaries. Never bypass `validate_path()` checks.
+186: - **Command sanitization**: Dangerous commands (`rm -rf`, `sudo`, etc.) are blocked. Do not circumvent the command whitelist.
+187: - **LLM rate limiting**: Global semaphore (concurrency=1) + 2s delay = 30 req/min. Do not bypass rate limiting.
+188: - **Workspace containment**: File tools must not access paths outside the project workspace.
+189: - **No secrets in code**: API keys are loaded from `config.toml` or environment variables, never hardcoded.
+190: - **Watchdog monitoring**: Agent behavior is monitored for objective deviation.
+191: 
+192: ---
+193: 
+194: ## Project Knowledge (.ai-context)
+195: 
+196: This project uses a tiered knowledge base in `.ai-context/` for architectural context that code alone cannot convey. **AGENTS.md tells you *how to work*; `.ai-context/` tells you *what the project is*.**
+197: 
+198: ### When to Read `.ai-context`
+199: 
+200: | Situation | What to Read |
+201: |-----------|-------------|
+202: | Starting a new session | `.ai-context/references/PROJECT-ESSENCE.md` |
+203: | Working across components | `.ai-context/references/ARCHITECTURE.md` |
+204: | Changing established patterns | `.ai-context/references/DECISIONS.md` |
+205: | Debugging unexpected behavior | `.ai-context/DYNAMICS.md` |
+206: | Unsure *why* something is designed a way | `.ai-context/references/DECISIONS.md` |
+207: 
+208: ### Session Start Protocol
+209: 
+210: ```
+211: 1. Read this file (AGENTS.md)
+212: 2. Read .ai-context/references/PROJECT-ESSENCE.md
+213: 3. Scan .ai-context/DYNAMICS.md for active issues
+214: 4. Proceed with code exploration
+215: ```
+216: 
+217: ### Knowledge Tiers
+218: 
+219: | Tier | File | Update Frequency |
+220: |------|------|------------------|
+221: | 0 | `references/PROJECT-ESSENCE.md` | Quarterly / Major version |
+222: | 1 | `references/ARCHITECTURE.md` | Monthly / Sprint |
+223: | 2 | `references/DECISIONS.md` | Per decision change |
+224: | 3 | `DYNAMICS.md` | As needed |
+225: 
+226: Full entry point: [`.ai-context/SKILL.md`](.ai-context/SKILL.md)
+227: 
+228: ### Updating `.ai-context`
+229: 
+230: When making significant changes, update the corresponding knowledge file:
+231: 
+232: | What Changed | Update |
+233: |-------------|--------|
+234: | New crate or major component | `.ai-context/references/ARCHITECTURE.md` |
+235: | Architecture decision | `.ai-context/references/DECISIONS.md` |
+236: | New active issue / constraint | `.ai-context/DYNAMICS.md` |
+237: | Project scope change | `.ai-context/references/PROJECT-ESSENCE.md` |
+238: 
+239: Before updating, read `.ai-context/meta/MAINTENANCE.md` for writing guidelines.
+240: 
+241: **No update needed for**: struct fields, function signatures, refactoring, bug fixes.
+242: 
+243: ---
+244: 
+245: ## PR Guidelines
+246: 
+247: - Run `cargo test` and `cargo clippy` before committing.
+248: - Ensure no `unwrap()` in production code paths.
+249: - If you added a new tool or stage, update `.ai-context/references/ARCHITECTURE.md`.
+250: - If you made a non-obvious design choice, add an ADR to `.ai-context/references/DECISIONS.md`.
+251: - Commit messages: use conventional commits format (`feat:`, `fix:`, `refactor:`, etc.).
+252: 
+253: ---
+254: 
+255: ## Common Pitfalls
+256: 
+257: - **Don't bypass `InteractiveBackend`**: Never call CLI-specific functions (e.g., `dialoguer`) from `cowork-core`. All user interaction must go through the `InteractiveBackend` trait.
+258: - **Don't ignore rate limiting**: LLM calls are serialized for a reason. Don't try to parallelize them.
+259: - **Don't access files outside workspace**: The security layer validates all paths. If you need to access a new path, update the validation logic, don't bypass it.
+260: - **Don't hardcode stage IDs**: Use `create_stage_by_id()` or flow configuration instead of string matching.
+261: - **Don't use `unwrap()`**: Use `anyhow::Result` with proper error propagation (`?` operator or `.context()`).
+262: - **Don't duplicate knowledge**: If information exists in `.ai-context/`, link to it rather than repeating it here.
+263: 
+264: <!-- terrain:begin env-overview v3 -->
+265: ## AI 工程环境（Terrain）
+266: 
+267: 本仓库由 Terrain 配置了 AI 工程环境。Coding Agent 请遵循以下约定：
+268: 
+269: - **知识资产**位于本仓库 **`.terrain/`**（Agent 友好的知识资产、人类友好的知识库、私域知识、源码索引；可随 Git 协作）
+270: - **项目登记**在本地 `~/.terrain/registry.json`（仅记录仓库路径，不含知识正文）
+271: - **Skills** 位于 `.agents/skills/`（由 Terrain 注入，可按需重新集成）
+272: - **Agent 工具**约定在 `~/.terrain/bin/`（`rtk` / `codegraph` / `terrain`）；可选本地清单 `.terrain/env/agent-tools.json`（不入库）
+273: - **无 Terrain 安装**时：RTK / CodeGraph 可降级为 `bunx` / `npx`（见 `rtk-skill`、`codegraph-skill`）
+274: - **工作流**：先读知识 → 再查关系 → 最后读源码；shell 输出优先走 RTK
+275: <!-- terrain:end env-overview -->
+276: 
+277: <!-- terrain:begin knowledge-guide v3 -->
+278: ## Terrain 知识资产
+279: 
+280: Coding Agent **必须先加载** `terrain-knowledge-skill`，并按其中分层策略查询 **`.terrain/`**（仓库内路径，非全局目录）。
+281: 
+282: | 层级 | 路径 | 何时使用 |
+283: |------|------|----------|
+284: | Agent 友好 | `.terrain/agent/context.md` | 模块划分、核心流程、系统边界 |
+285: | 私域 | `.terrain/knowledge/` | 业务术语、内部框架/API/脚手架 |
+286: | 人类友好 | `.terrain/human/` | Litho 人类友好的知识库（可选参考） |
+287: | 源码 | `.terrain/agent/repomix.md`（见 `repomix-context-skill`） | 实现细节（本地索引，不入库） |
+288: | 关系 | codegraph CLI（见 `codegraph-skill`） | 调用链、依赖关系、影响分析 |
+289: 
+290: **原则**：先宏观后微观；优先读已生成文档，再 grep 源码索引。
+291: 
+292: ## 知识保鲜（必读）
+293: 
+294: 1. 回答架构/模块问题前，读取 `.terrain/.meta/freshness.json`（或 `freshness` 工具输出）
+295: 2. `freshness_score < 70` 时：不得仅凭 `agent/context.md` 下结论，须用 `grep repomix` 或 `codegraph` 交叉验证
+296: 3. `freshness_score < 50` 时：宏观架构上下文不可信，以 repomix 源码切片为准
+297: 4. 发现矛盾时的优先级：**repomix 源码 > codegraph > agent/context.md > human/**
+298: 5. `knowledge/` 私域文档视为人为维护；若 `refs` 指向的源码路径已删除，应降权处理
+299: <!-- terrain:end knowledge-guide -->
+300: 
+301: <!-- terrain:begin skills v2 -->
+302: ### 可用 Skills
+303: 
+304: | Skill | 用途 |
+305: |-------|------|
+306: | `terrain-knowledge-skill` | `.terrain/` 知识分层与查询顺序（先读） |
+307: | `repomix-context-skill` | grep/读取 `repomix.md` 源码切片 |
+308: | `codegraph-skill` | 符号关系；`~/.terrain/bin/codegraph` 或 `bunx codegraph` |
+309: | `rtk-skill` | 冗长 shell 加 rtk 前缀；`~/.terrain/bin/rtk` 或 `bunx @terrain-ai/rtk` |
+310: 
+311: 加载顺序建议：knowledge → codegraph / repomix → rtk（执行命令时）。
+312: <!-- terrain:end skills -->
+313: 
+314: <!-- terrain:begin tools v2 -->
+315: ### 工具链
+316: 
+317: | 工具 | 约定路径 | 无 Terrain 时降级 |
+318: |------|----------|-------------------|
+319: | RTK | `~/.terrain/bin/rtk` | `bunx @terrain-ai/rtk` 或 `npx @terrain-ai/rtk` |
+320: | CodeGraph | `~/.terrain/bin/codegraph` | `bunx codegraph` 或 `npx codegraph` |
+321: | Terrain CLI | `~/.terrain/bin/terrain` | `bunx @terrain-ai/cli` 或 `npx @terrain-ai/cli` |
+322: | 知识文件 | `.terrain/` 仓库内路径 | 直接 Read/Grep，无需 CLI |
+323: 
+324: | 场景 | 用法 |
+325: |------|------|
+326: | 架构、私域知识 | 加载 `terrain-knowledge-skill` |
+327: | 源码片段 | `repomix-context-skill`；`<rtk> grep` 搜索 pack |
+328: | 符号关系 | `codegraph-skill`；检查 `~/.terrain/bin/codegraph` 是否存在（见 codegraph-skill） |
+329: | git/test/build | `rtk-skill`；检查 `~/.terrain/bin/rtk` 是否存在（见 rtk-skill） |
+330: | ACP 知识查询 | `~/.terrain/bin/terrain tools …` |
+331: 
+332: ### Agent 工具解析（必读）
+333: 
+334: **一律使用约定路径**（`~/.terrain/bin/…`、`.terrain/…`），**不要**写机器相关的绝对路径（如 `/Users/…` 或 `C:\Users\…`）。
+335: 
+336: Windows 上工具部署在 `%USERPROFILE%\.terrain\bin\`（Git Bash / PowerShell 7+ 中可写为 `~/.terrain/bin/`），二进制带 `.exe` 后缀。
+337: 
+338: 1. 执行前检查工具是否存在 — 见 `rtk-skill` / `codegraph-skill` 中的跨平台检查表（**不要**在 Windows 上使用 Unix 专用的 `test -x`）
+339: 2. 存在 → 用 `~/.terrain/bin/<tool> …`（词首 `~` 在 bash/zsh/Git Bash/PowerShell 7+ 会展开）
+340: 3. 不存在 → RTK / CodeGraph 用上表 `bunx` / `npx` 降级；Terrain CLI 请用户通过桌面应用操作
+341: 4. 可选参考：`.terrain/env/agent-tools.json`（本地生成、不入库），内容与约定路径一致
+342: 
+343: **不要**把 manifest 里的 `~` 路径赋给变量再引号调用（`"$VAR"` 不会展开 `~`）。直接写 `~/.terrain/bin/rtk` 或选用 `bunx` 前缀。
+344: 
+345: ### RTK 要点（必读 `rtk-skill`）
+346: 
+347: - **必须显式**加 rtk 前缀 — Terrain 不启用 `rtk init` 全局 hook
+348: - 内置 Read/Grep 不会自动走 RTK — 大文件用 `<rtk> read`，搜索用 `<rtk> grep`
+349: 
+350: **注意**：不要运行 `codegraph install` 或 `rtk init`（已由 Terrain + Skills 配置）。
+351: <!-- terrain:end tools -->
+````
+
+### Cargo.toml (53 lines)
 
 ```
-1: get_save_tool_name
-2: ⋮----
-3: (stage_name: &str)
-4: ⋮----
-5: get_artifact_filename
-6: ⋮----
-7: (stage_name: &str)
-8: ⋮----
-9: get_display_name
-10: ⋮----
-11: (agent_name: &str)
-12: ⋮----
-13: execute_stage_with_instruction
-14: ⋮----
-15: (
-16:     ctx: &PipelineContext,
-17:     interaction: Arc<dyn InteractiveBackend>,
-18:     stage_name: &str,
-19:     _instruction: &str,
-20:     feedback: Option<&str>,
-21: )
-22: ⋮----
-23: get_truncated_message
-24: ⋮----
-25: ()
-26: ⋮----
-27: truncate_content
-28: ⋮----
-29: (content: &str, max_chars: usize)
-30: ⋮----
-31: load_artifact_content
-32: ⋮----
-33: (ctx: &PipelineContext, artifact_name: &str)
-34: ⋮----
-35: build_prompt
-36: ⋮----
-37: (ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
-38: ⋮----
-39: SimpleInvocationContext
-40: ⋮----
-41: {
-42:     invocation_id: String,
-43:     agent_name: String,
-44:     user_id: String,
-45:     app_name: String,
-46:     session_id: String,
-47:     banch: String,
-48:     user_content: Content,
-49:     agent: Arc<dyn adk_core::Agent>,
-50:     memory: Option<Arc<dyn adk_core::Memory>>,
-51:     session: Box<dyn adk_core::Session>,
-52:     run_config: adk_core::RunConfig,
-53:     ended: std::sync::atomic::AtomicBool,
-54:     artifacts: Option<Arc<dyn adk_core::Artifacts>>,
-55: }
-56: ⋮----
-57: SimpleInvocationContext
-58: ⋮----
-59: {
-60:     pub fn new(ctx: &PipelineContext, content: &Content, agent: Arc<dyn adk_core::Agent>) -> Self {
-61:         Self {
-62:             invocation_id: uuid::Uuid::new_v4().to_string(),
-63:             agent_name: agent.name().to_string(),
-64:             user_id: "default_user".to_string(),
-65:             app_name: "cowork_forge".to_string(),
-66:             session_id: ctx.iteration.id.clone(),
-67:             banch: "main".to_string(),
-68:             user_content: content.clone(),
-69:             agent,
-70:             
-71:             
-72:             
-73:             memory: None,
-74:             session: Box::new(SimpleSession::new(&ctx.iteration.id, content.clone())),
-75:             run_config: adk_core::RunConfig {
-76:                 streaming_mode: adk_core::StreamingMode::SSE,
-77:                 ..adk_core::RunConfig::default()
-78:             },
-79:             ended: std::sync::atomic::AtomicBool::new(false),
-80:             artifacts: None,
-81:         }
-82:     }
-83: }
-84: ⋮----
-85: SimpleInvocationContext
-86: ⋮----
-87: {
-88:     fn clone(&self) -> Self {
-89:         Self {
-90:             invocation_id: self.invocation_id.clone(),
-91:             agent_name: self.agent_name.clone(),
-92:             user_id: self.user_id.clone(),
-93:             app_name: self.app_name.clone(),
-94:             session_id: self.session_id.clone(),
-95:             banch: self.banch.clone(),
-96:             user_content: self.user_content.clone(),
-97:             agent: self.agent.clone(),
-98:             memory: self.memory.clone(),
-99:             
-100:             session: Box::new(SimpleSession::new(
-101:                 &self.session_id,
-102:                 self.user_content.clone(),
-103:             )),
-104:             run_config: self.run_config.clone(),
-105:             ended: std::sync::atomic::AtomicBool::new(
-106:                 self.ended.load(std::sync::atomic::Ordering::SeqCst),
-107:             ),
-108:             artifacts: self.artifacts.clone(),
-109:         }
-110:     }
-111: }
-112: ⋮----
-113: SimpleInvocationContext
-114: ⋮----
-115: {
-116:     fn agent(&self) -> Arc<dyn adk_core::Agent> {
-117:         self.agent.clone()
-118:     }
-119: 
-120:     fn memory(&self) -> Option<Arc<dyn adk_core::Memory>> {
-121:         self.memory.clone()
-122:     }
-123: 
-124:     fn session(&self) -> &dyn adk_core::Session {
-125:         self.session.as_ref()
-126:     }
-127: 
-128:     fn run_config(&self) -> &adk_core::RunConfig {
-129:         &self.run_config
-130:     }
-131: 
-132:     fn end_invocation(&self) {
-133:         self.ended.store(true, std::sync::atomic::Ordering::SeqCst);
-134:     }
-135: 
-136:     fn ended(&self) -> bool {
-137:         self.ended.load(std::sync::atomic::Ordering::SeqCst)
-138:     }
-139: }
-140: ⋮----
-141: SimpleInvocationContext
-142: ⋮----
-143: {
-144:     fn artifacts(&self) -> Option<Arc<dyn adk_core::Artifacts>> {
-145:         self.artifacts.clone()
-146:     }
-147: }
-148: ⋮----
-149: SimpleInvocationContext
-150: ⋮----
-151: {
-152:     fn invocation_id(&self) -> &str {
-153:         &self.invocation_id
-154:     }
-155: 
-156:     fn agent_name(&self) -> &str {
-157:         &self.agent_name
-158:     }
-159: 
-160:     fn user_id(&self) -> &str {
-161:         &self.user_id
-162:     }
-163: 
-164:     fn app_name(&self) -> &str {
-165:         &self.app_name
-166:     }
-167: 
-168:     fn session_id(&self) -> &str {
-169:         &self.session_id
-170:     }
-171: 
-172:     fn banch(&self) -> &str {
-173:         &self.banch
-174:     }
-175: 
-176:     fn user_content(&self) -> &Content {
-177:         &self.user_content
-178:     }
-179: }
-180: ⋮----
-181: SimpleSession
-182: ⋮----
-183: {
-184:     session_id: String,
-185:     app_name: String,
-186:     user_id: String,
-187:     simple_state: SimpleState,
-188:     messages: Vec<Content>,
-189: }
-190: ⋮----
-191: SimpleSession
-192: ⋮----
-193: {
-194:     fn new(session_id: &str, initial_message: Content) -> Self {
-195:         Self {
-196:             session_id: session_id.to_string(),
-197:             app_name: "cowork_forge".to_string(),
-198:             user_id: "default_user".to_string(),
-199:             simple_state: SimpleState::new(),
-200:             messages: vec![initial_message],
-201:         }
-202:     }
-203: }
-204: ⋮----
-205: SimpleSession
-206: ⋮----
-207: {
-208:     fn id(&self) -> &str {
-209:         &self.session_id
-210:     }
-211: 
-212:     fn app_name(&self) -> &str {
-213:         &self.app_name
-214:     }
-215: 
-216:     fn user_id(&self) -> &str {
-217:         &self.user_id
-218:     }
-219: 
-220:     fn state(&self) -> &dyn adk_core::State {
-221:         &self.simple_state
-222:     }
-223: 
-224:     fn conversation_history(&self) -> Vec<Content> {
-225:         self.messages.clone()
-226:     }
-227: 
-228:     fn append_to_history(&self, _content: Content) {
-229:         
-230:     }
-231: }
-232: ⋮----
-233: SimpleState
-234: ⋮----
-235: {
-236:     data: std::collections::HashMap<String, serde_json::Value>,
-237: }
-238: ⋮----
-239: SimpleState
-240: ⋮----
-241: {
-242:     fn new() -> Self {
-243:         Self {
-244:             data: std::collections::HashMap::new(),
-245:         }
-246:     }
-247: }
-248: ⋮----
-249: SimpleState
-250: ⋮----
-251: {
-252:     fn get(&self, key: &str) -> Option<serde_json::Value> {
-253:         self.data.get(key).cloned()
-254:     }
-255: 
-256:     fn set(&mut self, key: String, value: serde_json::Value) {
-257:         self.data.insert(key, value);
-258:     }
-259: 
-260:     fn all(&self) -> std::collections::HashMap<String, serde_json::Value> {
-261:         self.data.clone()
-262:     }
-263: }
-264: ⋮----
-265: extract_text_from_content
-266: ⋮----
-267: (content: &Content)
-268: ⋮----
-269: extract_text_from_event
-270: ⋮----
-271: (event: &Event)
+1: [workspace]
+2: resolver = "2"
+3: members = [
+4:     "crates/cowork-core",
+5:     "crates/cowork-cli",
+6:     "crates/cowork-gui/src-tauri",
+7: ]
+8: 
+9: [workspace.package]
+10: version = "2.5.2"
+11: edition = "2024"
+12: authors = ["Sopaco"]
+13: license = "MIT"
+14: repository = "https://github.com/sopaco/cowork-forge"
+15: 
+16: [workspace.dependencies]
+17: adk-rust = "1.0.0"
+18: adk-core = "1.0.0"
+19: adk-agent = "1.0.0"
+20: adk-model = { version = "1.0.0", features = ["openai"] }
+21: adk-tool = "1.0.0"
+22: adk-runner = "1.0.0"
+23: adk-session = "1.0.0"
+24: adk-skill = "1.0.0"
+25: 
+26: tokio = { version = "1", features = ["full"] }
+27: tokio-util = { version = "0.7", features = ["compat"] }
+28: anyhow = "1"
+29: thiserror = "2"
+30: serde = { version = "1", features = ["derive"] }
+31: serde_json = "1"
+32: 
+33: toml = "1.0"
+34: 
+35: clap = { version = "4", features = ["derive"] }
+36: dialoguer = "0.12"
+37: console = "0.16"
+38: 
+39: tracing = "0.1"
+40: tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+41: 
+42: chrono = { version = "0.4", features = ["serde"] }
+43: uuid = { version = "1", features = ["v4", "serde"] }
+44: 
+45: dirs = "6"
+46: walkdir = "2"
+47: ignore = "0.4"
+48: 
+49: futures = "0.3"
+50: 
+51: tempfile = "3"
+52: 
+53: agent-client-protocol = "0.9"
 ```
 
 ### crates/cowork-core/src/lib.rs (109 lines)
@@ -1364,329 +2055,318 @@ LICENSE
 296: **Next Steps**: Refer to Container and Component Level diagrams for detailed internal architecture documentation.
 ````
 
-### AGENTS.md (262 lines)
-
-````
-1: # AGENTS.md — Cowork Forge
-2: 
-3: > This file provides AI coding agents with the context needed to work effectively on this project.
-4: > For project knowledge (architecture, decisions, issues), see [`.ai-context/SKILL.md`](.ai-context/SKILL.md).
-5: 
-6: ---
-7: 
-8: ## Project Overview
-9: 
-10: **Cowork Forge** is an AI-native multi-agent software development platform. It orchestrates specialized AI agents (Product Manager, Architect, Project Manager, Engineer) through a 7-stage pipeline to transform ideas into production-ready software.
-11: 
-12: | Aspect | Detail |
-13: |--------|--------|
-14: | Language | Rust (edition 2024) |
-15: | Agent Framework | adk-rust 0.5.0 |
-16: | GUI | Tauri + React 18 + Ant Design |
-17: | Architecture | Hexagonal + DDD |
-18: | License | MIT |
-19: 
-20: ### Workspace Structure
-21: 
-22: ```
-23: crates/
-24: ├── cowork-core/         # Domain logic, pipeline, tools, agents (MAIN crate)
-25: │   └── src/
-26: │       ├── pipeline/    # 7-stage orchestration & stage executor
-27: │       ├── domain/      # Project, Iteration, Memory aggregates
-28: │       ├── tools/       # 40+ ADK tools + MCP integration
-29: │       ├── agents/      # Agent wrappers (iterative, PM, legacy analyzer)
-30: │       ├── interaction/ # InteractiveBackend trait (CLI/GUI abstraction)
-31: │       ├── acp/         # Agent Client Protocol for external agents
-32: │       ├── config_definition/  # Data-driven config (agents, stages, flows)
-33: │       ├── instructions/       # Agent prompt library
-34: │       ├── skills/      # agentskills.io standard skill system
-35: │       ├── integration/ # Hook manager for external integrations
-36: │       └── persistence/ # JSON-based storage
-37: ├── cowork-cli/          # CLI adapter (clap + dialoguer)
-38: └── cowork-gui/          # Tauri + React GUI
-39:     ├── src-tauri/       # Rust backend (Tauri commands + events)
-40:     └── src/             # React frontend (TypeScript + Ant Design)
-41: ```
-42: 
-43: ---
-44: 
-45: ## Dev Environment Setup
-46: 
-47: ### Prerequisites
-48: 
-49: - **Rust** (edition 2024, stable toolchain)
-50: - **Node.js** (for GUI frontend build)
-51: - **LLM API Key** (OpenAI-compatible endpoint)
-52: 
-53: ### Build
-54: 
-55: ```bash
-56: # Build entire workspace
-57: cargo build
-58: 
-59: # Release build
-60: cargo build --release
-61: 
-62: # Build GUI only (installs frontend deps automatically)
-63: cd crates/cowork-gui && cargo tauri dev
-64: ```
-65: 
-66: ### Run
-67: 
-68: ```bash
-69: # CLI
-70: cargo run --package cowork-cli -- <command>
-71: 
-72: # GUI (development mode)
-73: cd crates/cowork-gui && cargo tauri dev
-74: ```
-75: 
-76: ### Configuration
-77: 
-78: Config file location:
-79: 
-80: | Platform | Path |
-81: |----------|------|
-82: | Windows | `%APPDATA%\CoworkCreative\config.toml` |
-83: | macOS | `~/Library/Application Support/CoworkCreative/config.toml` |
-84: | Linux | `~/.config/CoworkCreative/config.toml` |
-85: 
-86: User-facing config directory:
-87: 
-88: | Platform | Path |
-89: |----------|------|
-90: | Windows | `%APPDATA%\com.cowork-forge.app\config\` |
-91: | macOS | `~/Library/Application Support/com.cowork-forge.app/config/` |
-92: | Linux | `~/.config/com.cowork-forge.app/config/` |
-93: 
-94: ---
-95: 
-96: ## Build and Test Commands
-97: 
-98: ```bash
-99: # Run all tests
-100: cargo test
-101: 
-102: # Test a specific crate
-103: cargo test -p cowork-core
-104: 
-105: # Test a specific module
-106: cargo test -p cowork-core pipeline
-107: 
-108: # Run with all features
-109: cargo test --all-features
-110: 
-111: # Check compilation without building
-112: cargo check
-113: 
-114: # Lint (if clippy configured)
-115: cargo clippy
-116: ```
-117: 
-118: ### GUI Frontend
-119: 
-120: ```bash
-121: cd crates/cowork-gui
-122: 
-123: # Install dependencies
-124: npm install    # or: bun install
-125: 
-126: # Build frontend only
-127: npm run build
-128: 
-129: # Development server
-130: npm run dev
-131: ```
-132: 
-133: ---
-134: 
-135: ## Code Style and Conventions
-136: 
-137: ### Rust
-138: 
-139: - **Error handling**: Always use `anyhow::Result`. Never use `unwrap()` in production code.
-140: - **Async traits**: Use `async_trait` for async trait methods.
-141: - **Naming**: `snake_case` for functions/variables, `PascalCase` for types/traits.
-142: - **Architecture**: Follow hexagonal architecture — domain logic has zero external dependencies. Infrastructure adapters implement domain ports.
-143: - **Trait-based abstraction**: `InteractiveBackend` is the key port for CLI/GUI abstraction. All user interaction flows through this trait.
-144: - **Serialization**: `serde` with derive macros for all domain entities.
-145: - **Async runtime**: Tokio with `features = ["full"]`.
-146: 
-147: ### TypeScript / React (GUI)
-148: 
-149: - Component-based architecture with Ant Design.
-150: - Tauri commands for request-response, events for streaming.
-151: - State management via React hooks.
-152: 
-153: ### Key Patterns
-154: 
-155: | Pattern | Where | Purpose |
-156: |---------|-------|---------|
-157: | Actor-Critic | PRD, Design, Plan, Coding stages | Iterative self-refinement |
-158: | Strategy | Stage trait implementations | Pluggable stage behavior |
-159: | Template Method | Pipeline execution flow | Fixed stage sequence with hooks |
-160: | Repository | Persistence stores | Abstract data access |
-161: | Decorator | LLM rate limiting | Transparent cross-cutting concern |
-162: 
-163: ---
-164: 
-165: ## Key Files
-166: 
-167: When working on specific areas, start from these files:
-168: 
-169: | Area | Primary File | Related |
-170: |------|-------------|---------|
-171: | Pipeline execution | `crates/cowork-core/src/pipeline/executor/mod.rs` | `stage_executor.rs`, `knowledge.rs` |
-172: | Stage implementations | `crates/cowork-core/src/pipeline/stages/*.rs` | 7 stage files: idea, prd, design, plan, coding, check, delivery |
-173: | Tool implementations | `crates/cowork-core/src/tools/mod.rs` | `file_tools.rs`, `data_tools.rs`, `hitl_tools.rs`, `pm_tools.rs`, etc. |
-174: | Domain entities | `crates/cowork-core/src/domain/mod.rs` | `project.rs`, `iteration.rs`, `memory.rs` |
-175: | HITL interface | `crates/cowork-core/src/interaction/mod.rs` | `cli.rs`, `tauri.rs` |
-176: | Agent configs | `crates/cowork-core/src/config_definition/` | `default_configs/*.json` |
-177: | Agent prompts | `crates/cowork-core/src/instructions/*.rs` | 12 instruction modules |
-178: | External agent | `crates/cowork-core/src/acp/client.rs` | ACP protocol client |
-179: | Skill system | `crates/cowork-core/src/skills/` | agentskills.io standard |
-180: 
-181: ---
-182: 
-183: ## Security Considerations
-184: 
-185: - **Path validation**: All file operations are validated against workspace boundaries. Never bypass `validate_path()` checks.
-186: - **Command sanitization**: Dangerous commands (`rm -rf`, `sudo`, etc.) are blocked. Do not circumvent the command whitelist.
-187: - **LLM rate limiting**: Global semaphore (concurrency=1) + 2s delay = 30 req/min. Do not bypass rate limiting.
-188: - **Workspace containment**: File tools must not access paths outside the project workspace.
-189: - **No secrets in code**: API keys are loaded from `config.toml` or environment variables, never hardcoded.
-190: - **Watchdog monitoring**: Agent behavior is monitored for objective deviation.
-191: 
-192: ---
-193: 
-194: ## Project Knowledge (.ai-context)
-195: 
-196: This project uses a tiered knowledge base in `.ai-context/` for architectural context that code alone cannot convey. **AGENTS.md tells you *how to work*; `.ai-context/` tells you *what the project is*.**
-197: 
-198: ### When to Read `.ai-context`
-199: 
-200: | Situation | What to Read |
-201: |-----------|-------------|
-202: | Starting a new session | `.ai-context/references/PROJECT-ESSENCE.md` |
-203: | Working across components | `.ai-context/references/ARCHITECTURE.md` |
-204: | Changing established patterns | `.ai-context/references/DECISIONS.md` |
-205: | Debugging unexpected behavior | `.ai-context/DYNAMICS.md` |
-206: | Unsure *why* something is designed a way | `.ai-context/references/DECISIONS.md` |
-207: 
-208: ### Session Start Protocol
-209: 
-210: ```
-211: 1. Read this file (AGENTS.md)
-212: 2. Read .ai-context/references/PROJECT-ESSENCE.md
-213: 3. Scan .ai-context/DYNAMICS.md for active issues
-214: 4. Proceed with code exploration
-215: ```
-216: 
-217: ### Knowledge Tiers
-218: 
-219: | Tier | File | Update Frequency |
-220: |------|------|------------------|
-221: | 0 | `references/PROJECT-ESSENCE.md` | Quarterly / Major version |
-222: | 1 | `references/ARCHITECTURE.md` | Monthly / Sprint |
-223: | 2 | `references/DECISIONS.md` | Per decision change |
-224: | 3 | `DYNAMICS.md` | As needed |
-225: 
-226: Full entry point: [`.ai-context/SKILL.md`](.ai-context/SKILL.md)
-227: 
-228: ### Updating `.ai-context`
-229: 
-230: When making significant changes, update the corresponding knowledge file:
-231: 
-232: | What Changed | Update |
-233: |-------------|--------|
-234: | New crate or major component | `.ai-context/references/ARCHITECTURE.md` |
-235: | Architecture decision | `.ai-context/references/DECISIONS.md` |
-236: | New active issue / constraint | `.ai-context/DYNAMICS.md` |
-237: | Project scope change | `.ai-context/references/PROJECT-ESSENCE.md` |
-238: 
-239: Before updating, read `.ai-context/meta/MAINTENANCE.md` for writing guidelines.
-240: 
-241: **No update needed for**: struct fields, function signatures, refactoring, bug fixes.
-242: 
-243: ---
-244: 
-245: ## PR Guidelines
-246: 
-247: - Run `cargo test` and `cargo clippy` before committing.
-248: - Ensure no `unwrap()` in production code paths.
-249: - If you added a new tool or stage, update `.ai-context/references/ARCHITECTURE.md`.
-250: - If you made a non-obvious design choice, add an ADR to `.ai-context/references/DECISIONS.md`.
-251: - Commit messages: use conventional commits format (`feat:`, `fix:`, `refactor:`, etc.).
-252: 
-253: ---
-254: 
-255: ## Common Pitfalls
-256: 
-257: - **Don't bypass `InteractiveBackend`**: Never call CLI-specific functions (e.g., `dialoguer`) from `cowork-core`. All user interaction must go through the `InteractiveBackend` trait.
-258: - **Don't ignore rate limiting**: LLM calls are serialized for a reason. Don't try to parallelize them.
-259: - **Don't access files outside workspace**: The security layer validates all paths. If you need to access a new path, update the validation logic, don't bypass it.
-260: - **Don't hardcode stage IDs**: Use `create_stage_by_id()` or flow configuration instead of string matching.
-261: - **Don't use `unwrap()`**: Use `anyhow::Result` with proper error propagation (`?` operator or `.context()`).
-262: - **Don't duplicate knowledge**: If information exists in `.ai-context/`, link to it rather than repeating it here.
-````
-
-### Cargo.toml (53 lines)
+### crates/cowork-core/src/acp/client.rs (309 lines)
 
 ```
-1: [workspace]
-2: resolver = "2"
-3: members = [
-4:     "crates/cowork-core",
-5:     "crates/cowork-cli",
-6:     "crates/cowork-gui/src-tauri",
-7: ]
-8: 
-9: [workspace.package]
-10: version = "2.5.1"
-11: edition = "2024"
-12: authors = ["Sopaco"]
-13: license = "MIT"
-14: repository = "https://github.com/sopaco/cowork-forge"
-15: 
-16: [workspace.dependencies]
-17: adk-rust = "0.5.0"
-18: adk-core = "0.5.0"
-19: adk-agent = "0.5.0"
-20: adk-model = { version = "0.5.0", features = ["openai"] }
-21: adk-tool = "0.5.0"
-22: adk-runner = "0.5.0"
-23: adk-session = "0.5.0"
-24: adk-skill = "0.5.0"
-25: 
-26: tokio = { version = "1", features = ["full"] }
-27: tokio-util = { version = "0.7", features = ["compat"] }
-28: anyhow = "1"
-29: thiserror = "2"
-30: serde = { version = "1", features = ["derive"] }
-31: serde_json = "1"
-32: 
-33: toml = "1.0"
-34: 
-35: clap = { version = "4", features = ["derive"] }
-36: dialoguer = "0.12"
-37: console = "0.16"
-38: 
-39: tracing = "0.1"
-40: tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-41: 
-42: chrono = { version = "0.4", features = ["serde"] }
-43: uuid = { version = "1", features = ["v4", "serde"] }
-44: 
-45: dirs = "6"
-46: walkdir = "2"
-47: ignore = "0.4"
-48: 
-49: futures = "0.3"
-50: 
-51: tempfile = "3"
-52: 
-53: agent-client-protocol = "0.9"
+1: AgentMessage
+2: ⋮----
+3: {
+4:     
+5:     Thinking(String),
+6:     
+7:     Output(String),
+8:     
+9:     Status(String),
+10:     
+11:     Error(String),
+12:     
+13:     Completed,
+14: }
+15: ⋮----
+16: CoworkClient
+17: ⋮----
+18: {
+19:     output: Arc<std::sync::Mutex<String>>,
+20:     message_tx: mpsc::UnboundedSender<AgentMessage>,
+21:     workspace: PathBuf,
+22: }
+23: ⋮----
+24: CoworkClient
+25: ⋮----
+26: {
+27:     
+28:     
+29:     fn validate_workspace_path(&self, abs_path: &Path) -> Result<PathBuf, acp::Error> {
+30:         let workspace_abs = self
+31:             .workspace
+32:             .canonicalize()
+33:             .map_err(acp::Error::into_internal_error)?;
+34:         let target_abs = abs_path
+35:             .canonicalize()
+36:             .or_else(|_| {
+37:                 
+38:                 let parent = abs_path.parent().unwrap_or(abs_path);
+39:                 let file_name = abs_path.file_name().ok_or_else(|| {
+40:                     acp::Error::invalid_params().data("path has no file name")
+41:                 })?;
+42:                 let parent_abs = parent.canonicalize().map_err(acp::Error::into_internal_error)?;
+43:                 Ok::<_, acp::Error>(parent_abs.join(file_name))
+44:             })
+45:             .map_err(acp::Error::into_internal_error)?;
+46: 
+47:         let workspace_stripped = strip_unc_prefix(&workspace_abs);
+48:         let target_stripped = strip_unc_prefix(&target_abs);
+49: 
+50:         if target_stripped.starts_with(&workspace_stripped) {
+51:             Ok(target_stripped)
+52:         } else {
+53:             Err(acp::Error::invalid_params().data(format!(
+54:                 "path '{}' is outside workspace '{}'",
+55:                 target_stripped.display(),
+56:                 workspace_stripped.display()
+57:             )))
+58:         }
+59:     }
+60: }
+61: ⋮----
+62: strip_unc_prefix
+63: ⋮----
+64: (path: &Path)
+65: ⋮----
+66: CoworkClient
+67: ⋮----
+68: {
+69:     async fn request_permission(
+70:         &self,
+71:         args: acp::RequestPermissionRequest,
+72:     ) -> acp::Result<acp::RequestPermissionResponse> {
+73:         tracing::info!(
+74:             session_id = %args.session_id,
+75:             "ACP permission request for tool call: {:?}",
+76:             args.tool_call
+77:         );
+78: 
+79:         
+80:         
+81:         let allow_option = args
+82:             .options
+83:             .into_iter()
+84:             .find(|o| matches!(o.kind, acp::PermissionOptionKind::AllowOnce | acp::PermissionOptionKind::AllowAlways));
+85: 
+86:         match allow_option {
+87:             Some(option) => {
+88:                 tracing::info!(option_id = %option.option_id.0, "Auto-approving ACP permission request");
+89:                 Ok(acp::RequestPermissionResponse::new(
+90:                     acp::RequestPermissionOutcome::Selected(
+91:                         acp::SelectedPermissionOutcome::new(option.option_id),
+92:                     ),
+93:                 ))
+94:             }
+95:             None => {
+96:                 tracing::warn!("ACP permission request had no allow option; cancelling");
+97:                 Ok(acp::RequestPermissionResponse::new(
+98:                     acp::RequestPermissionOutcome::Cancelled,
+99:                 ))
+100:             }
+101:         }
+102:     }
+103: 
+104:     async fn write_text_file(
+105:         &self,
+106:         args: acp::WriteTextFileRequest,
+107:     ) -> acp::Result<acp::WriteTextFileResponse> {
+108:         tracing::debug!(session_id = %args.session_id, path = %args.path.display(), "ACP write_text_file");
+109: 
+110:         let rel_path = self.validate_workspace_path(&args.path)?;
+111:         let full_path = self.workspace.join(&rel_path);
+112: 
+113:         if let Some(parent) = full_path.parent() {
+114:             std::fs::create_dir_all(parent).map_err(acp::Error::into_internal_error)?;
+115:         }
+116:         std::fs::write(&full_path, args.content).map_err(|e| {
+117:             tracing::error!(path = %full_path.display(), error = %e, "ACP write_text_file failed");
+118:             acp::Error::into_internal_error(e)
+119:         })?;
+120: 
+121:         tracing::info!(path = %full_path.display(), bytes = ?std::fs::metadata(&full_path).map(|m| m.len()).unwrap_or(0), "ACP write_text_file succeeded");
+122:         let _ = self.message_tx.send(AgentMessage::Status(format!(
+123:             "Wrote file {}",
+124:             rel_path.display()
+125:         )));
+126:         Ok(acp::WriteTextFileResponse::new())
+127:     }
+128: 
+129:     async fn read_text_file(
+130:         &self,
+131:         args: acp::ReadTextFileRequest,
+132:     ) -> acp::Result<acp::ReadTextFileResponse> {
+133:         tracing::debug!(session_id = %args.session_id, path = %args.path.display(), "ACP read_text_file");
+134: 
+135:         let rel_path = self.validate_workspace_path(&args.path)?;
+136:         let full_path = self.workspace.join(&rel_path);
+137: 
+138:         let content = std::fs::read_to_string(&full_path).map_err(|e| {
+139:             tracing::error!(path = %full_path.display(), error = %e, "ACP read_text_file failed");
+140:             if e.kind() == std::io::ErrorKind::NotFound {
+141:                 acp::Error::resource_not_found(Some(full_path.display().to_string()))
+142:             } else {
+143:                 acp::Error::into_internal_error(e)
+144:             }
+145:         })?;
+146: 
+147:         tracing::info!(path = %full_path.display(), len = content.len(), "ACP read_text_file succeeded");
+148:         Ok(acp::ReadTextFileResponse::new(content))
+149:     }
+150: 
+151:     async fn create_terminal(
+152:         &self,
+153:         _args: acp::CreateTerminalRequest,
+154:     ) -> Result<acp::CreateTerminalResponse, acp::Error> {
+155:         Err(acp::Error::method_not_found())
+156:     }
+157: 
+158:     async fn terminal_output(
+159:         &self,
+160:         _args: acp::TerminalOutputRequest,
+161:     ) -> acp::Result<acp::TerminalOutputResponse> {
+162:         Err(acp::Error::method_not_found())
+163:     }
+164: 
+165:     async fn release_terminal(
+166:         &self,
+167:         _args: acp::ReleaseTerminalRequest,
+168:     ) -> acp::Result<acp::ReleaseTerminalResponse> {
+169:         Err(acp::Error::method_not_found())
+170:     }
+171: 
+172:     async fn wait_for_terminal_exit(
+173:         &self,
+174:         _args: acp::WaitForTerminalExitRequest,
+175:     ) -> acp::Result<acp::WaitForTerminalExitResponse> {
+176:         Err(acp::Error::method_not_found())
+177:     }
+178: 
+179:     async fn kill_terminal_command(
+180:         &self,
+181:         _args: acp::KillTerminalCommandRequest,
+182:     ) -> acp::Result<acp::KillTerminalCommandResponse> {
+183:         Err(acp::Error::method_not_found())
+184:     }
+185: 
+186:     async fn session_notification(
+187:         &self,
+188:         args: acp::SessionNotification,
+189:     ) -> acp::Result<(), acp::Error> {
+190:         match args.update {
+191:             acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk {
+192:                 content: acp::ContentBlock::Text(text_content),
+193:                 ..
+194:             }) => {
+195:                 let text = text_content.text.clone();
+196:                 tracing::debug!(len = text.len(), "ACP agent message chunk");
+197:                 let _ = self.message_tx.send(AgentMessage::Output(text));
+198:                 if let Ok(mut out) = self.output.lock() {
+199:                     out.push_str(&text_content.text);
+200:                 }
+201:             }
+202:             acp::SessionUpdate::AgentThoughtChunk(acp::ContentChunk {
+203:                 content: acp::ContentBlock::Text(text_content),
+204:                 ..
+205:             }) => {
+206:                 let text = text_content.text.clone();
+207:                 tracing::debug!(len = text.len(), "ACP agent thought chunk");
+208:                 let _ = self.message_tx.send(AgentMessage::Thinking(text));
+209:             }
+210:             
+211:             _ => {}
+212:         }
+213:         Ok(())
+214:     }
+215: 
+216:     async fn ext_method(&self, _args: acp::ExtRequest) -> acp::Result<acp::ExtResponse> {
+217:         Err(acp::Error::method_not_found())
+218:     }
+219: 
+220:     async fn ext_notification(&self, _args: acp::ExtNotification) -> acp::Result<()> {
+221:         Err(acp::Error::method_not_found())
+222:     }
+223: }
+224: ⋮----
+225: AcpTaskResult
+226: ⋮----
+227: {
+228:     
+229:     pub content: String,
+230:     
+231:     pub completed: bool,
+232:     
+233:     pub error: Option<String>,
+234: }
+235: ⋮----
+236: AcpTaskResult
+237: ⋮----
+238: {
+239:     pub fn new(content: String, completed: bool) -> Self {
+240:         Self {
+241:             content,
+242:             completed,
+243:             error: None,
+244:         }
+245:     }
+246: 
+247:     pub fn error(msg: String) -> Self {
+248:         Self {
+249:             content: String::new(),
+250:             completed: false,
+251:             error: Some(msg),
+252:         }
+253:     }
+254: }
+255: ⋮----
+256: execute_with_external_agent
+257: ⋮----
+258: (
+259:     config: CodingAgentConfig,
+260:     workspace: PathBuf,
+261:     task: String,
+262: )
+263: ⋮----
+264: run_acp_in_thread
+265: ⋮----
+266: (
+267:     config: CodingAgentConfig,
+268:     workspace: PathBuf,
+269:     task: String,
+270:     message_tx: mpsc::UnboundedSender<AgentMessage>,
+271: )
+272: ⋮----
+273: AcpClient
+274: ⋮----
+275: {
+276:     config: CodingAgentConfig,
+277:     workspace: PathBuf,
+278: }
+279: ⋮----
+280: AcpClient
+281: ⋮----
+282: {
+283:     
+284:     pub async fn from_config(config: &CodingAgentConfig, workspace: &Path) -> Result<Self> {
+285:         Ok(Self {
+286:             config: config.clone(),
+287:             workspace: workspace.to_path_buf(),
+288:         })
+289:     }
+290: 
+291:     
+292:     pub fn execute_task_stream(
+293:         self,
+294:         task: String,
+295:     ) -> (mpsc::UnboundedReceiver<AgentMessage>, impl std::future::Future<Output = Result<Result<String>>>) {
+296:         execute_with_external_agent(self.config, self.workspace, task)
+297:     }
+298: 
+299:     
+300:     pub async fn execute_task(&mut self, task: &str) -> Result<String> {
+301:         let (_, result) = execute_with_external_agent(
+302:             self.config.clone(),
+303:             self.workspace.clone(),
+304:             task.to_string(),
+305:         );
+306:         
+307:         result.await?
+308:     }
+309: }
 ```
 
 ### crates/cowork-gui/src/App.tsx (413 lines)
@@ -2155,1495 +2835,198 @@ LICENSE
 14: }
 ```
 
-### crates/cowork-core/src/acp/client.rs (206 lines)
+### crates/cowork-gui/src-tauri/Cargo.toml (50 lines)
 
 ```
-1: AgentMessage
-2: ⋮----
-3: {
-4:     
-5:     Thinking(String),
-6:     
-7:     Output(String),
-8:     
-9:     Status(String),
-10:     
-11:     Error(String),
-12:     
-13:     Completed,
-14: }
-15: ⋮----
-16: CoworkClient
-17: ⋮----
-18: {
-19:     output: Arc<std::sync::Mutex<String>>,
-20:     message_tx: mpsc::UnboundedSender<AgentMessage>,
-21: }
-22: ⋮----
-23: CoworkClient
-24: ⋮----
-25: {
-26:     async fn request_permission(
-27:         &self,
-28:         _args: acp::RequestPermissionRequest,
-29:     ) -> acp::Result<acp::RequestPermissionResponse> {
-30:         Err(acp::Error::method_not_found())
-31:     }
-32: 
-33:     async fn write_text_file(
-34:         &self,
-35:         _args: acp::WriteTextFileRequest,
-36:     ) -> acp::Result<acp::WriteTextFileResponse> {
-37:         Err(acp::Error::method_not_found())
-38:     }
-39: 
-40:     async fn read_text_file(
-41:         &self,
-42:         _args: acp::ReadTextFileRequest,
-43:     ) -> acp::Result<acp::ReadTextFileResponse> {
-44:         Err(acp::Error::method_not_found())
-45:     }
-46: 
-47:     async fn create_terminal(
-48:         &self,
-49:         _args: acp::CreateTerminalRequest,
-50:     ) -> Result<acp::CreateTerminalResponse, acp::Error> {
-51:         Err(acp::Error::method_not_found())
-52:     }
-53: 
-54:     async fn terminal_output(
-55:         &self,
-56:         _args: acp::TerminalOutputRequest,
-57:     ) -> acp::Result<acp::TerminalOutputResponse> {
-58:         Err(acp::Error::method_not_found())
-59:     }
-60: 
-61:     async fn release_terminal(
-62:         &self,
-63:         _args: acp::ReleaseTerminalRequest,
-64:     ) -> acp::Result<acp::ReleaseTerminalResponse> {
-65:         Err(acp::Error::method_not_found())
-66:     }
-67: 
-68:     async fn wait_for_terminal_exit(
-69:         &self,
-70:         _args: acp::WaitForTerminalExitRequest,
-71:     ) -> acp::Result<acp::WaitForTerminalExitResponse> {
-72:         Err(acp::Error::method_not_found())
-73:     }
-74: 
-75:     async fn kill_terminal_command(
-76:         &self,
-77:         _args: acp::KillTerminalCommandRequest,
-78:     ) -> acp::Result<acp::KillTerminalCommandResponse> {
-79:         Err(acp::Error::method_not_found())
-80:     }
-81: 
-82:     async fn session_notification(
-83:         &self,
-84:         args: acp::SessionNotification,
-85:     ) -> acp::Result<(), acp::Error> {
-86:         match args.update {
-87:             acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk { content, .. }) => {
-88:                 if let acp::ContentBlock::Text(text_content) = content {
-89:                     let text = text_content.text.clone();
-90:                     eprintln!("AGENT: {}", text);
-91:                     
-92:                     let _ = self.message_tx.send(AgentMessage::Output(text));
-93:                     
-94:                     if let Ok(mut out) = self.output.lock() {
-95:                         out.push_str(&text_content.text);
-96:                     }
-97:                 }
-98:             }
-99:             acp::SessionUpdate::AgentThoughtChunk(acp::ContentChunk { content, .. }) => {
-100:                 if let acp::ContentBlock::Text(text_content) = content {
-101:                     let text = text_content.text.clone();
-102:                     eprintln!("AGENT THINKING: {}", text);
-103:                     
-104:                     let _ = self.message_tx.send(AgentMessage::Thinking(text));
-105:                 }
-106:             }
-107:             
-108:             _ => {}
-109:         }
-110:         Ok(())
-111:     }
-112: 
-113:     async fn ext_method(&self, _args: acp::ExtRequest) -> acp::Result<acp::ExtResponse> {
-114:         Err(acp::Error::method_not_found())
-115:     }
-116: 
-117:     async fn ext_notification(&self, _args: acp::ExtNotification) -> acp::Result<()> {
-118:         Err(acp::Error::method_not_found())
-119:     }
-120: }
-121: ⋮----
-122: AcpTaskResult
-123: ⋮----
-124: {
-125:     
-126:     pub content: String,
-127:     
-128:     pub completed: bool,
-129:     
-130:     pub error: Option<String>,
-131: }
-132: ⋮----
-133: AcpTaskResult
-134: ⋮----
-135: {
-136:     pub fn new(content: String, completed: bool) -> Self {
-137:         Self {
-138:             content,
-139:             completed,
-140:             error: None,
-141:         }
-142:     }
-143: 
-144:     pub fn error(msg: String) -> Self {
-145:         Self {
-146:             content: String::new(),
-147:             completed: false,
-148:             error: Some(msg),
-149:         }
-150:     }
-151: }
-152: ⋮----
-153: execute_with_external_agent
-154: ⋮----
-155: (
-156:     config: CodingAgentConfig,
-157:     workspace: PathBuf,
-158:     task: String,
-159: )
-160: ⋮----
-161: run_acp_in_thread
-162: ⋮----
-163: (
-164:     config: CodingAgentConfig,
-165:     workspace: PathBuf,
-166:     task: String,
-167:     message_tx: mpsc::UnboundedSender<AgentMessage>,
-168: )
-169: ⋮----
-170: AcpClient
-171: ⋮----
-172: {
-173:     config: CodingAgentConfig,
-174:     workspace: PathBuf,
-175: }
-176: ⋮----
-177: AcpClient
-178: ⋮----
-179: {
-180:     
-181:     pub async fn from_config(config: &CodingAgentConfig, workspace: &PathBuf) -> Result<Self> {
-182:         Ok(Self {
-183:             config: config.clone(),
-184:             workspace: workspace.clone(),
-185:         })
-186:     }
-187: 
-188:     
-189:     pub fn execute_task_stream(
-190:         self,
-191:         task: String,
-192:     ) -> (mpsc::UnboundedReceiver<AgentMessage>, impl std::future::Future<Output = Result<Result<String>>>) {
-193:         execute_with_external_agent(self.config, self.workspace, task)
-194:     }
-195: 
-196:     
-197:     pub async fn execute_task(&mut self, task: &str) -> Result<String> {
-198:         let (_, result) = execute_with_external_agent(
-199:             self.config.clone(),
-200:             self.workspace.clone(),
-201:             task.to_string(),
-202:         );
-203:         
-204:         result.await?
-205:     }
-206: }
-```
-
-### crates/cowork-core/src/config_definition/builtin.rs (19 lines)
-
-```
-1: load_builtin_configs
-2: ⋮----
-3: (registry: &ConfigRegistry)
-4: ⋮----
-5: load_agent_from_embedded
-6: ⋮----
-7: (contents: &[u8])
-8: ⋮----
-9: load_stage_from_embedded
-10: ⋮----
-11: (contents: &[u8])
-12: ⋮----
-13: load_flow_from_embedded
-14: ⋮----
-15: (contents: &[u8])
-16: ⋮----
-17: test_load_builtin_configs
-18: ⋮----
-19: ()
-```
-
-### crates/cowork-core/src/config_definition/flow_definition.rs (269 lines)
-
-```
-1: FlowDefinition
-2: ⋮----
-3: {
-4:     
-5:     pub id: String,
-6:     
-7:     pub name: String,
-8:     
-9:     pub description: Option<String>,
-10:     
-11:     pub version: Option<String>,
-12: 
-13:     
-14:     pub stages: Vec<StageReference>,
-15: 
-16:     
-17:     #[serde(default)]
-18:     pub start_stage: Option<String>,
-19: 
-20:     
-21:     #[serde(default)]
-22:     pub global_hooks: Vec<GlobalHookConfig>,
-23: 
-24:     
-25:     #[serde(default)]
-26:     pub config: FlowConfig,
-27: 
-28:     
-29:     #[serde(default)]
-30:     pub tags: Vec<String>,
-31: 
-32:     
-33:     #[serde(default)]
-34:     pub metadata: HashMap<String, serde_json::Value>,
-35: 
-36:     
-37:     #[serde(default)]
-38:     #[serde(skip_serializing_if = "is_false")]
-39:     pub is_builtin: bool,
-40: }
-41: ⋮----
-42: is_false
-43: ⋮----
-44: (value: &bool)
-45: ⋮----
-46: StageReference
-47: ⋮----
-48: {
-49:     
-50:     pub stage_id: String,
-51:     
-52:     pub alias: Option<String>,
-53:     
-54:     #[serde(default)]
-55:     pub overrides: StageOverrides,
-56:     
-57:     #[serde(default)]
-58:     pub condition: Option<String>,
-59:     
-60:     pub on_success: Option<String>,
-61:     
-62:     pub on_failure: Option<String>,
-63: }
-64: ⋮----
-65: StageOverrides
-66: ⋮----
-67: {
-68:     
-69:     pub needs_confirmation: Option<bool>,
-70:     
-71:     #[serde(default)]
-72:     pub hooks: Vec<super::stage_definition::HookConfig>,
-73:     
-74:     pub timeout_secs: Option<u32>,
-75:     
-76:     #[serde(default)]
-77:     pub skip: bool,
-78: }
-79: ⋮----
-80: GlobalHookConfig
-81: ⋮----
-82: {
-83:     
-84:     pub integration_id: String,
-85:     
-86:     pub points: Vec<super::stage_definition::HookPoint>,
-87:     
-88:     #[serde(default)]
-89:     pub blocking: bool,
-90:     
-91:     #[serde(default = "default_global_timeout")]
-92:     pub timeout_secs: u32,
-93: }
-94: ⋮----
-95: default_global_timeout
-96: ⋮----
-97: ()
-98: ⋮----
-99: FlowConfig
-100: ⋮----
-101: {
-102:     
-103:     #[serde(default = "default_stop_on_failure")]
-104:     pub stop_on_failure: bool,
-105: 
-106:     
-107:     pub max_total_time_secs: Option<u32>,
-108: 
-109:     
-110:     #[serde(default = "default_save_state")]
-111:     pub save_state_on_interrupt: bool,
-112: 
-113:     
-114:     #[serde(default)]
-115:     pub memory_scope: MemoryScope,
-116: 
-117:     
-118:     #[serde(default)]
-119:     pub inheritance: InheritanceConfig,
-120: }
-121: ⋮----
-122: FlowConfig
-123: ⋮----
-124: {
-125:     fn default() -> Self {
-126:         Self {
-127:             stop_on_failure: true,
-128:             max_total_time_secs: None,
-129:             save_state_on_interrupt: true,
-130:             memory_scope: MemoryScope::default(),
-131:             inheritance: InheritanceConfig::default(),
-132:         }
-133:     }
-134: }
-135: ⋮----
-136: default_stop_on_failure
-137: ⋮----
-138: ()
-139: ⋮----
-140: default_save_state
-141: ⋮----
-142: ()
-143: ⋮----
-144: MemoryScope
-145: ⋮----
-146: {
-147:     
-148:     Project,
-149:     
-150:     Iteration,
-151:     
-152:     #[default]
-153:     Merged,
-154: }
-155: ⋮----
-156: InheritanceConfig
-157: ⋮----
-158: {
-159:     
-160:     #[serde(default)]
-161:     pub default_mode: InheritanceMode,
-162:     
-163:     #[serde(default)]
-164:     pub stage_mapping: HashMap<String, String>,
-165: }
-166: ⋮----
-167: InheritanceConfig
-168: ⋮----
-169: {
-170:     fn default() -> Self {
-171:         let mut stage_mapping = HashMap::new();
-172:         stage_mapping.insert("none".to_string(), "idea".to_string());
-173:         stage_mapping.insert("partial".to_string(), "idea".to_string());
-174:         stage_mapping.insert("full".to_string(), "idea".to_string());
-175: 
-176:         Self {
-177:             default_mode: InheritanceMode::Partial,
-178:             stage_mapping,
-179:         }
-180:     }
-181: }
-182: ⋮----
-183: InheritanceMode
-184: ⋮----
-185: {
-186:     
-187:     None,
-188:     
-189:     #[default]
-190:     Partial,
-191:     
-192:     Full,
-193: }
-194: ⋮----
-195: FlowDefinition
-196: ⋮----
-197: {
-198:     
-199:     pub fn new(id: impl Into<String>, name: impl Into<String>) -> Self {
-200:         Self {
-201:             id: id.into(),
-202:             name: name.into(),
-203:             description: None,
-204:             version: None,
-205:             stages: Vec::new(),
-206:             start_stage: None,
-207:             global_hooks: Vec::new(),
-208:             config: FlowConfig::default(),
-209:             tags: Vec::new(),
-210:             metadata: HashMap::new(),
-211:             is_builtin: false,
-212:         }
-213:     }
-214:     
-215:     
-216:     pub fn as_builtin(mut self) -> Self {
-217:         self.is_builtin = true;
-218:         self
-219:     }
-220: 
-221:     
-222:     pub fn with_stage(mut self, stage_id: impl Into<String>) -> Self {
-223:         self.stages.push(StageReference {
-224:             stage_id: stage_id.into(),
-225:             alias: None,
-226:             overrides: StageOverrides::default(),
-227:             condition: None,
-228:             on_success: None,
-229:             on_failure: None,
-230:         });
-231:         self
-232:     }
-233: 
-234:     
-235:     pub fn with_stage_alias(mut self, stage_id: impl Into<String>, alias: impl Into<String>) -> Self {
-236:         self.stages.push(StageReference {
-237:             stage_id: stage_id.into(),
-238:             alias: Some(alias.into()),
-239:             overrides: StageOverrides::default(),
-240:             condition: None,
-241:             on_success: None,
-242:             on_failure: None,
-243:         });
-244:         self
-245:     }
-246: 
-247:     
-248:     pub fn start_at(mut self, stage: impl Into<String>) -> Self {
-249:         self.start_stage = Some(stage.into());
-250:         self
-251:     }
-252: 
-253:     
-254:     pub fn default_v3() -> Self {
-255:         Self::new("default", "Default Development Flow")
-256:             .with_stage("idea")
-257:             .with_stage("prd")
-258:             .with_stage("design")
-259:             .with_stage("plan")
-260:             .with_stage("coding")
-261:             .with_stage("check")
-262:             .with_stage("delivery")
-263:             .start_at("idea")
-264:     }
-265: }
-266: ⋮----
-267: test_flow_definition
-268: ⋮----
-269: ()
-```
-
-### crates/cowork-core/src/config_definition/registry.rs (653 lines)
-
-```
-1: get_user_config_dir
-2: ⋮----
-3: ()
-4: ⋮----
-5: ensure_user_config_dir
-6: ⋮----
-7: ()
-8: ⋮----
-9: ConfigRegistry
-10: ⋮----
-11: {
-12:     
-13:     agents: RwLock<HashMap<String, AgentDefinition>>,
-14:     
-15:     stages: RwLock<HashMap<String, StageDefinition>>,
-16:     
-17:     flows: RwLock<HashMap<String, FlowDefinition>>,
-18:     
-19:     integrations: RwLock<HashMap<String, IntegrationDefinition>>,
-20:     
-21:     default_flow: RwLock<Option<String>>,
-22: }
-23: ⋮----
-24: ConfigRegistry
-25: ⋮----
-26: {
-27:     fn default() -> Self {
-28:         Self::new()
-29:     }
-30: }
-31: ⋮----
-32: ConfigRegistry
-33: ⋮----
-34: {
-35:     
-36:     pub fn new() -> Self {
-37:         Self {
-38:             agents: RwLock::new(HashMap::new()),
-39:             stages: RwLock::new(HashMap::new()),
-40:             flows: RwLock::new(HashMap::new()),
-41:             integrations: RwLock::new(HashMap::new()),
-42:             default_flow: RwLock::new(None),
-43:         }
-44:     }
-45:     
-46:     
-47:     
-48:     
-49:     
-50:     
-51:     pub fn register_agent(&self, definition: AgentDefinition) -> Result<()> {
-52:         let id = definition.id.clone();
-53:         let mut agents = self.agents.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-54:         agents.insert(id.clone(), definition);
-55:         tracing::debug!("Registered agent: {}", id);
-56:         Ok(())
-57:     }
-58:     
-59:     
-60:     pub fn get_agent(&self, id: &str) -> Option<AgentDefinition> {
-61:         let agents = self.agents.read().ok()?;
-62:         agents.get(id).cloned()
-63:     }
-64:     
-65:     
-66:     pub fn list_agents(&self) -> Vec<String> {
-67:         let agents = self.agents.read().unwrap_or_else(|e| {
-68:             tracing::error!("Lock error: {}", e);
-69:             panic!("Lock error")
-70:         });
-71:         agents.keys().cloned().collect()
-72:     }
-73:     
-74:     
-75:     pub fn unregister_agent(&self, id: &str) -> bool {
-76:         let mut agents = self.agents.write().unwrap_or_else(|e| {
-77:             tracing::error!("Lock error: {}", e);
-78:             panic!("Lock error")
-79:         });
-80:         agents.remove(id).is_some()
-81:     }
-82:     
-83:     
-84:     
-85:     
-86:     
-87:     
-88:     pub fn register_stage(&self, definition: StageDefinition) -> Result<()> {
-89:         let id = definition.id.clone();
-90:         let mut stages = self.stages.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-91:         stages.insert(id.clone(), definition);
-92:         tracing::debug!("Registered stage: {}", id);
-93:         Ok(())
-94:     }
-95:     
-96:     
-97:     pub fn get_stage(&self, id: &str) -> Option<StageDefinition> {
-98:         let stages = self.stages.read().ok()?;
-99:         stages.get(id).cloned()
-100:     }
-101:     
-102:     
-103:     pub fn list_stages(&self) -> Vec<String> {
-104:         let stages = self.stages.read().unwrap_or_else(|e| {
-105:             tracing::error!("Lock error: {}", e);
-106:             panic!("Lock error")
-107:         });
-108:         stages.keys().cloned().collect()
-109:     }
-110:     
-111:     
-112:     
-113:     
-114:     
-115:     
-116:     pub fn register_flow(&self, definition: FlowDefinition) -> Result<()> {
-117:         let id = definition.id.clone();
-118:         let mut flows = self.flows.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-119:         flows.insert(id.clone(), definition);
-120:         tracing::debug!("Registered flow: {}", id);
-121:         Ok(())
-122:     }
-123:     
-124:     
-125:     pub fn get_flow(&self, id: &str) -> Option<FlowDefinition> {
-126:         let flows = self.flows.read().ok()?;
-127:         flows.get(id).cloned()
-128:     }
-129:     
-130:     
-131:     pub fn list_flows(&self) -> Vec<String> {
-132:         let flows = self.flows.read().unwrap_or_else(|e| {
-133:             tracing::error!("Lock error: {}", e);
-134:             panic!("Lock error")
-135:         });
-136:         flows.keys().cloned().collect()
-137:     }
-138:     
-139:     
-140:     pub fn unregister_flow(&self, id: &str) -> bool {
-141:         let mut flows = self.flows.write().unwrap_or_else(|e| {
-142:             tracing::error!("Lock error: {}", e);
-143:             panic!("Lock error")
-144:         });
-145:         flows.remove(id).is_some()
-146:     }
-147:     
-148:     
-149:     pub fn set_default_flow(&self, id: Option<String>) -> Result<()> {
-150:         {
-151:             let mut default_flow = self.default_flow.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-152:             *default_flow = id.clone();
-153:         }
-154:         
-155:         self.save_settings()?;
-156:         Ok(())
-157:     }
-158:     
-159:     
-160:     
-161:     pub fn set_default_flow_without_save(&self, id: Option<String>) {
-162:         if let Ok(mut default_flow) = self.default_flow.write() {
-163:             *default_flow = id;
-164:         }
-165:     }
-166:     
-167:     
-168:     pub fn get_default_flow_id(&self) -> Option<String> {
-169:         let default_flow = self.default_flow.read().ok()?;
-170:         default_flow.clone()
-171:     }
-172:     
-173:     
-174:     pub fn get_default_flow(&self) -> Option<FlowDefinition> {
-175:         let default_flow = self.default_flow.read().ok()?;
-176:         let flow_id = default_flow.as_ref()?;
-177:         self.get_flow(flow_id)
-178:     }
-179:     
-180:     
-181:     
-182:     
-183:     
-184:     
-185:     fn get_settings_file_path() -> Option<PathBuf> {
-186:         get_user_config_dir().map(|dir| dir.join("settings.json"))
-187:     }
-188:     
-189:     
-190:     pub fn save_settings(&self) -> Result<()> {
-191:         let settings = Settings {
-192:             default_flow_id: self.get_default_flow_id(),
-193:         };
-194:         
-195:         let config_dir = ensure_user_config_dir()?;
-196:         let file_path = config_dir.join("settings.json");
-197:         let content = serde_json::to_string_pretty(&settings)
-198:             .with_context(|| "Failed to serialize settings")?;
-199:         
-200:         fs::write(&file_path, content)
-201:             .with_context(|| format!("Failed to write settings file: {:?}", file_path))?;
-202:         
-203:         tracing::debug!("Saved settings to {:?}", file_path);
-204:         Ok(())
-205:     }
-206:     
-207:     
-208:     pub fn load_settings(&self) -> Result<()> {
-209:         if let Some(file_path) = Self::get_settings_file_path() {
-210:             if file_path.exists() {
-211:                 match fs::read_to_string(&file_path)
-212:                     .and_then(|content| serde_json::from_str::<Settings>(&content)
-213:                         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-214:                 {
-215:                     Ok(settings) => {
-216:                         if let Some(flow_id) = settings.default_flow_id {
-217:                             
-218:                             if self.get_flow(&flow_id).is_some() {
-219:                                 let mut default_flow = self.default_flow.write()
-220:                                     .map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-221:                                 *default_flow = Some(flow_id.clone());
-222:                                 tracing::info!("Loaded default flow setting: {}", flow_id);
-223:                             } else {
-224:                                 tracing::warn!("Default flow '{}' not found, ignoring setting", flow_id);
-225:                             }
-226:                         }
-227:                     }
-228:                     Err(e) => {
-229:                         tracing::warn!("Failed to load settings: {}", e);
-230:                     }
-231:                 }
-232:             }
-233:         }
-234:         Ok(())
-235:     }
-236:     
-237:     
-238:     
-239:     
-240:     
-241:     
-242:     pub fn register_integration(&self, definition: IntegrationDefinition) -> Result<()> {
-243:         let id = definition.id.clone();
-244:         let mut integrations = self.integrations.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-245:         integrations.insert(id.clone(), definition);
-246:         tracing::debug!("Registered integration: {}", id);
-247:         Ok(())
-248:     }
-249:     
-250:     
-251:     pub fn get_integration(&self, id: &str) -> Option<IntegrationDefinition> {
-252:         let integrations = self.integrations.read().ok()?;
-253:         integrations.get(id).cloned()
-254:     }
-255:     
-256:     
-257:     pub fn list_integrations(&self) -> Vec<String> {
-258:         let integrations = self.integrations.read().unwrap_or_else(|e| {
-259:             tracing::error!("Lock error: {}", e);
-260:             panic!("Lock error")
-261:         });
-262:         integrations.keys().cloned().collect()
-263:     }
-264:     
-265:     
-266:     pub fn get_enabled_integrations(&self) -> Vec<IntegrationDefinition> {
-267:         let integrations = self.integrations.read().unwrap_or_else(|e| {
-268:             tracing::error!("Lock error: {}", e);
-269:             panic!("Lock error")
-270:         });
-271:         integrations.values().filter(|i| i.enabled).cloned().collect()
-272:     }
-273:     
-274:     
-275:     
-276:     
-277:     
-278:     
-279:     pub fn clear(&self) -> Result<()> {
-280:         {
-281:             let mut agents = self.agents.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-282:             agents.clear();
-283:         }
-284:         {
-285:             let mut stages = self.stages.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-286:             stages.clear();
-287:         }
-288:         {
-289:             let mut flows = self.flows.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-290:             flows.clear();
-291:         }
-292:         {
-293:             let mut integrations = self.integrations.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-294:             integrations.clear();
-295:         }
-296:         Ok(())
-297:     }
-298:     
-299:     
-300:     pub fn stats(&self) -> RegistryStats {
-301:         RegistryStats {
-302:             agents: self.agents.read().map(|g| g.len()).unwrap_or(0),
-303:             stages: self.stages.read().map(|g| g.len()).unwrap_or(0),
-304:             flows: self.flows.read().map(|g| g.len()).unwrap_or(0),
-305:             integrations: self.integrations.read().map(|g| g.len()).unwrap_or(0),
-306:         }
-307:     }
-308:     
-309:     
-310:     
-311:     
-312:     
-313:     
-314:     pub fn save_agent_to_file(&self, agent: &AgentDefinition) -> Result<()> {
-315:         let config_dir = ensure_user_config_dir()?;
-316:         let agents_dir = config_dir.join("agents");
-317:         fs::create_dir_all(&agents_dir)
-318:             .with_context(|| format!("Failed to create agents directory: {:?}", agents_dir))?;
-319:         
-320:         let file_path = agents_dir.join(format!("{}.json", agent.id));
-321:         let content = serde_json::to_string_pretty(agent)
-322:             .with_context(|| format!("Failed to serialize agent: {}", agent.id))?;
-323:         
-324:         fs::write(&file_path, content)
-325:             .with_context(|| format!("Failed to write agent file: {:?}", file_path))?;
-326:         
-327:         tracing::info!("Saved agent '{}' to {:?}", agent.id, file_path);
-328:         Ok(())
-329:     }
-330:     
-331:     
-332:     pub fn delete_agent_file(&self, id: &str) -> Result<()> {
-333:         if let Some(config_dir) = get_user_config_dir() {
-334:             let file_path = config_dir.join("agents").join(format!("{}.json", id));
-335:             if file_path.exists() {
-336:                 fs::remove_file(&file_path)
-337:                     .with_context(|| format!("Failed to delete agent file: {:?}", file_path))?;
-338:                 tracing::info!("Deleted agent file: {:?}", file_path);
-339:             }
-340:         }
-341:         Ok(())
-342:     }
-343:     
-344:     
-345:     pub fn save_stage_to_file(&self, stage: &StageDefinition) -> Result<()> {
-346:         let config_dir = ensure_user_config_dir()?;
-347:         let stages_dir = config_dir.join("stages");
-348:         fs::create_dir_all(&stages_dir)
-349:             .with_context(|| format!("Failed to create stages directory: {:?}", stages_dir))?;
-350:         
-351:         let file_path = stages_dir.join(format!("{}.json", stage.id));
-352:         let content = serde_json::to_string_pretty(stage)
-353:             .with_context(|| format!("Failed to serialize stage: {}", stage.id))?;
-354:         
-355:         fs::write(&file_path, content)
-356:             .with_context(|| format!("Failed to write stage file: {:?}", file_path))?;
-357:         
-358:         tracing::info!("Saved stage '{}' to {:?}", stage.id, file_path);
-359:         Ok(())
-360:     }
-361:     
-362:     
-363:     pub fn delete_stage_file(&self, id: &str) -> Result<()> {
-364:         if let Some(config_dir) = get_user_config_dir() {
-365:             let file_path = config_dir.join("stages").join(format!("{}.json", id));
-366:             if file_path.exists() {
-367:                 fs::remove_file(&file_path)
-368:                     .with_context(|| format!("Failed to delete stage file: {:?}", file_path))?;
-369:                 tracing::info!("Deleted stage file: {:?}", file_path);
-370:             }
-371:         }
-372:         Ok(())
-373:     }
-374:     
-375:     
-376:     pub fn save_flow_to_file(&self, flow: &FlowDefinition) -> Result<()> {
-377:         let config_dir = ensure_user_config_dir()?;
-378:         let flows_dir = config_dir.join("flows");
-379:         fs::create_dir_all(&flows_dir)
-380:             .with_context(|| format!("Failed to create flows directory: {:?}", flows_dir))?;
-381:         
-382:         let file_path = flows_dir.join(format!("{}.json", flow.id));
-383:         let content = serde_json::to_string_pretty(flow)
-384:             .with_context(|| format!("Failed to serialize flow: {}", flow.id))?;
-385:         
-386:         fs::write(&file_path, content)
-387:             .with_context(|| format!("Failed to write flow file: {:?}", file_path))?;
-388:         
-389:         tracing::info!("Saved flow '{}' to {:?}", flow.id, file_path);
-390:         Ok(())
-391:     }
-392:     
-393:     
-394:     pub fn delete_flow_file(&self, id: &str) -> Result<()> {
-395:         if let Some(config_dir) = get_user_config_dir() {
-396:             let file_path = config_dir.join("flows").join(format!("{}.json", id));
-397:             if file_path.exists() {
-398:                 fs::remove_file(&file_path)
-399:                     .with_context(|| format!("Failed to delete flow file: {:?}", file_path))?;
-400:                 tracing::info!("Deleted flow file: {:?}", file_path);
-401:             }
-402:         }
-403:         Ok(())
-404:     }
-405:     
-406:     
-407:     pub fn save_integration_to_file(&self, integration: &IntegrationDefinition) -> Result<()> {
-408:         let config_dir = ensure_user_config_dir()?;
-409:         let integrations_dir = config_dir.join("integrations");
-410:         fs::create_dir_all(&integrations_dir)
-411:             .with_context(|| format!("Failed to create integrations directory: {:?}", integrations_dir))?;
-412:         
-413:         let file_path = integrations_dir.join(format!("{}.json", integration.id));
-414:         let content = serde_json::to_string_pretty(integration)
-415:             .with_context(|| format!("Failed to serialize integration: {}", integration.id))?;
-416:         
-417:         fs::write(&file_path, content)
-418:             .with_context(|| format!("Failed to write integration file: {:?}", file_path))?;
-419:         
-420:         tracing::info!("Saved integration '{}' to {:?}", integration.id, file_path);
-421:         Ok(())
-422:     }
-423:     
-424:     
-425:     pub fn delete_integration_file(&self, id: &str) -> Result<()> {
-426:         if let Some(config_dir) = get_user_config_dir() {
-427:             let file_path = config_dir.join("integrations").join(format!("{}.json", id));
-428:             if file_path.exists() {
-429:                 fs::remove_file(&file_path)
-430:                     .with_context(|| format!("Failed to delete integration file: {:?}", file_path))?;
-431:                 tracing::info!("Deleted integration file: {:?}", file_path);
-432:             }
-433:         }
-434:         Ok(())
-435:     }
-436:     
-437:     
-438:     pub fn load_user_configs(&self) -> Result<LoadUserReport> {
-439:         let mut report = LoadUserReport::default();
-440:         
-441:         if let Some(config_dir) = get_user_config_dir() {
-442:             if config_dir.exists() {
-443:                 
-444:                 let agents_dir = config_dir.join("agents");
-445:                 if agents_dir.exists() {
-446:                     for entry in fs::read_dir(&agents_dir)
-447:                         .with_context(|| format!("Failed to read agents directory: {:?}", agents_dir))?
-448:                         .filter_map(|e| e.ok())
-449:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
-450:                     {
-451:                         let path = entry.path();
-452:                         match fs::read_to_string(&path)
-453:                             .and_then(|content| serde_json::from_str::<AgentDefinition>(&content)
-454:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-455:                         {
-456:                             Ok(agent) => {
-457:                                 let id = agent.id.clone();
-458:                                 self.register_agent(agent)?;
-459:                                 report.agents_loaded += 1;
-460:                                 tracing::debug!("Loaded user agent: {} from {:?}", id, path);
-461:                             }
-462:                             Err(e) => {
-463:                                 report.errors.push(format!("Failed to load agent from {:?}: {}", path, e));
-464:                             }
-465:                         }
-466:                     }
-467:                 }
-468:                 
-469:                 
-470:                 let stages_dir = config_dir.join("stages");
-471:                 if stages_dir.exists() {
-472:                     for entry in fs::read_dir(&stages_dir)
-473:                         .with_context(|| format!("Failed to read stages directory: {:?}", stages_dir))?
-474:                         .filter_map(|e| e.ok())
-475:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
-476:                     {
-477:                         let path = entry.path();
-478:                         match fs::read_to_string(&path)
-479:                             .and_then(|content| serde_json::from_str::<StageDefinition>(&content)
-480:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-481:                         {
-482:                             Ok(stage) => {
-483:                                 let id = stage.id.clone();
-484:                                 self.register_stage(stage)?;
-485:                                 report.stages_loaded += 1;
-486:                                 tracing::debug!("Loaded user stage: {} from {:?}", id, path);
-487:                             }
-488:                             Err(e) => {
-489:                                 report.errors.push(format!("Failed to load stage from {:?}: {}", path, e));
-490:                             }
-491:                         }
-492:                     }
-493:                 }
-494:                 
-495:                 
-496:                 let flows_dir = config_dir.join("flows");
-497:                 if flows_dir.exists() {
-498:                     for entry in fs::read_dir(&flows_dir)
-499:                         .with_context(|| format!("Failed to read flows directory: {:?}", flows_dir))?
-500:                         .filter_map(|e| e.ok())
-501:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
-502:                     {
-503:                         let path = entry.path();
-504:                         match fs::read_to_string(&path)
-505:                             .and_then(|content| serde_json::from_str::<FlowDefinition>(&content)
-506:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-507:                         {
-508:                             Ok(flow) => {
-509:                                 let id = flow.id.clone();
-510:                                 
-511:                                 if let Some(existing) = self.get_flow(&id) {
-512:                                     if existing.is_builtin {
-513:                                         tracing::debug!(
-514:                                             "Skipping user flow '{}' - builtin preset with same ID exists",
-515:                                             id
-516:                                         );
-517:                                         continue;
-518:                                     }
-519:                                 }
-520:                                 self.register_flow(flow)?;
-521:                                 report.flows_loaded += 1;
-522:                                 tracing::debug!("Loaded user flow: {} from {:?}", id, path);
-523:                             }
-524:                             Err(e) => {
-525:                                 report.errors.push(format!("Failed to load flow from {:?}: {}", path, e));
-526:                             }
-527:                         }
-528:                     }
-529:                 }
-530:                 
-531:                 
-532:                 let integrations_dir = config_dir.join("integrations");
-533:                 if integrations_dir.exists() {
-534:                     for entry in fs::read_dir(&integrations_dir)
-535:                         .with_context(|| format!("Failed to read integrations directory: {:?}", integrations_dir))?
-536:                         .filter_map(|e| e.ok())
-537:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
-538:                     {
-539:                         let path = entry.path();
-540:                         match fs::read_to_string(&path)
-541:                             .and_then(|content| serde_json::from_str::<IntegrationDefinition>(&content)
-542:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-543:                         {
-544:                             Ok(integration) => {
-545:                                 let id = integration.id.clone();
-546:                                 self.register_integration(integration)?;
-547:                                 report.integrations_loaded += 1;
-548:                                 tracing::debug!("Loaded user integration: {} from {:?}", id, path);
-549:                             }
-550:                             Err(e) => {
-551:                                 report.errors.push(format!("Failed to load integration from {:?}: {}", path, e));
-552:                             }
-553:                         }
-554:                     }
-555:                 }
-556:                 
-557:                 
-558:                 if let Err(e) = self.load_settings() {
-559:                     tracing::warn!("Failed to load settings: {}", e);
-560:                 }
-561:                 
-562:                 
-563:                 
-564:                 if self.get_default_flow_id().is_none() {
-565:                     if self.get_flow("default").is_some() {
-566:                         if let Err(e) = self.set_default_flow(Some("default".to_string())) {
-567:                             tracing::warn!("Failed to set default flow: {}", e);
-568:                         } else {
-569:                             tracing::info!("Set 'default' as the default flow (first time initialization)");
-570:                         }
-571:                     }
-572:                 }
-573:             }
-574:         } else {
-575:             
-576:             
-577:             if let Some(flow_id) = self.get_default_flow_id() {
-578:                 if let Err(e) = self.set_default_flow(Some(flow_id)) {
-579:                     tracing::warn!("Failed to save initial default flow setting: {}", e);
-580:                 }
-581:             }
-582:         }
-583:         
-584:         Ok(report)
-585:     }
-586: }
-587: ⋮----
-588: RegistryStats
-589: ⋮----
-590: {
-591:     pub agents: usize,
-592:     pub stages: usize,
-593:     pub flows: usize,
-594:     pub integrations: usize,
-595: }
-596: ⋮----
-597: LoadUserReport
-598: ⋮----
-599: {
-600:     pub agents_loaded: usize,
-601:     pub stages_loaded: usize,
-602:     pub flows_loaded: usize,
-603:     pub integrations_loaded: usize,
-604:     pub errors: Vec<String>,
-605: }
-606: ⋮----
-607: LoadReport
-608: ⋮----
-609: {
-610:     pub agents_loaded: usize,
-611:     pub stages_loaded: usize,
-612:     pub flows_loaded: usize,
-613:     pub integrations_loaded: usize,
-614:     pub default_flow_set: bool,
-615:     pub errors: Vec<String>,
-616: }
-617: ⋮----
-618: LoadReport
-619: ⋮----
-620: {
-621:     pub fn total_loaded(&self) -> usize {
-622:         self.agents_loaded + self.stages_loaded + self.flows_loaded + self.integrations_loaded
-623:     }
-624: 
-625:     pub fn has_errors(&self) -> bool {
-626:         !self.errors.is_empty()
-627:     }
-628: }
-629: ⋮----
-630: Settings
-631: ⋮----
-632: {
-633:     
-634:     pub default_flow_id: Option<String>,
-635: }
-636: ⋮----
-637: Settings
-638: ⋮----
-639: {
-640:     fn default() -> Self {
-641:         Self {
-642:             default_flow_id: None,
-643:         }
-644:     }
-645: }
-646: ⋮----
-647: global_registry
-648: ⋮----
-649: ()
-650: ⋮----
-651: test_registry_operations
-652: ⋮----
-653: ()
-```
-
-### crates/cowork-core/src/domain/iteration.rs (319 lines)
-
-```
-1: Iteration
-2: ⋮----
-3: {
-4:     pub id: String,
-5:     pub number: u32,
-6:     pub title: String,
-7:     pub description: String,
+1: [package]
+2: name = "cowork-gui"
+3: version.workspace = true
+4: edition.workspace = true
+5: authors.workspace = true
+6: license.workspace = true
+7: description = "Cowork Forge GUI"
 8: 
-9:     
-10:     pub base_iteration_id: Option<String>,
-11:     pub inheritance: InheritanceMode,
+9: [lib]
+10: name = "cowork_gui_lib"
+11: crate-type = ["staticlib", "cdylib", "rlib"]
 12: 
-13:     
-14:     pub status: IterationStatus,
-15:     pub started_at: DateTime<Utc>,
-16:     pub completed_at: Option<DateTime<Utc>>,
-17:     pub current_stage: Option<String>,
-18:     pub completed_stages: Vec<String>,
-19: 
-20:     
-21:     pub artifacts: Artifacts,
-22: }
-23: ⋮----
-24: Iteration
-25: ⋮----
-26: {
-27:     pub fn create_genesis(project: &Project, title: String, description: String) -> Self {
-28:         let now = Utc::now();
-29:         Self {
-30:             id: format!("iter-{}-{}", project.next_iteration_number(), now.timestamp()),
-31:             number: project.next_iteration_number(),
-32:             title,
-33:             description,
-34:             base_iteration_id: None,
-35:             inheritance: InheritanceMode::None,
-36:             status: IterationStatus::Draft,
-37:             started_at: now,
-38:             completed_at: None,
-39:             current_stage: None,
-40:             completed_stages: Vec::new(),
-41:             artifacts: Artifacts::default(),
-42:         }
-43:     }
+13: [build-dependencies]
+14: tauri-build = { version = "2.6.3", features = [] }
+15: 
+16: [dependencies]
+17: tauri = { version = "2.11.5", features = [] }
+18: tauri-plugin-opener = "2.5.4"
+19: tauri-plugin-dialog = "2.7.1"
+20: serde = { version = "1", features = ["derive"] }
+21: serde_json = "1"
+22: tokio = { version = "1", features = ["sync", "full"] }
+23: tokio-stream = "0.1"
+24: async-trait = "0.1"
+25: chrono = "0.4"
+26: uuid = { workspace = true }
+27: anyhow = "1"
+28: thiserror = "2"
+29: futures = "0.3"
+30: 
+31: tiny_http = "0.12"
+32: attohttpc = "0.30"
+33: urlencoding = "2.1"
+34: 
+35: lazy_static = "1.5"
+36: 
+37: tracing = "0.1"
+38: 
+39: dirs = { workspace = true }
+40: 
+41: sys-locale = "0.3"
+42: 
+43: cowork-core = { path = "../../cowork-core" }
 44: 
-45:     pub fn create_evolution(
-46:         project: &Project,
-47:         title: String,
-48:         description: String,
-49:         base_iteration_id: String,
-50:         inheritance: InheritanceMode,
-51:     ) -> Self {
-52:         let now = Utc::now();
-53:         Self {
-54:             id: format!("iter-{}-{}", project.next_iteration_number(), now.timestamp()),
-55:             number: project.next_iteration_number(),
-56:             title,
-57:             description,
-58:             base_iteration_id: Some(base_iteration_id),
-59:             inheritance,
-60:             status: IterationStatus::Draft,
-61:             started_at: now,
-62:             completed_at: None,
-63:             current_stage: None,
-64:             completed_stages: Vec::new(),
-65:             artifacts: Artifacts::default(),
-66:         }
-67:     }
-68: 
-69:     pub fn start(&mut self) {
-70:         self.status = IterationStatus::Running;
-71:         self.started_at = Utc::now();
-72:     }
-73: 
-74:     pub fn pause(&mut self) {
-75:         self.status = IterationStatus::Paused;
-76:     }
-77: 
-78:     pub fn resume(&mut self) {
-79:         self.status = IterationStatus::Running;
-80:     }
-81: 
-82:     pub fn complete(&mut self) {
-83:         self.status = IterationStatus::Completed;
-84:         self.completed_at = Some(Utc::now());
-85:         self.current_stage = None;
-86:         
-87:         
-88:         
-89:         
-90:         self.finalize_completed_stages();
-91:     }
+45: adk-core = { workspace = true }
+46: adk-runner = { workspace = true }
+47: adk-session = { workspace = true }
+48: adk-skill = { workspace = true }
+49: adk-tool = { workspace = true, features = ["http-transport"] }
+50: which = "8.0.0"
+```
+
+### crates/cowork-core/src/agents/mod.rs (134 lines)
+
+```
+1: create_idea_agent
+2: ⋮----
+3: (model: Arc<dyn Llm>)
+4: ⋮----
+5: create_idea_agent_with_id
+6: ⋮----
+7: (model: Arc<dyn Llm>, iteration_id: String)
+8: ⋮----
+9: create_prd_loop
+10: ⋮----
+11: (model: Arc<dyn Llm>)
+12: ⋮----
+13: create_prd_loop_with_id
+14: ⋮----
+15: (model: Arc<dyn Llm>, iteration_id: String)
+16: ⋮----
+17: create_design_loop
+18: ⋮----
+19: (model: Arc<dyn Llm>)
+20: ⋮----
+21: create_design_loop_with_id
+22: ⋮----
+23: (model: Arc<dyn Llm>, iteration_id: String)
+24: ⋮----
+25: create_plan_loop
+26: ⋮----
+27: (model: Arc<dyn Llm>)
+28: ⋮----
+29: create_plan_loop_with_id
+30: ⋮----
+31: (model: Arc<dyn Llm>, iteration_id: String)
+32: ⋮----
+33: create_coding_loop
+34: ⋮----
+35: (model: Arc<dyn Llm>)
+36: ⋮----
+37: create_coding_loop_with_id
+38: ⋮----
+39: (model: Arc<dyn Llm>, iteration_id: String)
+40: ⋮----
+41: create_check_agent
+42: ⋮----
+43: (model: Arc<dyn Llm>)
+44: ⋮----
+45: create_check_agent_with_id
+46: ⋮----
+47: (model: Arc<dyn Llm>, iteration_id: String)
+48: ⋮----
+49: create_delivery_agent
+50: ⋮----
+51: (model: Arc<dyn Llm>)
+52: ⋮----
+53: create_delivery_agent_with_id
+54: ⋮----
+55: (model: Arc<dyn Llm>, iteration_id: String)
+56: ⋮----
+57: create_summary_agent
+58: ⋮----
+59: (model: Arc<dyn Llm>, iteration_id: String, iteration_number: u32)
+60: ⋮----
+61: create_knowledge_generation_agent
+62: ⋮----
+63: (
+64:     model: Arc<dyn Llm>,
+65:     iteration_id: String,
+66:     iteration_number: u32,
+67:     base_iteration_id: Option<String>
+68: )
+69: ⋮----
+70: create_project_manager_agent
+71: ⋮----
+72: (model: Arc<dyn Llm>, iteration_id: String)
+73: ⋮----
+74: load_artifacts_summary_for_pm
+75: ⋮----
+76: (iteration_store: &IterationStore, iteration_id: &str)
+77: ⋮----
+78: PMAgentResult
+79: ⋮----
+80: {
+81:     
+82:     pub message: String,
+83:     
+84:     pub actions: Vec<PMAgentAction>,
+85:     
+86:     pub parts: Vec<adk_core::Part>,
+87: }
+88: ⋮----
+89: PMAgentAction
+90: ⋮----
+91: {
 92:     
-93:     
-94:     
-95:     fn finalize_completed_stages(&mut self) {
-96:         
-97:         let flow_stages = self.get_flow_stages();
-98:         
-99:         
-100:         let artifact_stages = [
-101:             ("idea", &self.artifacts.idea),
-102:             ("prd", &self.artifacts.prd),
-103:             ("design", &self.artifacts.design),
-104:             ("plan", &self.artifacts.plan),
-105:             ("coding", &self.artifacts.coding),
-106:             ("delivery", &self.artifacts.delivery),
-107:         ];
-108:         
-109:         for (stage_name, artifact) in artifact_stages {
-110:             if artifact.is_some() && !self.completed_stages.contains(&stage_name.to_string()) {
-111:                 self.completed_stages.push(stage_name.to_string());
-112:             }
-113:         }
-114:         
-115:         
-116:         
-117:         if self.completed_stages.is_empty() && !flow_stages.is_empty() {
-118:             self.completed_stages = flow_stages;
-119:         }
-120:     }
-121:     
-122:     
-123:     fn get_flow_stages(&self) -> Vec<String> {
-124:         use crate::config_definition::registry::global_registry;
-125:         
-126:         if let Some(flow) = global_registry().get_default_flow() {
-127:             flow.stages.iter().map(|s| s.stage_id.clone()).collect()
-128:         } else {
-129:             
-130:             vec![
-131:                 "idea".to_string(),
-132:                 "prd".to_string(),
-133:                 "design".to_string(),
-134:                 "plan".to_string(),
-135:                 "coding".to_string(),
-136:                 "check".to_string(),
-137:                 "delivery".to_string(),
-138:             ]
-139:         }
-140:     }
-141: 
-142:     pub fn fail(&mut self) {
-143:         self.status = IterationStatus::Failed;
-144:         
-145:         
-146:     }
-147: 
-148:     pub fn set_stage(&mut self, stage: impl Into<String>) {
-149:         self.current_stage = Some(stage.into());
-150:     }
-151: 
-152:     pub fn complete_stage(&mut self, stage: impl Into<String>, artifact_path: Option<String>) {
-153:         let stage_name = stage.into();
-154:         self.completed_stages.push(stage_name.clone());
-155: 
-156:         
-157:         let path = artifact_path.unwrap_or_default();
-158:         match stage_name.as_str() {
-159:             "idea" => self.artifacts.idea = Some(path),
-160:             "prd" => self.artifacts.prd = Some(path),
-161:             "design" => self.artifacts.design = Some(path),
-162:             "plan" => self.artifacts.plan = Some(path),
-163:             "coding" => self.artifacts.coding = Some(path), 
-164:             "delivery" => self.artifacts.delivery = Some(path),
-165:             _ => {}
-166:         }
-167:     }
-168: 
-169:     
-170:     
-171:     pub fn determine_start_stage(&self) -> String {
-172:         let stage_mapping = self.get_stage_mapping_from_flow();
-173:         
-174:         let mode_key = match self.inheritance {
-175:             InheritanceMode::None => "none",
-176:             InheritanceMode::Full => "full",
-177:             InheritanceMode::Partial => "partial",
-178:         };
-179:         
-180:         stage_mapping
-181:             .get(mode_key)
-182:             .cloned()
-183:             .unwrap_or_else(|| "idea".to_string())
-184:     }
-185:     
-186:     
-187:     fn get_stage_mapping_from_flow(&self) -> std::collections::HashMap<String, String> {
-188:         use crate::config_definition::registry::global_registry;
-189:         
-190:         if let Some(flow) = global_registry().get_default_flow() {
-191:             flow.config.inheritance.stage_mapping
-192:         } else {
-193:             
-194:             let mut mapping = std::collections::HashMap::new();
-195:             mapping.insert("none".to_string(), "idea".to_string());
-196:             mapping.insert("partial".to_string(), "idea".to_string());
-197:             mapping.insert("full".to_string(), "idea".to_string());
-198:             mapping
-199:         }
-200:     }
-201: 
-202:     pub fn to_summary(&self) -> super::IterationSummary {
-203:         super::IterationSummary {
-204:             id: self.id.clone(),
-205:             number: self.number,
-206:             title: self.title.clone(),
-207:             status: self.status,
-208:             completed_stages: self.completed_stages.clone(),
-209:             created_at: self.started_at,
-210:         }
-211:     }
-212: }
-213: ⋮----
-214: InheritanceMode
-215: ⋮----
-216: {
-217:     None,     
-218:     Full,     
-219:     Partial,  
-220: }
-221: ⋮----
-222: InheritanceMode
-223: ⋮----
-224: {
-225:     fn default() -> Self {
-226:         InheritanceMode::Full
-227:     }
-228: }
-229: ⋮----
-230: Artifacts
-231: ⋮----
-232: {
-233:     pub idea: Option<String>,
-234:     pub prd: Option<String>,
-235:     pub design: Option<String>,
-236:     pub plan: Option<String>,
-237:     pub coding: Option<String>,  
-238:     pub delivery: Option<String>,
-239: }
-240: ⋮----
-241: Artifacts
-242: ⋮----
-243: {
-244:     pub fn get(&self, stage: &str) -> Option<&String> {
-245:         match stage {
-246:             "idea" => self.idea.as_ref(),
-247:             "prd" => self.prd.as_ref(),
-248:             "design" => self.design.as_ref(),
-249:             "plan" => self.plan.as_ref(),
-250:             "coding" => self.coding.as_ref(),
-251:             "delivery" => self.delivery.as_ref(),
-252:             _ => None,
-253:         }
-254:     }
-255: 
-256:     pub fn set(&mut self, stage: &str, path: String) {
-257:         match stage {
-258:             "idea" => self.idea = Some(path),
-259:             "prd" => self.prd = Some(path),
-260:             "design" => self.design = Some(path),
-261:             "plan" => self.plan = Some(path),
-262:             "coding" => self.coding = Some(path),
-263:             "delivery" => self.delivery = Some(path),
-264:             _ => {}
-265:         }
-266:     }
-267: }
-268: ⋮----
-269: create_test_project
-270: ⋮----
-271: ()
-272: ⋮----
-273: test_create_genesis_iteration
-274: ⋮----
-275: ()
-276: ⋮----
-277: test_create_evolution_iteration
-278: ⋮----
-279: ()
-280: ⋮----
-281: test_iteration_status_transitions
-282: ⋮----
-283: ()
-284: ⋮----
-285: test_iteration_fail
-286: ⋮----
-287: ()
-288: ⋮----
-289: test_set_and_complete_stage
-290: ⋮----
-291: ()
-292: ⋮----
-293: test_determine_start_stage_none_mode
-294: ⋮----
-295: ()
-296: ⋮----
-297: test_determine_start_stage_partial_mode
-298: ⋮----
-299: ()
-300: ⋮----
-301: test_determine_start_stage_full_mode
-302: ⋮----
-303: ()
-304: ⋮----
-305: test_artifacts_get_set
-306: ⋮----
-307: ()
-308: ⋮----
-309: test_to_summary
-310: ⋮----
-311: ()
-312: ⋮----
-313: test_inheritance_mode_default
-314: ⋮----
-315: ()
-316: ⋮----
-317: test_inheritance_mode_serde
-318: ⋮----
-319: ()
+93:     #[serde(rename = "pm_goto_stage")]
+94:     GotoStage {
+95:         target_stage: String,
+96:         reason: String,
+97:     },
+98:     
+99:     #[serde(rename = "pm_create_iteration")]
+100:     CreateIteration {
+101:         iteration_id: String,
+102:         title: String,
+103:         description: String,
+104:         inheritance: String,
+105:     },
+106: }
+107: ⋮----
+108: PMAgentStreamCallback
+109: ⋮----
+110: {
+111:     
+112:     async fn on_text_chunk(&self, text: &str, is_first: bool, is_last: bool);
+113:     
+114:     async fn on_tool_call(&self, tool_name: &str, args: &serde_json::Value);
+115: }
+116: ⋮----
+117: execute_pm_agent_message_streaming
+118: ⋮----
+119: (
+120:     model: Arc<dyn Llm>,
+121:     iteration_id: String,
+122:     message: String,
+123:     history: Vec<serde_json::Value>,
+124:     stream_callback: Option<Arc<dyn PMAgentStreamCallback>>,
+125: )
+126: ⋮----
+127: execute_pm_agent_message
+128: ⋮----
+129: (
+130:     model: Arc<dyn Llm>,
+131:     iteration_id: String,
+132:     message: String,
+133:     history: Vec<serde_json::Value>,
+134: )
 ```
 
 ### crates/cowork-gui/src/hooks/useAppEvents.ts (432 lines)
@@ -4081,357 +3464,6 @@ LICENSE
 430: 		
 431: 	};
 432: }
-```
-
-### crates/cowork-gui/src/types/config.ts (291 lines)
-
-```
-1: AgentType
-2: ⋮----
-3: "simple" | { loop: { max_iterations?: number } }
-4: ⋮----
-5: ModelConfig
-6: ⋮----
-7: {
-8:   model_id?: string;
-9:   temperature?: number;
-10:   max_tokens?: number;
-11:   top_p?: number;
-12: }
-13: ⋮----
-14: ToolReference
-15: ⋮----
-16: {
-17:   tool_id: string;
-18:   config?: Record<string, unknown>;
-19: }
-20: ⋮----
-21: IncludeContentsMode
-22: ⋮----
-23: "none" | "all" | { selected: string[] }
-24: ⋮----
-25: AgentDefinition
-26: ⋮----
-27: {
-28:   id: string;
-29:   name: string;
-30:   description?: string;
-31:   version?: string;
-32:   agent_type: AgentType;
-33:   instruction: string;
-34:   tools: ToolReference[];
-35:   skills: string[];
-36:   model: ModelConfig;
-37:   include_contents: IncludeContentsMode;
-38:   tags: string[];
-39:   metadata: Record<string, unknown>;
-40: }
-41: ⋮----
-42: StageType
-43: ⋮----
-44: | "idea"
-45:   | "prd"
-46:   | "design"
-47:   | "plan"
-48:   | "coding"
-49:   | "check"
-50:   | "delivery"
-51: ⋮----
-52: HookPoint
-53: ⋮----
-54: | "pre_execute"
-55:   | "post_execute"
-56:   | "pre_confirmation"
-57:   | "post_confirmation"
-58:   | "on_failure"
-59: ⋮----
-60: HookConfig
-61: ⋮----
-62: {
-63:   integration_id: string;
-64:   point: HookPoint;
-65:   action: string;
-66:   params?: Record<string, unknown>;
-67:   blocking?: boolean;
-68:   timeout_secs?: number;
-69:   on_failure?: "ignore" | "warn" | "abort";
-70: }
-71: ⋮----
-72: ArtifactConfig
-73: ⋮----
-74: {
-75:   save_path: string;
-76:   format: string;
-77:   include_metadata?: boolean;
-78: }
-79: ⋮----
-80: StageRetryConfig
-81: ⋮----
-82: {
-83:   max_retries: number;
-84:   backoff_ms?: number;
-85:   retry_on?: string[];
-86: }
-87: ⋮----
-88: StageDefinition
-89: ⋮----
-90: {
-91:   id: string;
-92:   name: string;
-93:   description?: string;
-94:   stage_type: StageType;
-95:   agent_id: string;
-96:   needs_confirmation?: boolean;
-97:   confirmation_prompt?: string;
-98:   hooks: HookConfig[];
-99:   artifacts?: Record<string, ArtifactConfig>;
-100:   retry?: StageRetryConfig;
-101:   timeout_secs?: number;
-102:   tags: string[];
-103: }
-104: ⋮----
-105: MemoryScope
-106: ⋮----
-107: "project" | "iteration" | "merged"
-108: ⋮----
-109: InheritanceMode
-110: ⋮----
-111: "none" | "partial" | "full"
-112: ⋮----
-113: InheritanceConfig
-114: ⋮----
-115: {
-116:   default_mode: InheritanceMode;
-117:   stage_mapping: Record<string, string>;
-118: }
-119: ⋮----
-120: FlowConfig
-121: ⋮----
-122: {
-123:   stop_on_failure: boolean;
-124:   max_total_time_secs?: number;
-125:   save_state_on_interrupt: boolean;
-126:   memory_scope: MemoryScope;
-127:   inheritance: InheritanceConfig;
-128: }
-129: ⋮----
-130: StageOverrides
-131: ⋮----
-132: {
-133:   needs_confirmation?: boolean;
-134:   hooks: HookConfig[];
-135:   timeout_secs?: number;
-136:   skip: boolean;
-137: }
-138: ⋮----
-139: StageReference
-140: ⋮----
-141: {
-142:   stage_id: string;
-143:   alias?: string;
-144:   overrides: StageOverrides;
-145:   condition?: string;
-146:   on_success?: string;
-147:   on_failure?: string;
-148: }
-149: ⋮----
-150: GlobalHookConfig
-151: ⋮----
-152: {
-153:   integration_id: string;
-154:   points: HookPoint[];
-155:   blocking: boolean;
-156:   timeout_secs: number;
-157: }
-158: ⋮----
-159: FlowDefinition
-160: ⋮----
-161: {
-162:   id: string;
-163:   name: string;
-164:   description?: string;
-165:   version?: string;
-166:   stages: StageReference[];
-167:   start_stage?: string;
-168:   global_hooks: GlobalHookConfig[];
-169:   config: FlowConfig;
-170:   tags: string[];
-171:   metadata: Record<string, unknown>;
-172:   
-173:   is_builtin?: boolean;
-174: }
-175: ⋮----
-176: SkillInfo
-177: ⋮----
-178: {
-179:   id: string;
-180:   name: string;
-181:   description: string;
-182:   tags: string[];
-183:   body: string;
-184: }
-185: ⋮----
-186: IntegrationType
-187: ⋮----
-188: | "rest_api"
-189:   | "webhook"
-190:   | "message_queue"
-191:   | "database"
-192: ⋮----
-193: AuthType
-194: ⋮----
-195: | "none"
-196:   | "api_key"
-197:   | "bearer_token"
-198:   | "basic_auth"
-199:   | "oauth2"
-200: ⋮----
-201: CredentialSource
-202: ⋮----
-203: "env" | "config" | "prompt"
-204: ⋮----
-205: AuthConfig
-206: ⋮----
-207: {
-208:   auth_type: AuthType;
-209:   credential_source: CredentialSource;
-210:   credential_key?: string;
-211:   additional_headers?: Record<string, string>;
-212: }
-213: ⋮----
-214: ConnectionConfig
-215: ⋮----
-216: {
-217:   base_url?: string;
-218:   timeout_secs?: number;
-219:   retry_count?: number;
-220:   retry_delay_ms?: number;
-221: }
-222: ⋮----
-223: IntegrationEvent
-224: ⋮----
-225: | "on_stage_start"
-226:   | "on_stage_complete"
-227:   | "on_flow_start"
-228:   | "on_flow_complete"
-229:   | "on_error"
-230: ⋮----
-231: IntegrationDefinition
-232: ⋮----
-233: {
-234:   id: string;
-235:   name: string;
-236:   description?: string;
-237:   integration_type: IntegrationType;
-238:   connection: ConnectionConfig;
-239:   auth: AuthConfig;
-240:   events: IntegrationEvent[];
-241:   enabled: boolean;
-242:   metadata: Record<string, unknown>;
-243: }
-244: ⋮----
-245: ValidationIssue
-246: ⋮----
-247: {
-248:   path: string;
-249:   message: string;
-250:   severity: "error" | "warning";
-251: }
-252: ⋮----
-253: ValidationResult
-254: ⋮----
-255: {
-256:   valid: boolean;
-257:   issues: ValidationIssue[];
-258: }
-259: ⋮----
-260: ConfigRegistryState
-261: ⋮----
-262: {
-263:   agents: Record<string, AgentDefinition>;
-264:   stages: Record<string, StageDefinition>;
-265:   flows: Record<string, FlowDefinition>;
-266:   skills: SkillInfo[];
-267:   integrations: Record<string, IntegrationDefinition>;
-268:   default_flow_id?: string;
-269: }
-270: ⋮----
-271: BuiltinInstruction
-272: ⋮----
-273: {
-274:   id: string;
-275:   name: string;
-276:   description: string;
-277:   content: string;
-278: }
-279: ⋮----
-280: InstructionType
-281: ⋮----
-282: "builtin" | "file" | "inline"
-283: ⋮----
-284: ToolInfo
-285: ⋮----
-286: {
-287:   id: string;
-288:   name: string;
-289:   category: string;
-290:   description: string;
-291: }
-```
-
-### crates/cowork-gui/src-tauri/Cargo.toml (50 lines)
-
-```
-1: [package]
-2: name = "cowork-gui"
-3: version.workspace = true
-4: edition.workspace = true
-5: authors.workspace = true
-6: license.workspace = true
-7: description = "Cowork Forge GUI"
-8: 
-9: [lib]
-10: name = "cowork_gui_lib"
-11: crate-type = ["staticlib", "cdylib", "rlib"]
-12: 
-13: [build-dependencies]
-14: tauri-build = { version = "2.5.5", features = [] }
-15: 
-16: [dependencies]
-17: tauri = { version = "2.10.2", features = [] }
-18: tauri-plugin-opener = "2.5.3"
-19: tauri-plugin-dialog = "2.6.0"
-20: serde = { version = "1", features = ["derive"] }
-21: serde_json = "1"
-22: tokio = { version = "1", features = ["sync", "full"] }
-23: tokio-stream = "0.1"
-24: async-trait = "0.1"
-25: chrono = "0.4"
-26: uuid = { workspace = true }
-27: anyhow = "1"
-28: thiserror = "2"
-29: futures = "0.3"
-30: 
-31: tiny_http = "0.12"
-32: attohttpc = "0.30"
-33: urlencoding = "2.1"
-34: 
-35: lazy_static = "1.5"
-36: 
-37: tracing = "0.1"
-38: 
-39: dirs = { workspace = true }
-40: 
-41: sys-locale = "0.3"
-42: 
-43: cowork-core = { path = "../../cowork-core" }
-44: 
-45: adk-core = { workspace = true }
-46: adk-runner = { workspace = true }
-47: adk-session = { workspace = true }
-48: adk-skill = { workspace = true }
-49: adk-tool = { workspace = true, features = ["http-transport"] }
-50: which = "8.0.0"
 ```
 
 ### litho.docs/en/2.Architecture.md (1224 lines)
@@ -5663,145 +4695,6 @@ LICENSE
 1224: The system is well-positioned for evolutionary extension, with clear domain boundaries supporting future enhancements such as team collaboration features, additional AI model integrations, or custom pipeline stages.
 ````
 
-### crates/cowork-core/src/agents/mod.rs (134 lines)
-
-```
-1: create_idea_agent
-2: ⋮----
-3: (model: Arc<dyn Llm>)
-4: ⋮----
-5: create_idea_agent_with_id
-6: ⋮----
-7: (model: Arc<dyn Llm>, iteration_id: String)
-8: ⋮----
-9: create_prd_loop
-10: ⋮----
-11: (model: Arc<dyn Llm>)
-12: ⋮----
-13: create_prd_loop_with_id
-14: ⋮----
-15: (model: Arc<dyn Llm>, iteration_id: String)
-16: ⋮----
-17: create_design_loop
-18: ⋮----
-19: (model: Arc<dyn Llm>)
-20: ⋮----
-21: create_design_loop_with_id
-22: ⋮----
-23: (model: Arc<dyn Llm>, iteration_id: String)
-24: ⋮----
-25: create_plan_loop
-26: ⋮----
-27: (model: Arc<dyn Llm>)
-28: ⋮----
-29: create_plan_loop_with_id
-30: ⋮----
-31: (model: Arc<dyn Llm>, iteration_id: String)
-32: ⋮----
-33: create_coding_loop
-34: ⋮----
-35: (model: Arc<dyn Llm>)
-36: ⋮----
-37: create_coding_loop_with_id
-38: ⋮----
-39: (model: Arc<dyn Llm>, iteration_id: String)
-40: ⋮----
-41: create_check_agent
-42: ⋮----
-43: (model: Arc<dyn Llm>)
-44: ⋮----
-45: create_check_agent_with_id
-46: ⋮----
-47: (model: Arc<dyn Llm>, iteration_id: String)
-48: ⋮----
-49: create_delivery_agent
-50: ⋮----
-51: (model: Arc<dyn Llm>)
-52: ⋮----
-53: create_delivery_agent_with_id
-54: ⋮----
-55: (model: Arc<dyn Llm>, iteration_id: String)
-56: ⋮----
-57: create_summary_agent
-58: ⋮----
-59: (model: Arc<dyn Llm>, iteration_id: String, iteration_number: u32)
-60: ⋮----
-61: create_knowledge_generation_agent
-62: ⋮----
-63: (
-64:     model: Arc<dyn Llm>,
-65:     iteration_id: String,
-66:     iteration_number: u32,
-67:     base_iteration_id: Option<String>
-68: )
-69: ⋮----
-70: create_project_manager_agent
-71: ⋮----
-72: (model: Arc<dyn Llm>, iteration_id: String)
-73: ⋮----
-74: load_artifacts_summary_for_pm
-75: ⋮----
-76: (iteration_store: &IterationStore, iteration_id: &str)
-77: ⋮----
-78: PMAgentResult
-79: ⋮----
-80: {
-81:     
-82:     pub message: String,
-83:     
-84:     pub actions: Vec<PMAgentAction>,
-85:     
-86:     pub parts: Vec<adk_core::Part>,
-87: }
-88: ⋮----
-89: PMAgentAction
-90: ⋮----
-91: {
-92:     
-93:     #[serde(rename = "pm_goto_stage")]
-94:     GotoStage {
-95:         target_stage: String,
-96:         reason: String,
-97:     },
-98:     
-99:     #[serde(rename = "pm_create_iteration")]
-100:     CreateIteration {
-101:         iteration_id: String,
-102:         title: String,
-103:         description: String,
-104:         inheritance: String,
-105:     },
-106: }
-107: ⋮----
-108: PMAgentStreamCallback
-109: ⋮----
-110: {
-111:     
-112:     async fn on_text_chunk(&self, text: &str, is_first: bool, is_last: bool);
-113:     
-114:     async fn on_tool_call(&self, tool_name: &str, args: &serde_json::Value);
-115: }
-116: ⋮----
-117: execute_pm_agent_message_streaming
-118: ⋮----
-119: (
-120:     model: Arc<dyn Llm>,
-121:     iteration_id: String,
-122:     message: String,
-123:     history: Vec<serde_json::Value>,
-124:     stream_callback: Option<Arc<dyn PMAgentStreamCallback>>,
-125: )
-126: ⋮----
-127: execute_pm_agent_message
-128: ⋮----
-129: (
-130:     model: Arc<dyn Llm>,
-131:     iteration_id: String,
-132:     message: String,
-133:     history: Vec<serde_json::Value>,
-134: )
-```
-
 ### crates/cowork-core/src/config_definition/mod.rs (17 lines)
 
 ```
@@ -5822,6 +4715,988 @@ LICENSE
 15: pub use validator::*;
 16: pub use builtin::load_builtin_configs;
 17: pub use agent_factory::{create_agent_for_stage, create_agent_from_config, initialize_config_registry, initialize_mcp_toolsets, is_mcp_initialized};
+```
+
+### crates/cowork-core/src/config_definition/registry.rs (653 lines)
+
+```
+1: get_user_config_dir
+2: ⋮----
+3: ()
+4: ⋮----
+5: ensure_user_config_dir
+6: ⋮----
+7: ()
+8: ⋮----
+9: ConfigRegistry
+10: ⋮----
+11: {
+12:     
+13:     agents: RwLock<HashMap<String, AgentDefinition>>,
+14:     
+15:     stages: RwLock<HashMap<String, StageDefinition>>,
+16:     
+17:     flows: RwLock<HashMap<String, FlowDefinition>>,
+18:     
+19:     integrations: RwLock<HashMap<String, IntegrationDefinition>>,
+20:     
+21:     default_flow: RwLock<Option<String>>,
+22: }
+23: ⋮----
+24: ConfigRegistry
+25: ⋮----
+26: {
+27:     fn default() -> Self {
+28:         Self::new()
+29:     }
+30: }
+31: ⋮----
+32: ConfigRegistry
+33: ⋮----
+34: {
+35:     
+36:     pub fn new() -> Self {
+37:         Self {
+38:             agents: RwLock::new(HashMap::new()),
+39:             stages: RwLock::new(HashMap::new()),
+40:             flows: RwLock::new(HashMap::new()),
+41:             integrations: RwLock::new(HashMap::new()),
+42:             default_flow: RwLock::new(None),
+43:         }
+44:     }
+45:     
+46:     
+47:     
+48:     
+49:     
+50:     
+51:     pub fn register_agent(&self, definition: AgentDefinition) -> Result<()> {
+52:         let id = definition.id.clone();
+53:         let mut agents = self.agents.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+54:         agents.insert(id.clone(), definition);
+55:         tracing::debug!("Registered agent: {}", id);
+56:         Ok(())
+57:     }
+58:     
+59:     
+60:     pub fn get_agent(&self, id: &str) -> Option<AgentDefinition> {
+61:         let agents = self.agents.read().ok()?;
+62:         agents.get(id).cloned()
+63:     }
+64:     
+65:     
+66:     pub fn list_agents(&self) -> Vec<String> {
+67:         let agents = self.agents.read().unwrap_or_else(|e| {
+68:             tracing::error!("Lock error: {}", e);
+69:             panic!("Lock error")
+70:         });
+71:         agents.keys().cloned().collect()
+72:     }
+73:     
+74:     
+75:     pub fn unregister_agent(&self, id: &str) -> bool {
+76:         let mut agents = self.agents.write().unwrap_or_else(|e| {
+77:             tracing::error!("Lock error: {}", e);
+78:             panic!("Lock error")
+79:         });
+80:         agents.remove(id).is_some()
+81:     }
+82:     
+83:     
+84:     
+85:     
+86:     
+87:     
+88:     pub fn register_stage(&self, definition: StageDefinition) -> Result<()> {
+89:         let id = definition.id.clone();
+90:         let mut stages = self.stages.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+91:         stages.insert(id.clone(), definition);
+92:         tracing::debug!("Registered stage: {}", id);
+93:         Ok(())
+94:     }
+95:     
+96:     
+97:     pub fn get_stage(&self, id: &str) -> Option<StageDefinition> {
+98:         let stages = self.stages.read().ok()?;
+99:         stages.get(id).cloned()
+100:     }
+101:     
+102:     
+103:     pub fn list_stages(&self) -> Vec<String> {
+104:         let stages = self.stages.read().unwrap_or_else(|e| {
+105:             tracing::error!("Lock error: {}", e);
+106:             panic!("Lock error")
+107:         });
+108:         stages.keys().cloned().collect()
+109:     }
+110:     
+111:     
+112:     
+113:     
+114:     
+115:     
+116:     pub fn register_flow(&self, definition: FlowDefinition) -> Result<()> {
+117:         let id = definition.id.clone();
+118:         let mut flows = self.flows.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+119:         flows.insert(id.clone(), definition);
+120:         tracing::debug!("Registered flow: {}", id);
+121:         Ok(())
+122:     }
+123:     
+124:     
+125:     pub fn get_flow(&self, id: &str) -> Option<FlowDefinition> {
+126:         let flows = self.flows.read().ok()?;
+127:         flows.get(id).cloned()
+128:     }
+129:     
+130:     
+131:     pub fn list_flows(&self) -> Vec<String> {
+132:         let flows = self.flows.read().unwrap_or_else(|e| {
+133:             tracing::error!("Lock error: {}", e);
+134:             panic!("Lock error")
+135:         });
+136:         flows.keys().cloned().collect()
+137:     }
+138:     
+139:     
+140:     pub fn unregister_flow(&self, id: &str) -> bool {
+141:         let mut flows = self.flows.write().unwrap_or_else(|e| {
+142:             tracing::error!("Lock error: {}", e);
+143:             panic!("Lock error")
+144:         });
+145:         flows.remove(id).is_some()
+146:     }
+147:     
+148:     
+149:     pub fn set_default_flow(&self, id: Option<String>) -> Result<()> {
+150:         {
+151:             let mut default_flow = self.default_flow.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+152:             *default_flow = id.clone();
+153:         }
+154:         
+155:         self.save_settings()?;
+156:         Ok(())
+157:     }
+158:     
+159:     
+160:     
+161:     pub fn set_default_flow_without_save(&self, id: Option<String>) {
+162:         if let Ok(mut default_flow) = self.default_flow.write() {
+163:             *default_flow = id;
+164:         }
+165:     }
+166:     
+167:     
+168:     pub fn get_default_flow_id(&self) -> Option<String> {
+169:         let default_flow = self.default_flow.read().ok()?;
+170:         default_flow.clone()
+171:     }
+172:     
+173:     
+174:     pub fn get_default_flow(&self) -> Option<FlowDefinition> {
+175:         let default_flow = self.default_flow.read().ok()?;
+176:         let flow_id = default_flow.as_ref()?;
+177:         self.get_flow(flow_id)
+178:     }
+179:     
+180:     
+181:     
+182:     
+183:     
+184:     
+185:     fn get_settings_file_path() -> Option<PathBuf> {
+186:         get_user_config_dir().map(|dir| dir.join("settings.json"))
+187:     }
+188:     
+189:     
+190:     pub fn save_settings(&self) -> Result<()> {
+191:         let settings = Settings {
+192:             default_flow_id: self.get_default_flow_id(),
+193:         };
+194:         
+195:         let config_dir = ensure_user_config_dir()?;
+196:         let file_path = config_dir.join("settings.json");
+197:         let content = serde_json::to_string_pretty(&settings)
+198:             .with_context(|| "Failed to serialize settings")?;
+199:         
+200:         fs::write(&file_path, content)
+201:             .with_context(|| format!("Failed to write settings file: {:?}", file_path))?;
+202:         
+203:         tracing::debug!("Saved settings to {:?}", file_path);
+204:         Ok(())
+205:     }
+206:     
+207:     
+208:     pub fn load_settings(&self) -> Result<()> {
+209:         if let Some(file_path) = Self::get_settings_file_path() {
+210:             if file_path.exists() {
+211:                 match fs::read_to_string(&file_path)
+212:                     .and_then(|content| serde_json::from_str::<Settings>(&content)
+213:                         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+214:                 {
+215:                     Ok(settings) => {
+216:                         if let Some(flow_id) = settings.default_flow_id {
+217:                             
+218:                             if self.get_flow(&flow_id).is_some() {
+219:                                 let mut default_flow = self.default_flow.write()
+220:                                     .map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+221:                                 *default_flow = Some(flow_id.clone());
+222:                                 tracing::info!("Loaded default flow setting: {}", flow_id);
+223:                             } else {
+224:                                 tracing::warn!("Default flow '{}' not found, ignoring setting", flow_id);
+225:                             }
+226:                         }
+227:                     }
+228:                     Err(e) => {
+229:                         tracing::warn!("Failed to load settings: {}", e);
+230:                     }
+231:                 }
+232:             }
+233:         }
+234:         Ok(())
+235:     }
+236:     
+237:     
+238:     
+239:     
+240:     
+241:     
+242:     pub fn register_integration(&self, definition: IntegrationDefinition) -> Result<()> {
+243:         let id = definition.id.clone();
+244:         let mut integrations = self.integrations.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+245:         integrations.insert(id.clone(), definition);
+246:         tracing::debug!("Registered integration: {}", id);
+247:         Ok(())
+248:     }
+249:     
+250:     
+251:     pub fn get_integration(&self, id: &str) -> Option<IntegrationDefinition> {
+252:         let integrations = self.integrations.read().ok()?;
+253:         integrations.get(id).cloned()
+254:     }
+255:     
+256:     
+257:     pub fn list_integrations(&self) -> Vec<String> {
+258:         let integrations = self.integrations.read().unwrap_or_else(|e| {
+259:             tracing::error!("Lock error: {}", e);
+260:             panic!("Lock error")
+261:         });
+262:         integrations.keys().cloned().collect()
+263:     }
+264:     
+265:     
+266:     pub fn get_enabled_integrations(&self) -> Vec<IntegrationDefinition> {
+267:         let integrations = self.integrations.read().unwrap_or_else(|e| {
+268:             tracing::error!("Lock error: {}", e);
+269:             panic!("Lock error")
+270:         });
+271:         integrations.values().filter(|i| i.enabled).cloned().collect()
+272:     }
+273:     
+274:     
+275:     
+276:     
+277:     
+278:     
+279:     pub fn clear(&self) -> Result<()> {
+280:         {
+281:             let mut agents = self.agents.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+282:             agents.clear();
+283:         }
+284:         {
+285:             let mut stages = self.stages.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+286:             stages.clear();
+287:         }
+288:         {
+289:             let mut flows = self.flows.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+290:             flows.clear();
+291:         }
+292:         {
+293:             let mut integrations = self.integrations.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+294:             integrations.clear();
+295:         }
+296:         Ok(())
+297:     }
+298:     
+299:     
+300:     pub fn stats(&self) -> RegistryStats {
+301:         RegistryStats {
+302:             agents: self.agents.read().map(|g| g.len()).unwrap_or(0),
+303:             stages: self.stages.read().map(|g| g.len()).unwrap_or(0),
+304:             flows: self.flows.read().map(|g| g.len()).unwrap_or(0),
+305:             integrations: self.integrations.read().map(|g| g.len()).unwrap_or(0),
+306:         }
+307:     }
+308:     
+309:     
+310:     
+311:     
+312:     
+313:     
+314:     pub fn save_agent_to_file(&self, agent: &AgentDefinition) -> Result<()> {
+315:         let config_dir = ensure_user_config_dir()?;
+316:         let agents_dir = config_dir.join("agents");
+317:         fs::create_dir_all(&agents_dir)
+318:             .with_context(|| format!("Failed to create agents directory: {:?}", agents_dir))?;
+319:         
+320:         let file_path = agents_dir.join(format!("{}.json", agent.id));
+321:         let content = serde_json::to_string_pretty(agent)
+322:             .with_context(|| format!("Failed to serialize agent: {}", agent.id))?;
+323:         
+324:         fs::write(&file_path, content)
+325:             .with_context(|| format!("Failed to write agent file: {:?}", file_path))?;
+326:         
+327:         tracing::info!("Saved agent '{}' to {:?}", agent.id, file_path);
+328:         Ok(())
+329:     }
+330:     
+331:     
+332:     pub fn delete_agent_file(&self, id: &str) -> Result<()> {
+333:         if let Some(config_dir) = get_user_config_dir() {
+334:             let file_path = config_dir.join("agents").join(format!("{}.json", id));
+335:             if file_path.exists() {
+336:                 fs::remove_file(&file_path)
+337:                     .with_context(|| format!("Failed to delete agent file: {:?}", file_path))?;
+338:                 tracing::info!("Deleted agent file: {:?}", file_path);
+339:             }
+340:         }
+341:         Ok(())
+342:     }
+343:     
+344:     
+345:     pub fn save_stage_to_file(&self, stage: &StageDefinition) -> Result<()> {
+346:         let config_dir = ensure_user_config_dir()?;
+347:         let stages_dir = config_dir.join("stages");
+348:         fs::create_dir_all(&stages_dir)
+349:             .with_context(|| format!("Failed to create stages directory: {:?}", stages_dir))?;
+350:         
+351:         let file_path = stages_dir.join(format!("{}.json", stage.id));
+352:         let content = serde_json::to_string_pretty(stage)
+353:             .with_context(|| format!("Failed to serialize stage: {}", stage.id))?;
+354:         
+355:         fs::write(&file_path, content)
+356:             .with_context(|| format!("Failed to write stage file: {:?}", file_path))?;
+357:         
+358:         tracing::info!("Saved stage '{}' to {:?}", stage.id, file_path);
+359:         Ok(())
+360:     }
+361:     
+362:     
+363:     pub fn delete_stage_file(&self, id: &str) -> Result<()> {
+364:         if let Some(config_dir) = get_user_config_dir() {
+365:             let file_path = config_dir.join("stages").join(format!("{}.json", id));
+366:             if file_path.exists() {
+367:                 fs::remove_file(&file_path)
+368:                     .with_context(|| format!("Failed to delete stage file: {:?}", file_path))?;
+369:                 tracing::info!("Deleted stage file: {:?}", file_path);
+370:             }
+371:         }
+372:         Ok(())
+373:     }
+374:     
+375:     
+376:     pub fn save_flow_to_file(&self, flow: &FlowDefinition) -> Result<()> {
+377:         let config_dir = ensure_user_config_dir()?;
+378:         let flows_dir = config_dir.join("flows");
+379:         fs::create_dir_all(&flows_dir)
+380:             .with_context(|| format!("Failed to create flows directory: {:?}", flows_dir))?;
+381:         
+382:         let file_path = flows_dir.join(format!("{}.json", flow.id));
+383:         let content = serde_json::to_string_pretty(flow)
+384:             .with_context(|| format!("Failed to serialize flow: {}", flow.id))?;
+385:         
+386:         fs::write(&file_path, content)
+387:             .with_context(|| format!("Failed to write flow file: {:?}", file_path))?;
+388:         
+389:         tracing::info!("Saved flow '{}' to {:?}", flow.id, file_path);
+390:         Ok(())
+391:     }
+392:     
+393:     
+394:     pub fn delete_flow_file(&self, id: &str) -> Result<()> {
+395:         if let Some(config_dir) = get_user_config_dir() {
+396:             let file_path = config_dir.join("flows").join(format!("{}.json", id));
+397:             if file_path.exists() {
+398:                 fs::remove_file(&file_path)
+399:                     .with_context(|| format!("Failed to delete flow file: {:?}", file_path))?;
+400:                 tracing::info!("Deleted flow file: {:?}", file_path);
+401:             }
+402:         }
+403:         Ok(())
+404:     }
+405:     
+406:     
+407:     pub fn save_integration_to_file(&self, integration: &IntegrationDefinition) -> Result<()> {
+408:         let config_dir = ensure_user_config_dir()?;
+409:         let integrations_dir = config_dir.join("integrations");
+410:         fs::create_dir_all(&integrations_dir)
+411:             .with_context(|| format!("Failed to create integrations directory: {:?}", integrations_dir))?;
+412:         
+413:         let file_path = integrations_dir.join(format!("{}.json", integration.id));
+414:         let content = serde_json::to_string_pretty(integration)
+415:             .with_context(|| format!("Failed to serialize integration: {}", integration.id))?;
+416:         
+417:         fs::write(&file_path, content)
+418:             .with_context(|| format!("Failed to write integration file: {:?}", file_path))?;
+419:         
+420:         tracing::info!("Saved integration '{}' to {:?}", integration.id, file_path);
+421:         Ok(())
+422:     }
+423:     
+424:     
+425:     pub fn delete_integration_file(&self, id: &str) -> Result<()> {
+426:         if let Some(config_dir) = get_user_config_dir() {
+427:             let file_path = config_dir.join("integrations").join(format!("{}.json", id));
+428:             if file_path.exists() {
+429:                 fs::remove_file(&file_path)
+430:                     .with_context(|| format!("Failed to delete integration file: {:?}", file_path))?;
+431:                 tracing::info!("Deleted integration file: {:?}", file_path);
+432:             }
+433:         }
+434:         Ok(())
+435:     }
+436:     
+437:     
+438:     pub fn load_user_configs(&self) -> Result<LoadUserReport> {
+439:         let mut report = LoadUserReport::default();
+440:         
+441:         if let Some(config_dir) = get_user_config_dir() {
+442:             if config_dir.exists() {
+443:                 
+444:                 let agents_dir = config_dir.join("agents");
+445:                 if agents_dir.exists() {
+446:                     for entry in fs::read_dir(&agents_dir)
+447:                         .with_context(|| format!("Failed to read agents directory: {:?}", agents_dir))?
+448:                         .filter_map(|e| e.ok())
+449:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+450:                     {
+451:                         let path = entry.path();
+452:                         match fs::read_to_string(&path)
+453:                             .and_then(|content| serde_json::from_str::<AgentDefinition>(&content)
+454:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+455:                         {
+456:                             Ok(agent) => {
+457:                                 let id = agent.id.clone();
+458:                                 self.register_agent(agent)?;
+459:                                 report.agents_loaded += 1;
+460:                                 tracing::debug!("Loaded user agent: {} from {:?}", id, path);
+461:                             }
+462:                             Err(e) => {
+463:                                 report.errors.push(format!("Failed to load agent from {:?}: {}", path, e));
+464:                             }
+465:                         }
+466:                     }
+467:                 }
+468:                 
+469:                 
+470:                 let stages_dir = config_dir.join("stages");
+471:                 if stages_dir.exists() {
+472:                     for entry in fs::read_dir(&stages_dir)
+473:                         .with_context(|| format!("Failed to read stages directory: {:?}", stages_dir))?
+474:                         .filter_map(|e| e.ok())
+475:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+476:                     {
+477:                         let path = entry.path();
+478:                         match fs::read_to_string(&path)
+479:                             .and_then(|content| serde_json::from_str::<StageDefinition>(&content)
+480:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+481:                         {
+482:                             Ok(stage) => {
+483:                                 let id = stage.id.clone();
+484:                                 self.register_stage(stage)?;
+485:                                 report.stages_loaded += 1;
+486:                                 tracing::debug!("Loaded user stage: {} from {:?}", id, path);
+487:                             }
+488:                             Err(e) => {
+489:                                 report.errors.push(format!("Failed to load stage from {:?}: {}", path, e));
+490:                             }
+491:                         }
+492:                     }
+493:                 }
+494:                 
+495:                 
+496:                 let flows_dir = config_dir.join("flows");
+497:                 if flows_dir.exists() {
+498:                     for entry in fs::read_dir(&flows_dir)
+499:                         .with_context(|| format!("Failed to read flows directory: {:?}", flows_dir))?
+500:                         .filter_map(|e| e.ok())
+501:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+502:                     {
+503:                         let path = entry.path();
+504:                         match fs::read_to_string(&path)
+505:                             .and_then(|content| serde_json::from_str::<FlowDefinition>(&content)
+506:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+507:                         {
+508:                             Ok(flow) => {
+509:                                 let id = flow.id.clone();
+510:                                 
+511:                                 if let Some(existing) = self.get_flow(&id) {
+512:                                     if existing.is_builtin {
+513:                                         tracing::debug!(
+514:                                             "Skipping user flow '{}' - builtin preset with same ID exists",
+515:                                             id
+516:                                         );
+517:                                         continue;
+518:                                     }
+519:                                 }
+520:                                 self.register_flow(flow)?;
+521:                                 report.flows_loaded += 1;
+522:                                 tracing::debug!("Loaded user flow: {} from {:?}", id, path);
+523:                             }
+524:                             Err(e) => {
+525:                                 report.errors.push(format!("Failed to load flow from {:?}: {}", path, e));
+526:                             }
+527:                         }
+528:                     }
+529:                 }
+530:                 
+531:                 
+532:                 let integrations_dir = config_dir.join("integrations");
+533:                 if integrations_dir.exists() {
+534:                     for entry in fs::read_dir(&integrations_dir)
+535:                         .with_context(|| format!("Failed to read integrations directory: {:?}", integrations_dir))?
+536:                         .filter_map(|e| e.ok())
+537:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+538:                     {
+539:                         let path = entry.path();
+540:                         match fs::read_to_string(&path)
+541:                             .and_then(|content| serde_json::from_str::<IntegrationDefinition>(&content)
+542:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+543:                         {
+544:                             Ok(integration) => {
+545:                                 let id = integration.id.clone();
+546:                                 self.register_integration(integration)?;
+547:                                 report.integrations_loaded += 1;
+548:                                 tracing::debug!("Loaded user integration: {} from {:?}", id, path);
+549:                             }
+550:                             Err(e) => {
+551:                                 report.errors.push(format!("Failed to load integration from {:?}: {}", path, e));
+552:                             }
+553:                         }
+554:                     }
+555:                 }
+556:                 
+557:                 
+558:                 if let Err(e) = self.load_settings() {
+559:                     tracing::warn!("Failed to load settings: {}", e);
+560:                 }
+561:                 
+562:                 
+563:                 
+564:                 if self.get_default_flow_id().is_none() {
+565:                     if self.get_flow("default").is_some() {
+566:                         if let Err(e) = self.set_default_flow(Some("default".to_string())) {
+567:                             tracing::warn!("Failed to set default flow: {}", e);
+568:                         } else {
+569:                             tracing::info!("Set 'default' as the default flow (first time initialization)");
+570:                         }
+571:                     }
+572:                 }
+573:             }
+574:         } else {
+575:             
+576:             
+577:             if let Some(flow_id) = self.get_default_flow_id() {
+578:                 if let Err(e) = self.set_default_flow(Some(flow_id)) {
+579:                     tracing::warn!("Failed to save initial default flow setting: {}", e);
+580:                 }
+581:             }
+582:         }
+583:         
+584:         Ok(report)
+585:     }
+586: }
+587: ⋮----
+588: RegistryStats
+589: ⋮----
+590: {
+591:     pub agents: usize,
+592:     pub stages: usize,
+593:     pub flows: usize,
+594:     pub integrations: usize,
+595: }
+596: ⋮----
+597: LoadUserReport
+598: ⋮----
+599: {
+600:     pub agents_loaded: usize,
+601:     pub stages_loaded: usize,
+602:     pub flows_loaded: usize,
+603:     pub integrations_loaded: usize,
+604:     pub errors: Vec<String>,
+605: }
+606: ⋮----
+607: LoadReport
+608: ⋮----
+609: {
+610:     pub agents_loaded: usize,
+611:     pub stages_loaded: usize,
+612:     pub flows_loaded: usize,
+613:     pub integrations_loaded: usize,
+614:     pub default_flow_set: bool,
+615:     pub errors: Vec<String>,
+616: }
+617: ⋮----
+618: LoadReport
+619: ⋮----
+620: {
+621:     pub fn total_loaded(&self) -> usize {
+622:         self.agents_loaded + self.stages_loaded + self.flows_loaded + self.integrations_loaded
+623:     }
+624: 
+625:     pub fn has_errors(&self) -> bool {
+626:         !self.errors.is_empty()
+627:     }
+628: }
+629: ⋮----
+630: Settings
+631: ⋮----
+632: {
+633:     
+634:     pub default_flow_id: Option<String>,
+635: }
+636: ⋮----
+637: Settings
+638: ⋮----
+639: {
+640:     fn default() -> Self {
+641:         Self {
+642:             default_flow_id: None,
+643:         }
+644:     }
+645: }
+646: ⋮----
+647: global_registry
+648: ⋮----
+649: ()
+650: ⋮----
+651: test_registry_operations
+652: ⋮----
+653: ()
+```
+
+### crates/cowork-core/src/domain/iteration.rs (319 lines)
+
+```
+1: Iteration
+2: ⋮----
+3: {
+4:     pub id: String,
+5:     pub number: u32,
+6:     pub title: String,
+7:     pub description: String,
+8: 
+9:     
+10:     pub base_iteration_id: Option<String>,
+11:     pub inheritance: InheritanceMode,
+12: 
+13:     
+14:     pub status: IterationStatus,
+15:     pub started_at: DateTime<Utc>,
+16:     pub completed_at: Option<DateTime<Utc>>,
+17:     pub current_stage: Option<String>,
+18:     pub completed_stages: Vec<String>,
+19: 
+20:     
+21:     pub artifacts: Artifacts,
+22: }
+23: ⋮----
+24: Iteration
+25: ⋮----
+26: {
+27:     pub fn create_genesis(project: &Project, title: String, description: String) -> Self {
+28:         let now = Utc::now();
+29:         Self {
+30:             id: format!("iter-{}-{}", project.next_iteration_number(), now.timestamp()),
+31:             number: project.next_iteration_number(),
+32:             title,
+33:             description,
+34:             base_iteration_id: None,
+35:             inheritance: InheritanceMode::None,
+36:             status: IterationStatus::Draft,
+37:             started_at: now,
+38:             completed_at: None,
+39:             current_stage: None,
+40:             completed_stages: Vec::new(),
+41:             artifacts: Artifacts::default(),
+42:         }
+43:     }
+44: 
+45:     pub fn create_evolution(
+46:         project: &Project,
+47:         title: String,
+48:         description: String,
+49:         base_iteration_id: String,
+50:         inheritance: InheritanceMode,
+51:     ) -> Self {
+52:         let now = Utc::now();
+53:         Self {
+54:             id: format!("iter-{}-{}", project.next_iteration_number(), now.timestamp()),
+55:             number: project.next_iteration_number(),
+56:             title,
+57:             description,
+58:             base_iteration_id: Some(base_iteration_id),
+59:             inheritance,
+60:             status: IterationStatus::Draft,
+61:             started_at: now,
+62:             completed_at: None,
+63:             current_stage: None,
+64:             completed_stages: Vec::new(),
+65:             artifacts: Artifacts::default(),
+66:         }
+67:     }
+68: 
+69:     pub fn start(&mut self) {
+70:         self.status = IterationStatus::Running;
+71:         self.started_at = Utc::now();
+72:     }
+73: 
+74:     pub fn pause(&mut self) {
+75:         self.status = IterationStatus::Paused;
+76:     }
+77: 
+78:     pub fn resume(&mut self) {
+79:         self.status = IterationStatus::Running;
+80:     }
+81: 
+82:     pub fn complete(&mut self) {
+83:         self.status = IterationStatus::Completed;
+84:         self.completed_at = Some(Utc::now());
+85:         self.current_stage = None;
+86:         
+87:         
+88:         
+89:         
+90:         self.finalize_completed_stages();
+91:     }
+92:     
+93:     
+94:     
+95:     fn finalize_completed_stages(&mut self) {
+96:         
+97:         let flow_stages = self.get_flow_stages();
+98:         
+99:         
+100:         let artifact_stages = [
+101:             ("idea", &self.artifacts.idea),
+102:             ("prd", &self.artifacts.prd),
+103:             ("design", &self.artifacts.design),
+104:             ("plan", &self.artifacts.plan),
+105:             ("coding", &self.artifacts.coding),
+106:             ("delivery", &self.artifacts.delivery),
+107:         ];
+108:         
+109:         for (stage_name, artifact) in artifact_stages {
+110:             if artifact.is_some() && !self.completed_stages.contains(&stage_name.to_string()) {
+111:                 self.completed_stages.push(stage_name.to_string());
+112:             }
+113:         }
+114:         
+115:         
+116:         
+117:         if self.completed_stages.is_empty() && !flow_stages.is_empty() {
+118:             self.completed_stages = flow_stages;
+119:         }
+120:     }
+121:     
+122:     
+123:     fn get_flow_stages(&self) -> Vec<String> {
+124:         use crate::config_definition::registry::global_registry;
+125:         
+126:         if let Some(flow) = global_registry().get_default_flow() {
+127:             flow.stages.iter().map(|s| s.stage_id.clone()).collect()
+128:         } else {
+129:             
+130:             vec![
+131:                 "idea".to_string(),
+132:                 "prd".to_string(),
+133:                 "design".to_string(),
+134:                 "plan".to_string(),
+135:                 "coding".to_string(),
+136:                 "check".to_string(),
+137:                 "delivery".to_string(),
+138:             ]
+139:         }
+140:     }
+141: 
+142:     pub fn fail(&mut self) {
+143:         self.status = IterationStatus::Failed;
+144:         
+145:         
+146:     }
+147: 
+148:     pub fn set_stage(&mut self, stage: impl Into<String>) {
+149:         self.current_stage = Some(stage.into());
+150:     }
+151: 
+152:     pub fn complete_stage(&mut self, stage: impl Into<String>, artifact_path: Option<String>) {
+153:         let stage_name = stage.into();
+154:         self.completed_stages.push(stage_name.clone());
+155: 
+156:         
+157:         let path = artifact_path.unwrap_or_default();
+158:         match stage_name.as_str() {
+159:             "idea" => self.artifacts.idea = Some(path),
+160:             "prd" => self.artifacts.prd = Some(path),
+161:             "design" => self.artifacts.design = Some(path),
+162:             "plan" => self.artifacts.plan = Some(path),
+163:             "coding" => self.artifacts.coding = Some(path), 
+164:             "delivery" => self.artifacts.delivery = Some(path),
+165:             _ => {}
+166:         }
+167:     }
+168: 
+169:     
+170:     
+171:     pub fn determine_start_stage(&self) -> String {
+172:         let stage_mapping = self.get_stage_mapping_from_flow();
+173:         
+174:         let mode_key = match self.inheritance {
+175:             InheritanceMode::None => "none",
+176:             InheritanceMode::Full => "full",
+177:             InheritanceMode::Partial => "partial",
+178:         };
+179:         
+180:         stage_mapping
+181:             .get(mode_key)
+182:             .cloned()
+183:             .unwrap_or_else(|| "idea".to_string())
+184:     }
+185:     
+186:     
+187:     fn get_stage_mapping_from_flow(&self) -> std::collections::HashMap<String, String> {
+188:         use crate::config_definition::registry::global_registry;
+189:         
+190:         if let Some(flow) = global_registry().get_default_flow() {
+191:             flow.config.inheritance.stage_mapping
+192:         } else {
+193:             
+194:             let mut mapping = std::collections::HashMap::new();
+195:             mapping.insert("none".to_string(), "idea".to_string());
+196:             mapping.insert("partial".to_string(), "idea".to_string());
+197:             mapping.insert("full".to_string(), "idea".to_string());
+198:             mapping
+199:         }
+200:     }
+201: 
+202:     pub fn to_summary(&self) -> super::IterationSummary {
+203:         super::IterationSummary {
+204:             id: self.id.clone(),
+205:             number: self.number,
+206:             title: self.title.clone(),
+207:             status: self.status,
+208:             completed_stages: self.completed_stages.clone(),
+209:             created_at: self.started_at,
+210:         }
+211:     }
+212: }
+213: ⋮----
+214: InheritanceMode
+215: ⋮----
+216: {
+217:     None,     
+218:     Full,     
+219:     Partial,  
+220: }
+221: ⋮----
+222: InheritanceMode
+223: ⋮----
+224: {
+225:     fn default() -> Self {
+226:         InheritanceMode::Full
+227:     }
+228: }
+229: ⋮----
+230: Artifacts
+231: ⋮----
+232: {
+233:     pub idea: Option<String>,
+234:     pub prd: Option<String>,
+235:     pub design: Option<String>,
+236:     pub plan: Option<String>,
+237:     pub coding: Option<String>,  
+238:     pub delivery: Option<String>,
+239: }
+240: ⋮----
+241: Artifacts
+242: ⋮----
+243: {
+244:     pub fn get(&self, stage: &str) -> Option<&String> {
+245:         match stage {
+246:             "idea" => self.idea.as_ref(),
+247:             "prd" => self.prd.as_ref(),
+248:             "design" => self.design.as_ref(),
+249:             "plan" => self.plan.as_ref(),
+250:             "coding" => self.coding.as_ref(),
+251:             "delivery" => self.delivery.as_ref(),
+252:             _ => None,
+253:         }
+254:     }
+255: 
+256:     pub fn set(&mut self, stage: &str, path: String) {
+257:         match stage {
+258:             "idea" => self.idea = Some(path),
+259:             "prd" => self.prd = Some(path),
+260:             "design" => self.design = Some(path),
+261:             "plan" => self.plan = Some(path),
+262:             "coding" => self.coding = Some(path),
+263:             "delivery" => self.delivery = Some(path),
+264:             _ => {}
+265:         }
+266:     }
+267: }
+268: ⋮----
+269: create_test_project
+270: ⋮----
+271: ()
+272: ⋮----
+273: test_create_genesis_iteration
+274: ⋮----
+275: ()
+276: ⋮----
+277: test_create_evolution_iteration
+278: ⋮----
+279: ()
+280: ⋮----
+281: test_iteration_status_transitions
+282: ⋮----
+283: ()
+284: ⋮----
+285: test_iteration_fail
+286: ⋮----
+287: ()
+288: ⋮----
+289: test_set_and_complete_stage
+290: ⋮----
+291: ()
+292: ⋮----
+293: test_determine_start_stage_none_mode
+294: ⋮----
+295: ()
+296: ⋮----
+297: test_determine_start_stage_partial_mode
+298: ⋮----
+299: ()
+300: ⋮----
+301: test_determine_start_stage_full_mode
+302: ⋮----
+303: ()
+304: ⋮----
+305: test_artifacts_get_set
+306: ⋮----
+307: ()
+308: ⋮----
+309: test_to_summary
+310: ⋮----
+311: ()
+312: ⋮----
+313: test_inheritance_mode_default
+314: ⋮----
+315: ()
+316: ⋮----
+317: test_inheritance_mode_serde
+318: ⋮----
+319: ()
 ```
 
 ### crates/cowork-core/src/instructions/check.rs (413 lines)
@@ -6242,6 +6117,912 @@ LICENSE
 413: ;
 ````
 
+### crates/cowork-core/src/pipeline/executor/mod.rs (619 lines)
+
+```
+1: IterationExecutor
+2: ⋮----
+3: {
+4:     project_store: ProjectStore,
+5:     iteration_store: IterationStore,
+6:     interaction: Arc<dyn InteractiveBackend>,
+7: }
+8: ⋮----
+9: IterationExecutor
+10: ⋮----
+11: {
+12:     pub fn new(interaction: Arc<dyn InteractiveBackend>) -> Self {
+13:         Self {
+14:             project_store: ProjectStore::new(),
+15:             iteration_store: IterationStore::new(),
+16:             interaction,
+17:         }
+18:     }
+19: 
+20:     
+21:     pub fn create_genesis_iteration(
+22:         &self,
+23:         project: &mut Project,
+24:         title: impl Into<String>,
+25:         description: impl Into<String>,
+26:     ) -> anyhow::Result<crate::domain::Iteration> {
+27:         let iteration = crate::domain::Iteration::create_genesis(project, title.into(), description.into());
+28: 
+29:         self.iteration_store.save(&iteration)?;
+30:         self.project_store
+31:             .add_iteration(project, iteration.to_summary())?;
+32: 
+33:         Ok(iteration)
+34:     }
+35: 
+36:     
+37:     
+38:     
+39:     
+40:     
+41:     
+42:     pub fn create_evolution_iteration(
+43:         &self,
+44:         project: &mut Project,
+45:         title: impl Into<String>,
+46:         description: impl Into<String>,
+47:         base_iteration_id: impl Into<String>,
+48:         inheritance: crate::domain::InheritanceMode,
+49:     ) -> anyhow::Result<crate::domain::Iteration> {
+50:         let iteration = crate::domain::Iteration::create_evolution(
+51:             project,
+52:             title.into(),
+53:             description.into(),
+54:             base_iteration_id.into(),
+55:             inheritance,
+56:         );
+57: 
+58:         self.iteration_store.save(&iteration)?;
+59:         self.project_store
+60:             .add_iteration(project, iteration.to_summary())?;
+61: 
+62:         Ok(iteration)
+63:     }
+64: 
+65:     
+66:     pub async fn execute(
+67:         &self,
+68:         project: &mut Project,
+69:         iteration_id: &str,
+70:         resume_stage: Option<String>,
+71:         _model: Option<Arc<dyn adk_core::Llm>>,
+72:     ) -> anyhow::Result<()> {
+73:         let mut iteration = self.iteration_store.load(iteration_id)?;
+74: 
+75:         
+76:         let workspace = workspace::prepare_workspace(
+77:             &self.iteration_store,
+78:             &self.interaction,
+79:             &iteration,
+80:         ).await?;
+81: 
+82:         
+83:         let start_stage = if let Some(stage) = resume_stage {
+84:             stage
+85:         } else if let Some(ref current) = iteration.current_stage {
+86:             current.clone()
+87:         } else {
+88:             iteration.determine_start_stage()
+89:         };
+90: 
+91:         let stages = get_stages_from_flow(&start_stage);
+92:         let flow_config = get_flow_config();
+93: 
+94:         println!(
+95:             "[Executor] Using Flow config: stop_on_failure={}, memory_scope={:?}",
+96:             flow_config.stop_on_failure, flow_config.memory_scope
+97:         );
+98: 
+99:         
+100:         iteration.start();
+101:         self.iteration_store.save(&iteration)?;
+102:         self.project_store
+103:             .set_current_iteration(project, iteration_id.to_string())?;
+104: 
+105:         
+106:         let memory_store = crate::persistence::MemoryStore::new();
+107:         if let Err(e) = memory_store.ensure_iteration_memory(iteration_id) {
+108:             println!("[Executor] Warning: Failed to create iteration memory: {}", e);
+109:         }
+110: 
+111:         println!(
+112:             "[Executor] Iteration '{}' started, will execute {} stages starting from '{}'",
+113:             iteration.title,
+114:             stages.len(),
+115:             start_stage
+116:         );
+117: 
+118:         self.interaction
+119:             .show_message_with_context(
+120:                 crate::interaction::MessageLevel::Info,
+121:                 format!(
+122:                     "Starting iteration '{}' from stage '{}'",
+123:                     iteration.title, start_stage
+124:                 ),
+125:                 MessageContext::new("Pipeline Controller"),
+126:             )
+127:             .await;
+128: 
+129:         
+130:         if iteration.base_iteration_id.is_some() {
+131:             if let Err(e) = knowledge::inject_project_knowledge(&self.iteration_store, &iteration).await {
+132:                 println!("[Executor] Warning: Failed to inject project knowledge: {}", e);
+133:             }
+134:         }
+135: 
+136:         println!("[Executor] Starting stage execution loop...");
+137:         self.execute_stages_from(project, &mut iteration, stages, workspace, flow_config, 0).await
+138:     }
+139: 
+140:     
+141:     
+142:     
+143:     
+144:     
+145:     async fn execute_stages_from(
+146:         &self,
+147:         project: &mut Project,
+148:         iteration: &mut crate::domain::Iteration,
+149:         stages: Vec<Box<dyn crate::pipeline::Stage>>,
+150:         workspace: std::path::PathBuf,
+151:         flow_config: crate::config_definition::flow_definition::FlowConfig,
+152:         goto_depth: u32,
+153:     ) -> anyhow::Result<()> {
+154:         const MAX_STAGE_RETRIES: u32 = 3;
+155:         const RETRY_DELAY_MS: u64 = 5000;
+156:         const MAX_FEEDBACK_LOOPS: u32 = 5;
+157:         const MAX_GOTO_DEPTH: u32 = 10;
+158:         
+159:         let total_stages = stages.len();
+160:         let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
+161:         
+162:         crate::persistence::set_iteration_id(iteration.id.clone());
+163: 
+164:         for (stage_idx, stage) in stages.into_iter().enumerate() {
+165:             let stage_name = stage.name().to_string();
+166:             let stage_num = stage_idx + 1;
+167: 
+168:             iteration.set_stage(&stage_name);
+169:             self.iteration_store.save(&iteration)?;
+170: 
+171:             println!("[Executor] Stage updated: {} (iteration: {})", stage_name, iteration.id);
+172: 
+173:             self.interaction
+174:                 .show_message_with_context(
+175:                     crate::interaction::MessageLevel::Info,
+176:                     format!(
+177:                         "🚀 [{}/{}] Starting stage: {}",
+178:                         stage_num,
+179:                         total_stages,
+180:                         stage.description()
+181:                     ),
+182:                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+183:                 )
+184:                 .await;
+185: 
+186:             let mut last_error = None;
+187:             let mut success = false;
+188: 
+189:             for attempt in 0..MAX_STAGE_RETRIES {
+190:                 if attempt > 0 {
+191:                     println!(
+192:                         "[Executor] Retrying stage '{}' (attempt {}/{})",
+193:                         stage_name, attempt + 1, MAX_STAGE_RETRIES
+194:                     );
+195:                     self.interaction
+196:                         .show_message_with_context(
+197:                             crate::interaction::MessageLevel::Warning,
+198:                             format!(
+199:                                 "Retrying stage '{}' (attempt {}/{})",
+200:                                 stage_name, attempt + 1, MAX_STAGE_RETRIES
+201:                             ),
+202:                             MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+203:                         )
+204:                         .await;
+205:                     tokio::time::sleep(tokio::time::Duration::from_millis(RETRY_DELAY_MS)).await;
+206:                 }
+207: 
+208:                 
+209:                 let mut current_feedback: Option<String> = None;
+210:                 let mut feedback_loop_count: u32 = 0;
+211: 
+212:                 if let Ok(feedback_history) = crate::persistence::load_feedback_history() {
+213:                     if let Some(fb) = feedback_history
+214:                         .feedbacks
+215:                         .iter()
+216:                         .filter(|f| f.stage == stage_name)
+217:                         .max_by_key(|f| f.timestamp)
+218:                     {
+219:                         tracing::info!("[Executor] Found stored feedback for stage '{}': {}",
+220:                             stage_name, fb.details.chars().take(100).collect::<String>());
+221:                         current_feedback = Some(fb.details.clone());
+222:                         
+223:                         
+224:                         if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
+225:                             eprintln!("[Warning] Failed to clear consumed feedback for stage '{}': {}", stage_name, e);
+226:                         }
+227:                     }
+228:                 }
+229: 
+230:                 loop {
+231:                     let result = if let Some(ref feedback) = current_feedback {
+232:                         stage
+233:                             .execute_with_feedback(&ctx, self.interaction.clone(), feedback)
+234:                             .await
+235:                     } else {
+236:                         stage.execute(&ctx, self.interaction.clone()).await
+237:                     };
+238: 
+239:                     match result {
+240:                         StageResult::GotoStage(target_stage, reason) => {
+241:                             self.interaction
+242:                                 .show_message_with_context(
+243:                                     crate::interaction::MessageLevel::Warning,
+244:                                     format!(
+245:                                         "🔄 Stage jump requested: {} → {}\nReason: {}",
+246:                                         stage_name, target_stage, reason
+247:                                     ),
+248:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+249:                                 )
+250:                                 .await;
+251: 
+252:                             
+253:                             
+254:                             
+255: 
+256:                             if goto_depth >= MAX_GOTO_DEPTH {
+257:                                 anyhow::bail!(
+258:                                     "Maximum goto stage depth ({}) reached. Stage '{}' keeps requesting jumps to '{}'. Last reason: {}",
+259:                                     MAX_GOTO_DEPTH, stage_name, target_stage, reason
+260:                                 );
+261:                             }
+262: 
+263:                             iteration.set_stage(&target_stage);
+264:                             self.iteration_store.save(&iteration)?;
+265: 
+266:                             let new_stages = get_stages_from_flow(&target_stage);
+267: 
+268:                             self.interaction
+269:                                 .show_message_with_context(
+270:                                     crate::interaction::MessageLevel::Info,
+271:                                     format!(
+272:                                         "Restarting pipeline from '{}' stage with {} stages to execute (goto depth {}/{})",
+273:                                         target_stage,
+274:                                         new_stages.len(),
+275:                                         goto_depth + 1,
+276:                                         MAX_GOTO_DEPTH
+277:                                     ),
+278:                                     MessageContext::new("Pipeline Controller"),
+279:                                 )
+280:                                 .await;
+281: 
+282:                             return Box::pin(self.execute_stages_from(
+283:                                 project,
+284:                                 iteration,
+285:                                 new_stages,
+286:                                 workspace.clone(),
+287:                                 flow_config.clone(),
+288:                                 goto_depth + 1,
+289:                             )).await;
+290:                         }
+291:                         StageResult::Success(artifact_path) => {
+292:                             let artifact_exists = if let Some(ref path) = artifact_path {
+293:                                 std::path::Path::new(path).exists()
+294:                             } else {
+295:                                 workspace::check_artifact_exists(&stage_name, &workspace).await
+296:                             };
+297: 
+298:                             if !artifact_exists {
+299:                                 last_error = Some(format!("Artifacts not generated for stage '{}'", stage_name));
+300: 
+301:                                 self.interaction
+302:                                     .show_message_with_context(
+303:                                         crate::interaction::MessageLevel::Error,
+304:                                         format!("❌ Stage '{}' completed but artifacts not found. Will retry...", stage_name),
+305:                                         MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+306:                                     )
+307:                                     .await;
+308:                                 beak;
+309:                             }
+310: 
+311:                             if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
+312:                                 eprintln!("[Warning] Failed to clear feedback for stage '{}': {}", stage_name, e);
+313:                             }
+314: 
+315:                             iteration.complete_stage(&stage_name, artifact_path.clone());
+316:                             self.iteration_store.save(&iteration)?;
+317: 
+318:                             let progress_msg = if feedback_loop_count > 0 {
+319:                                 format!(
+320:                                     "✅ [{}/{}] Stage '{}' completed (revision {})",
+321:                                     stage_num, total_stages, stage_name, feedback_loop_count
+322:                                 )
+323:                             } else if attempt > 0 {
+324:                                 format!(
+325:                                     "✅ [{}/{}] Stage '{}' completed (after {} retries)",
+326:                                     stage_num, total_stages, stage_name, attempt
+327:                                 )
+328:                             } else {
+329:                                 format!("✅ [{}/{}] Stage '{}' completed", stage_num, total_stages, stage_name)
+330:                             };
+331: 
+332:                             self.interaction
+333:                                 .show_message_with_context(
+334:                                     crate::interaction::MessageLevel::Success,
+335:                                     progress_msg,
+336:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+337:                                 )
+338:                                 .await;
+339: 
+340:                             if is_critical_stage(&stage_name) {
+341:                                 iteration.pause();
+342:                                 self.iteration_store.save(&iteration)?;
+343: 
+344:                                 let artifact_type = match stage_name.as_str() {
+345:                                     "idea" => "idea",
+346:                                     "prd" => "requirements",
+347:                                     "design" => "design",
+348:                                     "plan" => "plan",
+349:                                     "coding" => "code",
+350:                                     _ => "artifacts",
+351:                                 };
+352: 
+353:                                 let action = self.interaction
+354:                                     .request_confirmation_with_feedback(
+355:                                         &format!(
+356:                                             "Stage '{}' completed. Please review the generated {} document.{}",
+357:                                             stage_name,
+358:                                             stage_name.to_uppercase(),
+359:                                             if feedback_loop_count > 0 {
+360:                                                 format!(" (Revision {})", feedback_loop_count)
+361:                                             } else {
+362:                                                 String::new()
+363:                                             }
+364:                                         ), 
+365:                                         artifact_type
+366:                                     )
+367:                                     .await;
+368: 
+369:                                 match action {
+370:                                     ConfirmationAction::Continue => {
+371:                                         iteration.resume();
+372:                                         self.iteration_store.save(&iteration)?;
+373:                                         success = true;
+374:                                         beak;
+375:                                     }
+376:                                     ConfirmationAction::ViewArtifact => {
+377:                                         current_feedback = None;
+378:                                         continue;
+379:                                     }
+380:                                     ConfirmationAction::ProvideFeedback(feedback) => {
+381:                                         if feedback_loop_count >= MAX_FEEDBACK_LOOPS {
+382:                                             self.interaction
+383:                                                 .show_message_with_context(
+384:                                                     crate::interaction::MessageLevel::Warning,
+385:                                                     format!("Maximum revision attempts ({}) reached. Proceeding...", MAX_FEEDBACK_LOOPS),
+386:                                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+387:                                                 )
+388:                                                 .await;
+389:                                             iteration.resume();
+390:                                             self.iteration_store.save(&iteration)?;
+391:                                             success = true;
+392:                                             beak;
+393:                                         }
+394: 
+395:                                         feedback_loop_count += 1;
+396:                                         current_feedback = Some(feedback);
+397:                                         self.interaction
+398:                                             .show_message_with_context(
+399:                                                 crate::interaction::MessageLevel::Info,
+400:                                                 format!("Revising stage '{}' based on feedback...", stage_name),
+401:                                                 MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+402:                                             )
+403:                                             .await;
+404:                                         continue;
+405:                                     }
+406:                                     ConfirmationAction::Cancel => {
+407:                                         iteration.pause();
+408:                                         self.iteration_store.save(&iteration)?;
+409:                                         return Err(anyhow::anyhow!("User cancelled at stage '{}'", stage_name));
+410:                                     }
+411:                                 }
+412:                             } else {
+413:                                 success = true;
+414:                                 beak;
+415:                             }
+416:                         }
+417:                         StageResult::Failed(e) => {
+418:                             last_error = Some(e.clone());
+419:                             eprintln!("[Executor] Stage '{}' failed: {}", stage_name, e);
+420:                             self.interaction
+421:                                 .show_message_with_context(
+422:                                     crate::interaction::MessageLevel::Error,
+423:                                     format!("❌ Stage '{}' failed: {}", stage_name, e),
+424:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+425:                                 )
+426:                                 .await;
+427:                             beak;
+428:                         }
+429:                         StageResult::Paused => {
+430:                             iteration.pause();
+431:                             self.iteration_store.save(&iteration)?;
+432:                             self.interaction
+433:                                 .show_message_with_context(
+434:                                     crate::interaction::MessageLevel::Info,
+435:                                     format!("⏸️ Stage '{}' paused by user", stage_name),
+436:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+437:                                 )
+438:                                 .await;
+439:                             return Ok(());
+440:                         }
+441:                         StageResult::NeedsRevision(e) => {
+442:                             last_error = Some(e.clone());
+443:                             self.interaction
+444:                                 .show_message_with_context(
+445:                                     crate::interaction::MessageLevel::Warning,
+446:                                     format!("🔄 Stage '{}' needs revision: {}", stage_name, e),
+447:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+448:                                 )
+449:                                 .await;
+450:                             beak;
+451:                         }
+452:                     }
+453:                 }
+454: 
+455:                 if success {
+456:                     beak;
+457:                 }
+458:             }
+459: 
+460:             if !success {
+461:                 if flow_config.stop_on_failure {
+462:                     iteration.fail();
+463:                     self.iteration_store.save(&iteration)?;
+464: 
+465:                     return Err(anyhow::anyhow!(
+466:                         "Stage '{}' failed after {} retries: {}",
+467:                         stage_name,
+468:                         MAX_STAGE_RETRIES,
+469:                         last_error.unwrap_or_else(|| "Unknown error".to_string())
+470:                     ));
+471:                 } else {
+472:                     self.interaction
+473:                         .show_message_with_context(
+474:                             crate::interaction::MessageLevel::Warning,
+475:                             format!("Skipping failed stage '{}' and continuing...", stage_name),
+476:                             MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+477:                         )
+478:                         .await;
+479:                 }
+480:             }
+481:         }
+482: 
+483:         
+484:         iteration.complete();
+485:         self.iteration_store.save(&iteration)?;
+486: 
+487:         
+488:         if let Err(e) = crate::persistence::MemoryStore::new().promote_insights_to_decisions(&iteration.id) {
+489:             println!("[Executor] Warning: Failed to promote insights: {}", e);
+490:         }
+491: 
+492:         project.current_iteration_id = Some(iteration.id.clone());
+493:         self.project_store.save(project)?;
+494: 
+495:         self.interaction
+496:             .show_message_with_context(
+497:                 crate::interaction::MessageLevel::Success,
+498:                 format!("Iteration '{}' completed successfully!", iteration.title),
+499:                 MessageContext::new("Pipeline Controller"),
+500:             )
+501:             .await;
+502: 
+503:         Ok(())
+504:     }
+505: 
+506:     
+507:     pub async fn continue_iteration(
+508:         &self,
+509:         project: &mut Project,
+510:         iteration_id: &str,
+511:         model: Option<Arc<dyn adk_core::Llm>>,
+512:     ) -> anyhow::Result<()> {
+513:         let mut iteration = self.iteration_store.load(iteration_id)?;
+514: 
+515:         println!(
+516:             "[Executor] Continuing iteration '{}' (status: {:?}, current_stage: {:?})",
+517:             iteration_id, iteration.status, iteration.current_stage
+518:         );
+519: 
+520:         if iteration.status != IterationStatus::Paused {
+521:             return Err(anyhow::anyhow!("Iteration is not paused"));
+522:         }
+523: 
+524:         let resume_stage = iteration.current_stage.clone();
+525:         println!("[Executor] Resuming from stage: {:?}", resume_stage);
+526: 
+527:         iteration.resume();
+528:         self.iteration_store.save(&iteration)?;
+529: 
+530:         self.interaction
+531:             .show_message_with_context(
+532:                 crate::interaction::MessageLevel::Info,
+533:                 format!(
+534:                     "Iteration '{}' resumed from stage: {}",
+535:                     iteration_id,
+536:                     resume_stage.as_ref().unwrap_or(&"unknown".to_string())
+537:                 ),
+538:                 MessageContext::new("Pipeline Controller")
+539:                     .with_stage(resume_stage.as_deref().unwrap_or("unknown")),
+540:             )
+541:             .await;
+542: 
+543:         self.execute(project, iteration_id, resume_stage, model).await
+544:     }
+545: 
+546:     
+547:     pub async fn retry_iteration(
+548:         &self,
+549:         project: &mut Project,
+550:         iteration_id: &str,
+551:     ) -> anyhow::Result<()> {
+552:         let mut iteration = self.iteration_store.load(iteration_id)?;
+553: 
+554:         println!(
+555:             "[Executor] Retrying failed iteration '{}' (status: {:?}, current_stage: {:?})",
+556:             iteration_id, iteration.status, iteration.current_stage
+557:         );
+558: 
+559:         if iteration.status != IterationStatus::Failed {
+560:             return Err(anyhow::anyhow!("Iteration is not failed"));
+561:         }
+562: 
+563:         let retry_stage = if let Some(ref current) = iteration.current_stage {
+564:             current.clone()
+565:         } else {
+566:             println!("[Executor] No current_stage found, defaulting to 'check' for retry");
+567:             "check".to_string()
+568:         };
+569: 
+570:         iteration.resume();
+571:         self.iteration_store.save(&iteration)?;
+572: 
+573:         self.interaction
+574:             .show_message_with_context(
+575:                 crate::interaction::MessageLevel::Info,
+576:                 format!("Retrying iteration '{}' from stage: {}", iteration_id, retry_stage),
+577:                 MessageContext::new("Pipeline Controller").with_stage(&retry_stage),
+578:             )
+579:             .await;
+580: 
+581:         self.execute(project, iteration_id, Some(retry_stage), None).await
+582:     }
+583: 
+584:     
+585:     
+586:     
+587: 
+588:     
+589:     pub async fn generate_document_summaries(
+590:         &self,
+591:         iteration: &crate::domain::Iteration,
+592:         model: Arc<dyn adk_core::Llm>,
+593:     ) -> anyhow::Result<()> {
+594:         knowledge::generate_document_summaries(&self.iteration_store, iteration, model).await
+595:     }
+596: 
+597:     
+598:     pub async fn generate_iteration_knowledge(
+599:         &self,
+600:         iteration: &crate::domain::Iteration,
+601:         model: Arc<dyn adk_core::Llm>,
+602:     ) -> anyhow::Result<()> {
+603:         knowledge::generate_iteration_knowledge(&self.iteration_store, iteration, model).await
+604:     }
+605: 
+606:     
+607:     pub async fn inject_project_knowledge(&self, iteration: &crate::domain::Iteration) -> anyhow::Result<()> {
+608:         knowledge::inject_project_knowledge(&self.iteration_store, iteration).await
+609:     }
+610: 
+611:     
+612:     pub async fn regenerate_iteration_knowledge(
+613:         &self,
+614:         iteration_id: &str,
+615:         model: Arc<dyn adk_core::Llm>,
+616:     ) -> anyhow::Result<()> {
+617:         knowledge::regenerate_iteration_knowledge(&self.iteration_store, iteration_id, model).await
+618:     }
+619: }
+```
+
+### crates/cowork-core/src/pipeline/stages/coding.rs (277 lines)
+
+```
+1: CodingStage
+2: ⋮----
+3: {
+4:     
+5:     fn is_external_enabled() -> bool {
+6:         match load_config() {
+7:             Ok(config) => config.coding_agent.enabled,
+8:             Err(_) => false,
+9:         }
+10:     }
+11: 
+12:     
+13:     async fn execute_external(
+14:         ctx: &PipelineContext,
+15:         interaction: Arc<dyn InteractiveBackend>,
+16:         feedback: Option<&str>,
+17:     ) -> StageResult {
+18:         
+19:         crate::persistence::set_iteration_id(ctx.iteration.id.clone());
+20:         
+21:         let workspace = ctx.workspace_path.clone();
+22:         
+23:         interaction
+24:             .show_message_with_context(
+25:                 MessageLevel::Info,
+26:                 "🚀 Using External Coding Agent (ACP)".to_string(),
+27:                 MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
+28:             )
+29:             .await;
+30: 
+31:         
+32:         
+33:         
+34:         let task_description = if let Some(fb) = feedback {
+35:             
+36:             println!("[Coding] Using parameter feedback: {}", fb.chars().take(100).collect::<String>());
+37:             format!(
+38:                 "## ⚠️ USER REPORTED ISSUE - REQUIRES FIX\n\n\
+39:                 The user has reported the following problems with the project:\n\n\
+40:                 \"\"\"\n{}\n\"\"\"\n\n\
+41:                 ## Your Task\n\
+42:                 1. Read and understand the user's issues above\n\
+43:                 2. Find the relevant code files\n\
+44:                 3. Fix each issue one by one\n\
+45:                 4. Verify your fixes work correctly",
+46:                 fb
+47:             )
+48:         } else {
+49:             
+50:             let stored_feedback = crate::persistence::load_feedback_history()
+51:                 .ok()
+52:                 .and_then(|history| {
+53:                     history.feedbacks
+54:                         .into_iter()
+55:                         .filter(|f| f.stage == "coding")
+56:                         .max_by_key(|f| f.timestamp)
+57:                 });
+58: 
+59:             if let Some(ref fb) = stored_feedback {
+60:                 println!("[Coding] Found fallback feedback from storage: {}", fb.details.chars().take(100).collect::<String>());
+61:                 format!("Fix issues based on feedback: {}", fb.details)
+62:             } else {
+63:                 
+64:                 println!("[Coding] No feedback found, loading plan...");
+65:                 let iteration_dir = workspace.parent().unwrap_or(&workspace);
+66:                 let plan_artifact = iteration_dir.join("artifacts").join("plan.md");
+67:                 
+68:                 if let Ok(content) = std::fs::read_to_string(&plan_artifact) {
+69:                     format!("Implement the tasks from the plan:\n\n{}", content)
+70:                 } else {
+71:                     "Implement the planned features.".to_string()
+72:                 }
+73:             }
+74:         };
+75: 
+76:         
+77:         let project_context = format!(
+78:             "Project: {}\nDescription: {}",
+79:             ctx.iteration.title,
+80:             ctx.iteration.description
+81:         );
+82: 
+83:         
+84:         eprintln!("DEBUG: Creating ExternalCodingAgent for workspace: {}", workspace.display());
+85:         eprintln!("DEBUG: Iteration id={}, base_id={:?}, inheritance={:?}", 
+86:             ctx.iteration.id, ctx.iteration.base_iteration_id, ctx.iteration.inheritance);
+87:         let agent = match ExternalCodingAgent::new_with_iteration(&workspace, Some(ctx.iteration.clone())).await {
+88:             Ok(agent) => agent,
+89:             Err(e) => {
+90:                 interaction
+91:                     .show_message_with_context(
+92:                         MessageLevel::Error,
+93:                         format!("Failed to start external agent: {}", e),
+94:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
+95:                     )
+96:                     .await;
+97:                 
+98:                 
+99:                 
+100:                 tracing::warn!("Falling back to built-in coding agent");
+101:                 let fallback_feedback = feedback;
+102:                 return execute_stage_with_instruction_and_context(
+103:                     ctx,
+104:                     interaction,
+105:                     "coding",
+106:                     CODING_ACTOR_INSTRUCTION,
+107:                     fallback_feedback,
+108:                     Some(&task_description),
+109:                 )
+110:                 .await;
+111:             }
+112:         };
+113: 
+114:         
+115:         let ctx_external = MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding");
+116: 
+117:         
+118:         let StreamingTask { mut messages, result } = agent.execute_task_stream(&task_description, &project_context);
+119: 
+120:         
+121:         let interaction_clone = interaction.clone();
+122:         
+123:         
+124:         
+125:         let message_handle = tokio::spawn(async move {
+126:             let mut thinking_buffer = String::new();
+127:             let mut output_buffer = String::new();
+128:             
+129:             loop {
+130:                 tokio::select! {
+131:                     msg = messages.recv() => {
+132:                         match msg {
+133:                             Some(AgentMessage::Thinking(text)) => {
+134:                                 
+135:                                 thinking_buffer.push_str(&text);
+136:                                 
+137:                                 if thinking_buffer.chars().count() > 100 {
+138:                                     let truncated: String = thinking_buffer.chars().take(100).collect();
+139:                                     let display = format!("💭 Thinking: {}...", truncated);
+140:                                     interaction_clone.show_message_with_context(MessageLevel::Info, display, ctx_external.clone()).await;
+141:                                     thinking_buffer.clear();
+142:                                 }
+143:                             }
+144:                             Some(AgentMessage::Output(text)) => {
+145:                                 output_buffer.push_str(&text);
+146:                                 
+147:                                 if output_buffer.chars().count() > 200 {
+148:                                     let truncated: String = output_buffer.chars().take(200).collect();
+149:                                     let display = format!("📝 Output: {}...", truncated);
+150:                                     interaction_clone.show_message_with_context(MessageLevel::Info, display, ctx_external.clone()).await;
+151:                                     output_buffer.clear();
+152:                                 }
+153:                             }
+154:                             Some(AgentMessage::Status(text)) => {
+155:                                 interaction_clone.show_message_with_context(MessageLevel::Info, format!("⏳ {}", text), ctx_external.clone()).await;
+156:                             }
+157:                             Some(AgentMessage::Error(text)) => {
+158:                                 interaction_clone.show_message_with_context(MessageLevel::Error, format!("❌ {}", text), ctx_external.clone()).await;
+159:                             }
+160:                             Some(AgentMessage::Completed) => {
+161:                                 interaction_clone.show_message_with_context(MessageLevel::Info, "✅ Task completed".to_string(), ctx_external.clone()).await;
+162:                             }
+163:                             None => {
+164:                                 
+165:                                 beak;
+166:                             }
+167:                         }
+168:                     }
+169:                     _ = tokio::time::sleep(tokio::time::Duration::from_secs(60)) => {
+170:                         
+171:                         interaction_clone.show_message_with_context(MessageLevel::Info, "⏳ Waiting for agent...".to_string(), ctx_external.clone()).await;
+172:                     }
+173:                 }
+174:             }
+175:         });
+176: 
+177:         
+178:         match result.await {
+179:             
+180:             Ok(Ok(_output)) => {
+181:                 
+182:                 let _ = message_handle.await;
+183:                 
+184:                 interaction
+185:                     .show_message_with_context(
+186:                         MessageLevel::Info,
+187:                         "External coding agent completed successfully".to_string(),
+188:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
+189:                     )
+190:                     .await;
+191:                 StageResult::Success(None)
+192:             }
+193:             
+194:             Ok(Err(e)) => {
+195:                 let error_msg = format!("External agent execution error: {}", e);
+196:                 interaction
+197:                     .show_message_with_context(
+198:                         MessageLevel::Error,
+199:                         error_msg.clone(),
+200:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
+201:                     )
+202:                     .await;
+203:                 StageResult::Failed(e.to_string())
+204:             }
+205:             
+206:             Err(e) => {
+207:                 let error_msg = format!("External agent error: {}", e);
+208:                 interaction
+209:                     .show_message_with_context(
+210:                         MessageLevel::Error,
+211:                         error_msg.clone(),
+212:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
+213:                     )
+214:                     .await;
+215:                 StageResult::Failed(e.to_string())
+216:             }
+217:         }
+218:     }
+219: }
+220: ⋮----
+221: CodingStage
+222: ⋮----
+223: {
+224:     fn name(&self) -> &str {
+225:         "coding"
+226:     }
+227: 
+228:     fn description(&self) -> &str {
+229:         "Coding - Generate code implementation using Agent with Memory and Tools"
+230:     }
+231: 
+232:     fn needs_confirmation(&self) -> bool {
+233:         true
+234:     }
+235: 
+236:     async fn execute(
+237:         &self,
+238:         ctx: &PipelineContext,
+239:         interaction: Arc<dyn InteractiveBackend>,
+240:     ) -> StageResult {
+241:         
+242:         if Self::is_external_enabled() {
+243:             return Self::execute_external(ctx, interaction, None).await;
+244:         }
+245:         
+246:         execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, None).await
+247:     }
+248: 
+249:     async fn execute_with_feedback(
+250:         &self,
+251:         ctx: &PipelineContext,
+252:         interaction: Arc<dyn InteractiveBackend>,
+253:         feedback: &str,
+254:     ) -> StageResult {
+255:         
+256:         let agent_name = if Self::is_external_enabled() {
+257:             AGENT_NAME_EXTERNAL
+258:         } else {
+259:             AGENT_NAME_BUILTIN
+260:         };
+261: 
+262:         interaction
+263:             .show_message_with_context(
+264:                 MessageLevel::Info,
+265:                 "Regenerating code based on your feedback...".to_string(),
+266:                 MessageContext::new(agent_name).with_stage("coding"),
+267:             )
+268:             .await;
+269: 
+270:         
+271:         if Self::is_external_enabled() {
+272:             return Self::execute_external(ctx, interaction, Some(feedback)).await;
+273:         }
+274:         
+275:         execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, Some(feedback)).await
+276:     }
+277: }
+```
+
 ### crates/cowork-core/src/tools/artifact_tools.rs (304 lines)
 
 ```
@@ -6579,16 +7360,47 @@ LICENSE
 23: (tool_name: &str, result: &Result<Value, AdkError>)
 ```
 
-### crates/cowork-gui/src/components/IterationsPanel.tsx (7 lines)
+### crates/cowork-gui/package.json (38 lines)
 
 ```
-1: IterationsPanelProps
-2: ⋮----
-3: {
-4:   onSelectIteration?: (iterationId: string) => void;
-5:   selectedIterationId?: string | null;
-6:   onExecuteStatusChange?: (iterationId: string, status: string) => void;
-7: }
+1: {
+2:   "name": "cowork-gui",
+3:   "private": true,
+4:   "type": "module",
+5:   "version": "2.5.2",
+6:   "scripts": {
+7:     "dev": "vite --port 15173",
+8:     "build": "tsc && vite build",
+9:     "tauri": "tauri",
+10:     "tauri:dev": "tauri dev --port 15173",
+11:     "tauri:build": "tauri build",
+12:     "typecheck": "tsc --noEmit"
+13:   },
+14:   "dependencies": {
+15:     "@monaco-editor/react": "^4.6.0",
+16:     "@tauri-apps/api": "^2.11.1",
+17:     "@tauri-apps/plugin-dialog": "^2.7.1",
+18:     "antd": "^5.12.0",
+19:     "react": "^18.3.1",
+20:     "react-dom": "^18.3.1",
+21:     "react-json-view": "^1.21.3",
+22:     "react-markdown": "^9.0.1",
+23:     "react-window": "^2.2.6",
+24:     "rehype-highlight": "^7.0.2",
+25:     "rehype-raw": "^7.0.0",
+26:     "remark-gfm": "^4.0.1",
+27:     "zustand": "^4.5.0"
+28:   },
+29:   "devDependencies": {
+30:     "@tauri-apps/cli": "^2.11.4",
+31:     "@types/node": "^20.0.0",
+32:     "@types/react": "^18.3.0",
+33:     "@types/react-dom": "^18.3.0",
+34:     "@vitejs/plugin-react": "^4.3.0",
+35:     "typescript": "^5.3.0",
+36:     "vite": "^5.0.0"
+37:   }
+38: }
 ```
 
 ### crates/cowork-gui/src/components/common/MarkdownMessage.tsx (5 lines)
@@ -6601,136 +7413,300 @@ LICENSE
 5: }
 ```
 
-### crates/cowork-gui/src/stores/configStore.ts (49 lines)
+### crates/cowork-gui/src/types/config.ts (291 lines)
 
 ```
-1: ConfigState
+1: AgentType
 2: ⋮----
-3: {
-4:   loading: boolean;
-5:   error: string | null;
-6:   selectedFlow: string | null;
-7:   selectedAgent: string | null;
-8:   selectedStage: string | null;
-9:   selectedSkill: string | null;  
-10:   selectedIntegration: string | null;
-11:   availableTools: ToolInfo[];  
-12: 
-13:   
-14:   loadConfigs: () => Promise<void>;
-15:   resetConfigs: () => Promise<void>;
-16:   selectFlow: (id: string | null) => void;
-17:   selectAgent: (id: string | null) => void;
-18:   selectStage: (id: string | null) => void;
-19:   selectSkill: (name: string | null) => void;
-20:   selectIntegration: (id: string | null) => void;
-21: 
-22:   
-23:   saveAgent: (agent: AgentDefinition) => Promise<void>;
-24:   deleteAgent: (id: string) => Promise<void>;
-25:   saveStage: (stage: StageDefinition) => Promise<void>;
-26:   deleteStage: (id: string) => Promise<void>;
-27:   saveFlow: (flow: FlowDefinition) => Promise<void>;
-28:   deleteFlow: (id: string) => Promise<void>;
-29:   setDefaultFlow: (id: string) => Promise<void>;
-30:   installSkill: (skillPath: string) => Promise<void>;
-31:   uninstallSkill: (name: string) => Promise<void>;
-32:   saveIntegration: (integration: IntegrationDefinition) => Promise<void>;
-33:   deleteIntegration: (id: string) => Promise<void>;
-34: 
-35:   
-36:   validateAgent: (agent: AgentDefinition) => Promise<ValidationResult>;
-37:   validateFlow: (flow: FlowDefinition) => Promise<ValidationResult>;
-38: 
-39:   
-40:   exportConfig: (type: 'agent' | 'stage' | 'flow', id: string) => Promise<string>;
-41:   importConfig: (type: 'agent' | 'stage' | 'flow', jsonData: string) => Promise<void>;
-42: 
-43:   
-44:   getBuiltinInstructions: () => Promise<BuiltinInstruction[]>;
-45:   
-46:   
-47:   loadAvailableTools: () => Promise<void>;
-48:   getToolsByCategory: () => Record<string, ToolInfo[]>;
-49: }
-```
-
-### crates/cowork-gui/src/types/index.ts (73 lines)
-
-```
-1: export type {
-2:   IterationInfo,
-3:   IterationStatus,
-4:   InheritanceMode,
-5:   CreateIterationRequest,
-6:   StageDef,
-7: } from './iteration';
-8: 
-9: 
-10: export type {
-11:   ProjectMetadata,
-12:   ProjectData,
-13:   ProjectStatus,
-14:   ProjectInfo,
-15:   CreateProjectRequest,
-16:   UpdateProjectRequest,
-17:   CreateProjectResponse,
-18: } from './project';
-19: 
-20: 
-21: export type {
-22:   ThinkingMessage,
-23:   AgentMessage,
-24:   UserMessage,
-25:   PMAgentMessage,
-26:   ToolCallMessage,
-27:   ToolResultMessage,
-28:   ChatMessage,
-29:   ChatMode,
-30:   PMAction,
-31:   InputOption,
-32:   InputRequest,
-33: } from './agent';
-34: 
-35: 
-36: export type {
-37:   Knowledge,
-38:   KnowledgeListResult,
-39: } from './knowledge';
-40: 
-41: 
-42: export type {
-43:   AgentType,
-44:   ModelConfig,
-45:   ToolReference,
-46:   IncludeContentsMode,
-47:   AgentDefinition,
-48:   StageType,
-49:   HookPoint,
-50:   HookConfig,
-51:   ArtifactConfig,
-52:   StageRetryConfig,
-53:   StageDefinition,
-54:   MemoryScope,
-55:   
-56:   InheritanceConfig,
-57:   FlowConfig,
-58:   StageOverrides,
-59:   StageReference,
-60:   GlobalHookConfig,
-61:   FlowDefinition,
-62:   SkillInfo,
-63:   IntegrationType,
-64:   AuthType,
-65:   CredentialSource,
-66:   AuthConfig,
-67:   ConnectionConfig,
-68:   IntegrationEvent,
-69:   IntegrationDefinition,
-70:   ValidationIssue,
-71:   ValidationResult,
-72:   ConfigRegistryState,
-73: } from './config';
+3: "simple" | { loop: { max_iterations?: number } }
+4: ⋮----
+5: ModelConfig
+6: ⋮----
+7: {
+8:   model_id?: string;
+9:   temperature?: number;
+10:   max_tokens?: number;
+11:   top_p?: number;
+12: }
+13: ⋮----
+14: ToolReference
+15: ⋮----
+16: {
+17:   tool_id: string;
+18:   config?: Record<string, unknown>;
+19: }
+20: ⋮----
+21: IncludeContentsMode
+22: ⋮----
+23: "none" | "all" | { selected: string[] }
+24: ⋮----
+25: AgentDefinition
+26: ⋮----
+27: {
+28:   id: string;
+29:   name: string;
+30:   description?: string;
+31:   version?: string;
+32:   agent_type: AgentType;
+33:   instruction: string;
+34:   tools: ToolReference[];
+35:   skills: string[];
+36:   model: ModelConfig;
+37:   include_contents: IncludeContentsMode;
+38:   tags: string[];
+39:   metadata: Record<string, unknown>;
+40: }
+41: ⋮----
+42: StageType
+43: ⋮----
+44: | "idea"
+45:   | "prd"
+46:   | "design"
+47:   | "plan"
+48:   | "coding"
+49:   | "check"
+50:   | "delivery"
+51: ⋮----
+52: HookPoint
+53: ⋮----
+54: | "pre_execute"
+55:   | "post_execute"
+56:   | "pre_confirmation"
+57:   | "post_confirmation"
+58:   | "on_failure"
+59: ⋮----
+60: HookConfig
+61: ⋮----
+62: {
+63:   integration_id: string;
+64:   point: HookPoint;
+65:   action: string;
+66:   params?: Record<string, unknown>;
+67:   blocking?: boolean;
+68:   timeout_secs?: number;
+69:   on_failure?: "ignore" | "warn" | "abort";
+70: }
+71: ⋮----
+72: ArtifactConfig
+73: ⋮----
+74: {
+75:   save_path: string;
+76:   format: string;
+77:   include_metadata?: boolean;
+78: }
+79: ⋮----
+80: StageRetryConfig
+81: ⋮----
+82: {
+83:   max_retries: number;
+84:   backoff_ms?: number;
+85:   retry_on?: string[];
+86: }
+87: ⋮----
+88: StageDefinition
+89: ⋮----
+90: {
+91:   id: string;
+92:   name: string;
+93:   description?: string;
+94:   stage_type: StageType;
+95:   agent_id: string;
+96:   needs_confirmation?: boolean;
+97:   confirmation_prompt?: string;
+98:   hooks: HookConfig[];
+99:   artifacts?: Record<string, ArtifactConfig>;
+100:   retry?: StageRetryConfig;
+101:   timeout_secs?: number;
+102:   tags: string[];
+103: }
+104: ⋮----
+105: MemoryScope
+106: ⋮----
+107: "project" | "iteration" | "merged"
+108: ⋮----
+109: InheritanceMode
+110: ⋮----
+111: "none" | "partial" | "full"
+112: ⋮----
+113: InheritanceConfig
+114: ⋮----
+115: {
+116:   default_mode: InheritanceMode;
+117:   stage_mapping: Record<string, string>;
+118: }
+119: ⋮----
+120: FlowConfig
+121: ⋮----
+122: {
+123:   stop_on_failure: boolean;
+124:   max_total_time_secs?: number;
+125:   save_state_on_interrupt: boolean;
+126:   memory_scope: MemoryScope;
+127:   inheritance: InheritanceConfig;
+128: }
+129: ⋮----
+130: StageOverrides
+131: ⋮----
+132: {
+133:   needs_confirmation?: boolean;
+134:   hooks: HookConfig[];
+135:   timeout_secs?: number;
+136:   skip: boolean;
+137: }
+138: ⋮----
+139: StageReference
+140: ⋮----
+141: {
+142:   stage_id: string;
+143:   alias?: string;
+144:   overrides: StageOverrides;
+145:   condition?: string;
+146:   on_success?: string;
+147:   on_failure?: string;
+148: }
+149: ⋮----
+150: GlobalHookConfig
+151: ⋮----
+152: {
+153:   integration_id: string;
+154:   points: HookPoint[];
+155:   blocking: boolean;
+156:   timeout_secs: number;
+157: }
+158: ⋮----
+159: FlowDefinition
+160: ⋮----
+161: {
+162:   id: string;
+163:   name: string;
+164:   description?: string;
+165:   version?: string;
+166:   stages: StageReference[];
+167:   start_stage?: string;
+168:   global_hooks: GlobalHookConfig[];
+169:   config: FlowConfig;
+170:   tags: string[];
+171:   metadata: Record<string, unknown>;
+172:   
+173:   is_builtin?: boolean;
+174: }
+175: ⋮----
+176: SkillInfo
+177: ⋮----
+178: {
+179:   id: string;
+180:   name: string;
+181:   description: string;
+182:   tags: string[];
+183:   body: string;
+184: }
+185: ⋮----
+186: IntegrationType
+187: ⋮----
+188: | "rest_api"
+189:   | "webhook"
+190:   | "message_queue"
+191:   | "database"
+192: ⋮----
+193: AuthType
+194: ⋮----
+195: | "none"
+196:   | "api_key"
+197:   | "bearer_token"
+198:   | "basic_auth"
+199:   | "oauth2"
+200: ⋮----
+201: CredentialSource
+202: ⋮----
+203: "env" | "config" | "prompt"
+204: ⋮----
+205: AuthConfig
+206: ⋮----
+207: {
+208:   auth_type: AuthType;
+209:   credential_source: CredentialSource;
+210:   credential_key?: string;
+211:   additional_headers?: Record<string, string>;
+212: }
+213: ⋮----
+214: ConnectionConfig
+215: ⋮----
+216: {
+217:   base_url?: string;
+218:   timeout_secs?: number;
+219:   retry_count?: number;
+220:   retry_delay_ms?: number;
+221: }
+222: ⋮----
+223: IntegrationEvent
+224: ⋮----
+225: | "on_stage_start"
+226:   | "on_stage_complete"
+227:   | "on_flow_start"
+228:   | "on_flow_complete"
+229:   | "on_error"
+230: ⋮----
+231: IntegrationDefinition
+232: ⋮----
+233: {
+234:   id: string;
+235:   name: string;
+236:   description?: string;
+237:   integration_type: IntegrationType;
+238:   connection: ConnectionConfig;
+239:   auth: AuthConfig;
+240:   events: IntegrationEvent[];
+241:   enabled: boolean;
+242:   metadata: Record<string, unknown>;
+243: }
+244: ⋮----
+245: ValidationIssue
+246: ⋮----
+247: {
+248:   path: string;
+249:   message: string;
+250:   severity: "error" | "warning";
+251: }
+252: ⋮----
+253: ValidationResult
+254: ⋮----
+255: {
+256:   valid: boolean;
+257:   issues: ValidationIssue[];
+258: }
+259: ⋮----
+260: ConfigRegistryState
+261: ⋮----
+262: {
+263:   agents: Record<string, AgentDefinition>;
+264:   stages: Record<string, StageDefinition>;
+265:   flows: Record<string, FlowDefinition>;
+266:   skills: SkillInfo[];
+267:   integrations: Record<string, IntegrationDefinition>;
+268:   default_flow_id?: string;
+269: }
+270: ⋮----
+271: BuiltinInstruction
+272: ⋮----
+273: {
+274:   id: string;
+275:   name: string;
+276:   description: string;
+277:   content: string;
+278: }
+279: ⋮----
+280: InstructionType
+281: ⋮----
+282: "builtin" | "file" | "inline"
+283: ⋮----
+284: ToolInfo
+285: ⋮----
+286: {
+287:   id: string;
+288:   name: string;
+289:   category: string;
+290:   description: string;
+291: }
 ```
 
 ### crates/cowork-gui/src-tauri/src/commands/import_cmd.rs (88 lines)
@@ -6883,6 +7859,42 @@ LICENSE
 52: (config: &cowork_core::ProjectRuntimeConfig)
 ```
 
+### crates/cowork-gui/src-tauri/tauri.conf.json (31 lines)
+
+```
+1: {
+2:   "$schema": "https://schema.tauri.app/config/2",
+3:   "productName": "Cowork Forge",
+4:   "version": "2.5.2",
+5:   "identifier": "com.coworkforge.gui",
+6:   "build": {
+7:     "beforeDevCommand": "bun run dev",
+8:     "beforeBuildCommand": "bun run build",
+9:     "devUrl": "http://localhost:15173",
+10:     "frontendDist": "../dist"
+11:   },
+12:   "app": {
+13:     "withGlobalTauri": true,
+14:     "windows": [
+15:       {
+16:         "title": "Cowork Forge",
+17:         "width": 1200,
+18:         "height": 720,
+19:         "center": true,
+20:         "minWidth": 800,
+21:         "minHeight": 600
+22:       }
+23:     ],
+24:     "security": { "csp": null }
+25:   },
+26:   "bundle": {
+27:     "active": true,
+28:     "targets": "all",
+29:     "icon": ["icons/icon-rgba.png", "icons/icon.icns", "icons/icon.ico"]
+30:   }
+31: }
+```
+
 ### crates/cowork-gui/vite.config.js (40 lines)
 
 ```
@@ -6994,6 +8006,575 @@ LICENSE
 61: 
 62: [dev-dependencies]
 63: tempfile = { workspace = true }
+```
+
+### crates/cowork-core/src/agents/external_coding_agent.rs (210 lines)
+
+```
+1: ExternalCodingAgent
+2: ⋮----
+3: {
+4:     
+5:     config: CodingAgentConfig,
+6:     
+7:     workspace: PathBuf,
+8:     
+9:     ready: bool,
+10:     
+11:     iteration: Option<Iteration>,
+12: }
+13: ⋮----
+14: StreamingTask
+15: ⋮----
+16: {
+17:     
+18:     pub messages: mpsc::UnboundedReceiver<AgentMessage>,
+19:     
+20:     pub result: std::pin::Pin<Box<dyn std::future::Future<Output = Result<Result<String>>> + Send>>,
+21: }
+22: ⋮----
+23: ExternalCodingAgent
+24: ⋮----
+25: {
+26:     
+27:     pub async fn new(workspace: &PathBuf) -> Result<Self> {
+28:         Self::new_with_iteration(workspace, None).await
+29:     }
+30: 
+31:     
+32:     pub async fn new_with_iteration(workspace: &PathBuf, iteration: Option<Iteration>) -> Result<Self> {
+33:         eprintln!("DEBUG: ExternalCodingAgent::new_with_iteration called with workspace: {}", workspace.display());
+34:         if let Some(ref iter) = iteration {
+35:             eprintln!("DEBUG: Iteration context: id={}, base_id={:?}, inheritance={:?}",
+36:                 iter.id, iter.base_iteration_id, iter.inheritance);
+37:         }
+38: 
+39:         let config = load_config()
+40:             .context("Failed to load config")?;
+41: 
+42:         eprintln!("DEBUG: Config loaded, coding_agent.enabled: {}", config.coding_agent.enabled);
+43: 
+44:         if !config.coding_agent.enabled {
+45:             anyhow::bail!("External coding agent is not enabled in config");
+46:         }
+47: 
+48:         Ok(Self {
+49:             config: config.coding_agent,
+50:             workspace: workspace.clone(),
+51:             ready: false,
+52:             iteration,
+53:         })
+54:     }
+55: 
+56:     
+57:     pub fn is_enabled() -> Result<bool> {
+58:         let config = load_config()
+59:             .context("Failed to load config")?;
+60:         Ok(config.coding_agent.enabled)
+61:     }
+62: 
+63:     
+64:     
+65:     
+66:     
+67:     pub fn execute_task_stream(
+68:         self,
+69:         task_description: &str,
+70:         project_context: &str,
+71:     ) -> StreamingTask {
+72:         let prompt = self.build_prompt(task_description, project_context);
+73: 
+74:         
+75:         let (messages, result) = crate::acp::execute_with_external_agent(
+76:             self.config,
+77:             self.workspace,
+78:             prompt,
+79:         );
+80: 
+81:         StreamingTask {
+82:             messages,
+83:             result: Box::pin(result),
+84:         }
+85:     }
+86: 
+87:     
+88:     
+89:     
+90:     
+91:     
+92:     
+93:     
+94:     pub async fn execute_task(
+95:         &mut self,
+96:         task_description: &str,
+97:         project_context: &str,
+98:     ) -> Result<AcpTaskResult> {
+99:         
+100:         let prompt = self.build_prompt(task_description, project_context);
+101: 
+102:         tracing::info!("Executing coding task via external agent: {}", &prompt[..prompt.len().min(200)]);
+103: 
+104:         
+105:         let mut client = AcpClient::from_config(&self.config, &self.workspace).await?;
+106: 
+107:         
+108:         match client.execute_task(&prompt).await {
+109:             Ok(result) => {
+110:                 self.ready = true;
+111:                 Ok(AcpTaskResult::new(result, true))
+112:             }
+113:             Err(e) => {
+114:                 tracing::error!("External agent execution failed: {}", e);
+115:                 Ok(AcpTaskResult::error(e.to_string()))
+116:             }
+117:         }
+118:     }
+119: 
+120:     
+121:     fn build_prompt(&self, task_description: &str, project_context: &str) -> String {
+122:         let mut prompt = String::new();
+123: 
+124:         
+125:         let is_evolution = self.iteration.as_ref()
+126:             .map(|i| i.base_iteration_id.is_some())
+127:             .unwrap_or(false);
+128: 
+129:         let inheritance_mode = self.iteration.as_ref()
+130:             .map(|i| i.inheritance)
+131:             .unwrap_or(InheritanceMode::None);
+132: 
+133:         if is_evolution {
+134:             prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+135:             prompt.push_str("🚨 CRITICAL: THIS IS AN EVOLUTION ITERATION\n");
+136:             prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+137:             prompt.push_str("\n");
+138:             prompt.push_str("⚠️ DO NOT DELETE EXISTING CODE! ⚠️\n");
+139:             prompt.push_str("\n");
+140:             prompt.push_str("This iteration builds upon an EXISTING project.\n");
+141:             prompt.push_str("The workspace directory already contains code from a previous iteration.\n");
+142:             prompt.push_str("\n");
+143: 
+144:             match inheritance_mode {
+145:                 InheritanceMode::Partial => {
+146:                     prompt.push_str("📋 INHERITANCE MODE: PARTIAL\n");
+147:                     prompt.push_str("- Code files from the base iteration have been copied to the workspace\n");
+148:                     prompt.push_str("- Artifacts (PRD, Design, Plan) are regenerated fresh\n");
+149:                     prompt.push_str("- You MUST preserve existing code and add new features incrementally\n");
+150:                 }
+151:                 InheritanceMode::Full => {
+152:                     prompt.push_str("📋 INHERITANCE MODE: FULL\n");
+153:                     prompt.push_str("- All files (code + artifacts) from base iteration are available\n");
+154:                     prompt.push_str("- You MUST preserve existing code and only make necessary modifications\n");
+155:                 }
+156:                 InheritanceMode::None => {}
+157:             }
+158: 
+159:             prompt.push_str("\n");
+160:             prompt.push_str("🎯 YOUR TASK:\n");
+161:             prompt.push_str("1. FIRST, list the existing files in the workspace to understand the current structure\n");
+162:             prompt.push_str("2. Read relevant existing code files before making changes\n");
+163:             prompt.push_str("3. Add new features incrementally - DO NOT rewrite from scratch\n");
+164:             prompt.push_str("4. Only modify files that need changes for the new features\n");
+165:             prompt.push_str("5. Preserve all existing functionality\n");
+166:             prompt.push_str("\n");
+167:             prompt.push_str("═══════════════════════════════════════════════════════════════\n\n");
+168:         }
+169: 
+170:         prompt.push_str(&format!(
+171:             r#"# Coding Task
+172: 
+173: ## Project Context
+174: {}
+175: 
+176: ## Base Instruction
+177: {}
+178: 
+179: ## Task Description
+180: {}
+181: 
+182: ## Working Directory
+183: {}
+184: 
+185: ## Requirements
+186: 1. Implement the task according to the description
+187: 2. Write clean, maintainable code
+188: 3. Ensure the code compiles and runs correctly
+189: 4. If you encounter any issues, report them clearly
+190: 
+191: Please start implementing the task."#,
+192:             project_context,
+193:             CODING_ACTOR_INSTRUCTION,
+194:             task_description,
+195:             self.workspace.display()
+196:         ));
+197: 
+198:         prompt
+199:     }
+200: 
+201:     
+202:     pub fn is_ready(&self) -> bool {
+203:         self.ready
+204:     }
+205: 
+206:     
+207:     pub fn agent_type(&self) -> &str {
+208:         &self.config.agent_type
+209:     }
+210: }
+```
+
+### crates/cowork-core/src/config_definition/builtin.rs (19 lines)
+
+```
+1: load_builtin_configs
+2: ⋮----
+3: (registry: &ConfigRegistry)
+4: ⋮----
+5: load_agent_from_embedded
+6: ⋮----
+7: (contents: &[u8])
+8: ⋮----
+9: load_stage_from_embedded
+10: ⋮----
+11: (contents: &[u8])
+12: ⋮----
+13: load_flow_from_embedded
+14: ⋮----
+15: (contents: &[u8])
+16: ⋮----
+17: test_load_builtin_configs
+18: ⋮----
+19: ()
+```
+
+### crates/cowork-core/src/config_definition/default_configs/agents/built-in/check_agent.json (51 lines)
+
+```
+1: {
+2:   "id": "check_agent",
+3:   "name": "Check Agent",
+4:   "description": "Performs quality validation on the implemented code",
+5:   "version": "1.0.0",
+6:   "agent_type": "simple",
+7:   "instruction": "builtin://check_agent",
+8:   "tools": [
+9:     {
+10:       "tool_id": "get_implementation_plan"
+11:     },
+12:     {
+13:       "tool_id": "read_file"
+14:     },
+15:     {
+16:       "tool_id": "list_files"
+17:     },
+18:     {
+19:       "tool_id": "run_command"
+20:     },
+21:     {
+22:       "tool_id": "check_tests"
+23:     },
+24:     {
+25:       "tool_id": "check_lint"
+26:     },
+27:     {
+28:       "tool_id": "check_data_format"
+29:     },
+30:     {
+31:       "tool_id": "query_memory"
+32:     },
+33:     {
+34:       "tool_id": "save_insight"
+35:     },
+36:     {
+37:       "tool_id": "save_issue"
+38:     },
+39:     {
+40:       "tool_id": "save_check_report"
+41:     },
+42:     {
+43:       "tool_id": "goto_stage"
+44:     }
+45:   ],
+46:   "model": {
+47:     "temperature": 0.3
+48:   },
+49:   "include_contents": "none",
+50:   "tags": ["built-in", "quality", "validation"]
+51: }
+```
+
+### crates/cowork-core/src/config_definition/flow_definition.rs (269 lines)
+
+```
+1: FlowDefinition
+2: ⋮----
+3: {
+4:     
+5:     pub id: String,
+6:     
+7:     pub name: String,
+8:     
+9:     pub description: Option<String>,
+10:     
+11:     pub version: Option<String>,
+12: 
+13:     
+14:     pub stages: Vec<StageReference>,
+15: 
+16:     
+17:     #[serde(default)]
+18:     pub start_stage: Option<String>,
+19: 
+20:     
+21:     #[serde(default)]
+22:     pub global_hooks: Vec<GlobalHookConfig>,
+23: 
+24:     
+25:     #[serde(default)]
+26:     pub config: FlowConfig,
+27: 
+28:     
+29:     #[serde(default)]
+30:     pub tags: Vec<String>,
+31: 
+32:     
+33:     #[serde(default)]
+34:     pub metadata: HashMap<String, serde_json::Value>,
+35: 
+36:     
+37:     #[serde(default)]
+38:     #[serde(skip_serializing_if = "is_false")]
+39:     pub is_builtin: bool,
+40: }
+41: ⋮----
+42: is_false
+43: ⋮----
+44: (value: &bool)
+45: ⋮----
+46: StageReference
+47: ⋮----
+48: {
+49:     
+50:     pub stage_id: String,
+51:     
+52:     pub alias: Option<String>,
+53:     
+54:     #[serde(default)]
+55:     pub overrides: StageOverrides,
+56:     
+57:     #[serde(default)]
+58:     pub condition: Option<String>,
+59:     
+60:     pub on_success: Option<String>,
+61:     
+62:     pub on_failure: Option<String>,
+63: }
+64: ⋮----
+65: StageOverrides
+66: ⋮----
+67: {
+68:     
+69:     pub needs_confirmation: Option<bool>,
+70:     
+71:     #[serde(default)]
+72:     pub hooks: Vec<super::stage_definition::HookConfig>,
+73:     
+74:     pub timeout_secs: Option<u32>,
+75:     
+76:     #[serde(default)]
+77:     pub skip: bool,
+78: }
+79: ⋮----
+80: GlobalHookConfig
+81: ⋮----
+82: {
+83:     
+84:     pub integration_id: String,
+85:     
+86:     pub points: Vec<super::stage_definition::HookPoint>,
+87:     
+88:     #[serde(default)]
+89:     pub blocking: bool,
+90:     
+91:     #[serde(default = "default_global_timeout")]
+92:     pub timeout_secs: u32,
+93: }
+94: ⋮----
+95: default_global_timeout
+96: ⋮----
+97: ()
+98: ⋮----
+99: FlowConfig
+100: ⋮----
+101: {
+102:     
+103:     #[serde(default = "default_stop_on_failure")]
+104:     pub stop_on_failure: bool,
+105: 
+106:     
+107:     pub max_total_time_secs: Option<u32>,
+108: 
+109:     
+110:     #[serde(default = "default_save_state")]
+111:     pub save_state_on_interrupt: bool,
+112: 
+113:     
+114:     #[serde(default)]
+115:     pub memory_scope: MemoryScope,
+116: 
+117:     
+118:     #[serde(default)]
+119:     pub inheritance: InheritanceConfig,
+120: }
+121: ⋮----
+122: FlowConfig
+123: ⋮----
+124: {
+125:     fn default() -> Self {
+126:         Self {
+127:             stop_on_failure: true,
+128:             max_total_time_secs: None,
+129:             save_state_on_interrupt: true,
+130:             memory_scope: MemoryScope::default(),
+131:             inheritance: InheritanceConfig::default(),
+132:         }
+133:     }
+134: }
+135: ⋮----
+136: default_stop_on_failure
+137: ⋮----
+138: ()
+139: ⋮----
+140: default_save_state
+141: ⋮----
+142: ()
+143: ⋮----
+144: MemoryScope
+145: ⋮----
+146: {
+147:     
+148:     Project,
+149:     
+150:     Iteration,
+151:     
+152:     #[default]
+153:     Merged,
+154: }
+155: ⋮----
+156: InheritanceConfig
+157: ⋮----
+158: {
+159:     
+160:     #[serde(default)]
+161:     pub default_mode: InheritanceMode,
+162:     
+163:     #[serde(default)]
+164:     pub stage_mapping: HashMap<String, String>,
+165: }
+166: ⋮----
+167: InheritanceConfig
+168: ⋮----
+169: {
+170:     fn default() -> Self {
+171:         let mut stage_mapping = HashMap::new();
+172:         stage_mapping.insert("none".to_string(), "idea".to_string());
+173:         stage_mapping.insert("partial".to_string(), "idea".to_string());
+174:         stage_mapping.insert("full".to_string(), "idea".to_string());
+175: 
+176:         Self {
+177:             default_mode: InheritanceMode::Partial,
+178:             stage_mapping,
+179:         }
+180:     }
+181: }
+182: ⋮----
+183: InheritanceMode
+184: ⋮----
+185: {
+186:     
+187:     None,
+188:     
+189:     #[default]
+190:     Partial,
+191:     
+192:     Full,
+193: }
+194: ⋮----
+195: FlowDefinition
+196: ⋮----
+197: {
+198:     
+199:     pub fn new(id: impl Into<String>, name: impl Into<String>) -> Self {
+200:         Self {
+201:             id: id.into(),
+202:             name: name.into(),
+203:             description: None,
+204:             version: None,
+205:             stages: Vec::new(),
+206:             start_stage: None,
+207:             global_hooks: Vec::new(),
+208:             config: FlowConfig::default(),
+209:             tags: Vec::new(),
+210:             metadata: HashMap::new(),
+211:             is_builtin: false,
+212:         }
+213:     }
+214:     
+215:     
+216:     pub fn as_builtin(mut self) -> Self {
+217:         self.is_builtin = true;
+218:         self
+219:     }
+220: 
+221:     
+222:     pub fn with_stage(mut self, stage_id: impl Into<String>) -> Self {
+223:         self.stages.push(StageReference {
+224:             stage_id: stage_id.into(),
+225:             alias: None,
+226:             overrides: StageOverrides::default(),
+227:             condition: None,
+228:             on_success: None,
+229:             on_failure: None,
+230:         });
+231:         self
+232:     }
+233: 
+234:     
+235:     pub fn with_stage_alias(mut self, stage_id: impl Into<String>, alias: impl Into<String>) -> Self {
+236:         self.stages.push(StageReference {
+237:             stage_id: stage_id.into(),
+238:             alias: Some(alias.into()),
+239:             overrides: StageOverrides::default(),
+240:             condition: None,
+241:             on_success: None,
+242:             on_failure: None,
+243:         });
+244:         self
+245:     }
+246: 
+247:     
+248:     pub fn start_at(mut self, stage: impl Into<String>) -> Self {
+249:         self.start_stage = Some(stage.into());
+250:         self
+251:     }
+252: 
+253:     
+254:     pub fn default_v3() -> Self {
+255:         Self::new("default", "Default Development Flow")
+256:             .with_stage("idea")
+257:             .with_stage("prd")
+258:             .with_stage("design")
+259:             .with_stage("plan")
+260:             .with_stage("coding")
+261:             .with_stage("check")
+262:             .with_stage("delivery")
+263:             .start_at("idea")
+264:     }
+265: }
+266: ⋮----
+267: test_flow_definition
+268: ⋮----
+269: ()
 ```
 
 ### crates/cowork-core/src/instructions/plan.rs (391 lines)
@@ -7597,1006 +9178,6 @@ LICENSE
 32: extract_summary_from_response
 33: ⋮----
 34: (response: &str)
-```
-
-### crates/cowork-core/src/pipeline/executor/mod.rs (591 lines)
-
-```
-1: IterationExecutor
-2: ⋮----
-3: {
-4:     project_store: ProjectStore,
-5:     iteration_store: IterationStore,
-6:     interaction: Arc<dyn InteractiveBackend>,
-7: }
-8: ⋮----
-9: IterationExecutor
-10: ⋮----
-11: {
-12:     pub fn new(interaction: Arc<dyn InteractiveBackend>) -> Self {
-13:         Self {
-14:             project_store: ProjectStore::new(),
-15:             iteration_store: IterationStore::new(),
-16:             interaction,
-17:         }
-18:     }
-19: 
-20:     
-21:     pub fn create_genesis_iteration(
-22:         &self,
-23:         project: &mut Project,
-24:         title: impl Into<String>,
-25:         description: impl Into<String>,
-26:     ) -> anyhow::Result<crate::domain::Iteration> {
-27:         let iteration = crate::domain::Iteration::create_genesis(project, title.into(), description.into());
-28: 
-29:         self.iteration_store.save(&iteration)?;
-30:         self.project_store
-31:             .add_iteration(project, iteration.to_summary())?;
-32: 
-33:         Ok(iteration)
-34:     }
-35: 
-36:     
-37:     pub fn create_evolution_iteration(
-38:         &self,
-39:         project: &mut Project,
-40:         title: impl Into<String>,
-41:         description: impl Into<String>,
-42:         base_iteration_id: impl Into<String>,
-43:     ) -> anyhow::Result<crate::domain::Iteration> {
-44:         let iteration = crate::domain::Iteration::create_evolution(
-45:             project,
-46:             title.into(),
-47:             description.into(),
-48:             base_iteration_id.into(),
-49:             crate::domain::InheritanceMode::Full,
-50:         );
-51: 
-52:         self.iteration_store.save(&iteration)?;
-53:         self.project_store
-54:             .add_iteration(project, iteration.to_summary())?;
-55: 
-56:         Ok(iteration)
-57:     }
-58: 
-59:     
-60:     pub async fn execute(
-61:         &self,
-62:         project: &mut Project,
-63:         iteration_id: &str,
-64:         resume_stage: Option<String>,
-65:         _model: Option<Arc<dyn adk_core::Llm>>,
-66:     ) -> anyhow::Result<()> {
-67:         let mut iteration = self.iteration_store.load(iteration_id)?;
-68: 
-69:         
-70:         let workspace = workspace::prepare_workspace(
-71:             &self.iteration_store,
-72:             &self.interaction,
-73:             &iteration,
-74:         ).await?;
-75: 
-76:         
-77:         let start_stage = if let Some(stage) = resume_stage {
-78:             stage
-79:         } else if let Some(ref current) = iteration.current_stage {
-80:             current.clone()
-81:         } else {
-82:             iteration.determine_start_stage()
-83:         };
-84: 
-85:         let stages = get_stages_from_flow(&start_stage);
-86:         let flow_config = get_flow_config();
-87: 
-88:         println!(
-89:             "[Executor] Using Flow config: stop_on_failure={}, memory_scope={:?}",
-90:             flow_config.stop_on_failure, flow_config.memory_scope
-91:         );
-92: 
-93:         
-94:         iteration.start();
-95:         self.iteration_store.save(&iteration)?;
-96:         self.project_store
-97:             .set_current_iteration(project, iteration_id.to_string())?;
-98: 
-99:         
-100:         let memory_store = crate::persistence::MemoryStore::new();
-101:         if let Err(e) = memory_store.ensure_iteration_memory(iteration_id) {
-102:             println!("[Executor] Warning: Failed to create iteration memory: {}", e);
-103:         }
-104: 
-105:         println!(
-106:             "[Executor] Iteration '{}' started, will execute {} stages starting from '{}'",
-107:             iteration.title,
-108:             stages.len(),
-109:             start_stage
-110:         );
-111: 
-112:         self.interaction
-113:             .show_message_with_context(
-114:                 crate::interaction::MessageLevel::Info,
-115:                 format!(
-116:                     "Starting iteration '{}' from stage '{}'",
-117:                     iteration.title, start_stage
-118:                 ),
-119:                 MessageContext::new("Pipeline Controller"),
-120:             )
-121:             .await;
-122: 
-123:         
-124:         if iteration.base_iteration_id.is_some() {
-125:             if let Err(e) = knowledge::inject_project_knowledge(&self.iteration_store, &iteration).await {
-126:                 println!("[Executor] Warning: Failed to inject project knowledge: {}", e);
-127:             }
-128:         }
-129: 
-130:         println!("[Executor] Starting stage execution loop...");
-131:         self.execute_stages_from(project, &mut iteration, stages, workspace, flow_config).await
-132:     }
-133: 
-134:     
-135:     async fn execute_stages_from(
-136:         &self,
-137:         project: &mut Project,
-138:         iteration: &mut crate::domain::Iteration,
-139:         stages: Vec<Box<dyn crate::pipeline::Stage>>,
-140:         workspace: std::path::PathBuf,
-141:         flow_config: crate::config_definition::flow_definition::FlowConfig,
-142:     ) -> anyhow::Result<()> {
-143:         const MAX_STAGE_RETRIES: u32 = 3;
-144:         const RETRY_DELAY_MS: u64 = 5000;
-145:         const MAX_FEEDBACK_LOOPS: u32 = 5;
-146:         
-147:         let total_stages = stages.len();
-148:         let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
-149:         
-150:         crate::persistence::set_iteration_id(iteration.id.clone());
-151: 
-152:         for (stage_idx, stage) in stages.into_iter().enumerate() {
-153:             let stage_name = stage.name().to_string();
-154:             let stage_num = stage_idx + 1;
-155: 
-156:             iteration.set_stage(&stage_name);
-157:             self.iteration_store.save(&iteration)?;
-158: 
-159:             println!("[Executor] Stage updated: {} (iteration: {})", stage_name, iteration.id);
-160: 
-161:             self.interaction
-162:                 .show_message_with_context(
-163:                     crate::interaction::MessageLevel::Info,
-164:                     format!(
-165:                         "🚀 [{}/{}] Starting stage: {}",
-166:                         stage_num,
-167:                         total_stages,
-168:                         stage.description()
-169:                     ),
-170:                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-171:                 )
-172:                 .await;
-173: 
-174:             let mut last_error = None;
-175:             let mut success = false;
-176: 
-177:             for attempt in 0..MAX_STAGE_RETRIES {
-178:                 if attempt > 0 {
-179:                     println!(
-180:                         "[Executor] Retrying stage '{}' (attempt {}/{})",
-181:                         stage_name, attempt + 1, MAX_STAGE_RETRIES
-182:                     );
-183:                     self.interaction
-184:                         .show_message_with_context(
-185:                             crate::interaction::MessageLevel::Warning,
-186:                             format!(
-187:                                 "Retrying stage '{}' (attempt {}/{})",
-188:                                 stage_name, attempt + 1, MAX_STAGE_RETRIES
-189:                             ),
-190:                             MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-191:                         )
-192:                         .await;
-193:                     tokio::time::sleep(tokio::time::Duration::from_millis(RETRY_DELAY_MS)).await;
-194:                 }
-195: 
-196:                 
-197:                 let mut current_feedback: Option<String> = None;
-198:                 let mut feedback_loop_count: u32 = 0;
-199: 
-200:                 if let Ok(feedback_history) = crate::persistence::load_feedback_history() {
-201:                     if let Some(fb) = feedback_history
-202:                         .feedbacks
-203:                         .iter()
-204:                         .filter(|f| f.stage == stage_name)
-205:                         .max_by_key(|f| f.timestamp)
-206:                     {
-207:                         tracing::info!("[Executor] Found stored feedback for stage '{}': {}", 
-208:                             stage_name, fb.details.chars().take(100).collect::<String>());
-209:                         current_feedback = Some(fb.details.clone());
-210:                     }
-211:                 }
-212: 
-213:                 loop {
-214:                     let result = if let Some(ref feedback) = current_feedback {
-215:                         stage
-216:                             .execute_with_feedback(&ctx, self.interaction.clone(), feedback)
-217:                             .await
-218:                     } else {
-219:                         stage.execute(&ctx, self.interaction.clone()).await
-220:                     };
-221: 
-222:                     match result {
-223:                         StageResult::GotoStage(target_stage, reason) => {
-224:                             self.interaction
-225:                                 .show_message_with_context(
-226:                                     crate::interaction::MessageLevel::Warning,
-227:                                     format!(
-228:                                         "🔄 Stage jump requested: {} → {}\nReason: {}",
-229:                                         stage_name, target_stage, reason
-230:                                     ),
-231:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-232:                                 )
-233:                                 .await;
-234: 
-235:                             if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
-236:                                 eprintln!("[Warning] Failed to clear feedback for stage '{}': {}", stage_name, e);
-237:                             }
-238: 
-239:                             iteration.set_stage(&target_stage);
-240:                             self.iteration_store.save(&iteration)?;
-241: 
-242:                             let new_stages = get_stages_from_flow(&target_stage);
-243:                             
-244:                             self.interaction
-245:                                 .show_message_with_context(
-246:                                     crate::interaction::MessageLevel::Info,
-247:                                     format!(
-248:                                         "Restarting pipeline from '{}' stage with {} stages to execute",
-249:                                         target_stage,
-250:                                         new_stages.len()
-251:                                     ),
-252:                                     MessageContext::new("Pipeline Controller"),
-253:                                 )
-254:                                 .await;
-255: 
-256:                             return Box::pin(self.execute_stages_from(
-257:                                 project,
-258:                                 iteration,
-259:                                 new_stages,
-260:                                 workspace.clone(),
-261:                                 flow_config.clone(),
-262:                             )).await;
-263:                         }
-264:                         StageResult::Success(artifact_path) => {
-265:                             let artifact_exists = if let Some(ref path) = artifact_path {
-266:                                 std::path::Path::new(path).exists()
-267:                             } else {
-268:                                 workspace::check_artifact_exists(&stage_name, &workspace).await
-269:                             };
-270: 
-271:                             if !artifact_exists {
-272:                                 last_error = Some(format!("Artifacts not generated for stage '{}'", stage_name));
-273: 
-274:                                 self.interaction
-275:                                     .show_message_with_context(
-276:                                         crate::interaction::MessageLevel::Error,
-277:                                         format!("❌ Stage '{}' completed but artifacts not found. Will retry...", stage_name),
-278:                                         MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-279:                                     )
-280:                                     .await;
-281:                                 beak;
-282:                             }
-283: 
-284:                             if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
-285:                                 eprintln!("[Warning] Failed to clear feedback for stage '{}': {}", stage_name, e);
-286:                             }
-287: 
-288:                             iteration.complete_stage(&stage_name, artifact_path.clone());
-289:                             self.iteration_store.save(&iteration)?;
-290: 
-291:                             let progress_msg = if feedback_loop_count > 0 {
-292:                                 format!(
-293:                                     "✅ [{}/{}] Stage '{}' completed (revision {})",
-294:                                     stage_num, total_stages, stage_name, feedback_loop_count
-295:                                 )
-296:                             } else if attempt > 0 {
-297:                                 format!(
-298:                                     "✅ [{}/{}] Stage '{}' completed (after {} retries)",
-299:                                     stage_num, total_stages, stage_name, attempt
-300:                                 )
-301:                             } else {
-302:                                 format!("✅ [{}/{}] Stage '{}' completed", stage_num, total_stages, stage_name)
-303:                             };
-304: 
-305:                             self.interaction
-306:                                 .show_message_with_context(
-307:                                     crate::interaction::MessageLevel::Success,
-308:                                     progress_msg,
-309:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-310:                                 )
-311:                                 .await;
-312: 
-313:                             if is_critical_stage(&stage_name) {
-314:                                 iteration.pause();
-315:                                 self.iteration_store.save(&iteration)?;
-316: 
-317:                                 let artifact_type = match stage_name.as_str() {
-318:                                     "idea" => "idea",
-319:                                     "prd" => "requirements",
-320:                                     "design" => "design",
-321:                                     "plan" => "plan",
-322:                                     "coding" => "code",
-323:                                     _ => "artifacts",
-324:                                 };
-325: 
-326:                                 let action = self.interaction
-327:                                     .request_confirmation_with_feedback(
-328:                                         &format!(
-329:                                             "Stage '{}' completed. Please review the generated {} document.{}",
-330:                                             stage_name,
-331:                                             stage_name.to_uppercase(),
-332:                                             if feedback_loop_count > 0 {
-333:                                                 format!(" (Revision {})", feedback_loop_count)
-334:                                             } else {
-335:                                                 String::new()
-336:                                             }
-337:                                         ), 
-338:                                         artifact_type
-339:                                     )
-340:                                     .await;
-341: 
-342:                                 match action {
-343:                                     ConfirmationAction::Continue => {
-344:                                         iteration.resume();
-345:                                         self.iteration_store.save(&iteration)?;
-346:                                         success = true;
-347:                                         beak;
-348:                                     }
-349:                                     ConfirmationAction::ViewArtifact => {
-350:                                         current_feedback = None;
-351:                                         continue;
-352:                                     }
-353:                                     ConfirmationAction::ProvideFeedback(feedback) => {
-354:                                         if feedback_loop_count >= MAX_FEEDBACK_LOOPS {
-355:                                             self.interaction
-356:                                                 .show_message_with_context(
-357:                                                     crate::interaction::MessageLevel::Warning,
-358:                                                     format!("Maximum revision attempts ({}) reached. Proceeding...", MAX_FEEDBACK_LOOPS),
-359:                                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-360:                                                 )
-361:                                                 .await;
-362:                                             iteration.resume();
-363:                                             self.iteration_store.save(&iteration)?;
-364:                                             success = true;
-365:                                             beak;
-366:                                         }
-367: 
-368:                                         feedback_loop_count += 1;
-369:                                         current_feedback = Some(feedback);
-370:                                         self.interaction
-371:                                             .show_message_with_context(
-372:                                                 crate::interaction::MessageLevel::Info,
-373:                                                 format!("Revising stage '{}' based on feedback...", stage_name),
-374:                                                 MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-375:                                             )
-376:                                             .await;
-377:                                         continue;
-378:                                     }
-379:                                     ConfirmationAction::Cancel => {
-380:                                         iteration.pause();
-381:                                         self.iteration_store.save(&iteration)?;
-382:                                         return Err(anyhow::anyhow!("User cancelled at stage '{}'", stage_name));
-383:                                     }
-384:                                 }
-385:                             } else {
-386:                                 success = true;
-387:                                 beak;
-388:                             }
-389:                         }
-390:                         StageResult::Failed(e) => {
-391:                             last_error = Some(e.clone());
-392:                             self.interaction
-393:                                 .show_message_with_context(
-394:                                     crate::interaction::MessageLevel::Error,
-395:                                     format!("❌ Stage '{}' failed: {}", stage_name, e),
-396:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-397:                                 )
-398:                                 .await;
-399:                             beak;
-400:                         }
-401:                         StageResult::Paused => {
-402:                             iteration.pause();
-403:                             self.iteration_store.save(&iteration)?;
-404:                             self.interaction
-405:                                 .show_message_with_context(
-406:                                     crate::interaction::MessageLevel::Info,
-407:                                     format!("⏸️ Stage '{}' paused by user", stage_name),
-408:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-409:                                 )
-410:                                 .await;
-411:                             return Ok(());
-412:                         }
-413:                         StageResult::NeedsRevision(e) => {
-414:                             last_error = Some(e.clone());
-415:                             self.interaction
-416:                                 .show_message_with_context(
-417:                                     crate::interaction::MessageLevel::Warning,
-418:                                     format!("🔄 Stage '{}' needs revision: {}", stage_name, e),
-419:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-420:                                 )
-421:                                 .await;
-422:                             beak;
-423:                         }
-424:                     }
-425:                 }
-426: 
-427:                 if success {
-428:                     beak;
-429:                 }
-430:             }
-431: 
-432:             if !success {
-433:                 if flow_config.stop_on_failure {
-434:                     iteration.fail();
-435:                     self.iteration_store.save(&iteration)?;
-436: 
-437:                     return Err(anyhow::anyhow!(
-438:                         "Stage '{}' failed after {} retries: {}",
-439:                         stage_name,
-440:                         MAX_STAGE_RETRIES,
-441:                         last_error.unwrap_or_else(|| "Unknown error".to_string())
-442:                     ));
-443:                 } else {
-444:                     self.interaction
-445:                         .show_message_with_context(
-446:                             crate::interaction::MessageLevel::Warning,
-447:                             format!("Skipping failed stage '{}' and continuing...", stage_name),
-448:                             MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-449:                         )
-450:                         .await;
-451:                 }
-452:             }
-453:         }
-454: 
-455:         
-456:         iteration.complete();
-457:         self.iteration_store.save(&iteration)?;
-458: 
-459:         
-460:         if let Err(e) = crate::persistence::MemoryStore::new().promote_insights_to_decisions(&iteration.id) {
-461:             println!("[Executor] Warning: Failed to promote insights: {}", e);
-462:         }
-463: 
-464:         project.current_iteration_id = Some(iteration.id.clone());
-465:         self.project_store.save(project)?;
-466: 
-467:         self.interaction
-468:             .show_message_with_context(
-469:                 crate::interaction::MessageLevel::Success,
-470:                 format!("Iteration '{}' completed successfully!", iteration.title),
-471:                 MessageContext::new("Pipeline Controller"),
-472:             )
-473:             .await;
-474: 
-475:         Ok(())
-476:     }
-477: 
-478:     
-479:     pub async fn continue_iteration(
-480:         &self,
-481:         project: &mut Project,
-482:         iteration_id: &str,
-483:         model: Option<Arc<dyn adk_core::Llm>>,
-484:     ) -> anyhow::Result<()> {
-485:         let mut iteration = self.iteration_store.load(iteration_id)?;
-486: 
-487:         println!(
-488:             "[Executor] Continuing iteration '{}' (status: {:?}, current_stage: {:?})",
-489:             iteration_id, iteration.status, iteration.current_stage
-490:         );
-491: 
-492:         if iteration.status != IterationStatus::Paused {
-493:             return Err(anyhow::anyhow!("Iteration is not paused"));
-494:         }
-495: 
-496:         let resume_stage = iteration.current_stage.clone();
-497:         println!("[Executor] Resuming from stage: {:?}", resume_stage);
-498: 
-499:         iteration.resume();
-500:         self.iteration_store.save(&iteration)?;
-501: 
-502:         self.interaction
-503:             .show_message_with_context(
-504:                 crate::interaction::MessageLevel::Info,
-505:                 format!(
-506:                     "Iteration '{}' resumed from stage: {}",
-507:                     iteration_id,
-508:                     resume_stage.as_ref().unwrap_or(&"unknown".to_string())
-509:                 ),
-510:                 MessageContext::new("Pipeline Controller")
-511:                     .with_stage(resume_stage.as_deref().unwrap_or("unknown")),
-512:             )
-513:             .await;
-514: 
-515:         self.execute(project, iteration_id, resume_stage, model).await
-516:     }
-517: 
-518:     
-519:     pub async fn retry_iteration(
-520:         &self,
-521:         project: &mut Project,
-522:         iteration_id: &str,
-523:     ) -> anyhow::Result<()> {
-524:         let mut iteration = self.iteration_store.load(iteration_id)?;
-525: 
-526:         println!(
-527:             "[Executor] Retrying failed iteration '{}' (status: {:?}, current_stage: {:?})",
-528:             iteration_id, iteration.status, iteration.current_stage
-529:         );
-530: 
-531:         if iteration.status != IterationStatus::Failed {
-532:             return Err(anyhow::anyhow!("Iteration is not failed"));
-533:         }
-534: 
-535:         let retry_stage = if let Some(ref current) = iteration.current_stage {
-536:             current.clone()
-537:         } else {
-538:             println!("[Executor] No current_stage found, defaulting to 'check' for retry");
-539:             "check".to_string()
-540:         };
-541: 
-542:         iteration.resume();
-543:         self.iteration_store.save(&iteration)?;
-544: 
-545:         self.interaction
-546:             .show_message_with_context(
-547:                 crate::interaction::MessageLevel::Info,
-548:                 format!("Retrying iteration '{}' from stage: {}", iteration_id, retry_stage),
-549:                 MessageContext::new("Pipeline Controller").with_stage(&retry_stage),
-550:             )
-551:             .await;
-552: 
-553:         self.execute(project, iteration_id, Some(retry_stage), None).await
-554:     }
-555: 
-556:     
-557:     
-558:     
-559: 
-560:     
-561:     pub async fn generate_document_summaries(
-562:         &self,
-563:         iteration: &crate::domain::Iteration,
-564:         model: Arc<dyn adk_core::Llm>,
-565:     ) -> anyhow::Result<()> {
-566:         knowledge::generate_document_summaries(&self.iteration_store, iteration, model).await
-567:     }
-568: 
-569:     
-570:     pub async fn generate_iteration_knowledge(
-571:         &self,
-572:         iteration: &crate::domain::Iteration,
-573:         model: Arc<dyn adk_core::Llm>,
-574:     ) -> anyhow::Result<()> {
-575:         knowledge::generate_iteration_knowledge(&self.iteration_store, iteration, model).await
-576:     }
-577: 
-578:     
-579:     pub async fn inject_project_knowledge(&self, iteration: &crate::domain::Iteration) -> anyhow::Result<()> {
-580:         knowledge::inject_project_knowledge(&self.iteration_store, iteration).await
-581:     }
-582: 
-583:     
-584:     pub async fn regenerate_iteration_knowledge(
-585:         &self,
-586:         iteration_id: &str,
-587:         model: Arc<dyn adk_core::Llm>,
-588:     ) -> anyhow::Result<()> {
-589:         knowledge::regenerate_iteration_knowledge(&self.iteration_store, iteration_id, model).await
-590:     }
-591: }
-```
-
-### crates/cowork-core/src/pipeline/mod.rs (124 lines)
-
-```
-1: StageResult
-2: ⋮----
-3: {
-4:     Success(Option<String>), 
-5:     Failed(String),          
-6:     Paused,                  
-7:     NeedsRevision(String),   
-8:     GotoStage(String, String), 
-9: }
-10: ⋮----
-11: PipelineContext
-12: ⋮----
-13: {
-14:     pub project: Project,
-15:     pub iteration: Iteration,
-16:     pub workspace_path: std::path::PathBuf,
-17: }
-18: ⋮----
-19: PipelineContext
-20: ⋮----
-21: {
-22:     pub fn new(project: Project, iteration: Iteration, workspace_path: std::path::PathBuf) -> Self {
-23:         Self {
-24:             project,
-25:             iteration,
-26:             workspace_path,
-27:         }
-28:     }
-29: }
-30: ⋮----
-31: Stage
-32: ⋮----
-33: {
-34:     fn name(&self) -> &str;
-35:     fn description(&self) -> &str;
-36: 
-37:     
-38:     fn needs_confirmation(&self) -> bool {
-39:         false
-40:     }
-41: 
-42:     
-43:     async fn execute(
-44:         &self,
-45:         ctx: &PipelineContext,
-46:         interaction: Arc<dyn InteractiveBackend>,
-47:     ) -> StageResult;
-48: 
-49:     
-50:     async fn execute_with_feedback(
-51:         &self,
-52:         ctx: &PipelineContext,
-53:         interaction: Arc<dyn InteractiveBackend>,
-54:         _feedback: &str,
-55:     ) -> StageResult {
-56:         
-57:         
-58:         self.execute(ctx, interaction).await
-59:     }
-60: }
-61: ⋮----
-62: get_all_stages
-63: ⋮----
-64: ()
-65: ⋮----
-66: get_stages_from
-67: ⋮----
-68: (start_stage: &str)
-69: ⋮----
-70: create_stage_by_id
-71: ⋮----
-72: (stage_id: &str)
-73: ⋮----
-74: get_stages_from_flow
-75: ⋮----
-76: (start_stage: &str)
-77: ⋮----
-78: get_flow_config
-79: ⋮----
-80: ()
-81: ⋮----
-82: is_critical_stage
-83: ⋮----
-84: (stage_name: &str)
-85: ⋮----
-86: test_get_all_stages_order
-87: ⋮----
-88: ()
-89: ⋮----
-90: test_get_stages_from_beginning
-91: ⋮----
-92: ()
-93: ⋮----
-94: test_get_stages_from_middle
-95: ⋮----
-96: ()
-97: ⋮----
-98: test_get_stages_from_end
-99: ⋮----
-100: ()
-101: ⋮----
-102: test_get_stages_from_unknown
-103: ⋮----
-104: ()
-105: ⋮----
-106: test_create_stage_by_id_valid
-107: ⋮----
-108: ()
-109: ⋮----
-110: test_create_stage_by_id_invalid
-111: ⋮----
-112: ()
-113: ⋮----
-114: test_is_critical_stage
-115: ⋮----
-116: ()
-117: ⋮----
-118: test_pipeline_context_new
-119: ⋮----
-120: ()
-121: ⋮----
-122: test_stage_names_and_descriptions
-123: ⋮----
-124: ()
-```
-
-### crates/cowork-core/src/pipeline/stages/coding.rs (270 lines)
-
-```
-1: CodingStage
-2: ⋮----
-3: {
-4:     
-5:     fn is_external_enabled() -> bool {
-6:         match load_config() {
-7:             Ok(config) => config.coding_agent.enabled,
-8:             Err(_) => false,
-9:         }
-10:     }
-11: 
-12:     
-13:     async fn execute_external(
-14:         ctx: &PipelineContext,
-15:         interaction: Arc<dyn InteractiveBackend>,
-16:         feedback: Option<&str>,
-17:     ) -> StageResult {
-18:         
-19:         crate::persistence::set_iteration_id(ctx.iteration.id.clone());
-20:         
-21:         let workspace = ctx.workspace_path.clone();
-22:         
-23:         interaction
-24:             .show_message_with_context(
-25:                 MessageLevel::Info,
-26:                 "🚀 Using External Coding Agent (ACP)".to_string(),
-27:                 MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
-28:             )
-29:             .await;
-30: 
-31:         
-32:         
-33:         
-34:         let task_description = if let Some(fb) = feedback {
-35:             
-36:             println!("[Coding] Using parameter feedback: {}", fb.chars().take(100).collect::<String>());
-37:             format!(
-38:                 "## ⚠️ USER REPORTED ISSUE - REQUIRES FIX\n\n\
-39:                 The user has reported the following problems with the project:\n\n\
-40:                 \"\"\"\n{}\n\"\"\"\n\n\
-41:                 ## Your Task\n\
-42:                 1. Read and understand the user's issues above\n\
-43:                 2. Find the relevant code files\n\
-44:                 3. Fix each issue one by one\n\
-45:                 4. Verify your fixes work correctly",
-46:                 fb
-47:             )
-48:         } else {
-49:             
-50:             let stored_feedback = crate::persistence::load_feedback_history()
-51:                 .ok()
-52:                 .and_then(|history| {
-53:                     history.feedbacks
-54:                         .into_iter()
-55:                         .filter(|f| f.stage == "coding")
-56:                         .max_by_key(|f| f.timestamp)
-57:                 });
-58: 
-59:             if let Some(ref fb) = stored_feedback {
-60:                 println!("[Coding] Found fallback feedback from storage: {}", fb.details.chars().take(100).collect::<String>());
-61:                 format!("Fix issues based on feedback: {}", fb.details)
-62:             } else {
-63:                 
-64:                 println!("[Coding] No feedback found, loading plan...");
-65:                 let iteration_dir = workspace.parent().unwrap_or(&workspace);
-66:                 let plan_artifact = iteration_dir.join("artifacts").join("plan.md");
-67:                 
-68:                 if let Ok(content) = std::fs::read_to_string(&plan_artifact) {
-69:                     format!("Implement the tasks from the plan:\n\n{}", content)
-70:                 } else {
-71:                     "Implement the planned features.".to_string()
-72:                 }
-73:             }
-74:         };
-75: 
-76:         
-77:         let project_context = format!(
-78:             "Project: {}\nDescription: {}",
-79:             ctx.iteration.title,
-80:             ctx.iteration.description
-81:         );
-82: 
-83:         
-84:         eprintln!("DEBUG: Creating ExternalCodingAgent for workspace: {}", workspace.display());
-85:         eprintln!("DEBUG: Iteration id={}, base_id={:?}, inheritance={:?}", 
-86:             ctx.iteration.id, ctx.iteration.base_iteration_id, ctx.iteration.inheritance);
-87:         let agent = match ExternalCodingAgent::new_with_iteration(&workspace, Some(ctx.iteration.clone())).await {
-88:             Ok(agent) => agent,
-89:             Err(e) => {
-90:                 interaction
-91:                     .show_message_with_context(
-92:                         MessageLevel::Error,
-93:                         format!("Failed to start external agent: {}", e),
-94:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
-95:                     )
-96:                     .await;
-97:                 
-98:                 tracing::warn!("Falling back to built-in coding agent");
-99:                 return if let Some(fb) = feedback {
-100:                     execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, Some(fb)).await
-101:                 } else {
-102:                     execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, None).await
-103:                 };
-104:             }
-105:         };
-106: 
-107:         
-108:         let ctx_external = MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding");
-109: 
-110:         
-111:         let StreamingTask { mut messages, result } = agent.execute_task_stream(&task_description, &project_context);
-112: 
-113:         
-114:         let interaction_clone = interaction.clone();
-115:         
-116:         
-117:         
-118:         let message_handle = tokio::spawn(async move {
-119:             let mut thinking_buffer = String::new();
-120:             let mut output_buffer = String::new();
-121:             
-122:             loop {
-123:                 tokio::select! {
-124:                     msg = messages.recv() => {
-125:                         match msg {
-126:                             Some(AgentMessage::Thinking(text)) => {
-127:                                 
-128:                                 thinking_buffer.push_str(&text);
-129:                                 
-130:                                 if thinking_buffer.chars().count() > 100 {
-131:                                     let truncated: String = thinking_buffer.chars().take(100).collect();
-132:                                     let display = format!("💭 Thinking: {}...", truncated);
-133:                                     interaction_clone.show_message_with_context(MessageLevel::Info, display, ctx_external.clone()).await;
-134:                                     thinking_buffer.clear();
-135:                                 }
-136:                             }
-137:                             Some(AgentMessage::Output(text)) => {
-138:                                 output_buffer.push_str(&text);
-139:                                 
-140:                                 if output_buffer.chars().count() > 200 {
-141:                                     let truncated: String = output_buffer.chars().take(200).collect();
-142:                                     let display = format!("📝 Output: {}...", truncated);
-143:                                     interaction_clone.show_message_with_context(MessageLevel::Info, display, ctx_external.clone()).await;
-144:                                     output_buffer.clear();
-145:                                 }
-146:                             }
-147:                             Some(AgentMessage::Status(text)) => {
-148:                                 interaction_clone.show_message_with_context(MessageLevel::Info, format!("⏳ {}", text), ctx_external.clone()).await;
-149:                             }
-150:                             Some(AgentMessage::Error(text)) => {
-151:                                 interaction_clone.show_message_with_context(MessageLevel::Error, format!("❌ {}", text), ctx_external.clone()).await;
-152:                             }
-153:                             Some(AgentMessage::Completed) => {
-154:                                 interaction_clone.show_message_with_context(MessageLevel::Info, "✅ Task completed".to_string(), ctx_external.clone()).await;
-155:                             }
-156:                             None => {
-157:                                 
-158:                                 beak;
-159:                             }
-160:                         }
-161:                     }
-162:                     _ = tokio::time::sleep(tokio::time::Duration::from_secs(60)) => {
-163:                         
-164:                         interaction_clone.show_message_with_context(MessageLevel::Info, "⏳ Waiting for agent...".to_string(), ctx_external.clone()).await;
-165:                     }
-166:                 }
-167:             }
-168:         });
-169: 
-170:         
-171:         match result.await {
-172:             
-173:             Ok(Ok(_output)) => {
-174:                 
-175:                 let _ = message_handle.await;
-176:                 
-177:                 interaction
-178:                     .show_message_with_context(
-179:                         MessageLevel::Info,
-180:                         "External coding agent completed successfully".to_string(),
-181:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
-182:                     )
-183:                     .await;
-184:                 StageResult::Success(None)
-185:             }
-186:             
-187:             Ok(Err(e)) => {
-188:                 let error_msg = format!("External agent execution error: {}", e);
-189:                 interaction
-190:                     .show_message_with_context(
-191:                         MessageLevel::Error,
-192:                         error_msg.clone(),
-193:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
-194:                     )
-195:                     .await;
-196:                 StageResult::Failed(e.to_string())
-197:             }
-198:             
-199:             Err(e) => {
-200:                 let error_msg = format!("External agent error: {}", e);
-201:                 interaction
-202:                     .show_message_with_context(
-203:                         MessageLevel::Error,
-204:                         error_msg.clone(),
-205:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
-206:                     )
-207:                     .await;
-208:                 StageResult::Failed(e.to_string())
-209:             }
-210:         }
-211:     }
-212: }
-213: ⋮----
-214: CodingStage
-215: ⋮----
-216: {
-217:     fn name(&self) -> &str {
-218:         "coding"
-219:     }
-220: 
-221:     fn description(&self) -> &str {
-222:         "Coding - Generate code implementation using Agent with Memory and Tools"
-223:     }
-224: 
-225:     fn needs_confirmation(&self) -> bool {
-226:         true
-227:     }
-228: 
-229:     async fn execute(
-230:         &self,
-231:         ctx: &PipelineContext,
-232:         interaction: Arc<dyn InteractiveBackend>,
-233:     ) -> StageResult {
-234:         
-235:         if Self::is_external_enabled() {
-236:             return Self::execute_external(ctx, interaction, None).await;
-237:         }
-238:         
-239:         execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, None).await
-240:     }
-241: 
-242:     async fn execute_with_feedback(
-243:         &self,
-244:         ctx: &PipelineContext,
-245:         interaction: Arc<dyn InteractiveBackend>,
-246:         feedback: &str,
-247:     ) -> StageResult {
-248:         
-249:         let agent_name = if Self::is_external_enabled() {
-250:             AGENT_NAME_EXTERNAL
-251:         } else {
-252:             AGENT_NAME_BUILTIN
-253:         };
-254: 
-255:         interaction
-256:             .show_message_with_context(
-257:                 MessageLevel::Info,
-258:                 "Regenerating code based on your feedback...".to_string(),
-259:                 MessageContext::new(agent_name).with_stage("coding"),
-260:             )
-261:             .await;
-262: 
-263:         
-264:         if Self::is_external_enabled() {
-265:             return Self::execute_external(ctx, interaction, Some(feedback)).await;
-266:         }
-267:         
-268:         execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, Some(feedback)).await
-269:     }
-270: }
 ```
 
 ### crates/cowork-core/src/tools/control_tools.rs (134 lines)
@@ -12214,100 +12795,16 @@ LICENSE
 167:     )
 ```
 
-### crates/cowork-gui/package.json (38 lines)
+### crates/cowork-gui/src/components/IterationsPanel.tsx (7 lines)
 
 ```
-1: {
-2:   "name": "cowork-gui",
-3:   "private": true,
-4:   "type": "module",
-5:   "version": "2.5.0",
-6:   "scripts": {
-7:     "dev": "vite --port 15173",
-8:     "build": "tsc && vite build",
-9:     "tauri": "tauri",
-10:     "tauri:dev": "tauri dev --port 15173",
-11:     "tauri:build": "tauri build",
-12:     "typecheck": "tsc --noEmit"
-13:   },
-14:   "dependencies": {
-15:     "@monaco-editor/react": "^4.6.0",
-16:     "@tauri-apps/api": "^2.10.1",
-17:     "@tauri-apps/plugin-dialog": "^2.6.0",
-18:     "antd": "^5.12.0",
-19:     "react": "^18.3.1",
-20:     "react-dom": "^18.3.1",
-21:     "react-json-view": "^1.21.3",
-22:     "react-markdown": "^9.0.1",
-23:     "react-window": "^2.2.6",
-24:     "rehype-highlight": "^7.0.2",
-25:     "rehype-raw": "^7.0.0",
-26:     "remark-gfm": "^4.0.1",
-27:     "zustand": "^4.5.0"
-28:   },
-29:   "devDependencies": {
-30:     "@tauri-apps/cli": "^2.10.0",
-31:     "@types/node": "^20.0.0",
-32:     "@types/react": "^18.3.0",
-33:     "@types/react-dom": "^18.3.0",
-34:     "@vitejs/plugin-react": "^4.3.0",
-35:     "typescript": "^5.3.0",
-36:     "vite": "^5.0.0"
-37:   }
-38: }
-```
-
-### crates/cowork-gui/src/components/MemoryPanel.tsx (48 lines)
-
-```
-1: Memory
+1: IterationsPanelProps
 2: ⋮----
 3: {
-4:   id: string;
-5:   title: string;
-6:   summary: string;
-7:   category: string;
-8:   stage?: string;
-9:   created_at: string;
-10:   impact?: string;
-11:   tags?: string[];
-12:   file?: string;
-13:   _ts?: number;
-14: }
-15: ⋮----
-16: MemoryDetail
-17: ⋮----
-18: {
-19:   content: string;
-20: }
-21: ⋮----
-22: MemoryQueryResult
-23: ⋮----
-24: {
-25:   results: Memory[];
-26:   total: number;
-27: }
-28: ⋮----
-29: MemoryPanelProps
-30: ⋮----
-31: {
-32:   currentSession?: string;
-33:   refreshTrigger?: number;
-34: }
-35: ⋮----
-36: getCategoryColor
-37: ⋮----
-38: (memory.category)
-39: ⋮----
-40: getCategoryColor
-41: ⋮----
-42: (
-43:                             selectedMemory?.category || "",
-44:                           )
-45: ⋮----
-46: getImpactColor
-47: ⋮----
-48: (selectedMemory.impact)
+4:   onSelectIteration?: (iterationId: string) => void;
+5:   selectedIterationId?: string | null;
+6:   onExecuteStatusChange?: (iterationId: string, status: string) => void;
+7: }
 ```
 
 ### crates/cowork-gui/src/components/config/SkillManager.tsx (237 lines)
@@ -12647,6 +13144,60 @@ LICENSE
 90: 		handleCommandSelect
 91: 	};
 92: }
+```
+
+### crates/cowork-gui/src/stores/configStore.ts (49 lines)
+
+```
+1: ConfigState
+2: ⋮----
+3: {
+4:   loading: boolean;
+5:   error: string | null;
+6:   selectedFlow: string | null;
+7:   selectedAgent: string | null;
+8:   selectedStage: string | null;
+9:   selectedSkill: string | null;  
+10:   selectedIntegration: string | null;
+11:   availableTools: ToolInfo[];  
+12: 
+13:   
+14:   loadConfigs: () => Promise<void>;
+15:   resetConfigs: () => Promise<void>;
+16:   selectFlow: (id: string | null) => void;
+17:   selectAgent: (id: string | null) => void;
+18:   selectStage: (id: string | null) => void;
+19:   selectSkill: (name: string | null) => void;
+20:   selectIntegration: (id: string | null) => void;
+21: 
+22:   
+23:   saveAgent: (agent: AgentDefinition) => Promise<void>;
+24:   deleteAgent: (id: string) => Promise<void>;
+25:   saveStage: (stage: StageDefinition) => Promise<void>;
+26:   deleteStage: (id: string) => Promise<void>;
+27:   saveFlow: (flow: FlowDefinition) => Promise<void>;
+28:   deleteFlow: (id: string) => Promise<void>;
+29:   setDefaultFlow: (id: string) => Promise<void>;
+30:   installSkill: (skillPath: string) => Promise<void>;
+31:   uninstallSkill: (name: string) => Promise<void>;
+32:   saveIntegration: (integration: IntegrationDefinition) => Promise<void>;
+33:   deleteIntegration: (id: string) => Promise<void>;
+34: 
+35:   
+36:   validateAgent: (agent: AgentDefinition) => Promise<ValidationResult>;
+37:   validateFlow: (flow: FlowDefinition) => Promise<ValidationResult>;
+38: 
+39:   
+40:   exportConfig: (type: 'agent' | 'stage' | 'flow', id: string) => Promise<string>;
+41:   importConfig: (type: 'agent' | 'stage' | 'flow', jsonData: string) => Promise<void>;
+42: 
+43:   
+44:   getBuiltinInstructions: () => Promise<BuiltinInstruction[]>;
+45:   
+46:   
+47:   loadAvailableTools: () => Promise<void>;
+48:   getToolsByCategory: () => Record<string, ToolInfo[]>;
+49: }
 ```
 
 ### crates/cowork-gui/src/styles/chat.css (432 lines)
@@ -13086,6 +13637,84 @@ LICENSE
 432: }
 ```
 
+### crates/cowork-gui/src/types/index.ts (73 lines)
+
+```
+1: export type {
+2:   IterationInfo,
+3:   IterationStatus,
+4:   InheritanceMode,
+5:   CreateIterationRequest,
+6:   StageDef,
+7: } from './iteration';
+8: 
+9: 
+10: export type {
+11:   ProjectMetadata,
+12:   ProjectData,
+13:   ProjectStatus,
+14:   ProjectInfo,
+15:   CreateProjectRequest,
+16:   UpdateProjectRequest,
+17:   CreateProjectResponse,
+18: } from './project';
+19: 
+20: 
+21: export type {
+22:   ThinkingMessage,
+23:   AgentMessage,
+24:   UserMessage,
+25:   PMAgentMessage,
+26:   ToolCallMessage,
+27:   ToolResultMessage,
+28:   ChatMessage,
+29:   ChatMode,
+30:   PMAction,
+31:   InputOption,
+32:   InputRequest,
+33: } from './agent';
+34: 
+35: 
+36: export type {
+37:   Knowledge,
+38:   KnowledgeListResult,
+39: } from './knowledge';
+40: 
+41: 
+42: export type {
+43:   AgentType,
+44:   ModelConfig,
+45:   ToolReference,
+46:   IncludeContentsMode,
+47:   AgentDefinition,
+48:   StageType,
+49:   HookPoint,
+50:   HookConfig,
+51:   ArtifactConfig,
+52:   StageRetryConfig,
+53:   StageDefinition,
+54:   MemoryScope,
+55:   
+56:   InheritanceConfig,
+57:   FlowConfig,
+58:   StageOverrides,
+59:   StageReference,
+60:   GlobalHookConfig,
+61:   FlowDefinition,
+62:   SkillInfo,
+63:   IntegrationType,
+64:   AuthType,
+65:   CredentialSource,
+66:   AuthConfig,
+67:   ConnectionConfig,
+68:   IntegrationEvent,
+69:   IntegrationDefinition,
+70:   ValidationIssue,
+71:   ValidationResult,
+72:   ConfigRegistryState,
+73: } from './config';
+```
+
 ### crates/cowork-gui/src-tauri/src/commands/mod.rs (7 lines)
 
 ```
@@ -13176,42 +13805,6 @@ LICENSE
 9: get_system_locale
 10: ⋮----
 11: ()
-```
-
-### crates/cowork-gui/src-tauri/tauri.conf.json (31 lines)
-
-```
-1: {
-2:   "$schema": "https://schema.tauri.app/config/2",
-3:   "productName": "Cowork Forge",
-4:   "version": "2.5.1",
-5:   "identifier": "com.coworkforge.gui",
-6:   "build": {
-7:     "beforeDevCommand": "bun run dev",
-8:     "beforeBuildCommand": "bun run build",
-9:     "devUrl": "http://localhost:15173",
-10:     "frontendDist": "../dist"
-11:   },
-12:   "app": {
-13:     "withGlobalTauri": true,
-14:     "windows": [
-15:       {
-16:         "title": "Cowork Forge",
-17:         "width": 1200,
-18:         "height": 720,
-19:         "center": true,
-20:         "minWidth": 800,
-21:         "minHeight": 600
-22:       }
-23:     ],
-24:     "security": { "csp": null }
-25:   },
-26:   "bundle": {
-27:     "active": true,
-28:     "targets": "all",
-29:     "icon": ["icons/icon-rgba.png", "icons/icon.icns", "icons/icon.ico"]
-30:   }
-31: }
 ```
 
 ### litho.docs/en/4.Deep-Exploration/Persistence Domain.md (436 lines)
@@ -14406,221 +14999,6 @@ LICENSE
 3: (s: &str, max_len: usize)
 ```
 
-### crates/cowork-core/src/agents/external_coding_agent.rs (210 lines)
-
-```
-1: ExternalCodingAgent
-2: ⋮----
-3: {
-4:     
-5:     config: CodingAgentConfig,
-6:     
-7:     workspace: PathBuf,
-8:     
-9:     ready: bool,
-10:     
-11:     iteration: Option<Iteration>,
-12: }
-13: ⋮----
-14: StreamingTask
-15: ⋮----
-16: {
-17:     
-18:     pub messages: mpsc::UnboundedReceiver<AgentMessage>,
-19:     
-20:     pub result: std::pin::Pin<Box<dyn std::future::Future<Output = Result<Result<String>>> + Send>>,
-21: }
-22: ⋮----
-23: ExternalCodingAgent
-24: ⋮----
-25: {
-26:     
-27:     pub async fn new(workspace: &PathBuf) -> Result<Self> {
-28:         Self::new_with_iteration(workspace, None).await
-29:     }
-30: 
-31:     
-32:     pub async fn new_with_iteration(workspace: &PathBuf, iteration: Option<Iteration>) -> Result<Self> {
-33:         eprintln!("DEBUG: ExternalCodingAgent::new_with_iteration called with workspace: {}", workspace.display());
-34:         if let Some(ref iter) = iteration {
-35:             eprintln!("DEBUG: Iteration context: id={}, base_id={:?}, inheritance={:?}", 
-36:                 iter.id, iter.base_iteration_id, iter.inheritance);
-37:         }
-38:         
-39:         let config = load_config()
-40:             .context("Failed to load config")?;
-41:         
-42:         eprintln!("DEBUG: Config loaded, coding_agent.enabled: {}", config.coding_agent.enabled);
-43: 
-44:         if !config.coding_agent.enabled {
-45:             anyhow::bail!("External coding agent is not enabled in config");
-46:         }
-47: 
-48:         Ok(Self {
-49:             config: config.coding_agent,
-50:             workspace: workspace.clone(),
-51:             ready: false,
-52:             iteration,
-53:         })
-54:     }
-55: 
-56:     
-57:     pub fn is_enabled() -> Result<bool> {
-58:         let config = load_config()
-59:             .context("Failed to load config")?;
-60:         Ok(config.coding_agent.enabled)
-61:     }
-62: 
-63:     
-64:     
-65:     
-66:     
-67:     pub fn execute_task_stream(
-68:         self,
-69:         task_description: &str,
-70:         project_context: &str,
-71:     ) -> StreamingTask {
-72:         let prompt = self.build_prompt(task_description, project_context);
-73:         
-74:         
-75:         let (messages, result) = crate::acp::execute_with_external_agent(
-76:             self.config,
-77:             self.workspace,
-78:             prompt,
-79:         );
-80: 
-81:         StreamingTask {
-82:             messages,
-83:             result: Box::pin(result),
-84:         }
-85:     }
-86: 
-87:     
-88:     
-89:     
-90:     
-91:     
-92:     
-93:     
-94:     pub async fn execute_task(
-95:         &mut self,
-96:         task_description: &str,
-97:         project_context: &str,
-98:     ) -> Result<AcpTaskResult> {
-99:         
-100:         let prompt = self.build_prompt(task_description, project_context);
-101: 
-102:         tracing::info!("Executing coding task via external agent: {}", &prompt[..prompt.len().min(200)]);
-103: 
-104:         
-105:         let mut client = AcpClient::from_config(&self.config, &self.workspace).await?;
-106:         
-107:         
-108:         match client.execute_task(&prompt).await {
-109:             Ok(result) => {
-110:                 self.ready = true;
-111:                 Ok(AcpTaskResult::new(result, true))
-112:             }
-113:             Err(e) => {
-114:                 tracing::error!("External agent execution failed: {}", e);
-115:                 Ok(AcpTaskResult::error(e.to_string()))
-116:             }
-117:         }
-118:     }
-119: 
-120:     
-121:     fn build_prompt(&self, task_description: &str, project_context: &str) -> String {
-122:         let mut prompt = String::new();
-123: 
-124:         
-125:         let is_evolution = self.iteration.as_ref()
-126:             .map(|i| i.base_iteration_id.is_some())
-127:             .unwrap_or(false);
-128:         
-129:         let inheritance_mode = self.iteration.as_ref()
-130:             .map(|i| i.inheritance)
-131:             .unwrap_or(InheritanceMode::None);
-132: 
-133:         if is_evolution {
-134:             prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-135:             prompt.push_str("🚨 CRITICAL: THIS IS AN EVOLUTION ITERATION\n");
-136:             prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-137:             prompt.push_str("\n");
-138:             prompt.push_str("⚠️ DO NOT DELETE EXISTING CODE! ⚠️\n");
-139:             prompt.push_str("\n");
-140:             prompt.push_str("This iteration builds upon an EXISTING project.\n");
-141:             prompt.push_str("The workspace directory already contains code from a previous iteration.\n");
-142:             prompt.push_str("\n");
-143:             
-144:             match inheritance_mode {
-145:                 InheritanceMode::Partial => {
-146:                     prompt.push_str("📋 INHERITANCE MODE: PARTIAL\n");
-147:                     prompt.push_str("- Code files from the base iteration have been copied to the workspace\n");
-148:                     prompt.push_str("- Artifacts (PRD, Design, Plan) are regenerated fresh\n");
-149:                     prompt.push_str("- You MUST preserve existing code and add new features incrementally\n");
-150:                 }
-151:                 InheritanceMode::Full => {
-152:                     prompt.push_str("📋 INHERITANCE MODE: FULL\n");
-153:                     prompt.push_str("- All files (code + artifacts) from base iteration are available\n");
-154:                     prompt.push_str("- You MUST preserve existing code and only make necessary modifications\n");
-155:                 }
-156:                 InheritanceMode::None => {}
-157:             }
-158:             
-159:             prompt.push_str("\n");
-160:             prompt.push_str("🎯 YOUR TASK:\n");
-161:             prompt.push_str("1. FIRST, list the existing files in the workspace to understand the current structure\n");
-162:             prompt.push_str("2. Read relevant existing code files before making changes\n");
-163:             prompt.push_str("3. Add new features incrementally - DO NOT rewrite from scratch\n");
-164:             prompt.push_str("4. Only modify files that need changes for the new features\n");
-165:             prompt.push_str("5. Preserve all existing functionality\n");
-166:             prompt.push_str("\n");
-167:             prompt.push_str("═══════════════════════════════════════════════════════════════\n\n");
-168:         }
-169: 
-170:         prompt.push_str(&format!(
-171:             r#"# Coding Task
-172: 
-173: ## Project Context
-174: {}
-175: 
-176: ## Base Instruction
-177: {}
-178: 
-179: ## Task Description
-180: {}
-181: 
-182: ## Working Directory
-183: {}
-184: 
-185: ## Requirements
-186: 1. Implement the task according to the description
-187: 2. Write clean, maintainable code
-188: 3. Ensure the code compiles and runs correctly
-189: 4. If you encounter any issues, report them clearly
-190: 
-191: Please start implementing the task."#,
-192:             project_context,
-193:             CODING_ACTOR_INSTRUCTION,
-194:             task_description,
-195:             self.workspace.display()
-196:         ));
-197: 
-198:         prompt
-199:     }
-200: 
-201:     
-202:     pub fn is_ready(&self) -> bool {
-203:         self.ready
-204:     }
-205: 
-206:     
-207:     pub fn agent_type(&self) -> &str {
-208:         &self.config.agent_type
-209:     }
-210: }
-```
-
 ### crates/cowork-core/src/agents/legacy_project_analyzer.rs (18 lines)
 
 ```
@@ -14822,59 +15200,6 @@ LICENSE
 173: test_agent_definition_serialization
 174: ⋮----
 175: ()
-```
-
-### crates/cowork-core/src/config_definition/default_configs/agents/built-in/check_agent.json (48 lines)
-
-```
-1: {
-2:   "id": "check_agent",
-3:   "name": "Check Agent",
-4:   "description": "Performs quality validation on the implemented code",
-5:   "version": "1.0.0",
-6:   "agent_type": "simple",
-7:   "instruction": "builtin://check_agent",
-8:   "tools": [
-9:     {
-10:       "tool_id": "get_implementation_plan"
-11:     },
-12:     {
-13:       "tool_id": "read_file"
-14:     },
-15:     {
-16:       "tool_id": "list_files"
-17:     },
-18:     {
-19:       "tool_id": "run_command"
-20:     },
-21:     {
-22:       "tool_id": "check_tests"
-23:     },
-24:     {
-25:       "tool_id": "check_lint"
-26:     },
-27:     {
-28:       "tool_id": "check_data_format"
-29:     },
-30:     {
-31:       "tool_id": "query_memory"
-32:     },
-33:     {
-34:       "tool_id": "save_insight"
-35:     },
-36:     {
-37:       "tool_id": "save_issue"
-38:     },
-39:     {
-40:       "tool_id": "save_check_report"
-41:     }
-42:   ],
-43:   "model": {
-44:     "temperature": 0.3
-45:   },
-46:   "include_contents": "none",
-47:   "tags": ["built-in", "quality", "validation"]
-48: }
 ```
 
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/delivery_agent.json (36 lines)
@@ -17757,6 +18082,135 @@ LICENSE
 61: ()
 ```
 
+### crates/cowork-core/src/pipeline/mod.rs (124 lines)
+
+```
+1: StageResult
+2: ⋮----
+3: {
+4:     Success(Option<String>), 
+5:     Failed(String),          
+6:     Paused,                  
+7:     NeedsRevision(String),   
+8:     GotoStage(String, String), 
+9: }
+10: ⋮----
+11: PipelineContext
+12: ⋮----
+13: {
+14:     pub project: Project,
+15:     pub iteration: Iteration,
+16:     pub workspace_path: std::path::PathBuf,
+17: }
+18: ⋮----
+19: PipelineContext
+20: ⋮----
+21: {
+22:     pub fn new(project: Project, iteration: Iteration, workspace_path: std::path::PathBuf) -> Self {
+23:         Self {
+24:             project,
+25:             iteration,
+26:             workspace_path,
+27:         }
+28:     }
+29: }
+30: ⋮----
+31: Stage
+32: ⋮----
+33: {
+34:     fn name(&self) -> &str;
+35:     fn description(&self) -> &str;
+36: 
+37:     
+38:     fn needs_confirmation(&self) -> bool {
+39:         false
+40:     }
+41: 
+42:     
+43:     async fn execute(
+44:         &self,
+45:         ctx: &PipelineContext,
+46:         interaction: Arc<dyn InteractiveBackend>,
+47:     ) -> StageResult;
+48: 
+49:     
+50:     async fn execute_with_feedback(
+51:         &self,
+52:         ctx: &PipelineContext,
+53:         interaction: Arc<dyn InteractiveBackend>,
+54:         _feedback: &str,
+55:     ) -> StageResult {
+56:         
+57:         
+58:         self.execute(ctx, interaction).await
+59:     }
+60: }
+61: ⋮----
+62: get_all_stages
+63: ⋮----
+64: ()
+65: ⋮----
+66: get_stages_from
+67: ⋮----
+68: (start_stage: &str)
+69: ⋮----
+70: create_stage_by_id
+71: ⋮----
+72: (stage_id: &str)
+73: ⋮----
+74: get_stages_from_flow
+75: ⋮----
+76: (start_stage: &str)
+77: ⋮----
+78: get_flow_config
+79: ⋮----
+80: ()
+81: ⋮----
+82: is_critical_stage
+83: ⋮----
+84: (stage_name: &str)
+85: ⋮----
+86: test_get_all_stages_order
+87: ⋮----
+88: ()
+89: ⋮----
+90: test_get_stages_from_beginning
+91: ⋮----
+92: ()
+93: ⋮----
+94: test_get_stages_from_middle
+95: ⋮----
+96: ()
+97: ⋮----
+98: test_get_stages_from_end
+99: ⋮----
+100: ()
+101: ⋮----
+102: test_get_stages_from_unknown
+103: ⋮----
+104: ()
+105: ⋮----
+106: test_create_stage_by_id_valid
+107: ⋮----
+108: ()
+109: ⋮----
+110: test_create_stage_by_id_invalid
+111: ⋮----
+112: ()
+113: ⋮----
+114: test_is_critical_stage
+115: ⋮----
+116: ()
+117: ⋮----
+118: test_pipeline_context_new
+119: ⋮----
+120: ()
+121: ⋮----
+122: test_stage_names_and_descriptions
+123: ⋮----
+124: ()
+```
+
 ### crates/cowork-core/src/runtime_security.rs (269 lines)
 
 ```
@@ -19513,6 +19967,59 @@ LICENSE
 34: }
 ```
 
+### crates/cowork-gui/src/components/MemoryPanel.tsx (48 lines)
+
+```
+1: Memory
+2: ⋮----
+3: {
+4:   id: string;
+5:   title: string;
+6:   summary: string;
+7:   category: string;
+8:   stage?: string;
+9:   created_at: string;
+10:   impact?: string;
+11:   tags?: string[];
+12:   file?: string;
+13:   _ts?: number;
+14: }
+15: ⋮----
+16: MemoryDetail
+17: ⋮----
+18: {
+19:   content: string;
+20: }
+21: ⋮----
+22: MemoryQueryResult
+23: ⋮----
+24: {
+25:   results: Memory[];
+26:   total: number;
+27: }
+28: ⋮----
+29: MemoryPanelProps
+30: ⋮----
+31: {
+32:   currentSession?: string;
+33:   refreshTrigger?: number;
+34: }
+35: ⋮----
+36: getCategoryColor
+37: ⋮----
+38: (memory.category)
+39: ⋮----
+40: getCategoryColor
+41: ⋮----
+42: (
+43:                             selectedMemory?.category || "",
+44:                           )
+45: ⋮----
+46: getImpactColor
+47: ⋮----
+48: (selectedMemory.impact)
+```
+
 ### crates/cowork-gui/src/components/ProjectsPanel.tsx (348 lines)
 
 ```
@@ -20591,14 +21098,6 @@ LICENSE
 3: 'flows' | 'agents' | 'skills' | 'integrations'
 ```
 
-### crates/cowork-gui/src/components/config/FlowConfigPanel.tsx (3 lines)
-
-```
-1: getStageTypeColor
-2: ⋮----
-3: (stage.stage_id)
-```
-
 ### crates/cowork-gui/src/components/config/index.ts (5 lines)
 
 ```
@@ -20607,34 +21106,6 @@ LICENSE
 3: export { default as AgentConfigForm } from './AgentConfigForm';
 4: export { default as SkillManager } from './SkillManager';
 5: export { default as IntegrationConfig } from './IntegrationConfig';
-```
-
-### crates/cowork-gui/src/components/iterations/IterationDetailsModal.tsx (11 lines)
-
-```
-1: IterationDetailsModalProps
-2: ⋮----
-3: {
-4:   open: boolean;
-5:   onClose: () => void;
-6:   iteration: IterationInfo | null;
-7: }
-8: ⋮----
-9: getStatusColor
-10: ⋮----
-11: (iteration.status)
-```
-
-### crates/cowork-gui/src/components/projects/CreateProjectModal.tsx (7 lines)
-
-```
-1: CreateProjectModalProps
-2: ⋮----
-3: {
-4:   open: boolean;
-5:   onClose: () => void;
-6:   onSuccess: (projectId: string, projectName: string) => void;
-7: }
 ```
 
 ### crates/cowork-gui/src/components/projects/ImportProjectModal.tsx (37 lines)
@@ -21529,54 +22000,6 @@ LICENSE
 63: (file_path: String)
 ```
 
-### crates/cowork-gui/src-tauri/src/commands/memory.rs (43 lines)
-
-```
-1: query_memory_index
-2: ⋮----
-3: (
-4:     iteration_id: String,
-5:     query_type: String,
-6:     category: Option<String>,
-7:     stage: Option<String>,
-8:     limit: Option<u64>,
-9: )
-10: ⋮----
-11: load_memory_detail
-12: ⋮----
-13: (
-14:     memory_id: String,
-15:     file: Option<String>,
-16:     iteration_id: Option<String>,
-17:     ts: Option<i64>,
-18: )
-19: ⋮----
-20: save_session_memory
-21: ⋮----
-22: (
-23:     iteration_id: String,
-24:     content_type: String,
-25:     _category: String,
-26:     content: String,
-27: )
-28: ⋮----
-29: promote_to_project_memory
-30: ⋮----
-31: (
-32:     memory_id: String,
-33:     iteration_id: String,
-34:     ts: Option<i64>,
-35: )
-36: ⋮----
-37: get_memory_context
-38: ⋮----
-39: (iteration_id: Option<String>)
-40: ⋮----
-41: get_available_stages
-42: ⋮----
-43: (iteration_id: String)
-```
-
 ### crates/cowork-gui/src-tauri/src/commands/path_utils.rs (59 lines)
 
 ```
@@ -22099,698 +22522,6 @@ LICENSE
 394:     }
 395: }
 ```
-
-### litho.docs/context-aware/adr-guide.md (105 lines)
-
-````
-1: # Architecture Decisions Record (ADR) 编写指南
-2: 
-3: ## 什么是ADR？
-4: 
-5: 记录**反直觉的设计决策**——那些AI无法从代码推断的"为什么"。
-6: 
-7: ## 什么需要记录？
-8: 
-9: | 需要记录 | 不需要记录 |
-10: |---------|-----------|
-11: | 违反常见模式 | 遵循最佳实践 |
-12: | 有非显而易见的原因 | 原因显而易见 |
-13: | 会让人困惑的设计 | 直观的设计 |
-14: | 有替代方案但放弃了 | 没有其他选择 |
-15: 
-16: ## ADR模板
-17: 
-18: ```markdown
-19: ## ADR-XXX: [简短标题]
-20: 
-21: **Decision**: 做了什么决定
-22: 
-23: **Reason**: 为什么这样做（最重要）
-24: 
-25: **Impact**: 影响哪些代码/模块
-26: 
-27: **Do not**: 什么不要做（可选）
-28: 
-29: **Limitation**: 有什么限制（可选）
-30: ```
-31: 
-32: ## 示例
-33: 
-34: ### ✅ 好的ADR
-35: 
-36: ```markdown
-37: ## ADR-001: LoopAgent max_iterations=1
-38: 
-39: **Decision**: 所有Actor-Critic循环使用max_iterations=1
-40: 
-41: **Reason**: SequentialAgent有bug，exit_loop()会终止整个链而非仅循环。
-42: 用max_iterations=1让LoopAgent自然完成。
-43: 
-44: **Impact**: 所有critical stages (PRD, Design, Plan, Coding)
-45: 
-46: **Do not**: 修改此参数或迁移到SequentialAgent
-47: ```
-48: 
-49: ### ❌ 不需要记录的
-50: 
-51: ```markdown
-52: ## ADR-XXX: 使用async/await
-53: 
-54: **Decision**: 使用async/await处理异步
-55: 
-56: **Reason**: 这是Rust标准做法
-57: 
-58: → 这是最佳实践，不需要记录
-59: ```
-60: 
-61: ## 示例场景
-62: 
-63: ### 场景1：性能换简洁
-64: 
-65: ```markdown
-66: ## ADR-XXX: JSON存储而非SQLite
-67: 
-68: **Decision**: 用JSON文件存储数据
-69: 
-70: **Reason**: 简化调试、易于检查、无外部依赖。数据量小、无并发需求。
-71: 
-72: **Limitation**: 不适合大规模并发场景
-73: ```
-74: 
-75: ### 场景2：Bug workaround
-76: 
-77: ```markdown
-78: ## ADR-XXX: 两步知识提升
-79: 
-80: **Decision**: Insight→Decision需要两个工具
-81: 
-82: **Reason**: 并非所有insight都应成为decision。
-83: 中间步骤让人review确保质量。
-84: 
-85: **Impact**: memory tools, knowledge workflow
-86: ```
-87: 
-88: ### 场景3：安全权衡
-89: 
-90: ```markdown
-91: ## ADR-XXX: HITL超时默认Pass
-92: 
-93: **Decision**: HITL确认超时时默认继续(Pass)
-94: 
-95: **Reason**: 比无限阻塞好。用户可用PM Agent回退。
-96: 
-97: **Impact**: Stage执行, GUI超时处理
-98: ```
-99: 
-100: ## 维护原则
-101: 
-102: 1. **只加不减**：ADR是历史记录，不建议删除
-103: 2. **简短有力**：每个ADR不超过100字
-104: 3. **聚焦原因**：Reason字段最重要
-105: 4. **保持数量少**：一个项目通常只有5-15个ADR
-````
-
-### litho.docs/context-aware/maintenance.md (158 lines)
-
-````
-1: # AI上下文维护实践
-2: 
-3: ## 会话启动检测
-4: 
-5: 在AGENTS.md中添加启动检测指令：
-6: 
-7: ```markdown
-8: ## 每次开始编程任务前
-9: 
-10: 1. 运行: git diff --name-only HEAD~10
-11: 2. 如果变更涉及关键目录，提醒用户更新文档
-12: ```
-13: 
-14: ### 关键目录映射
-15: 
-16: | 目录变更 | 提醒更新 |
-17: |---------|---------|
-18: | `tools/*.rs` | tools.md |
-19: | `pipeline/stages/*.rs` | pipeline.md |
-20: | `domain/*.rs` | domain-logic.md |
-21: | 新增安全规则 | constraints.md |
-22: 
-23: ---
-24: 
-25: ## 更新工作流
-26: 
-27: ### 用户主动更新
-28: 
-29: ```
-30: 用户: "Update .ai-context because I added a new tool"
-31: 
-32: Agent执行：
-33: 1. 读取 manifest.yaml 了解更新规则
-34: 2. 读取对应文件（如 tools.md）
-35: 3. 添加条目到合适位置
-36: 4. 保持格式一致
-37: ```
-38: 
-39: ### Agent检测更新
-40: 
-41: ```
-42: Agent在会话启动时：
-43: 1. git diff --name-only HEAD~10
-44: 2. 检查是否涉及关键目录
-45: 3. 如有，提醒："检测到[目录]变更，是否更新.ai-context？"
-46: ```
-47: 
-48: ---
-49: 
-50: ## 文档一致性检查
-51: 
-52: ### 手动检查清单
-53: 
-54: - [ ] 新增工具是否在tools.md中有条目？
-55: - [ ] 新增Stage是否在pipeline.md中有记录？
-56: - [ ] 架构决策是否记录在architecture-decisions.md？
-57: - [ ] 文档中的路径是否仍然有效？
-58: 
-59: ### 自动化检查（可选）
-60: 
-61: ```bash
-62: # 检查tools.md中提到的文件是否存在
-63: grep -o "tools/[^.]*\.rs" .ai-context/domains/tools.md | while read f; do
-64:   [ -f "crates/cowork-core/src/$f" ] || echo "Missing: $f"
-65: done
-66: ```
-67: 
-68: ---
-69: 
-70: ## 常见更新场景
-71: 
-72: ### 场景1：新增工具
-73: 
-74: ```
-75: 用户: "我刚加了一个ValidateSchemaTool"
-76: 
-77: Agent:
-78: 1. 读取 tools.md
-79: 2. 判断工具属于哪个分类（Validation）
-80: 3. 在对应表格添加：| ValidateSchemaTool | Validate JSON schema |
-81: ```
-82: 
-83: ### 场景2：架构决策
-84: 
-85: ```
-86: 用户: "我决定用Redis替代内存缓存"
-87: 
-88: Agent:
-89: 1. 读取 architecture-decisions.md
-90: 2. 添加ADR：
-91:    ## ADR-XXX: Redis for Caching
-92:    Decision: 使用Redis替代进程内缓存
-93:    Reason: 需要跨进程共享、持久化
-94:    Impact: memory模块
-95: ```
-96: 
-97: ### 场景3：新增模块
-98: 
-99: ```
-100: 用户: "我加了一个新的reporting模块"
-101: 
-102: Agent:
-103: 1. 更新 modules.map 模块列表
-104: 2. 更新 project.snapshot 结构说明
-105: 3. 如有新的Store，更新 storage structure
-106: ```
-107: 
-108: ---
-109: 
-110: ## 不需要更新的场景
-111: 
-112: | 场景 | 原因 |
-113: |------|------|
-114: | 重命名变量 | AI读代码即可 |
-115: | 提取函数 | 不影响结构 |
-116: | struct增减字段 | 文档不记录字段 |
-117: | 函数签名变化 | AI直接看代码 |
-118: | 移动文件位置 | 如不影响模块关系，可不更新 |
-119: 
-120: ---
-121: 
-122: ## 文档过时了怎么办？
-123: 
-124: ### 轻度过时（10-20%）
-125: 
-126: 不影响使用，AI能从代码推断正确信息。
-127: 
-128: ### 中度过时（20-40%）
-129: 
-130: AI可能定位错误，需要用户手动更新。
-131: 
-132: ### 重度过时（>40%）
-133: 
-134: 建议重新生成文档或手动全面更新。
-135: 
-136: ---
-137: 
-138: ## CI集成（可选）
-139: 
-140: ```yaml
-141: # .github/workflows/ai-context-check.yml
-142: name: AI Context Check
-143: on: [pull_request]
-144: 
-145: jobs:
-146:   check:
-147:     runs-on: ubuntu-latest
-148:     steps:
-149:       - uses: actions/checkout@v4
-150:       - name: Check for significant changes
-151:         run: |
-152:           CHANGED=$(git diff --name-only origin/main)
-153:           if echo "$CHANGED" | grep -q "tools/\|pipeline/stages/\|domain/"; then
-154:             echo "::warning::Significant changes detected. Consider updating .ai-context/"
-155:           fi
-156: ```
-157: 
-158: 这只是提醒，不阻塞CI。
-````
-
-### litho.docs/context-aware/methodology.md (180 lines)
-
-````
-1: # AI友好的项目上下文方法论
-2: 
-3: ## 核心理念
-4: 
-5: 让Coding Agent理解项目，不需要每次都消耗大量Token从头阅读代码。
-6: 
-7: ### 关键矛盾
-8: 
-9: | 需求 | 约束 |
-10: |------|------|
-11: | 信息足够让AI理解代码 | 文档不能太细，维护成本高 |
-12: | 保持准确性 | 更新本身消耗Token |
-13: | 覆盖关键决策 | 不能每次都从头读代码 |
-14: 
-15: ### 解决思路：分层 + 衰减
-16: 
-17: ```
-18: 高价值/低变化 → 详细文档，长期有效
-19: 高价值/高变化 → 简要索引，指向代码
-20: 低价值/低变化 → 不记录
-21: 低价值/高变化 → 不记录（AI直接读代码）
-22: ```
-23: 
-24: ---
-25: 
-26: ## 设计原则
-27: 
-28: ### 1. 记录"为什么"，不记录"是什么"
-29: 
-30: AI可以从代码读出"是什么"，但无法推断"为什么"。
-31: 
-32: ```
-33: ❌ 不记录：
-34: struct Iteration {
-35:     id: String,
-36:     number: u32,
-37:     ...
-38: }
-39: 
-40: ✅ 记录：
-41: 为什么LoopAgent用max_iterations=1？
-42: 因为SequentialAgent有bug，exit_loop会提前终止整个链。
-43: ```
-44: 
-45: ### 2. 删除精确引用
-46: 
-47: 精确行号容易过时，用概念定位代替。
-48: 
-49: ```
-50: ❌ 位置: crates/cowork-core/src/pipeline/executor/mod.rs:72
-51: 
-52: ✅ 入口函数: IterationExecutor::execute()
-53:    AI可以通过grep自己定位
-54: ```
-55: 
-56: ### 3. 合并相关内容
-57: 
-58: 减少文件跳转，降低认知负担。
-59: 
-60: ```
-61: 合并前：
-62: - domains/pipeline.md (Pipeline)
-63: - domains/agents.md (Agents)
-64: - domains/interaction.md (Interaction)
-65: 
-66: 合并后：
-67: - domains/pipeline.md (Pipeline + Agents)
-68: - core/constraints.md (约束 + Interaction规则)
-69: ```
-70: 
-71: ### 4. 精简工具列表
-72: 
-73: 工具名已经足够说明功能。
-74: 
-75: ```
-76: ❌ | ReadFileTool | 读取文件内容 |
-77:    | WriteFileTool | 写入文件内容 |
-78: 
-79: ✅ File Tools: ReadFile, WriteFile, ListFiles
-80: ```
-81: 
-82: ---
-83: 
-84: ## 文档结构
-85: 
-86: ### 最小化结构
-87: 
-88: ```
-89: .ai-context/
-90: ├── manifest.yaml          # 索引 + 维护指南
-91: ├── project.snapshot       # 项目结构 + 存储 + 配置
-92: ├── architecture-decisions.md  # 反直觉设计决策
-93: ├── core/
-94: │   ├── modules.map        # 模块依赖 + 导航
-95: │   └── constraints.md     # 安全约束 + 限制规则
-96: ├── domains/
-97: │   ├── pipeline.md        # 流程 + Agent
-98: │   ├── domain-logic.md    # 核心实体关系
-99: │   └── tools.md           # 工具分类
-100: └── prompts/
-101:     └── coding-context.md  # 代码风格
-102: ```
-103: 
-104: ### Token预算
-105: 
-106: | 文件 | 预算 | 用途 |
-107: |------|------|------|
-108: | project.snapshot | ~800 | 项目概览 |
-109: | modules.map | ~800 | 导航定位 |
-110: | constraints.md | ~400 | 约束规则 |
-111: | pipeline.md | ~500 | 流程理解 |
-112: | domain-logic.md | ~400 | 实体关系 |
-113: | tools.md | ~400 | 工具索引 |
-114: | architecture-decisions.md | ~500 | 决策理解 |
-115: | **总计** | **~4000** | |
-116: 
-117: ---
-118: 
-119: ## 维护策略
-120: 
-121: ### 需要更新 vs 不需要更新
-122: 
-123: | 变化类型 | 是否更新文档 |
-124: |---------|-------------|
-125: | 新增工具 | ✅ 更新 tools.md |
-126: | 新增Stage | ✅ 更新 pipeline.md |
-127: | 新增模块 | ✅ 更新 modules.map |
-128: | 新增约束 | ✅ 更新 constraints.md |
-129: | 架构决策 | ✅ 更新 architecture-decisions.md |
-130: | struct字段变化 | ❌ 不更新 |
-131: | 函数签名变化 | ❌ 不更新 |
-132: | 重构代码 | ❌ 不更新 |
-133: | 行号变化 | ❌ 不记录 |
-134: 
-135: ### 更新指令
-136: 
-137: ```
-138: 用户: "Update .ai-context because I added a new tool"
-139: 用户: "Update .ai-context because I made an architecture decision"
-140: ```
-141: 
-142: ### 变更检测
-143: 
-144: Agent可在会话启动时检测：
-145: ```bash
-146: git diff --name-only HEAD~10
-147: ```
-148: 
-149: 检测到关键目录变更时提醒用户更新文档。
-150: 
-151: ---
-152: 
-153: ## 实践检查清单
-154: 
-155: ### 创建AI上下文时
-156: 
-157: - [ ] 是否只记录"为什么"而非"是什么"？
-158: - [ ] 是否删除了精确行号引用？
-159: - [ ] 是否合并了相关内容？
-160: - [ ] 是否删除了struct字段定义？
-161: - [ ] 总Token是否控制在4000以内？
-162: 
-163: ### 维护AI上下文时
-164: 
-165: - [ ] 是否只在高价值变化时更新？
-166: - [ ] 是否避免了结构体字段的同步？
-167: - [ ] 是否保持了"指向代码"的原则？
-168: 
-169: ---
-170: 
-171: ## 效果评估
-172: 
-173: | 准确度 | 效果 |
-174: |--------|------|
-175: | 70% | Agent能理解项目结构 |
-176: | 80% | Agent能找到关键代码 |
-177: | 90% | Agent能遵循核心约束 |
-178: | 100% | 不现实，维护成本过高 |
-179: 
-180: **核心目标**：让Agent快速定位，需要精确信息时自己去读代码。
-````
-
-### litho.docs/context-aware/templates.md (229 lines)
-
-````
-1: # AI上下文模板
-2: 
-3: ## 项目快照模板 (project.snapshot)
-4: 
-5: ```markdown
-6: # [项目名] - AI Context Snapshot
-7: 
-8: ## PROJECT OVERVIEW
-9: 
-10: name: [项目名]
-11: type: [rust-workspace | monorepo | single-app]
-12: version: [版本]
-13: description: [一句话描述]
-14: 
-15: ## STRUCTURE
-16: 
-17: ### [核心模块名]
-18: path: [路径]
-19: key_modules:
-20:   - [模块1]: [作用]
-21:   - [模块2]: [作用]
-22: 
-23: ### [CLI/前端等其他模块]
-24: path: [路径]
-25: 
-26: ---
-27: 
-28: ## STORAGE STRUCTURE
-29: 
-30: [存储目录结构，简化版]
-31: 
-32: | Store | File | Purpose |
-33: |-------|------|---------|
-34: | [Store名] | [文件路径] | [用途] |
-35: 
-36: ---
-37: 
-38: ## CONFIGURATION
-39: 
-40: [配置文件位置和关键字段]
-41: 
-42: ---
-43: 
-44: ## EXTERNAL INTEGRATIONS
-45: 
-46: [外部集成，如API、SDK等]
-47: 
-48: ---
-49: **Note**: For detailed implementations, see corresponding source files.
-50: ```
-51: 
-52: ---
-53: 
-54: ## 模块地图模板 (modules.map)
-55: 
-56: ```markdown
-57: # Module Dependency Map
-58: # Note: For detailed function signatures, grep the code directly
-59: 
-60: ## ARCHITECTURE LAYERS
-61: 
-62: ```
-63: [ASCII架构图，展示分层]
-64: ```
-65: 
-66: ## MODULE DEPENDENCY FLOW
-67: 
-68: ```
-69: [依赖流向，一行表示]
-70: ```
-71: 
-72: ## KEY TRAITS
-73: 
-74: | Trait | Location | Purpose |
-75: |-------|----------|---------|
-76: | [Trait名] | [位置] | [用途] |
-77: 
-78: ## CORE FLOWS
-79: 
-80: ### [流程名]
-81: ```
-82: [流程步骤]
-83: ```
-84: 
-85: ## MODULE FILES REFERENCE
-86: 
-87: ### [模块名]
-88: `[路径]`
-89: - [文件1] - [作用]
-90: - [文件2] - [作用]
-91: 
-92: ## QUICK NAVIGATION BY TASK
-93: 
-94: | Task | Location |
-95: |------|----------|
-96: | [任务描述] | [文件路径] |
-97: ```
-98: 
-99: ---
-100: 
-101: ## 约束模板 (constraints.md)
-102: 
-103: ```markdown
-104: # Constraints & Boundaries
-105: 
-106: ## Security Constraints
-107: 
-108: | Constraint | Rule |
-109: |------------|------|
-110: | [约束名] | [规则] |
-111: 
-112: ## Rate Limiting
-113: 
-114: | Resource | Limit |
-115: |----------|-------|
-116: | [资源名] | [限制] |
-117: 
-118: ## [业务] Constraints
-119: 
-120: | Constraint | Value |
-121: |------------|-------|
-122: | [约束] | [值] |
-123: 
-124: ## Error Handling
-125: 
-126: | Type | Behavior |
-127: |------|----------|
-128: | [错误类型] | [处理方式] |
-129: ```
-130: 
-131: ---
-132: 
-133: ## 领域文档模板 (domains/*.md)
-134: 
-135: ```markdown
-136: # [领域名] Domain
-137: 
-138: ## Core Concepts
-139: 
-140: | Concept | Location | Purpose |
-141: |---------|----------|---------|
-142: | [概念] | [位置] | [用途] |
-143: 
-144: ## Relationships
-145: 
-146: ```
-147: [实体关系图]
-148: ```
-149: 
-150: ## [关键机制]
-151: 
-152: | Type | Description |
-153: |------|-------------|
-154: | [类型] | [描述] |
-155: 
-156: ## Code Locations
-157: 
-158: | Component | Location |
-159: |-----------|----------|
-160: | [组件] | [位置] |
-161: 
-162: ---
-163: **Note**: For details, read source files directly.
-164: ```
-165: 
-166: ---
-167: 
-168: ## 工具索引模板 (tools.md)
-169: 
-170: ```markdown
-171: # Tools Domain
-172: 
-173: ## Tool Categories
-174: 
-175: | Category | File | Key Tools |
-176: |----------|------|-----------|
-177: | [分类] | [文件] | [工具列表] |
-178: 
-179: ## Security
-180: 
-181: [安全约束摘要]
-182: 
-183: ## Location
-184: 
-185: [工具目录路径]
-186: ```
-187: 
-188: ---
-189: 
-190: ## Manifest模板 (manifest.yaml)
-191: 
-192: ```yaml
-193: # AI Context Manifest
-194: # Version: [版本]
-195: # Project: [项目名]
-196: 
-197: manifest_version: "[版本]"
-198: project:
-199:   name: [项目名]
-200:   version: [版本]
-201:   language: [语言]
-202: 
-203: documents:
-204:   - path: [文件路径]
-205:     purpose: [用途]
-206:     tokens: ~[估算]
-207: 
-208: usage:
-209:   coding_context:
-210:     - [文件列表]
-211:   
-212:   debug_context:
-213:     - [文件列表]
-214: 
-215: total_tokens: ~[总计]
-216: 
-217: # =============================================================================
-218: # MAINTENANCE GUIDE
-219: # =============================================================================
-220: #
-221: # | Code Change              | Update File            |
-222: # |--------------------------|------------------------|
-223: # | [变更类型]               | [更新文件]             |
-224: #
-225: # | NO UPDATE: [不需要更新的情况] |
-226: #
-227: # Command: "Update .ai-context because I [action] [thing]"
-228: # =============================================================================
-229: ```
-````
 
 ### litho.docs/en/4.Deep-Exploration/CLI Domain.md (734 lines)
 
@@ -24424,6 +24155,660 @@ LICENSE
 392: 
 393: **Contact:**  
 394: For technical questions regarding the GUI Backend Domain, refer to the `cowork-gui/src-tauri/src/` directory structure and associated Rust module documentation.
+````
+
+### litho.docs/en/4.Deep-Exploration/GUI Frontend Domain.md (649 lines)
+
+````
+1: **GUI Frontend Domain Technical Documentation**
+2: 
+3: **Generation Time:** 2026-02-14 05:21:52 (UTC)  
+4: **Version:** 1.0  
+5: **Domain:** Presentation Layer (Cowork-GUI)  
+6: 
+7: ---
+8: 
+9: ## 1. Executive Summary
+10: 
+11: The **GUI Frontend Domain** implements the desktop presentation layer of the Cowork Forge system, delivering a comprehensive AI-assisted development environment through a Tauri-based desktop application shell with a React 18 frontend. This domain provides the primary human-computer interface for the 7-stage AI agent pipeline, enabling real-time iteration monitoring, artifact inspection, code editing, and Human-in-the-Loop (HITL) validation workflows.
+12: 
+13: **Key Architectural Characteristics:**
+14: - **Multi-Panel Workspace**: Eight functional panels (Projects, Iterations, Chat/Artifacts, Code Editor, Runner, Preview, Memory, Knowledge) orchestrated through a central state manager
+15: - **Event-Driven Real-Time Communication**: Bidirectional IPC via Tauri's invoke/listen APIs supporting streaming AI agent outputs and asynchronous HITL interactions
+16: - **Dual-Mode Interaction**: Supports both automated execution monitoring and interactive feedback loops with modal-based confirmation workflows
+17: - **Performance-Optimized Rendering**: Virtualized lists for large file trees, Monaco Editor integration for code editing, and optimistic UI updates for responsive feedback
+18: 
+19: ---
+20: 
+21: ## 2. System Architecture
+22: 
+23: ### 2.1 Container Context (C4 Level 2)
+24: 
+25: The GUI Frontend operates as a distinct container within the Cowork Forge architecture, communicating exclusively with the Tauri Backend Domain through well-defined IPC boundaries:
+26: 
+27: ```mermaid
+28: flowchart TB
+29:     subgraph GUIContainer["cowork-gui (Tauri Application)"]
+30:         React["React 18 Frontend<br/>(Ant Design + Monaco)"]
+31:         TauriCmd["Tauri Commands<br/>(Rust Bridge)"]
+32:         EventBus["Event Listener Hub<br/>(13+ Event Types)"]
+33:     end
+34:     
+35:     subgraph CoreContainer["cowork-core (Domain Engine)"]
+36:         Pipeline["Pipeline Controller"]
+37:         Domain["Domain Logic"]
+38:         Tools["Tool Ecosystem"]
+39:     end
+40:     
+41:     subgraph External["External Systems"]
+42:         FileSystem["Local File System"]
+43:         LLM["LLM APIs"]
+44:     end
+45:     
+46:     React <-->|invoke/listen| TauriCmd
+47:     TauriCmd -->|Implements| Interaction["InteractiveBackend Trait"]
+48:     Interaction -->|Drives| Pipeline
+49:     Pipeline -->|Uses| Tools
+50:     Tools -->|Access| FileSystem
+51:     Pipeline -->|Calls| LLM
+52:     
+53:     TauriCmd -->|Emits| EventBus
+54:     EventBus -->|Updates| React
+55: ```
+56: 
+57: ### 2.2 Component Architecture (C4 Level 3)
+58: 
+59: The frontend implements a layered component hierarchy with clear separation of concerns:
+60: 
+61: ```mermaid
+62: flowchart TB
+63:     subgraph EntryLayer["Entry Layer"]
+64:         Main[main.tsx<br/>Theme & React Root]
+65:         IndexCSS[Index Styling<br/>Ant Design Theme]
+66:     end
+67:     
+68:     subgraph OrchestrationLayer["Core Orchestration"]
+69:         App[App.tsx<br/>State Management Hub + Zustand Stores]
+70:         EventManager[Event Listener Manager<br/>agent_event, tool_call, input_request]
+71:         InputModal[HITL Input Modal<br/>Confirmation & Feedback]
+72:     end
+73:     
+74:     subgraph PanelLayer["Panel Registry"]
+75:         Projects[ProjectsPanel<br/>Project Management]
+76:         Iterations[IterationsPanel<br/>7-Stage Lifecycle]
+77:         Chat[ChatPanel<br/>Pipeline & PM Agent Chat]
+78:         Artifacts[ArtifactsViewer<br/>Markdown Viewer]
+79:         Editor[CodeEditor<br/>Monaco + Virtual Tree]
+80:         Runner[RunnerPanel<br/>Process Logs]
+81:         Preview[PreviewPanel<br/>Dev Server IFrame]
+82:         Memory[MemoryPanel<br/>Query & Browse]
+83:         Knowledge[KnowledgePanel<br/>Knowledge Repository]
+84:         Settings[SettingsPanel<br/>Configuration]
+85:     end
+86:     
+87:     subgraph Communication["IPC Layer"]
+88:         Commands[Command Invokers<br/>gui_*, query_*]
+89:         Listeners[Event Listeners<br/>13+ Event Types]
+90:         Types[TypeScript Types<br/>Serde-mapped DTOs]
+91:     end
+92:     
+93:     Main --> App
+94:     App --> EventManager
+95:     App --> InputModal
+96:     App --> Projects
+97:     App --> Iterations
+98:     App --> Chat
+99:     App --> Editor
+100:     App --> Runner
+101:     App --> Preview
+102:     App --> Memory
+103:     App --> Knowledge
+104:     
+105:     Projects --> Commands
+106:     Iterations --> Commands
+107:     Editor --> Commands
+108:     Memory --> Commands
+109:     
+110:     EventManager --> Listeners
+111:     Listeners --> Chat
+112:     Listeners --> Iterations
+113:     Listeners --> Runner
+114: ```
+115: 
+116: ---
+117: 
+118: ## 3. Technical Implementation
+119: 
+120: ### 3.1 Technology Stack
+121: 
+122: | Layer | Technology | Purpose |
+123: |-------|-----------|---------|
+124: | **UI Framework** | React 18 + TypeScript | Component-based declarative UI with type safety |
+125: | **Component Library** | Ant Design 5.x | Enterprise-grade UI components (Tables, Modals, Tabs) |
+126: | **Desktop Shell** | Tauri 1.x+ | Rust-based desktop runtime with native OS integration |
+127: | **Code Editor** | Monaco Editor | VS Code-powered editing with syntax highlighting and IntelliSense |
+128: | **Virtualization** | react-window | Performance optimization for large file trees and lists |
+129: | **Content Rendering** | ReactMarkdown + remark-gfm | Markdown parsing for AI-generated artifacts |
+130: | **Styling** | CSS Modules + Ant Design Tokens | Scoped component styles with theme consistency |
+131: | **State Management** | Zustand | Lightweight state management with stores (project, agent, UI) |
+132: | **Icons** | @ant-design/icons | Consistent iconography across interface |
+133: 
+134: ### 3.2 State Management Architecture
+135: 
+136: The domain employs a **Zustand-based centralized state management** pattern with three dedicated stores:
+137: 
+138: **Store Architecture:**
+139: - **Project Store** (`useProjectStore`): Project and iteration state, current session context
+140: - **Agent Store** (`useAgentStore`): Chat messages, PM messages, processing state, input requests
+141: - **UI Store** (`useUIStore`): Active view, refresh triggers, command palette state
+142: 
+143: **Central State Hub (App.tsx):**
+144: - `currentSession`: Active project/iteration context
+145: - `activeView`: Current visible panel (projects, iterations, chat, code, run, memory, knowledge, settings)
+146: - `messages[]`: Real-time AI agent message buffer with type differentiation (user, agent, thinking, tool_call, tool_result)
+147: - `pmMessages[]`: Project Manager Agent chat message buffer (user, pm_agent)
+148: - `chatMode`: Chat mode identifier (pipeline, pm_agent, disabled), automatically switches based on iteration status
+149: - `isProcessing`: Global execution state for pipeline operations
+150: - `inputRequest`: HITL modal state management
+151: - `refreshTriggers`: Counter-based cache invalidation for memory/knowledge panels
+152: 
+153: **State Distribution Pattern:**
+154: ```javascript
+155: // Centralized state with selective prop drilling
+156: <App>
+157:   <ProjectsPanel currentSession={session} onProjectSelect={handler} />
+158:   <IterationsPanel 
+159:     currentSession={session} 
+160:     isProcessing={isProcessing}
+161:     onExecuteStatusChange={handler}
+162:     refreshTrigger={refreshTrigger}
+163:   />
+164:   <CodeEditor currentIterationId={iterationId} />
+165:   {/* ... additional panels */}
+166: </App>
+167: ```
+168: 
+169: **Event-Driven State Updates:**
+170: Rather than polling, the system maintains WebSocket-like connectivity through Tauri's event system:
+171: - **Emission**: Backend emits events via `AppHandle` in Rust
+172: - **Subscription**: Frontend registers listeners in `useEffect` hooks with cleanup
+173: - **Aggregation**: Streaming content aggregated in local state buffers
+174: 
+175: ---
+176: 
+177: ## 4. Communication Layer (IPC)
+178: 
+179: ### 4.1 Command Interface (Frontend → Backend)
+180: 
+181: The domain exposes type-safe command invocations using Tauri's `invoke` API:
+182: 
+183: **Project Management Commands:**
+184: | Command | Parameters | Return | Description |
+185: |---------|-----------|--------|-------------|
+186: | `gui_init_project` | `{ name, description?, path? }` | `ProjectDTO` | Initialize new project workspace |
+187: | `get_all_projects` | - | `ProjectDTO[]` | Retrieve registered projects |
+188: | `open_project` | `{ projectId, newWindow? }` | `void` | Load project in current/new window |
+189: | `delete_project` | `{ projectId }` | `boolean` | Remove project from registry |
+190: | `update_project` | `{ projectId, updates }` | `ProjectDTO` | Modify project metadata |
+191: 
+192: **Iteration Control Commands:**
+193: | Command | Parameters | Return | Description |
+194: |---------|-----------|--------|-------------|
+195: | `gui_create_iteration` | `{ projectId, title, description, fromIteration? }` | `IterationDTO` | Create genesis/evolution iteration |
+196: | `gui_execute_iteration` | `{ iterationId }` | `void` | Start pipeline execution (async) |
+197: | `gui_continue_iteration` | `{ iterationId }` | `void` | Resume paused iteration |
+198: | `gui_retry_iteration` | `{ iterationId, stage? }` | `void` | Retry failed stage |
+199: | `gui_delete_iteration` | `{ iterationId }` | `boolean` | Remove iteration workspace |
+200: 
+201: **File Operations:**
+202: | Command | Parameters | Return | Description |
+203: |---------|-----------|--------|-------------|
+204: | `get_iteration_file_tree` | `{ iterationId }` | `FileNode[]` | Retrieve virtualized file tree |
+205: | `read_iteration_file` | `{ iterationId, filePath }` | `string` | Read file content |
+206: | `save_iteration_file` | `{ iterationId, filePath, content }` | `boolean` | Persist file changes |
+207: | `format_code` | `{ code, language }` | `string` | Format code using external formatter |
+208: 
+209: **Knowledge & Memory:**
+210: | Command | Parameters | Return | Description |
+211: |---------|-----------|--------|-------------|
+212: | `query_memory_index` | `{ scope, category?, stage?, limit?, keyword? }` | `MemoryEntry[]` | Search project memory |
+213: | `load_memory_detail` | `{ memoryId }` | `MemoryDetail` | Retrieve full memory content |
+214: | `gui_get_project_knowledge` | `{ projectId }` | `KnowledgeDTO` | Get aggregated knowledge |
+215: | `gui_regenerate_knowledge` | `{ iterationId }` | `void` | Trigger knowledge re-extraction |
+216: 
+217: ### 4.2 Event Interface (Backend → Frontend)
+218: 
+219: The system implements 13+ event types for real-time streaming:
+220: 
+221: **Lifecycle Events:**
+222: - `project_loaded`: Emitted when project context initialized
+223: - `iteration_started`: Pipeline execution commenced
+224: - `iteration_completed`: Successful completion with results
+225: - `iteration_failed`: Error state with diagnostic messages
+226: - `iteration_continued`: Resumed from paused state
+227: 
+228: **Agent Streaming Events:**
+229: - `agent_event`: Structured content messages (thinking, progress, stage transitions)
+230: - `agent_streaming`: Real-time token streaming from LLM APIs
+231: 
+232: **Execution Events:**
+233: - `tool_call`: Tool invocation with name and arguments
+234: - `tool_result`: Tool execution result (success/failure with output)
+235: - `progress`: Stage completion percentage and status
+236: 
+237: **HITL Events:**
+238: - `input_request`: Suspension for human input with metadata (type, options, context)
+239: - `input_response`: (Command) Response submission from frontend
+240: 
+241: **Process Events:**
+242: - `project_log`: Stdout/stderr from development server processes
+243: - `project_error`: Process execution errors
+244: 
+245: **Implementation Pattern:**
+246: ```javascript
+247: // Event subscription in App.tsx
+248: useEffect(() => {
+249:   const unlisten = listen('agent_event', (event) => {
+250:     const { payload } = event;
+251:     setMessages(prev => [...prev, {
+252:       type: payload.type, // 'thinking' | 'message' | 'stage'
+253:       content: payload.content,
+254:       timestamp: Date.now()
+255:     }]);
+256:   });
+257:   
+258:   return () => { unlisten.then(f => f()); };
+259: }, []);
+260: ```
+261: 
+262: ---
+263: 
+264: ## 5. Functional Components
+265: 
+266: ### 5.1 Projects Panel (`ProjectsPanel.tsx`)
+267: 
+268: **Responsibilities:**
+269: - Project lifecycle management (CRUD operations)
+270: - Multi-window project loading support
+271: - Workspace directory access integration
+272: - Technology stack visualization
+273: 
+274: **Key Features:**
+275: - **Card-based Layout**: Grid display of projects with metadata (tech stack, last modified, iteration count)
+276: - **Multi-window Support**: "Open in New Window" functionality using Tauri's window management API
+277: - **Quick Actions**: Direct access to workspace directories via OS file explorer
+278: - **Deletion Safety**: Confirmation modals with warning states for destructive operations
+279: 
+280: **State Interactions:**
+281: - Emits `project_loaded` event on selection
+282: - Triggers `activeView` transition to 'iterations'
+283: - Manages `currentSession` context for child components
+284: 
+285: ### 5.2 Iterations Panel (`IterationsPanel.tsx`)
+286: 
+287: **Responsibilities:**
+288: - 7-stage pipeline visualization (Idea → PRD → Design → Plan → Coding → Check → Delivery)
+289: - Iteration execution control (Start, Pause, Continue, Retry)
+290: - Real-time status tracking and progress indication
+291: - Evolution iteration creation with inheritance mode selection
+292: 
+293: **Key Features:**
+294: - **Stage Visualization**: Visual pipeline showing current stage, completed stages, and pending stages with color-coded status indicators
+295: - **Execution Controls**: Context-aware buttons (Start for Draft, Continue for Paused, Retry for Failed)
+296: - **Evolution Workflow**: "Evolve" button triggering inheritance mode selection (Full/Partial/None)
+297: - **Live Status**: Real-time updates via `iteration_started`, `iteration_completed` events
+298: 
+299: **HITL Integration:**
+300: - Listens for `input_request` events with `ARTIFACT_TYPE` context
+301: - Auto-switches view to appropriate panel (Artifacts/Code) based on confirmation type
+302: - Manages execution blocking during human validation phases
+303: 
+304: ### 5.3 Code Editor (`CodeEditor.tsx`)
+305: 
+306: **Responsibilities:**
+307: - File tree navigation with virtualized rendering
+308: - Multi-tab code editing with Monaco Editor
+309: - File content persistence
+310: - Language-specific syntax highlighting and formatting
+311: 
+312: **Technical Implementation:**
+313: - **Virtualized Tree**: Uses `react-window` for performant rendering of large directory structures (>1000 files)
+314: - **Monaco Integration**: Full-featured editor with IntelliSense, error highlighting, and minimap
+315: - **Language Detection**: Automatic mode setting based on file extensions (rs, js, ts, py, html, css, json, md, toml, yaml)
+316: - **Auto-save**: Debounced save operations to backend via `save_iteration_file`
+317: 
+318: **File Operations:**
+319: - Lazy loading: File content fetched on-demand via `read_iteration_file`
+320: - Change tracking: Dirty state management for unsaved changes
+321: - Cross-panel integration: File selection from Chat/Artifacts panel opens in editor
+322: 
+323: ### 5.4 Runner & Preview Panels (`RunnerPanel.tsx`, `PreviewPanel.tsx`)
+324: 
+325: **Responsibilities:**
+326: - Development server process management
+327: - Real-time log streaming with ANSI sequence processing
+328: - Live preview via iframe embedding
+329: - Process lifecycle control (start, stop, restart)
+330: 
+331: **Technical Features:**
+332: - **Log Streaming**: Consumes `project_log` events with ANSI color code rendering for terminal-like output
+333: - **Log Filtering**: Search and filter capabilities for process output
+334: - **Dual-Tab Interface**: "Run Program" (logs) and "Page Preview" (iframe) modes
+335: - **Safety Controls**: Graceful process termination and port conflict detection
+336: 
+337: ### 5.5 Memory & Knowledge Panels (`MemoryPanel.tsx`, `KnowledgePanel.tsx`)
+338: 
+339: **Responsibilities:**
+340: - Project memory querying and browsing
+341: - Knowledge artifact visualization
+342: - Historical decision and pattern retrieval
+343: - Fuzzy search across memory entries
+344: 
+345: **Key Features:**
+346: - **Query Interface**: Filter by scope (project/iteration), category (decision/pattern/insight), and keywords
+347: - **Markdown Rendering**: Rich content display with syntax highlighting for code blocks
+348: - **Detail Modals**: Drill-down views for memory entries with full context
+349: - **Refresh Coordination**: Responds to `knowledge_regeneration_completed` events
+350: 
+351: ---
+352: 
+353: ## 6. Human-in-the-Loop (HITL) Implementation
+354: 
+355: The GUI Frontend implements sophisticated HITL workflows for AI-human collaboration:
+356: 
+357: ### 6.1 Confirmation Flow Architecture
+358: 
+359: ```mermaid
+360: sequenceDiagram
+361:     participant Agent as AI Agent
+362:     participant Backend as Tauri Backend
+363:     participant Frontend as React Frontend
+364:     participant User as Developer
+365:     
+366:     Agent->>Backend: Request confirmation
+367:     Backend->>Frontend: emit input_request event
+368:     Frontend->>Frontend: Update state with request
+369:     Frontend->>Frontend: Switch to relevant view
+370:     Frontend->>User: Display modal with content preview
+371:     
+372:     alt User selects Pass
+373:         User->>Frontend: Click Pass button
+374:         Frontend->>Backend: Submit response with pass choice
+375:         Backend->>Agent: Resume execution
+376:     else User selects Edit
+377:         User->>Frontend: Click Edit button
+378:         Frontend->>Backend: Open external editor
+379:         Backend->>Frontend: Wait for file change
+380:         Frontend->>Backend: Detect changes or timeout
+381:         Backend->>Agent: Resume with user edits
+382:     else User selects Feedback
+383:         User->>Frontend: Click Feedback button
+384:         Frontend->>Frontend: Show feedback input area
+385:         User->>Frontend: Enter feedback text
+386:         Frontend->>Backend: Submit response with feedback and text
+387:         Backend->>Agent: Execute with feedback
+388:         Agent->>Agent: Regenerate content
+389:         Agent->>Backend: New confirmation request
+390:         Backend->>Frontend: New input request event
+391:     end
+392: ```
+393: 
+394: ### 6.2 Modal State Management
+395: 
+396: The `InputModal` component handles three interaction modes:
+397: 1. **Text Input**: Freeform feedback for regeneration requests
+398: 2. **Option Selection**: Predefined choices (Yes/No/View/Feedback) for artifact confirmation
+399: 3. **Artifact Review**: Rich content display with tab switching to relevant panels
+400: 
+401: **Timeout Handling:**
+402: - Backend maintains 3000-second timeout (50 minutes) for HITL responses
+403: - Frontend displays countdown warnings for long-running operations
+404: - Automatic cleanup on component unmount to prevent memory leaks
+405: 
+406: ---
+407: 
+408: ## 7. Performance Optimizations
+409: 
+410: ### 7.1 Virtualization Strategy
+411: 
+412: **File Tree Rendering:**
+413: - Implements `react-window` FixedSizeTree for directories with >100 items
+414: - Lazy loading of file metadata (size, modification time)
+415: - Collapsed node optimization (children not rendered until expanded)
+416: 
+417: **Memory Lists:**
+418: - Virtualized scrolling for memory entries with dynamic height support
+419: - Pagination via "Load More" pattern for large result sets
+420: - Debounced search input (300ms) to prevent excessive query commands
+421: 
+422: ### 7.2 Streaming Optimization
+423: 
+424: **Message Aggregation:**
+425: - Buffers rapid `agent_streaming` events (throttled to 60fps updates)
+426: - Uses `requestAnimationFrame` for smooth scrolling during high-velocity token streaming
+427: - Implements message deduplication for tool_call/tool_result pairs
+428: 
+429: **Memoization:**
+430: - `React.memo` on panel components to prevent unnecessary re-renders during background streaming
+431: - `useMemo` for expensive markdown parsing and syntax highlighting
+432: - `useCallback` for event handlers passed to child components
+433: 
+434: ---
+435: 
+436: ## 8. Integration Patterns
+437: 
+438: ### 8.1 Error Handling Strategy
+439: 
+440: **Command Errors:**
+441: - Rust `Result` types mapped to JavaScript exceptions
+442: - Ant Design `message` API for transient error notifications
+443: - Modal dialogs for critical failures (workspace access denied, iteration corruption)
+444: 
+445: **Event Stream Errors:**
+446: - `iteration_failed` events trigger error boundary catches
+447: - Automatic state reset to prevent UI desynchronization
+448: - Retry mechanisms with exponential backoff for transient network issues
+449: 
+450: ### 8.2 Cross-Panel Communication
+451: 
+452: **Refresh Coordination:**
+453: ```javascript
+454: // Counter-based invalidation pattern
+455: const [memoryRefreshTrigger, setMemoryRefreshTrigger] = useState(0);
+456: 
+457: // Trigger from App.tsx when iteration completes
+458: useEffect(() => {
+459:   if (iterationCompleted) {
+460:     setMemoryRefreshTrigger(prev => prev + 1);
+461:   }
+462: }, [iterationCompleted]);
+463: 
+464: // Consumption in MemoryPanel
+465: useEffect(() => {
+466:   loadMemoryData();
+467: }, [memoryRefreshTrigger]);
+468: ```
+469: 
+470: **View Switching:**
+471: - Programmatic navigation via `setActiveView` prop drilling
+472: - Context-aware switching (e.g., artifact confirmation switches to Code view for code files, Artifacts view for markdown)
+473: 
+474: ---
+475: 
+476: ## 9. Security Considerations
+477: 
+478: **Path Validation:**
+479: - All file paths validated by backend `runtime_security` module before operations
+480: - Frontend displays workspace-relative paths only (absolute paths obscured)
+481: - Traversal attack prevention via backend path canonicalization
+482: 
+483: **Content Security:**
+484: - IFrame sandboxing for Preview panel (`sandbox="allow-scripts allow-same-origin"`)
+485: - Monaco Editor runs in isolated context
+486: - Markdown rendering sanitizes HTML to prevent XSS via AI-generated content
+487: 
+488: **Process Isolation:**
+489: - Development servers spawned in separate processes with restricted environment
+490: - Frontend cannot execute arbitrary shell commands (all commands validated by backend Tool domain)
+491: 
+492: ---
+493: 
+494: ## 10. Known Limitations & Technical Debt
+495: 
+496: **Current Issues:**
+497: 1. **Large Component**: `App.tsx` exceeds 800 LOC with complex state management; candidate for component splitting
+498: 2. **Memory Leaks**: Event listeners in early returns may not cleanup properly if component unmounts during async operations
+499: 3. **Chat History Performance**: Long-running iterations may accumulate large message arrays without virtualization
+500: 
+501: **Future Improvements:**
+502: - Component splitting: Extract chat logic, iteration management, and panel rendering into separate modules
+503: - Optimize message handling for very long-running iterations
+504: - Consider WebSocket fallback for Tauri IPC in potential web deployment scenarios
+505: 
+506: ---
+507: 
+508: ## 11. Development Guidelines
+509: 
+510: **Adding New Panels:**
+511: 1. Create component in `src/components/`
+512: 2. Add panel key to `activeView` state in UI store (`src/stores/uiStore.ts`)
+513: 3. Add menu item in `App.tsx` Sider menu with icon and label
+514: 4. Add rendering logic in `App.tsx` renderContent function
+515: 5. Add necessary IPC commands to Tauri backend
+516: 6. Register event listeners in panel's `useEffect`
+517: 
+518: **Event Listener Best Practices:**
+519: ```javascript
+520: useEffect(() => {
+521:   let unlisten;
+522:   
+523:   const setupListener = async () => {
+524:     unlisten = await listen('event_name', handler);
+525:   };
+526:   
+527:   setupListener();
+528:   
+529:   return () => {
+530:     if (unlisten) unlisten.then(f => f());
+531:   };
+532: }, []);
+533: ```
+534: 
+535: **Styling Conventions:**
+536: - Use Ant Design tokens for consistency (`token.colorPrimary`, `token.borderRadius`)
+537: - CSS Modules for component-scoped styles
+538: - Responsive breakpoints: `xs` (<576px), `sm` (≥576px), `md` (≥768px), `lg` (≥992px), `xl` (≥1200px)
+539: 
+540: ---
+541: 
+542: **Conclusion:** The GUI Frontend Domain successfully abstracts the complexity of the AI agent pipeline into an intuitive desktop interface. Its event-driven architecture enables real-time collaboration between human developers and AI agents, while the modular panel structure supports diverse workflows from project initialization to code deployment. The domain maintains strict separation from core business logic through the Tauri IPC boundary, ensuring architectural integrity while delivering responsive user experiences.
+543: 
+544: ---
+545: 
+546: ## 12. Project Manager Agent (PM Agent) Interface
+547: 
+548: The GUI provides a dedicated interface for post-delivery interactions through the Project Manager Agent.
+549: 
+550: ### 12.1 PM Agent Activation
+551: 
+552: The PM Agent becomes available when an iteration reaches `Completed` status:
+553: - Chat mode automatically switches from `pipeline` to `pm_agent`
+554: - A welcome message is displayed with quick action buttons
+555: - The chat interface becomes available for natural language interaction
+556: 
+557: ### 12.2 PM Agent Features
+558: 
+559: **Welcome Actions**:
+560: - 🚀 **Start Application**: Launch the generated application
+561: - 📁 **Open Project Folder**: Open workspace in file explorer
+562: - 📄 **View Artifacts**: Navigate to artifacts viewer
+563: - 💻 **View Source Code**: Navigate to code editor
+564: - 📚 **View Knowledge Base**: Navigate to knowledge panel
+565: 
+566: **Conversational Interactions**:
+567: - Ask questions about the project (technology stack, architecture, etc.)
+568: - Request code modifications → Triggers `goto_stage` to Coding
+569: - Request new features → Triggers `create_iteration` with inheritance
+570: - Save decisions to project memory
+571: 
+572: ### 12.3 PM Agent State Management
+573: 
+574: **State Variables** (in `useAgentStore`):
+575: - `pmMessages[]`: Message history for PM Agent chat
+576: - `pmProcessing`: Boolean indicating PM Agent is processing a request
+577: - `chatMode`: Current chat mode (`pipeline` | `pm_agent` | `disabled`)
+578: 
+579: **Events**:
+580: | Event | Purpose |
+581: |-------|---------|
+582: | `pm_message` | PM Agent response message |
+583: | `pm_actions` | Actionable buttons for user |
+584: | `agent_streaming` | Real-time streaming from PM Agent |
+585: | `iteration_created` | New iteration created via PM Agent |
+586: 
+587: ### 12.4 PM Agent Commands
+588: 
+589: | Command | Parameters | Description |
+590: |---------|------------|-------------|
+591: | `pm_send_message` | `iteration_id`, `message`, `history` | Send message to PM Agent |
+592: | `pm_restart_iteration` | `iteration_id`, `target_stage` | Restart from specific stage |
+593: | `pm_get_welcome_message` | `iteration_id` | Get welcome message with actions |
+594: 
+595: ---
+596: 
+597: ## 13. Settings Panel: External Coding Agent Configuration
+598: 
+599: The Settings Panel (`SettingsPanel.tsx`) provides configuration for external coding agents:
+600: 
+601: ### 13.1 Configuration Fields
+602: 
+603: | Field | Type | Description |
+604: |-------|------|-------------|
+605: | `enabled` | Boolean | Enable/disable external agent |
+606: | `agent_type` | Select | Agent type (opencode, iflow, codex, gemini, claude) |
+607: | `command` | String | Command to execute (e.g., "bun") |
+608: | `args` | String[] | Command arguments |
+609: | `transport` | Select | Communication transport (stdio, websocket) |
+610: | `workspace_path` | String | Optional workspace path override |
+611: 
+612: ### 13.2 Agent Types
+613: 
+614: ```
+615: OpenCode  → bun x opencode-ai acp
+616: Codex     → codex
+617: Gemini    → gemini
+618: Claude    → claude
+619: ```
+620: 
+621: ### 13.3 UI Components
+622: 
+623: - **Enable Switch**: Toggle for external agent activation
+624: - **Agent Type Selector**: Dropdown with supported agent types
+625: - **Command Input**: Text input for the executable command
+626: - **Arguments Input**: Tag-style multi-value input for arguments
+627: - **Transport Selector**: stdio or websocket options
+628: - **Test Connection Button**: Validates LLM configuration
+629: 
+630: ---
+631: 
+632: ## 14. Technology Stack Updates
+633: 
+634: ### 14.1 Current Stack (Updated)
+635: 
+636: | Layer | Technology | Purpose |
+637: |-------|-----------|---------|
+638: | **UI Framework** | React 18 + TypeScript | Component-based declarative UI with type safety |
+639: | **State Management** | Zustand | Lightweight centralized state with stores |
+640: | **Component Library** | Ant Design 5.x | Enterprise-grade UI components |
+641: | **Desktop Shell** | Tauri 1.x+ | Rust-based desktop runtime |
+642: | **Code Editor** | Monaco Editor | VS Code-powered editing |
+643: | **Virtualization** | react-window | Performance optimization |
+644: 
+645: ### 14.2 Zustand Stores
+646: 
+647: **useProjectStore**: Project and iteration state management
+648: **useAgentStore**: Chat messages, PM messages, processing states
+649: **useUIStore**: Active view, refresh triggers, UI preferences
 ````
 
 ### litho.docs/en/4.Deep-Exploration/Pipeline Domain.md (541 lines)
@@ -30851,6 +31236,14 @@ LICENSE
 3: export { LoadingScreen } from './LoadingScreen';
 ```
 
+### crates/cowork-gui/src/components/config/FlowConfigPanel.tsx (3 lines)
+
+```
+1: getStageTypeColor
+2: ⋮----
+3: (stage.stage_id)
+```
+
 ### crates/cowork-gui/src/components/config/IntegrationConfig.tsx (3 lines)
 
 ```
@@ -30884,6 +31277,22 @@ LICENSE
 7: }
 ```
 
+### crates/cowork-gui/src/components/iterations/IterationDetailsModal.tsx (11 lines)
+
+```
+1: IterationDetailsModalProps
+2: ⋮----
+3: {
+4:   open: boolean;
+5:   onClose: () => void;
+6:   iteration: IterationInfo | null;
+7: }
+8: ⋮----
+9: getStatusColor
+10: ⋮----
+11: (iteration.status)
+```
+
 ### crates/cowork-gui/src/components/iterations/index.ts (3 lines)
 
 ```
@@ -30896,6 +31305,18 @@ LICENSE
 
 ```
 1: export { Onboarding } from './Onboarding';
+```
+
+### crates/cowork-gui/src/components/projects/CreateProjectModal.tsx (7 lines)
+
+```
+1: CreateProjectModalProps
+2: ⋮----
+3: {
+4:   open: boolean;
+5:   onClose: () => void;
+6:   onSuccess: (projectId: string, projectName: string) => void;
+7: }
 ```
 
 ### crates/cowork-gui/src/components/projects/EditProjectModal.tsx (8 lines)
@@ -32997,6 +33418,54 @@ LICENSE
 1: {"$schema": "../gen/schemas/desktop-schema.json", "identifier": "default", "description": "Capability for the main window", "windows": ["main"], "permissions": ["core:default", "opener:default", "dialog:allow-open"]}
 ```
 
+### crates/cowork-gui/src-tauri/src/commands/memory.rs (43 lines)
+
+```
+1: query_memory_index
+2: ⋮----
+3: (
+4:     iteration_id: String,
+5:     query_type: String,
+6:     category: Option<String>,
+7:     stage: Option<String>,
+8:     limit: Option<u64>,
+9: )
+10: ⋮----
+11: load_memory_detail
+12: ⋮----
+13: (
+14:     memory_id: String,
+15:     file: Option<String>,
+16:     iteration_id: Option<String>,
+17:     ts: Option<i64>,
+18: )
+19: ⋮----
+20: save_session_memory
+21: ⋮----
+22: (
+23:     iteration_id: String,
+24:     content_type: String,
+25:     _category: String,
+26:     content: String,
+27: )
+28: ⋮----
+29: promote_to_project_memory
+30: ⋮----
+31: (
+32:     memory_id: String,
+33:     iteration_id: String,
+34:     ts: Option<i64>,
+35: )
+36: ⋮----
+37: get_memory_context
+38: ⋮----
+39: (iteration_id: Option<String>)
+40: ⋮----
+41: get_available_stages
+42: ⋮----
+43: (iteration_id: String)
+```
+
 ### crates/cowork-gui/src-tauri/src/commands/template.rs (44 lines)
 
 ```
@@ -34478,661 +34947,6 @@ LICENSE
 548: ---
 549: 
 550: **End of Core Workflows Documentation**
-````
-
-### litho.docs/en/4.Deep-Exploration/GUI Frontend Domain.md (650 lines)
-
-````
-1: **GUI Frontend Domain Technical Documentation**
-2: 
-3: **Generation Time:** 2026-02-14 05:21:52 (UTC)  
-4: **Version:** 1.0  
-5: **Domain:** Presentation Layer (Cowork-GUI)  
-6: 
-7: ---
-8: 
-9: ## 1. Executive Summary
-10: 
-11: The **GUI Frontend Domain** implements the desktop presentation layer of the Cowork Forge system, delivering a comprehensive AI-assisted development environment through a Tauri-based desktop application shell with a React 18 frontend. This domain provides the primary human-computer interface for the 7-stage AI agent pipeline, enabling real-time iteration monitoring, artifact inspection, code editing, and Human-in-the-Loop (HITL) validation workflows.
-12: 
-13: **Key Architectural Characteristics:**
-14: - **Multi-Panel Workspace**: Eight functional panels (Projects, Iterations, Chat/Artifacts, Code Editor, Runner, Preview, Memory, Knowledge) orchestrated through a central state manager
-15: - **Event-Driven Real-Time Communication**: Bidirectional IPC via Tauri's invoke/listen APIs supporting streaming AI agent outputs and asynchronous HITL interactions
-16: - **Dual-Mode Interaction**: Supports both automated execution monitoring and interactive feedback loops with modal-based confirmation workflows
-17: - **Performance-Optimized Rendering**: Virtualized lists for large file trees, Monaco Editor integration for code editing, and optimistic UI updates for responsive feedback
-18: 
-19: ---
-20: 
-21: ## 2. System Architecture
-22: 
-23: ### 2.1 Container Context (C4 Level 2)
-24: 
-25: The GUI Frontend operates as a distinct container within the Cowork Forge architecture, communicating exclusively with the Tauri Backend Domain through well-defined IPC boundaries:
-26: 
-27: ```mermaid
-28: flowchart TB
-29:     subgraph GUIContainer["cowork-gui (Tauri Application)"]
-30:         React["React 18 Frontend<br/>(Ant Design + Monaco)"]
-31:         TauriCmd["Tauri Commands<br/>(Rust Bridge)"]
-32:         EventBus["Event Listener Hub<br/>(13+ Event Types)"]
-33:     end
-34:     
-35:     subgraph CoreContainer["cowork-core (Domain Engine)"]
-36:         Pipeline["Pipeline Controller"]
-37:         Domain["Domain Logic"]
-38:         Tools["Tool Ecosystem"]
-39:     end
-40:     
-41:     subgraph External["External Systems"]
-42:         FileSystem["Local File System"]
-43:         LLM["LLM APIs"]
-44:     end
-45:     
-46:     React <-->|invoke/listen| TauriCmd
-47:     TauriCmd -->|Implements| Interaction["InteractiveBackend Trait"]
-48:     Interaction -->|Drives| Pipeline
-49:     Pipeline -->|Uses| Tools
-50:     Tools -->|Access| FileSystem
-51:     Pipeline -->|Calls| LLM
-52:     
-53:     TauriCmd -->|Emits| EventBus
-54:     EventBus -->|Updates| React
-55: ```
-56: 
-57: ### 2.2 Component Architecture (C4 Level 3)
-58: 
-59: The frontend implements a layered component hierarchy with clear separation of concerns:
-60: 
-61: ```mermaid
-62: flowchart TB
-63:     subgraph EntryLayer["Entry Layer"]
-64:         Main[main.tsx<br/>Theme & React Root]
-65:         IndexCSS[Index Styling<br/>Ant Design Theme]
-66:     end
-67:     
-68:     subgraph OrchestrationLayer["Core Orchestration"]
-69:         App[App.tsx<br/>State Management Hub + Zustand Stores]
-70:         EventManager[Event Listener Manager<br/>agent_event, tool_call, input_request]
-71:         InputModal[HITL Input Modal<br/>Confirmation & Feedback]
-72:     end
-73:     
-74:     subgraph PanelLayer["Panel Registry"]
-75:         Projects[ProjectsPanel<br/>Project Management]
-76:         Iterations[IterationsPanel<br/>7-Stage Lifecycle]
-77:         Chat[ChatPanel<br/>Pipeline & PM Agent Chat]
-78:         Artifacts[ArtifactsViewer<br/>Markdown Viewer]
-79:         Editor[CodeEditor<br/>Monaco + Virtual Tree]
-80:         Runner[RunnerPanel<br/>Process Logs]
-81:         Preview[PreviewPanel<br/>Dev Server IFrame]
-82:         Memory[MemoryPanel<br/>Query & Browse]
-83:         Knowledge[KnowledgePanel<br/>Knowledge Repository]
-84:         Settings[SettingsPanel<br/>Configuration]
-85:     end
-86:     
-87:     subgraph Communication["IPC Layer"]
-88:         Commands[Command Invokers<br/>gui_*, query_*]
-89:         Listeners[Event Listeners<br/>13+ Event Types]
-90:         Types[TypeScript Types<br/>Serde-mapped DTOs]
-91:     end
-92:     
-93:     Main --> App
-94:     App --> EventManager
-95:     App --> InputModal
-96:     App --> Projects
-97:     App --> Iterations
-98:     App --> Chat
-99:     App --> Editor
-100:     App --> Runner
-101:     App --> Preview
-102:     App --> Memory
-103:     App --> Knowledge
-104:     
-105:     Projects --> Commands
-106:     Iterations --> Commands
-107:     Editor --> Commands
-108:     Memory --> Commands
-109:     
-110:     EventManager --> Listeners
-111:     Listeners --> Chat
-112:     Listeners --> Iterations
-113:     Listeners --> Runner
-114: ```
-115: 
-116: ---
-117: 
-118: ## 3. Technical Implementation
-119: 
-120: ### 3.1 Technology Stack
-121: 
-122: | Layer | Technology | Purpose |
-123: |-------|-----------|---------|
-124: | **UI Framework** | React 18 + TypeScript | Component-based declarative UI with type safety |
-125: | **Component Library** | Ant Design 5.x | Enterprise-grade UI components (Tables, Modals, Tabs) |
-126: | **Desktop Shell** | Tauri 1.x+ | Rust-based desktop runtime with native OS integration |
-127: | **Code Editor** | Monaco Editor | VS Code-powered editing with syntax highlighting and IntelliSense |
-128: | **Virtualization** | react-window | Performance optimization for large file trees and lists |
-129: | **Content Rendering** | ReactMarkdown + remark-gfm | Markdown parsing for AI-generated artifacts |
-130: | **Styling** | CSS Modules + Ant Design Tokens | Scoped component styles with theme consistency |
-131: | **State Management** | Zustand | Lightweight state management with stores (project, agent, UI) |
-132: | **Icons** | @ant-design/icons | Consistent iconography across interface |
-133: 
-134: ### 3.2 State Management Architecture
-135: 
-136: The domain employs a **Zustand-based centralized state management** pattern with three dedicated stores:
-137: 
-138: **Store Architecture:**
-139: - **Project Store** (`useProjectStore`): Project and iteration state, current session context
-140: - **Agent Store** (`useAgentStore`): Chat messages, PM messages, processing state, input requests
-141: - **UI Store** (`useUIStore`): Active view, refresh triggers, command palette state
-142: 
-143: **Central State Hub (App.tsx):**
-144: - `currentSession`: Active project/iteration context
-145: - `activeView`: Current visible panel (projects, iterations, chat, code, run, memory, knowledge, settings)
-146: - `messages[]`: Real-time AI agent message buffer with type differentiation (user, agent, thinking, tool_call, tool_result)
-147: - `pmMessages[]`: Project Manager Agent chat message buffer (user, pm_agent)
-148: - `chatMode`: Chat mode identifier (pipeline, pm_agent, disabled), automatically switches based on iteration status
-149: - `isProcessing`: Global execution state for pipeline operations
-150: - `inputRequest`: HITL modal state management
-151: - `refreshTriggers`: Counter-based cache invalidation for memory/knowledge panels
-152: 
-153: **State Distribution Pattern:**
-154: ```javascript
-155: // Centralized state with selective prop drilling
-156: <App>
-157:   <ProjectsPanel currentSession={session} onProjectSelect={handler} />
-158:   <IterationsPanel 
-159:     currentSession={session} 
-160:     isProcessing={isProcessing}
-161:     onExecuteStatusChange={handler}
-162:     refreshTrigger={refreshTrigger}
-163:   />
-164:   <CodeEditor currentIterationId={iterationId} />
-165:   {/* ... additional panels */}
-166: </App>
-167: ```
-168: 
-169: **Event-Driven State Updates:**
-170: Rather than polling, the system maintains WebSocket-like connectivity through Tauri's event system:
-171: - **Emission**: Backend emits events via `AppHandle` in Rust
-172: - **Subscription**: Frontend registers listeners in `useEffect` hooks with cleanup
-173: - **Aggregation**: Streaming content aggregated in local state buffers
-174: 
-175: ---
-176: 
-177: ## 4. Communication Layer (IPC)
-178: 
-179: ### 4.1 Command Interface (Frontend → Backend)
-180: 
-181: The domain exposes type-safe command invocations using Tauri's `invoke` API:
-182: 
-183: **Project Management Commands:**
-184: | Command | Parameters | Return | Description |
-185: |---------|-----------|--------|-------------|
-186: | `gui_init_project` | `{ name, description?, path? }` | `ProjectDTO` | Initialize new project workspace |
-187: | `get_all_projects` | - | `ProjectDTO[]` | Retrieve registered projects |
-188: | `open_project` | `{ projectId, newWindow? }` | `void` | Load project in current/new window |
-189: | `delete_project` | `{ projectId }` | `boolean` | Remove project from registry |
-190: | `update_project` | `{ projectId, updates }` | `ProjectDTO` | Modify project metadata |
-191: 
-192: **Iteration Control Commands:**
-193: | Command | Parameters | Return | Description |
-194: |---------|-----------|--------|-------------|
-195: | `gui_create_iteration` | `{ projectId, title, description, fromIteration? }` | `IterationDTO` | Create genesis/evolution iteration |
-196: | `gui_execute_iteration` | `{ iterationId }` | `void` | Start pipeline execution (async) |
-197: | `gui_continue_iteration` | `{ iterationId }` | `void` | Resume paused iteration |
-198: | `gui_retry_iteration` | `{ iterationId, stage? }` | `void` | Retry failed stage |
-199: | `gui_delete_iteration` | `{ iterationId }` | `boolean` | Remove iteration workspace |
-200: 
-201: **File Operations:**
-202: | Command | Parameters | Return | Description |
-203: |---------|-----------|--------|-------------|
-204: | `get_iteration_file_tree` | `{ iterationId }` | `FileNode[]` | Retrieve virtualized file tree |
-205: | `read_iteration_file` | `{ iterationId, filePath }` | `string` | Read file content |
-206: | `save_iteration_file` | `{ iterationId, filePath, content }` | `boolean` | Persist file changes |
-207: | `format_code` | `{ code, language }` | `string` | Format code using external formatter |
-208: 
-209: **Knowledge & Memory:**
-210: | Command | Parameters | Return | Description |
-211: |---------|-----------|--------|-------------|
-212: | `query_memory_index` | `{ scope, category?, stage?, limit?, keyword? }` | `MemoryEntry[]` | Search project memory |
-213: | `load_memory_detail` | `{ memoryId }` | `MemoryDetail` | Retrieve full memory content |
-214: | `gui_get_project_knowledge` | `{ projectId }` | `KnowledgeDTO` | Get aggregated knowledge |
-215: | `gui_regenerate_knowledge` | `{ iterationId }` | `void` | Trigger knowledge re-extraction |
-216: 
-217: ### 4.2 Event Interface (Backend → Frontend)
-218: 
-219: The system implements 13+ event types for real-time streaming:
-220: 
-221: **Lifecycle Events:**
-222: - `project_loaded`: Emitted when project context initialized
-223: - `iteration_started`: Pipeline execution commenced
-224: - `iteration_completed`: Successful completion with results
-225: - `iteration_failed`: Error state with diagnostic messages
-226: - `iteration_continued`: Resumed from paused state
-227: 
-228: **Agent Streaming Events:**
-229: - `agent_event`: Structured content messages (thinking, progress, stage transitions)
-230: - `agent_streaming`: Real-time token streaming from LLM APIs
-231: 
-232: **Execution Events:**
-233: - `tool_call`: Tool invocation with name and arguments
-234: - `tool_result`: Tool execution result (success/failure with output)
-235: - `progress`: Stage completion percentage and status
-236: 
-237: **HITL Events:**
-238: - `input_request`: Suspension for human input with metadata (type, options, context)
-239: - `input_response`: (Command) Response submission from frontend
-240: 
-241: **Process Events:**
-242: - `project_log`: Stdout/stderr from development server processes
-243: - `project_error`: Process execution errors
-244: 
-245: **Implementation Pattern:**
-246: ```javascript
-247: // Event subscription in App.tsx
-248: useEffect(() => {
-249:   const unlisten = listen('agent_event', (event) => {
-250:     const { payload } = event;
-251:     setMessages(prev => [...prev, {
-252:       type: payload.type, // 'thinking' | 'message' | 'stage'
-253:       content: payload.content,
-254:       timestamp: Date.now()
-255:     }]);
-256:   });
-257:   
-258:   return () => { unlisten.then(f => f()); };
-259: }, []);
-260: ```
-261: 
-262: ---
-263: 
-264: ## 5. Functional Components
-265: 
-266: ### 5.1 Projects Panel (`ProjectsPanel.tsx`)
-267: 
-268: **Responsibilities:**
-269: - Project lifecycle management (CRUD operations)
-270: - Multi-window project loading support
-271: - Workspace directory access integration
-272: - Technology stack visualization
-273: 
-274: **Key Features:**
-275: - **Card-based Layout**: Grid display of projects with metadata (tech stack, last modified, iteration count)
-276: - **Multi-window Support**: "Open in New Window" functionality using Tauri's window management API
-277: - **Quick Actions**: Direct access to workspace directories via OS file explorer
-278: - **Deletion Safety**: Confirmation modals with warning states for destructive operations
-279: 
-280: **State Interactions:**
-281: - Emits `project_loaded` event on selection
-282: - Triggers `activeView` transition to 'iterations'
-283: - Manages `currentSession` context for child components
-284: 
-285: ### 5.2 Iterations Panel (`IterationsPanel.tsx`)
-286: 
-287: **Responsibilities:**
-288: - 7-stage pipeline visualization (Idea → PRD → Design → Plan → Coding → Check → Delivery)
-289: - Iteration execution control (Start, Pause, Continue, Retry)
-290: - Real-time status tracking and progress indication
-291: - Evolution iteration creation with inheritance mode selection
-292: 
-293: **Key Features:**
-294: - **Stage Visualization**: Visual pipeline showing current stage, completed stages, and pending stages with color-coded status indicators
-295: - **Execution Controls**: Context-aware buttons (Start for Draft, Continue for Paused, Retry for Failed)
-296: - **Evolution Workflow**: "Evolve" button triggering inheritance mode selection (Full/Partial/None)
-297: - **Live Status**: Real-time updates via `iteration_started`, `iteration_completed` events
-298: 
-299: **HITL Integration:**
-300: - Listens for `input_request` events with `ARTIFACT_TYPE` context
-301: - Auto-switches view to appropriate panel (Artifacts/Code) based on confirmation type
-302: - Manages execution blocking during human validation phases
-303: 
-304: ### 5.3 Code Editor (`CodeEditor.tsx`)
-305: 
-306: **Responsibilities:**
-307: - File tree navigation with virtualized rendering
-308: - Multi-tab code editing with Monaco Editor
-309: - File content persistence
-310: - Language-specific syntax highlighting and formatting
-311: 
-312: **Technical Implementation:**
-313: - **Virtualized Tree**: Uses `react-window` for performant rendering of large directory structures (>1000 files)
-314: - **Monaco Integration**: Full-featured editor with IntelliSense, error highlighting, and minimap
-315: - **Language Detection**: Automatic mode setting based on file extensions (rs, js, ts, py, html, css, json, md, toml, yaml)
-316: - **Auto-save**: Debounced save operations to backend via `save_iteration_file`
-317: 
-318: **File Operations:**
-319: - Lazy loading: File content fetched on-demand via `read_iteration_file`
-320: - Change tracking: Dirty state management for unsaved changes
-321: - Cross-panel integration: File selection from Chat/Artifacts panel opens in editor
-322: 
-323: ### 5.4 Runner & Preview Panels (`RunnerPanel.tsx`, `PreviewPanel.tsx`)
-324: 
-325: **Responsibilities:**
-326: - Development server process management
-327: - Real-time log streaming with ANSI sequence processing
-328: - Live preview via iframe embedding
-329: - Process lifecycle control (start, stop, restart)
-330: 
-331: **Technical Features:**
-332: - **Log Streaming**: Consumes `project_log` events with ANSI color code rendering for terminal-like output
-333: - **Log Filtering**: Search and filter capabilities for process output
-334: - **Dual-Tab Interface**: "Run Program" (logs) and "Page Preview" (iframe) modes
-335: - **Safety Controls**: Graceful process termination and port conflict detection
-336: 
-337: ### 5.5 Memory & Knowledge Panels (`MemoryPanel.tsx`, `KnowledgePanel.tsx`)
-338: 
-339: **Responsibilities:**
-340: - Project memory querying and browsing
-341: - Knowledge artifact visualization
-342: - Historical decision and pattern retrieval
-343: - Fuzzy search across memory entries
-344: 
-345: **Key Features:**
-346: - **Query Interface**: Filter by scope (project/iteration), category (decision/pattern/insight), and keywords
-347: - **Markdown Rendering**: Rich content display with syntax highlighting for code blocks
-348: - **Detail Modals**: Drill-down views for memory entries with full context
-349: - **Refresh Coordination**: Responds to `knowledge_regeneration_completed` events
-350: 
-351: ---
-352: 
-353: ## 6. Human-in-the-Loop (HITL) Implementation
-354: 
-355: The GUI Frontend implements sophisticated HITL workflows for AI-human collaboration:
-356: 
-357: ### 6.1 Confirmation Flow Architecture
-358: 
-359: ```mermaid
-360: sequenceDiagram
-361:     participant Agent as AI Agent
-362:     participant Backend as Tauri Backend
-363:     participant Frontend as React Frontend
-364:     participant User as Developer
-365:     
-366:     Agent->>Backend: Request confirmation
-367:     Backend->>Frontend: emit input_request event
-368:     Frontend->>Frontend: Update state with request
-369:     Frontend->>Frontend: Switch to relevant view
-370:     Frontend->>User: Display modal with content preview
-371:     
-372:     alt User selects Pass
-373:         User->>Frontend: Click Pass button
-374:         Frontend->>Backend: Submit response with pass choice
-375:         Backend->>Agent: Resume execution
-376:     else User selects Edit
-377:         User->>Frontend: Click Edit button
-378:         Frontend->>Backend: Open external editor
-379:         Backend->>Frontend: Wait for file change
-380:         Frontend->>Backend: Detect changes or timeout
-381:         Backend->>Agent: Resume with user edits
-382:     else User selects Feedback
-383:         User->>Frontend: Click Feedback button
-384:         Frontend->>Frontend: Show feedback input area
-385:         User->>Frontend: Enter feedback text
-386:         Frontend->>Backend: Submit response with feedback and text
-387:         Backend->>Agent: Execute with feedback
-388:         Agent->>Agent: Regenerate content
-389:         Agent->>Backend: New confirmation request
-390:         Backend->>Frontend: New input request event
-391:     end
-392: ```
-393: 
-394: ### 6.2 Modal State Management
-395: 
-396: The `InputModal` component handles three interaction modes:
-397: 1. **Text Input**: Freeform feedback for regeneration requests
-398: 2. **Option Selection**: Predefined choices (Yes/No/View/Feedback) for artifact confirmation
-399: 3. **Artifact Review**: Rich content display with tab switching to relevant panels
-400: 
-401: **Timeout Handling:**
-402: - Backend maintains 3000-second timeout (50 minutes) for HITL responses
-403: - Frontend displays countdown warnings for long-running operations
-404: - Automatic cleanup on component unmount to prevent memory leaks
-405: 
-406: ---
-407: 
-408: ## 7. Performance Optimizations
-409: 
-410: ### 7.1 Virtualization Strategy
-411: 
-412: **File Tree Rendering:**
-413: - Implements `react-window` FixedSizeTree for directories with >100 items
-414: - Lazy loading of file metadata (size, modification time)
-415: - Collapsed node optimization (children not rendered until expanded)
-416: 
-417: **Memory Lists:**
-418: - Virtualized scrolling for memory entries with dynamic height support
-419: - Pagination via "Load More" pattern for large result sets
-420: - Debounced search input (300ms) to prevent excessive query commands
-421: 
-422: ### 7.2 Streaming Optimization
-423: 
-424: **Message Aggregation:**
-425: - Buffers rapid `agent_streaming` events (throttled to 60fps updates)
-426: - Uses `requestAnimationFrame` for smooth scrolling during high-velocity token streaming
-427: - Implements message deduplication for tool_call/tool_result pairs
-428: 
-429: **Memoization:**
-430: - `React.memo` on panel components to prevent unnecessary re-renders during background streaming
-431: - `useMemo` for expensive markdown parsing and syntax highlighting
-432: - `useCallback` for event handlers passed to child components
-433: 
-434: ---
-435: 
-436: ## 8. Integration Patterns
-437: 
-438: ### 8.1 Error Handling Strategy
-439: 
-440: **Command Errors:**
-441: - Rust `Result` types mapped to JavaScript exceptions
-442: - Ant Design `message` API for transient error notifications
-443: - Modal dialogs for critical failures (workspace access denied, iteration corruption)
-444: 
-445: **Event Stream Errors:**
-446: - `iteration_failed` events trigger error boundary catches
-447: - Automatic state reset to prevent UI desynchronization
-448: - Retry mechanisms with exponential backoff for transient network issues
-449: 
-450: ### 8.2 Cross-Panel Communication
-451: 
-452: **Refresh Coordination:**
-453: ```javascript
-454: // Counter-based invalidation pattern
-455: const [memoryRefreshTrigger, setMemoryRefreshTrigger] = useState(0);
-456: 
-457: // Trigger from App.tsx when iteration completes
-458: useEffect(() => {
-459:   if (iterationCompleted) {
-460:     setMemoryRefreshTrigger(prev => prev + 1);
-461:   }
-462: }, [iterationCompleted]);
-463: 
-464: // Consumption in MemoryPanel
-465: useEffect(() => {
-466:   loadMemoryData();
-467: }, [memoryRefreshTrigger]);
-468: ```
-469: 
-470: **View Switching:**
-471: - Programmatic navigation via `setActiveView` prop drilling
-472: - Context-aware switching (e.g., artifact confirmation switches to Code view for code files, Artifacts view for markdown)
-473: 
-474: ---
-475: 
-476: ## 9. Security Considerations
-477: 
-478: **Path Validation:**
-479: - All file paths validated by backend `runtime_security` module before operations
-480: - Frontend displays workspace-relative paths only (absolute paths obscured)
-481: - Traversal attack prevention via backend path canonicalization
-482: 
-483: **Content Security:**
-484: - IFrame sandboxing for Preview panel (`sandbox="allow-scripts allow-same-origin"`)
-485: - Monaco Editor runs in isolated context
-486: - Markdown rendering sanitizes HTML to prevent XSS via AI-generated content
-487: 
-488: **Process Isolation:**
-489: - Development servers spawned in separate processes with restricted environment
-490: - Frontend cannot execute arbitrary shell commands (all commands validated by backend Tool domain)
-491: 
-492: ---
-493: 
-494: ## 10. Known Limitations & Technical Debt
-495: 
-496: **Current Issues:**
-497: 1. **Large Component**: `App.tsx` exceeds 800 LOC with complex state management; candidate for component splitting
-498: 2. **Memory Leaks**: Event listeners in early returns may not cleanup properly if component unmounts during async operations
-499: 3. **Chat History Performance**: Long-running iterations may accumulate large message arrays without virtualization
-500: 
-501: **Future Improvements:**
-502: - Component splitting: Extract chat logic, iteration management, and panel rendering into separate modules
-503: - Optimize message handling for very long-running iterations
-504: - Consider WebSocket fallback for Tauri IPC in potential web deployment scenarios
-505: 
-506: ---
-507: 
-508: ## 11. Development Guidelines
-509: 
-510: **Adding New Panels:**
-511: 1. Create component in `src/components/`
-512: 2. Add panel key to `activeView` state in UI store (`src/stores/uiStore.ts`)
-513: 3. Add menu item in `App.tsx` Sider menu with icon and label
-514: 4. Add rendering logic in `App.tsx` renderContent function
-515: 5. Add necessary IPC commands to Tauri backend
-516: 6. Register event listeners in panel's `useEffect`
-517: 
-518: **Event Listener Best Practices:**
-519: ```javascript
-520: useEffect(() => {
-521:   let unlisten;
-522:   
-523:   const setupListener = async () => {
-524:     unlisten = await listen('event_name', handler);
-525:   };
-526:   
-527:   setupListener();
-528:   
-529:   return () => {
-530:     if (unlisten) unlisten.then(f => f());
-531:   };
-532: }, []);
-533: ```
-534: 
-535: **Styling Conventions:**
-536: - Use Ant Design tokens for consistency (`token.colorPrimary`, `token.borderRadius`)
-537: - CSS Modules for component-scoped styles
-538: - Responsive breakpoints: `xs` (<576px), `sm` (≥576px), `md` (≥768px), `lg` (≥992px), `xl` (≥1200px)
-539: 
-540: ---
-541: 
-542: **Conclusion:** The GUI Frontend Domain successfully abstracts the complexity of the AI agent pipeline into an intuitive desktop interface. Its event-driven architecture enables real-time collaboration between human developers and AI agents, while the modular panel structure supports diverse workflows from project initialization to code deployment. The domain maintains strict separation from core business logic through the Tauri IPC boundary, ensuring architectural integrity while delivering responsive user experiences.
-543: 
-544: ---
-545: 
-546: ## 12. Project Manager Agent (PM Agent) Interface
-547: 
-548: The GUI provides a dedicated interface for post-delivery interactions through the Project Manager Agent.
-549: 
-550: ### 12.1 PM Agent Activation
-551: 
-552: The PM Agent becomes available when an iteration reaches `Completed` status:
-553: - Chat mode automatically switches from `pipeline` to `pm_agent`
-554: - A welcome message is displayed with quick action buttons
-555: - The chat interface becomes available for natural language interaction
-556: 
-557: ### 12.2 PM Agent Features
-558: 
-559: **Welcome Actions**:
-560: - 🚀 **Start Application**: Launch the generated application
-561: - 📁 **Open Project Folder**: Open workspace in file explorer
-562: - 📄 **View Artifacts**: Navigate to artifacts viewer
-563: - 💻 **View Source Code**: Navigate to code editor
-564: - 📚 **View Knowledge Base**: Navigate to knowledge panel
-565: 
-566: **Conversational Interactions**:
-567: - Ask questions about the project (technology stack, architecture, etc.)
-568: - Request code modifications → Triggers `goto_stage` to Coding
-569: - Request new features → Triggers `create_iteration` with inheritance
-570: - Save decisions to project memory
-571: 
-572: ### 12.3 PM Agent State Management
-573: 
-574: **State Variables** (in `useAgentStore`):
-575: - `pmMessages[]`: Message history for PM Agent chat
-576: - `pmProcessing`: Boolean indicating PM Agent is processing a request
-577: - `chatMode`: Current chat mode (`pipeline` | `pm_agent` | `disabled`)
-578: 
-579: **Events**:
-580: | Event | Purpose |
-581: |-------|---------|
-582: | `pm_message` | PM Agent response message |
-583: | `pm_actions` | Actionable buttons for user |
-584: | `agent_streaming` | Real-time streaming from PM Agent |
-585: | `iteration_created` | New iteration created via PM Agent |
-586: 
-587: ### 12.4 PM Agent Commands
-588: 
-589: | Command | Parameters | Description |
-590: |---------|------------|-------------|
-591: | `pm_send_message` | `iteration_id`, `message`, `history` | Send message to PM Agent |
-592: | `pm_restart_iteration` | `iteration_id`, `target_stage` | Restart from specific stage |
-593: | `pm_get_welcome_message` | `iteration_id` | Get welcome message with actions |
-594: 
-595: ---
-596: 
-597: ## 13. Settings Panel: External Coding Agent Configuration
-598: 
-599: The Settings Panel (`SettingsPanel.tsx`) provides configuration for external coding agents:
-600: 
-601: ### 13.1 Configuration Fields
-602: 
-603: | Field | Type | Description |
-604: |-------|------|-------------|
-605: | `enabled` | Boolean | Enable/disable external agent |
-606: | `agent_type` | Select | Agent type (opencode, iflow, codex, gemini, claude) |
-607: | `command` | String | Command to execute (e.g., "bun") |
-608: | `args` | String[] | Command arguments |
-609: | `transport` | Select | Communication transport (stdio, websocket) |
-610: | `workspace_path` | String | Optional workspace path override |
-611: 
-612: ### 13.2 Agent Types
-613: 
-614: ```
-615: OpenCode  → bun x opencode-ai acp
-616: iFlow     → iflow acp
-617: Codex     → codex
-618: Gemini    → gemini
-619: Claude    → claude
-620: ```
-621: 
-622: ### 13.3 UI Components
-623: 
-624: - **Enable Switch**: Toggle for external agent activation
-625: - **Agent Type Selector**: Dropdown with supported agent types
-626: - **Command Input**: Text input for the executable command
-627: - **Arguments Input**: Tag-style multi-value input for arguments
-628: - **Transport Selector**: stdio or websocket options
-629: - **Test Connection Button**: Validates LLM configuration
-630: 
-631: ---
-632: 
-633: ## 14. Technology Stack Updates
-634: 
-635: ### 14.1 Current Stack (Updated)
-636: 
-637: | Layer | Technology | Purpose |
-638: |-------|-----------|---------|
-639: | **UI Framework** | React 18 + TypeScript | Component-based declarative UI with type safety |
-640: | **State Management** | Zustand | Lightweight centralized state with stores |
-641: | **Component Library** | Ant Design 5.x | Enterprise-grade UI components |
-642: | **Desktop Shell** | Tauri 1.x+ | Rust-based desktop runtime |
-643: | **Code Editor** | Monaco Editor | VS Code-powered editing |
-644: | **Virtualization** | react-window | Performance optimization |
-645: 
-646: ### 14.2 Zustand Stores
-647: 
-648: **useProjectStore**: Project and iteration state management
-649: **useAgentStore**: Chat messages, PM messages, processing states
-650: **useUIStore**: Active view, refresh triggers, UI preferences
 ````
 
 ### litho.docs/en/4.Deep-Exploration/Interaction Domain.md (330 lines)
