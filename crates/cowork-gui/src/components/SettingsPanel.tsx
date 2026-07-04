@@ -8,7 +8,7 @@ const { Password } = Input;
 
 const AGENT_TYPES = [
   { value: "opencode", label: "OpenCode" },
-  { value: "iflow", label: "iFlow" },
+  { value: "codebuddy", label: "CodeBuddy" },
   { value: "codex", label: "Codex" },
   { value: "gemini", label: "Gemini CLI" },
   { value: "claude", label: "Claude CLI" },
@@ -63,6 +63,23 @@ const SettingsPanel: React.FC = () => {
   const [hasConfig, setHasConfig] = useState(false);
   const [testingTavily, setTestingTavily] = useState(false);
   const [testingDeepWiki, setTestingDeepWiki] = useState(false);
+
+  // Preset configs for known agent types
+  const AGENT_PRESETS: Record<string, { command: string; args: string[] }> = {
+    opencode: { command: "bun", args: ["x", "opencode-ai", "acp"] },
+    codebuddy: { command: "codebuddy", args: ["--acp"] },
+    codex: { command: "codex", args: ["--acp"] },
+    gemini: { command: "gemini", args: ["--acp"] },
+    claude: { command: "claude", args: ["--acp"] },
+  };
+
+  const handleAgentTypeChange = (value: string) => {
+    const preset = AGENT_PRESETS[value];
+    if (preset) {
+      form.setFieldValue(["coding_agent", "command"], preset.command);
+      form.setFieldValue(["coding_agent", "args"], preset.args);
+    }
+  };
 
   useEffect(() => {
     loadConfig();
@@ -242,7 +259,7 @@ const SettingsPanel: React.FC = () => {
           <Paragraph type="secondary" style={{ marginBottom: "16px" }}>
             Configure remote Model Context Protocol (MCP) services to extend agent capabilities.
           </Paragraph>
-          
+
           <Form.Item name={["mcp", "tavily_api_key"]} label={
             <Space>
               <SearchOutlined />
@@ -253,9 +270,9 @@ const SettingsPanel: React.FC = () => {
             <Password placeholder="tvly-dev-your-api-key" />
           </Form.Item>
           <Form.Item>
-            <Button 
-              icon={<CheckCircleOutlined />} 
-              onClick={handleTestTavily} 
+            <Button
+              icon={<CheckCircleOutlined />}
+              onClick={handleTestTavily}
               loading={testingTavily}
               size="small"
             >
@@ -278,9 +295,9 @@ const SettingsPanel: React.FC = () => {
             {({ getFieldValue }) =>
               getFieldValue(["mcp", "deepwiki_enabled"]) ? (
                 <Form.Item>
-                  <Button 
-                    icon={<CheckCircleOutlined />} 
-                    onClick={handleTestDeepWiki} 
+                  <Button
+                    icon={<CheckCircleOutlined />}
+                    onClick={handleTestDeepWiki}
                     loading={testingDeepWiki}
                     size="small"
                   >
@@ -301,7 +318,7 @@ const SettingsPanel: React.FC = () => {
               getFieldValue(["coding_agent", "enabled"]) ? (
                 <>
                   <Form.Item name={["coding_agent", "agent_type"]} label="Agent Type">
-                    <Select options={AGENT_TYPES} />
+                    <Select options={AGENT_TYPES} onChange={handleAgentTypeChange} />
                   </Form.Item>
                   <Form.Item name={["coding_agent", "command"]} label="Command">
                     <Input placeholder="bun" />

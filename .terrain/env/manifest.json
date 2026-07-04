@@ -1,0 +1,10 @@
+{
+  "catalog_version": 1,
+  "integrated_at": "2026-07-04T15:54:24.903731100+00:00",
+  "applied": [
+    "tool-codegraph: CodeGraph 已初始化 .codegraph/（Agent 使用 ~/.terrain/bin/codegraph，见 .terrain/env/agent-tools.json）",
+    "agents-md: 已更新 D:\\workspace\\SAW_S\\cowork-forge\\AGENTS.md",
+    "gitignore-repomix: 追加 1 条规则",
+    "gitignore-sdd-agent: 追加 1 条规则"
+  ]
+}

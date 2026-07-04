@@ -76,33 +76,44 @@ pub async fn execute_stage_with_instruction(
     ctx: &PipelineContext,
     interaction: Arc<dyn InteractiveBackend>,
     stage_name: &str,
+    instruction: &str,
+    feedback: Option<&str>,
+) -> StageResult {
+    execute_stage_with_instruction_and_context(ctx, interaction, stage_name, instruction, feedback, None).await
+}
+
+pub async fn execute_stage_with_instruction_and_context(
+    ctx: &PipelineContext,
+    interaction: Arc<dyn InteractiveBackend>,
+    stage_name: &str,
     _instruction: &str,
     feedback: Option<&str>,
+    extra_context: Option<&str>,
 ) -> StageResult {
     // Set iteration ID for data tools (V2 architecture)
     set_iteration_id(ctx.iteration.id.clone());
 
     // Check for restart mode (GotoStage mechanism)
-    if let Ok(Some(session_meta)) = crate::persistence::load_session_meta() {
-        if let Some(restart_reason) = session_meta.restart_reason {
-            // This is a restart from a previous stage
-            interaction
-                .show_message(
-                    crate::interaction::MessageLevel::Warning,
-                    format!(
-                        "🔄 RESTART MODE: Restarting {} stage due to: {}",
-                        stage_name, restart_reason
-                    ),
-                )
-                .await;
+    if let Ok(Some(session_meta)) = crate::persistence::load_session_meta()
+        && let Some(restart_reason) = session_meta.restart_reason
+    {
+        // This is a restart from a previous stage
+        interaction
+            .show_message(
+                crate::interaction::MessageLevel::Warning,
+                format!(
+                    "🔄 RESTART MODE: Restarting {} stage due to: {}",
+                    stage_name, restart_reason
+                ),
+            )
+            .await;
 
-            // Clear the restart reason after displaying it
-            if let Ok(mut meta) = crate::persistence::load_session_meta() {
-                if let Some(ref mut m) = meta {
-                    m.restart_reason = None;
-                    let _ = crate::persistence::save_session_meta(m);
-                }
-            }
+        // Clear the restart reason after displaying it
+        if let Ok(mut meta) = crate::persistence::load_session_meta()
+            && let Some(ref mut m) = meta
+        {
+            m.restart_reason = None;
+            let _ = crate::persistence::save_session_meta(m);
         }
     }
 
@@ -148,7 +159,7 @@ pub async fn execute_stage_with_instruction(
     let display_name = get_display_name(internal_name);
 
     // Build prompt with context
-    let prompt = build_prompt(ctx, stage_name, feedback);
+    let prompt = build_prompt(ctx, stage_name, feedback, extra_context);
 
     // Execute agent - send start notification with user-friendly name
     let status_msg = if feedback.is_some() {
@@ -281,24 +292,26 @@ pub async fn execute_stage_with_instruction(
         // Check if the agent saved the artifact via a tool call (e.g., save_idea)
         // even though it didn't produce any text output in the stream
         if let Some(ref path) = artifact_path {
-            if path.exists() {
-                if let Ok(content) = std::fs::read_to_string(path) {
-                    if !content.trim().is_empty() {
-                        tracing::info!(
-                            "[StageExecutor] Agent produced no text in stream, but artifact was saved via tool call ({:?}, {} chars)",
-                            path, content.len()
-                        );
-                        // Artifact exists and has content — stage is successful
-                        interaction
-                            .show_message_with_context(
-                                crate::interaction::MessageLevel::Success,
-                                format!("✓ Completed (artifact saved via tool, {} chars)", content.len()),
-                                MessageContext::new(&display_name).with_stage(stage_name),
-                            )
-                            .await;
-                        return StageResult::Success(Some(path.to_string_lossy().to_string()));
-                    }
+            if path.exists()
+                && let Ok(content) = std::fs::read_to_string(path)
+                && !content.trim().is_empty()
+            {
+                if let Err(e) = validate_artifact_content(stage_name, &content) {
+                    return StageResult::Failed(e);
                 }
+                tracing::info!(
+                    "[StageExecutor] Agent produced no text in stream, but artifact was saved via tool call ({:?}, {} chars)",
+                    path, content.len()
+                );
+                // Artifact exists and has content — stage is successful
+                interaction
+                    .show_message_with_context(
+                        crate::interaction::MessageLevel::Success,
+                        format!("✓ Completed (artifact saved via tool, {} chars)", content.len()),
+                        MessageContext::new(&display_name).with_stage(stage_name),
+                    )
+                    .await;
+                return StageResult::Success(Some(path.to_string_lossy().to_string()));
             }
         } else {
             // No artifact expected (e.g., coding stage) — just check that agent ran
@@ -345,16 +358,18 @@ pub async fn execute_stage_with_instruction(
     };
 
     // Check if artifact was saved via tool call (e.g., save_idea)
-    if artifact_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&artifact_path) {
-            if !content.trim().is_empty() {
-                tracing::info!(
-                    "[StageExecutor] Artifact saved via tool call ({:?}, {} chars)",
-                    artifact_path, content.len()
-                );
-                return StageResult::Success(Some(artifact_path.to_string_lossy().to_string()));
-            }
+    if artifact_path.exists()
+        && let Ok(content) = std::fs::read_to_string(&artifact_path)
+        && !content.trim().is_empty()
+    {
+        if let Err(e) = validate_artifact_content(stage_name, &content) {
+            return StageResult::Failed(e);
         }
+        tracing::info!(
+            "[StageExecutor] Artifact saved via tool call ({:?}, {} chars)",
+            artifact_path, content.len()
+        );
+        return StageResult::Success(Some(artifact_path.to_string_lossy().to_string()));
     }
 
     // Agent produced text output but didn't call the save tool.
@@ -404,12 +419,11 @@ pub async fn execute_stage_with_instruction(
         match result {
             Ok(event) => {
                 // Stream any text content from the follow-up
-                if let Some(content) = event.content() {
-                    if let Some(text) = extract_text_from_content(content) {
-                        if !text.trim().is_empty() {
-                            interaction.send_streaming(text, &display_name, false).await;
-                        }
-                    }
+                if let Some(content) = event.content()
+                    && let Some(text) = extract_text_from_content(content)
+                    && !text.trim().is_empty()
+                {
+                    interaction.send_streaming(text, &display_name, false).await;
                 }
             }
             Err(e) => {
@@ -419,23 +433,25 @@ pub async fn execute_stage_with_instruction(
     }
 
     // Check artifact again after follow-up
-    if artifact_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&artifact_path) {
-            if !content.trim().is_empty() {
-                tracing::info!(
-                    "[StageExecutor] Artifact saved after follow-up ({:?}, {} chars)",
-                    artifact_path, content.len()
-                );
-                interaction
-                    .show_message_with_context(
-                        crate::interaction::MessageLevel::Success,
-                        format!("✓ Artifact saved ({} chars)", content.len()),
-                        MessageContext::new(&display_name).with_stage(stage_name),
-                    )
-                    .await;
-                return StageResult::Success(Some(artifact_path.to_string_lossy().to_string()));
-            }
+    if artifact_path.exists()
+        && let Ok(content) = std::fs::read_to_string(&artifact_path)
+        && !content.trim().is_empty()
+    {
+        if let Err(e) = validate_artifact_content(stage_name, &content) {
+            return StageResult::Failed(e);
         }
+        tracing::info!(
+            "[StageExecutor] Artifact saved after follow-up ({:?}, {} chars)",
+            artifact_path, content.len()
+        );
+        interaction
+            .show_message_with_context(
+                crate::interaction::MessageLevel::Success,
+                format!("✓ Artifact saved ({} chars)", content.len()),
+                MessageContext::new(&display_name).with_stage(stage_name),
+            )
+            .await;
+        return StageResult::Success(Some(artifact_path.to_string_lossy().to_string()));
     }
 
     tracing::warn!(
@@ -448,8 +464,13 @@ pub async fn execute_stage_with_instruction(
     ))
 }
 
-/// Maximum characters for pre-injected artifacts (to avoid token limits)
-const MAX_ARTIFACT_CHARS: usize = 3000;
+/// Maximum characters for fully pre-injected artifacts.
+/// Artifacts below this size are injected in their entirety.
+const FULL_INJECTION_MAX_CHARS: usize = 12000;
+
+/// Maximum characters for artifact previews when the artifact is too large
+/// to inject fully. The agent MUST use the load tool to get the full content.
+const PREVIEW_MAX_CHARS: usize = 2000;
 
 /// Get truncated message in current language
 fn get_truncated_message() -> String {
@@ -463,13 +484,51 @@ fn get_truncated_message() -> String {
     }
 }
 
-/// Truncate content to a maximum number of characters (UTF-8 safe)
+/// Truncate content to a maximum number of characters (UTF-8 safe).
+/// This is kept for backward compatibility; new code should use
+/// `format_artifact_block` so callers can distinguish full vs. preview content.
 fn truncate_content(content: &str, max_chars: usize) -> String {
     if content.chars().count() <= max_chars {
         content.to_string()
     } else {
         let truncated: String = content.chars().take(max_chars).collect();
         format!("{}{}", truncated, get_truncated_message())
+    }
+}
+
+/// Format an artifact block for injection into the agent prompt.
+///
+/// - If the artifact is small enough, inject it in full and tell the agent it
+///   is pre-loaded.
+/// - If it is too large, inject only a preview and explicitly instruct the
+///   agent to use `load_tool` to read the complete document. This prevents
+///   the agent from making decisions on a silently truncated artifact.
+fn format_artifact_block(label: &str, content: &str, load_tool: &str) -> String {
+    let char_count = content.chars().count();
+
+    if char_count <= FULL_INJECTION_MAX_CHARS {
+        format!(
+            "═══════════════════════════════════════════════════════════════\n\
+             📋 PRE-LOADED: {} ({} characters, complete)\n\
+             ═══════════════════════════════════════════════════════════════\n\
+             {}\n\
+             ═══════════════════════════════════════════════════════════════\n\n",
+            label, char_count, content
+        )
+    } else {
+        let preview: String = content.chars().take(PREVIEW_MAX_CHARS).collect();
+        format!(
+            "═══════════════════════════════════════════════════════════════\n\
+             📋 PREVIEW: {} ({} characters total — ONLY FIRST {} CHARACTERS SHOWN)\n\
+             ═══════════════════════════════════════════════════════════════\n\
+             {}\n\
+             ...[TRUNCATED]\n\
+             ═══════════════════════════════════════════════════════════════\n\
+             ⚠️ CRITICAL: The full {} is too large to pre-load. You MUST call `{}` \
+             to read the complete document before making any decisions. Do NOT assume \
+             the preview above contains all requirements or details.\n\n",
+            label, char_count, PREVIEW_MAX_CHARS, preview, label, load_tool
+        )
     }
 }
 
@@ -490,7 +549,12 @@ fn load_artifact_content(ctx: &PipelineContext, artifact_name: &str) -> Option<S
 }
 
 /// Build prompt with iteration context and pre-injected artifacts
-fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>) -> String {
+fn build_prompt(
+    ctx: &PipelineContext,
+    stage_name: &str,
+    feedback: Option<&str>,
+    extra_context: Option<&str>,
+) -> String {
     let mut prompt = format!(
         "You are working on iteration #{} - '{}'.\n",
         ctx.iteration.number, ctx.iteration.title
@@ -510,7 +574,7 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
         prompt.push_str("═══════════════════════════════════════════════════════════════\n");
         prompt.push_str("🚨🚨🚨 CRITICAL: THIS IS AN EVOLUTION ITERATION 🚨🚨🚨\n");
         prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-        prompt.push_str("\n");
+        prompt.push('\n');
         prompt.push_str("⚠️ DO NOT CREATE NEW PROJECT - BUILD ON EXISTING CODE ⚠️\n\n");
         prompt.push_str(&format!("Base Iteration: {}\n", base_id));
         prompt.push_str(&format!("Inheritance Mode: {}\n\n", inheritance_mode_name));
@@ -565,84 +629,61 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
     prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
 
     // Pre-inject artifacts from previous stages (Optimization: reduces tool calls)
-    let mut injected_artifacts = Vec::new();
+    // We also track which artifacts were injected only as previews so the agent
+    // knows it must load the full document before making decisions.
+    let mut injected_artifacts: Vec<&'static str> = Vec::new();
+    let mut preview_artifacts: Vec<&'static str> = Vec::new();
+
+    // Helper to inject an artifact and track whether it was a preview.
+    let mut inject = |filename: &'static str, label: &'static str, load_tool: &'static str| {
+        if let Some(content) = load_artifact_content(ctx, filename) {
+            let was_preview = content.chars().count() > FULL_INJECTION_MAX_CHARS;
+            prompt.push_str(&format_artifact_block(label, &content, load_tool));
+            injected_artifacts.push(filename);
+            if was_preview {
+                preview_artifacts.push(filename);
+            }
+        }
+    };
 
     match stage_name {
         "prd" => {
             // PRD needs Idea
-            if let Some(idea) = load_artifact_content(ctx, "idea.md") {
-                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-                prompt.push_str("📋 PRE-LOADED: Idea Document (from previous stage)\n");
-                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-                prompt.push_str(&truncate_content(&idea, MAX_ARTIFACT_CHARS));
-                prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
-                injected_artifacts.push("idea.md");
-            }
+            inject("idea.md", "Idea Document (from previous stage)", "load_idea()");
         }
         "design" => {
             // Design needs PRD
-            if let Some(prd) = load_artifact_content(ctx, "prd.md") {
-                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-                prompt.push_str("📋 PRE-LOADED: PRD Document (from previous stage)\n");
-                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-                prompt.push_str(&truncate_content(&prd, MAX_ARTIFACT_CHARS));
-                prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
-                injected_artifacts.push("prd.md");
-            }
+            inject("prd.md", "PRD Document (from previous stage)", "load_prd_doc()");
         }
         "plan" => {
-            // Plan needs Design and PRD
-            if let Some(design) = load_artifact_content(ctx, "design.md") {
-                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-                prompt.push_str("📋 PRE-LOADED: Design Document (from previous stage)\n");
-                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-                prompt.push_str(&truncate_content(&design, MAX_ARTIFACT_CHARS));
-                prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
-                injected_artifacts.push("design.md");
-            }
+            // Plan needs Design (PRD can be loaded if needed)
+            inject("design.md", "Design Document (from previous stage)", "load_design_doc()");
         }
         "coding" => {
-            // Coding needs Plan (most important) and Design
-            if let Some(plan) = load_artifact_content(ctx, "plan.md") {
-                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-                prompt.push_str("📋 PRE-LOADED: Implementation Plan (from previous stage)\n");
-                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-                prompt.push_str(&truncate_content(&plan, MAX_ARTIFACT_CHARS));
-                prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
-                injected_artifacts.push("plan.md");
-            }
-            // Also include design for architecture context
-            if let Some(design) = load_artifact_content(ctx, "design.md") {
-                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-                prompt.push_str("📋 PRE-LOADED: Design Document (architecture reference)\n");
-                prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-                prompt.push_str(&truncate_content(&design, 2000)); // Smaller for coding
-                prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
-                injected_artifacts.push("design.md");
-            }
+            // Coding needs Plan (most important) and Design for architecture context
+            inject("plan.md", "Implementation Plan (from previous stage)", "load_plan_doc()");
+            inject("design.md", "Design Document (architecture reference)", "load_design_doc()");
         }
         "check" | "delivery" => {
             // Check and Delivery need all artifacts
-            let artifacts = [
-                ("idea.md", "Idea Document"),
-                ("prd.md", "PRD Document"),
-                ("design.md", "Design Document"),
-                ("plan.md", "Implementation Plan"),
-            ];
-
-            for (filename, label) in artifacts {
-                if let Some(content) = load_artifact_content(ctx, filename) {
-                    prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-                    prompt.push_str(&format!("📋 PRE-LOADED: {}\n", label));
-                    prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-                    prompt.push_str(&truncate_content(&content, 2000)); // Smaller for all artifacts
-                    prompt.push_str("\n═══════════════════════════════════════════════════════════════\n\n");
-                    injected_artifacts.push(filename);
-                }
-            }
+            inject("idea.md", "Idea Document", "load_idea()");
+            inject("prd.md", "PRD Document", "load_prd_doc()");
+            inject("design.md", "Design Document", "load_design_doc()");
+            inject("plan.md", "Implementation Plan", "load_plan_doc()");
         }
         _ => {}
     }
+
+    // Build a human-readable note about which artifacts were preview-only.
+    let preview_note = if preview_artifacts.is_empty() {
+        String::new()
+    } else {
+        format!(
+            " NOTE: The following pre-loaded documents were truncated previews: {}. \
+             Use the corresponding load tool to read the full content before making decisions.",
+            preview_artifacts.join(", ")
+        )
+    };
 
     // Provide stage-specific guidance
     match stage_name {
@@ -660,12 +701,15 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             prompt.push_str("========================================\n");
             prompt.push_str("STAGE: PRD (Product Requirements Document)\n");
             prompt.push_str("========================================\n");
-            if injected_artifacts.is_empty() {
+            if injected_artifacts.contains(&"idea.md") {
                 prompt.push_str("YOUR TASK:\n");
-                prompt.push_str("1. Load idea using load_idea() tool\n");
+                prompt.push_str(&format!(
+                    "1. The Idea document is provided above (pre-loaded or preview).{}\n",
+                    preview_note
+                ));
             } else {
                 prompt.push_str("YOUR TASK:\n");
-                prompt.push_str("1. The Idea document is provided above (pre-loaded)\n");
+                prompt.push_str("1. Load idea using load_idea() tool\n");
             }
             prompt.push_str("2. Analyze the idea and create requirements\n");
             prompt.push_str("3. SAVE PRD using save_prd_doc() tool (MANDATORY)\n\n");
@@ -674,12 +718,15 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             prompt.push_str("========================================\n");
             prompt.push_str("STAGE: Design (System Architecture)\n");
             prompt.push_str("========================================\n");
-            if injected_artifacts.is_empty() {
+            if injected_artifacts.contains(&"prd.md") {
                 prompt.push_str("YOUR TASK:\n");
-                prompt.push_str("1. Load requirements using get_requirements() tool\n");
+                prompt.push_str(&format!(
+                    "1. The PRD document is provided above (pre-loaded or preview).{}\n",
+                    preview_note
+                ));
             } else {
                 prompt.push_str("YOUR TASK:\n");
-                prompt.push_str("1. The PRD document is provided above (pre-loaded)\n");
+                prompt.push_str("1. Load requirements using get_requirements() tool\n");
             }
             prompt.push_str("2. Design system architecture (2-4 components max)\n");
             prompt.push_str("3. SAVE DESIGN using save_design_doc() tool (MANDATORY)\n\n");
@@ -688,12 +735,15 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             prompt.push_str("========================================\n");
             prompt.push_str("STAGE: Plan (Implementation Tasks)\n");
             prompt.push_str("========================================\n");
-            if injected_artifacts.is_empty() {
+            if injected_artifacts.contains(&"design.md") {
                 prompt.push_str("YOUR TASK:\n");
-                prompt.push_str("1. Load design using get_design() tool\n");
+                prompt.push_str(&format!(
+                    "1. The Design document is provided above (pre-loaded or preview).{}\n",
+                    preview_note
+                ));
             } else {
                 prompt.push_str("YOUR TASK:\n");
-                prompt.push_str("1. The Design document is provided above (pre-loaded)\n");
+                prompt.push_str("1. Load design using get_design() tool\n");
             }
             prompt.push_str("2. Create 5-12 simple implementation tasks\n");
             prompt.push_str("3. SAVE PLAN using save_plan_doc() tool (MANDATORY)\n\n");
@@ -702,12 +752,15 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             prompt.push_str("========================================\n");
             prompt.push_str("STAGE: Coding (Implementation)\n");
             prompt.push_str("========================================\n");
-            if injected_artifacts.is_empty() {
+            if injected_artifacts.contains(&"plan.md") {
                 prompt.push_str("YOUR TASK:\n");
-                prompt.push_str("1. Load plan using get_plan() tool\n");
+                prompt.push_str(&format!(
+                    "1. The Plan and Design documents are provided above (pre-loaded or preview).{}\n",
+                    preview_note
+                ));
             } else {
                 prompt.push_str("YOUR TASK:\n");
-                prompt.push_str("1. The Plan and Design documents are provided above (pre-loaded)\n");
+                prompt.push_str("1. Load plan using get_plan() tool\n");
             }
             prompt.push_str("2. Implement tasks one by one\n");
             prompt.push_str("3. Update task status using update_task_status() tool\n\n");
@@ -716,12 +769,15 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             prompt.push_str("========================================\n");
             prompt.push_str("STAGE: Check (Quality Assurance)\n");
             prompt.push_str("========================================\n");
-            if injected_artifacts.is_empty() {
+            if injected_artifacts.len() >= 4 {
                 prompt.push_str("YOUR TASK:\n");
-                prompt.push_str("1. Load all artifacts (requirements, design, plan)\n");
+                prompt.push_str(&format!(
+                    "1. All artifacts are provided above (pre-loaded or preview).{}\n",
+                    preview_note
+                ));
             } else {
                 prompt.push_str("YOUR TASK:\n");
-                prompt.push_str("1. All artifacts are provided above (pre-loaded)\n");
+                prompt.push_str("1. Load all artifacts (requirements, design, plan)\n");
             }
             prompt.push_str("2. Run quality checks\n");
             prompt.push_str("3. Use goto_stage() if issues found\n\n");
@@ -730,12 +786,15 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
             prompt.push_str("========================================\n");
             prompt.push_str("STAGE: Delivery (Final Report)\n");
             prompt.push_str("========================================\n");
-            if injected_artifacts.is_empty() {
+            if injected_artifacts.len() >= 4 {
                 prompt.push_str("YOUR TASK:\n");
-                prompt.push_str("1. Load all artifacts\n");
+                prompt.push_str(&format!(
+                    "1. All artifacts are provided above (pre-loaded or preview).{}\n",
+                    preview_note
+                ));
             } else {
                 prompt.push_str("YOUR TASK:\n");
-                prompt.push_str("1. All artifacts are provided above (pre-loaded)\n");
+                prompt.push_str("1. Load all artifacts\n");
             }
             prompt.push_str("2. Generate delivery report\n");
             prompt.push_str("3. SAVE using save_delivery_report() tool\n");
@@ -768,6 +827,14 @@ fn build_prompt(ctx: &PipelineContext, stage_name: &str, feedback: Option<&str>)
     if let Some(feedback_text) = feedback {
         prompt.push_str(&format!("USER FEEDBACK: {}\n\n", feedback_text));
         prompt.push_str("Please revise your previous work based on this feedback.\n");
+    }
+
+    if let Some(extra) = extra_context {
+        prompt.push_str("\n═══════════════════════════════════════════════════════════════\n");
+        prompt.push_str("📋 ADDITIONAL CONTEXT FROM EXTERNAL AGENT FALLBACK\n");
+        prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+        prompt.push_str(extra);
+        prompt.push_str("\n═══════════════════════════════════════════════════════════════\n");
     }
 
     // Add language preference instruction
@@ -805,17 +872,18 @@ impl SimpleInvocationContext {
             branch: "main".to_string(),
             user_content: content.clone(),
             agent,
-            // Memory and Artifacts are accessed via Tools (QueryMemoryTool, LoadArtifactTool, etc.)
-            // rather than through InvocationContext. This is intentional - tools provide more
-            // flexible access with proper validation and error handling.
-            memory: None,
+            // Memory and Artifacts are ALSO available through dedicated tools
+            // (QueryMemoryTool, LoadArtifactTool, etc.). We wire them into the
+            // InvocationContext so that framework callbacks, plugins, or future
+            // agents that rely on ctx.memory() / ctx.artifacts() work correctly.
+            memory: Some(Arc::new(SimpleMemory::new(&ctx.iteration.id))),
             session: Box::new(SimpleSession::new(&ctx.iteration.id, content.clone())),
             run_config: adk_core::RunConfig {
                 streaming_mode: adk_core::StreamingMode::SSE,
                 ..adk_core::RunConfig::default()
             },
             ended: std::sync::atomic::AtomicBool::new(false),
-            artifacts: None,
+            artifacts: Some(Arc::new(SimpleArtifacts::new(&ctx.iteration.id))),
         }
     }
 }
@@ -915,24 +983,79 @@ impl adk_core::ReadonlyContext for SimpleInvocationContext {
     }
 }
 
-/// Simple Session implementation
+
+
+/// Simple Session implementation that persists conversation history to disk.
+///
+/// History is stored as newline-delimited JSON in
+/// `.cowork-v2/iterations/{session_id}/session_history.jsonl` so that retries,
+/// actor-critic loops, and feedback revisions can see prior turns instead of
+/// starting from scratch.
 struct SimpleSession {
     session_id: String,
     app_name: String,
     user_id: String,
     simple_state: SimpleState,
-    messages: Vec<Content>,
+    messages: std::sync::Mutex<Vec<Content>>,
+    history_path: std::path::PathBuf,
 }
 
 impl SimpleSession {
     fn new(session_id: &str, initial_message: Content) -> Self {
+        let history_path = crate::persistence::get_cowork_dir()
+            .map(|dir| dir.join("iterations").join(session_id).join("session_history.jsonl"))
+            .unwrap_or_else(|_| {
+                std::path::PathBuf::from(".cowork-v2")
+                    .join("iterations")
+                    .join(session_id)
+                    .join("session_history.jsonl")
+            });
+
+        // Ensure parent directory exists and load any prior history.
+        let mut messages = Vec::new();
+        if let Some(parent) = history_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if history_path.exists()
+            && let Ok(contents) = std::fs::read_to_string(&history_path)
+        {
+            for line in contents.lines() {
+                if line.trim().is_empty() {
+                    continue;
+                }
+                if let Ok(content) = serde_json::from_str::<Content>(line) {
+                    messages.push(content);
+                }
+            }
+        }
+
+        // Add the current prompt to the in-memory history, but do NOT write it
+        // to the persistent file. The prompt is reconstructed for every agent
+        // invocation; persisting it here would duplicate it on every run.
+        messages.push(initial_message.clone());
+
         Self {
             session_id: session_id.to_string(),
             app_name: "cowork_forge".to_string(),
             user_id: "default_user".to_string(),
             simple_state: SimpleState::new(),
-            messages: vec![initial_message],
+            messages: std::sync::Mutex::new(messages),
+            history_path,
         }
+    }
+
+    fn append_message_to_file(
+        path: &std::path::PathBuf,
+        content: &Content,
+    ) -> anyhow::Result<()> {
+        let line = serde_json::to_string(content)?;
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)?;
+        writeln!(file, "{}", line)?;
+        Ok(())
     }
 }
 
@@ -954,11 +1077,221 @@ impl adk_core::Session for SimpleSession {
     }
 
     fn conversation_history(&self) -> Vec<Content> {
-        self.messages.clone()
+        self.messages.lock().map(|m| m.clone()).unwrap_or_default()
     }
 
-    fn append_to_history(&self, _content: Content) {
-        // Simple implementation - doesn't store history
+    fn append_to_history(&self, content: Content) {
+        if let Ok(mut messages) = self.messages.lock() {
+            messages.push(content.clone());
+        }
+        if let Err(e) = Self::append_message_to_file(&self.history_path, &content) {
+            tracing::warn!("Failed to persist session history: {}", e);
+        }
+    }
+}
+
+/// Minimal in-memory + file-backed artifact store for the InvocationContext.
+///
+/// This is a thin adapter over the iteration's artifacts directory. Most agents
+/// should continue to use dedicated artifact tools (load_artifact, save_artifact)
+/// for validation and schema enforcement; this store exists so that framework
+/// callbacks and plugins can access artifacts through `CallbackContext::artifacts()`.
+struct SimpleArtifacts {
+    artifacts_dir: std::path::PathBuf,
+}
+
+impl SimpleArtifacts {
+    fn new(iteration_id: &str) -> Self {
+        let artifacts_dir = crate::persistence::get_cowork_dir()
+            .map(|dir| dir.join("iterations").join(iteration_id).join("artifacts"))
+            .unwrap_or_else(|_| {
+                std::path::PathBuf::from(".cowork-v2")
+                    .join("iterations")
+                    .join(iteration_id)
+                    .join("artifacts")
+            });
+        let _ = std::fs::create_dir_all(&artifacts_dir);
+        Self { artifacts_dir }
+    }
+
+    fn safe_name(name: &str) -> Option<String> {
+        let sanitized: String = name
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
+            .collect();
+        if sanitized.is_empty() || sanitized != name {
+            None
+        } else {
+            Some(sanitized)
+        }
+    }
+
+    fn path_for(&self, name: &str) -> Option<std::path::PathBuf> {
+        Self::safe_name(name).map(|n| self.artifacts_dir.join(n))
+    }
+}
+
+#[async_trait::async_trait]
+impl adk_core::Artifacts for SimpleArtifacts {
+    async fn save(&self, name: &str, data: &adk_core::Part) -> adk_core::Result<i64> {
+        let path = self.path_for(name).ok_or_else(|| {
+            adk_core::AdkError::tool(format!("Invalid artifact name: {}", name))
+        })?;
+
+        match data {
+            adk_core::Part::Text { text } => {
+                std::fs::write(&path, text).map_err(|e| {
+                    adk_core::AdkError::tool(format!("Failed to write artifact {}: {}", name, e))
+                })?;
+            }
+            adk_core::Part::InlineData { mime_type, data } => {
+                let ext = match mime_type.as_str() {
+                    "text/markdown" | "text/plain" => "txt",
+                    "application/json" => "json",
+                    "image/png" => "png",
+                    "image/jpeg" => "jpg",
+                    _ => "bin",
+                };
+                let path = path.with_extension(ext);
+                std::fs::write(&path, data).map_err(|e| {
+                    adk_core::AdkError::tool(format!("Failed to write artifact {}: {}", name, e))
+                })?;
+            }
+            adk_core::Part::FileData { file_uri, .. } => {
+                // We cannot meaningfully save a URI reference to local disk.
+                return Err(adk_core::AdkError::tool(format!(
+                    "Cannot save FileData artifact with URI: {}",
+                    file_uri
+                )));
+            }
+            _ => {
+                return Err(adk_core::AdkError::tool(
+                    "Unsupported artifact part type".to_string(),
+                ));
+            }
+        }
+        Ok(1)
+    }
+
+    async fn load(&self, name: &str) -> adk_core::Result<adk_core::Part> {
+        let path = self.path_for(name).ok_or_else(|| {
+            adk_core::AdkError::tool(format!("Invalid artifact name: {}", name))
+        })?;
+
+        let data = std::fs::read(&path).map_err(|e| {
+            adk_core::AdkError::tool(format!("Failed to read artifact {}: {}", name, e))
+        })?;
+
+        // Try to return as text for UTF-8 content, otherwise inline binary.
+        if let Ok(text) = String::from_utf8(data.clone()) {
+            Ok(adk_core::Part::Text { text })
+        } else {
+            let mime_type = match path.extension().and_then(|e| e.to_str()) {
+                Some("png") => "image/png",
+                Some("jpg") | Some("jpeg") => "image/jpeg",
+                _ => "application/octet-stream",
+            }
+            .to_string();
+            Ok(adk_core::Part::InlineData { mime_type, data })
+        }
+    }
+
+    async fn list(&self) -> adk_core::Result<Vec<String>> {
+        let mut names = Vec::new();
+        if self.artifacts_dir.exists() {
+            for entry in std::fs::read_dir(&self.artifacts_dir).map_err(|e| {
+                adk_core::AdkError::tool(format!("Failed to list artifacts: {}", e))
+            })? {
+                let entry = entry.map_err(|e| adk_core::AdkError::tool(format!("Failed to read artifact entry: {}", e)))?;
+                if entry.file_type().map(|t| t.is_file()).unwrap_or(false)
+                    && let Some(name) = entry.file_name().to_str()
+                {
+                    names.push(name.to_string());
+                }
+            }
+        }
+        Ok(names)
+    }
+}
+
+/// Minimal memory adapter for the InvocationContext.
+///
+/// Delegates to the project's persisted memory store. Agents should prefer the
+/// dedicated `query_memory` tool for richer filtering; this adapter lets the
+/// framework call `InvocationContext::memory()` without returning `None`.
+struct SimpleMemory {
+    iteration_id: String,
+}
+
+impl SimpleMemory {
+    fn new(iteration_id: &str) -> Self {
+        Self {
+            iteration_id: iteration_id.to_string(),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl adk_core::Memory for SimpleMemory {
+    async fn search(&self, query: &str) -> adk_core::Result<Vec<adk_core::MemoryEntry>> {
+        let store = crate::persistence::MemoryStore::new();
+        let memory_query = crate::domain::MemoryQuery {
+            scope: crate::domain::MemoryScope::Smart,
+            query_type: crate::domain::MemoryQueryType::All,
+            keywords: query.split_whitespace().map(|s| s.to_string()).collect(),
+            limit: Some(20),
+        };
+
+        let result = store.query(&memory_query, Some(&self.iteration_id)).map_err(|e| {
+            adk_core::AdkError::memory(format!("Failed to query memory: {}", e))
+        })?;
+
+        let mut entries = Vec::new();
+        for decision in result.decisions {
+            let decision_text = format!(
+                "Decision: {}\nContext: {}\nOutcome: {}\nConsequences: {}",
+                decision.title,
+                decision.context,
+                decision.decision,
+                if decision.consequences.is_empty() {
+                    "None recorded".to_string()
+                } else {
+                    decision.consequences.join(", ")
+                }
+            );
+            entries.push(adk_core::MemoryEntry {
+                content: adk_core::Content::new("model").with_text(decision_text),
+                author: "project".to_string(),
+            });
+        }
+        for pattern in result.patterns {
+            let pattern_text = format!(
+                "Pattern: {}\nDescription: {}\nUsage: {}\nTags: {}",
+                pattern.name,
+                pattern.description,
+                if pattern.usage.is_empty() {
+                    "Not specified".to_string()
+                } else {
+                    pattern.usage.join(", ")
+                },
+                if pattern.tags.is_empty() {
+                    "None".to_string()
+                } else {
+                    pattern.tags.join(", ")
+                }
+            );
+            entries.push(adk_core::MemoryEntry {
+                content: adk_core::Content::new("model").with_text(pattern_text),
+                author: "project".to_string(),
+            });
+        }
+        for insight in result.insights {
+            entries.push(adk_core::MemoryEntry {
+                content: adk_core::Content::new("model").with_text(insight.content),
+                author: insight.stage,
+            });
+        }
+        Ok(entries)
     }
 }
 
@@ -1017,4 +1350,47 @@ pub fn extract_text_from_event(event: &Event) -> Option<String> {
         // Not a content event (could be tool call, result, or error)
         None
     }
+}
+
+/// Validate that a stage artifact contains meaningful content.
+///
+/// This prevents downstream stages from consuming placeholder output such as
+/// "TODO", "FIXME", or near-empty documents. Returns `Ok(())` when the
+/// content looks valid, otherwise returns an error message describing the issue.
+fn validate_artifact_content(stage_name: &str, content: &str) -> std::result::Result<(), String> {
+    let trimmed = content.trim();
+
+    if trimmed.is_empty() {
+        return Err(format!("Stage '{}' produced an empty artifact", stage_name));
+    }
+
+    if trimmed.chars().count() < 50 {
+        return Err(format!(
+            "Stage '{}' produced an artifact that is too short ({} chars). Provide a complete document.",
+            stage_name,
+            trimmed.chars().count()
+        ));
+    }
+
+    // Reject documents that are only placeholders.
+    let upper = trimmed.to_uppercase();
+    let placeholder_only = ["TODO", "FIXME", "TBD", "PLACEHOLDER", "NOT IMPLEMENTED"]
+        .iter()
+        .any(|p| upper.contains(p));
+    if placeholder_only {
+        return Err(format!(
+            "Stage '{}' artifact appears to contain only placeholder text (TODO/FIXME/TBD). Provide complete content.",
+            stage_name
+        ));
+    }
+
+    // Markdown artifacts should contain at least one heading.
+    if stage_name != "coding" && !content.contains('#') {
+        return Err(format!(
+            "Stage '{}' markdown artifact is missing headings. Use proper markdown structure.",
+            stage_name
+        ));
+    }
+
+    Ok(())
 }

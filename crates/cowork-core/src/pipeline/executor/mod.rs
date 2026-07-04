@@ -46,20 +46,26 @@ impl IterationExecutor {
         Ok(iteration)
     }
 
-    /// Create a new Evolution iteration (based on previous iteration)
+    /// Create a new Evolution iteration (based on previous iteration).
+    ///
+    /// `inheritance` controls what files are copied from the base iteration.
+    /// Use `InheritanceMode::Partial` for typical incremental feature work
+    /// (copies code, not artifacts) and `InheritanceMode::Full` when you want
+    /// to start from an exact snapshot of the base iteration.
     pub fn create_evolution_iteration(
         &self,
         project: &mut Project,
         title: impl Into<String>,
         description: impl Into<String>,
         base_iteration_id: impl Into<String>,
+        inheritance: crate::domain::InheritanceMode,
     ) -> anyhow::Result<crate::domain::Iteration> {
         let iteration = crate::domain::Iteration::create_evolution(
             project,
             title.into(),
             description.into(),
             base_iteration_id.into(),
-            crate::domain::InheritanceMode::Full,
+            inheritance,
         );
 
         self.iteration_store.save(&iteration)?;
@@ -141,10 +147,14 @@ impl IterationExecutor {
         }
 
         println!("[Executor] Starting stage execution loop...");
-        self.execute_stages_from(project, &mut iteration, stages, workspace, flow_config).await
+        self.execute_stages_from(project, &mut iteration, stages, workspace, flow_config, 0).await
     }
 
-    /// Execute stages starting from a given list
+    /// Execute stages starting from a given list.
+    ///
+    /// `goto_depth` tracks how many times we have jumped backwards via
+    /// `goto_stage`. It protects against unbounded recursion when a fix does
+    /// not resolve the underlying issue (e.g. Check -> Coding -> Check loop).
     async fn execute_stages_from(
         &self,
         project: &mut Project,
@@ -152,10 +162,12 @@ impl IterationExecutor {
         stages: Vec<Box<dyn crate::pipeline::Stage>>,
         workspace: std::path::PathBuf,
         flow_config: crate::config_definition::flow_definition::FlowConfig,
+        goto_depth: u32,
     ) -> anyhow::Result<()> {
         const MAX_STAGE_RETRIES: u32 = 3;
         const RETRY_DELAY_MS: u64 = 5000;
         const MAX_FEEDBACK_LOOPS: u32 = 5;
+        const MAX_GOTO_DEPTH: u32 = 10;
         
         let total_stages = stages.len();
         let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
@@ -217,9 +229,14 @@ impl IterationExecutor {
                         .filter(|f| f.stage == stage_name)
                         .max_by_key(|f| f.timestamp)
                     {
-                        tracing::info!("[Executor] Found stored feedback for stage '{}': {}", 
+                        tracing::info!("[Executor] Found stored feedback for stage '{}': {}",
                             stage_name, fb.details.chars().take(100).collect::<String>());
                         current_feedback = Some(fb.details.clone());
+                        // Consume the feedback immediately so it is not re-applied on a
+                        // later attempt or a subsequent run of this stage.
+                        if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
+                            eprintln!("[Warning] Failed to clear consumed feedback for stage '{}': {}", stage_name, e);
+                        }
                     }
                 }
 
@@ -245,22 +262,31 @@ impl IterationExecutor {
                                 )
                                 .await;
 
-                            if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
-                                eprintln!("[Warning] Failed to clear feedback for stage '{}': {}", stage_name, e);
+                            // The feedback stored by goto_stage is for the target
+                            // stage; it will be consumed when that stage starts.
+                            // We no longer clear the current stage's feedback here.
+
+                            if goto_depth >= MAX_GOTO_DEPTH {
+                                anyhow::bail!(
+                                    "Maximum goto stage depth ({}) reached. Stage '{}' keeps requesting jumps to '{}'. Last reason: {}",
+                                    MAX_GOTO_DEPTH, stage_name, target_stage, reason
+                                );
                             }
 
                             iteration.set_stage(&target_stage);
                             self.iteration_store.save(&iteration)?;
 
                             let new_stages = get_stages_from_flow(&target_stage);
-                            
+
                             self.interaction
                                 .show_message_with_context(
                                     crate::interaction::MessageLevel::Info,
                                     format!(
-                                        "Restarting pipeline from '{}' stage with {} stages to execute",
+                                        "Restarting pipeline from '{}' stage with {} stages to execute (goto depth {}/{})",
                                         target_stage,
-                                        new_stages.len()
+                                        new_stages.len(),
+                                        goto_depth + 1,
+                                        MAX_GOTO_DEPTH
                                     ),
                                     MessageContext::new("Pipeline Controller"),
                                 )
@@ -272,6 +298,7 @@ impl IterationExecutor {
                                 new_stages,
                                 workspace.clone(),
                                 flow_config.clone(),
+                                goto_depth + 1,
                             )).await;
                         }
                         StageResult::Success(artifact_path) => {
@@ -402,6 +429,7 @@ impl IterationExecutor {
                         }
                         StageResult::Failed(e) => {
                             last_error = Some(e.clone());
+                            eprintln!("[Executor] Stage '{}' failed: {}", stage_name, e);
                             self.interaction
                                 .show_message_with_context(
                                     crate::interaction::MessageLevel::Error,

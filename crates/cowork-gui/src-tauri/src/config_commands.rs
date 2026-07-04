@@ -672,6 +672,7 @@ pub async fn test_llm_connection(llm_config: LlmConfig) -> Result<bool, String> 
         contents,
         config: None,
         tools: Default::default(),
+        previous_response_id: None,
     };
 
     let mut stream = client

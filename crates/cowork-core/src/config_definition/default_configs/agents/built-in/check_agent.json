@@ -38,6 +38,9 @@
     },
     {
       "tool_id": "save_check_report"
+    },
+    {
+      "tool_id": "goto_stage"
     }
   ],
   "model": {

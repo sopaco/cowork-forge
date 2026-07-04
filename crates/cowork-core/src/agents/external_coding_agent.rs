@@ -12,10 +12,10 @@ use crate::instructions::coding::CODING_ACTOR_INSTRUCTION;
 use crate::llm::config::{load_config, CodingAgentConfig};
 
 /// External Coding Agent Adapter
-/// 
-/// This adapter allows Cowork to use external coding CLI tools (like iFlow, Gemini CLI, Codex)
+///
+/// This adapter allows Cowork to use external coding CLI tools (like Codex, Claude Code, Gemini)
 /// as the underlying coding agent instead of the built-in adk-rust agent.
-/// 
+///
 /// The adapter communicates with the external agent via ACP (Agent Client Protocol),
 /// either through stdio or WebSocket.
 pub struct ExternalCodingAgent {
@@ -47,13 +47,13 @@ impl ExternalCodingAgent {
     pub async fn new_with_iteration(workspace: &PathBuf, iteration: Option<Iteration>) -> Result<Self> {
         eprintln!("DEBUG: ExternalCodingAgent::new_with_iteration called with workspace: {}", workspace.display());
         if let Some(ref iter) = iteration {
-            eprintln!("DEBUG: Iteration context: id={}, base_id={:?}, inheritance={:?}", 
+            eprintln!("DEBUG: Iteration context: id={}, base_id={:?}, inheritance={:?}",
                 iter.id, iter.base_iteration_id, iter.inheritance);
         }
-        
+
         let config = load_config()
             .context("Failed to load config")?;
-        
+
         eprintln!("DEBUG: Config loaded, coding_agent.enabled: {}", config.coding_agent.enabled);
 
         if !config.coding_agent.enabled {
@@ -76,7 +76,7 @@ impl ExternalCodingAgent {
     }
 
     /// Execute a coding task with streaming messages
-    /// 
+    ///
     /// Returns a StreamingTask with a message receiver for real-time updates
     /// and a result future for the final output.
     pub fn execute_task_stream(
@@ -85,7 +85,7 @@ impl ExternalCodingAgent {
         project_context: &str,
     ) -> StreamingTask {
         let prompt = self.build_prompt(task_description, project_context);
-        
+
         // Use the execute_with_external_agent directly to avoid async issues
         let (messages, result) = crate::acp::execute_with_external_agent(
             self.config,
@@ -100,7 +100,7 @@ impl ExternalCodingAgent {
     }
 
     /// Execute a coding task (simpler API)
-    /// 
+    ///
     /// This method sends the task to the external agent and returns the result.
     /// It builds a comprehensive prompt including:
     /// - The base instruction
@@ -118,7 +118,7 @@ impl ExternalCodingAgent {
 
         // Create client and execute
         let mut client = AcpClient::from_config(&self.config, &self.workspace).await?;
-        
+
         // Execute the task
         match client.execute_task(&prompt).await {
             Ok(result) => {
@@ -140,7 +140,7 @@ impl ExternalCodingAgent {
         let is_evolution = self.iteration.as_ref()
             .map(|i| i.base_iteration_id.is_some())
             .unwrap_or(false);
-        
+
         let inheritance_mode = self.iteration.as_ref()
             .map(|i| i.inheritance)
             .unwrap_or(InheritanceMode::None);
@@ -155,7 +155,7 @@ impl ExternalCodingAgent {
             prompt.push_str("This iteration builds upon an EXISTING project.\n");
             prompt.push_str("The workspace directory already contains code from a previous iteration.\n");
             prompt.push_str("\n");
-            
+
             match inheritance_mode {
                 InheritanceMode::Partial => {
                     prompt.push_str("📋 INHERITANCE MODE: PARTIAL\n");
@@ -170,7 +170,7 @@ impl ExternalCodingAgent {
                 }
                 InheritanceMode::None => {}
             }
-            
+
             prompt.push_str("\n");
             prompt.push_str("🎯 YOUR TASK:\n");
             prompt.push_str("1. FIRST, list the existing files in the workspace to understand the current structure\n");

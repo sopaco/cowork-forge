@@ -5,7 +5,7 @@ use crate::interaction::{InteractiveBackend, MessageContext, MessageLevel};
 use crate::llm::config::load_config;
 use crate::pipeline::{PipelineContext, Stage, StageResult};
 use crate::instructions::coding::CODING_ACTOR_INSTRUCTION;
-use crate::pipeline::stage_executor::execute_stage_with_instruction;
+use crate::pipeline::stage_executor::{execute_stage_with_instruction, execute_stage_with_instruction_and_context};
 use crate::acp::AgentMessage;
 
 /// Coding Stage - Generate code implementation using Agent with Instructions + Tools
@@ -113,13 +113,20 @@ impl CodingStage {
                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
                     )
                     .await;
-                // Fall back to built-in agent
+                // Fall back to built-in agent. Preserve the external agent's
+                // task description (plan + feedback context) so the built-in
+                // agent does not start from a blank slate.
                 tracing::warn!("Falling back to built-in coding agent");
-                return if let Some(fb) = feedback {
-                    execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, Some(fb)).await
-                } else {
-                    execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, None).await
-                };
+                let fallback_feedback = feedback;
+                return execute_stage_with_instruction_and_context(
+                    ctx,
+                    interaction,
+                    "coding",
+                    CODING_ACTOR_INSTRUCTION,
+                    fallback_feedback,
+                    Some(&task_description),
+                )
+                .await;
             }
         };
 

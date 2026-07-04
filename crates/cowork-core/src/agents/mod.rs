@@ -856,9 +856,9 @@ pub async fn execute_pm_agent_message_streaming(
                 if new_iteration.id != iteration_id {
                     detected_actions.push(PMAgentAction::CreateIteration {
                         iteration_id: new_iteration.id.clone(),
-                        title: title,
-                        description: description,
-                        inheritance: inheritance,
+                        title,
+                        description,
+                        inheritance,
                     });
                 }
             }
