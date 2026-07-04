@@ -118,8 +118,7 @@ _Source: `.terrain/knowledge/10-internal-framework.md` (truncated)_
 ### Error Categories
 - **Domain Errors**: Business logic violations
 - **Infrastructure Errors**: I/O and external system failures
-- **Configuration Errors**: Invalid settings or parameters
-- **Security Errors**: Path validation or command sanitizati
+- **Configura
 
 …
 
@@ -273,7 +272,7 @@ hitl_tools::show_progress(
 [llm]
 provider = "openai"
 api_key = "your-api-key"
-model = "gpt-4"
+model = "gpt-5"
 
 [pipeline]
 max_iterations = 10
@@ -295,12 +294,7 @@ config::get_setting(key: &str) -> Result<Value>
 config::update_setting(key: &str, value: Value) -> Result<()>
 ```
 
-## Event System
-
-### Tauri Events
-- `pipeline-progress` - Pipeline execution updates
-- `agent-output` - Agent generation output
-- `stage-completed` - Stage completion no
+#
 
 …
 
@@ -442,17 +436,6 @@ impl StageId {
     pub fn new(id: &str) -> anyhow::Result<Self> {
         if id.is_empty() {
             anyhow::bail!("Stage ID cannot be empty");
-        }
-        Ok(Self(id.to_string()))
-    }
-    
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-```
 
-### Domain Event
 
 …
-

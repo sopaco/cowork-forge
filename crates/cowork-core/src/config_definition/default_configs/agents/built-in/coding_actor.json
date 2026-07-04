@@ -13,7 +13,16 @@
       "tool_id": "get_implementation_plan"
     },
     {
+      "tool_id": "get_requirements"
+    },
+    {
+      "tool_id": "load_design_doc"
+    },
+    {
       "tool_id": "update_task_status"
+    },
+    {
+      "tool_id": "update_feature_status"
     },
     {
       "tool_id": "read_file"

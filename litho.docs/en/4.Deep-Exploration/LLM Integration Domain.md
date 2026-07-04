@@ -180,7 +180,7 @@ All errors are propagated using the `anyhow` crate for ergonomic error handling:
 [llm]
 api_base_url = "https://api.openai.com/v1"
 api_key = "sk-..."
-model_name = "gpt-4"
+model_name = "gpt-5"
 max_retries = 3
 timeout_seconds = 120
 ```
@@ -191,7 +191,7 @@ timeout_seconds = 120
 |----------|-------------|----------|
 | `LLM_API_BASE_URL` | Base URL for OpenAI-compatible API | Yes |
 | `LLM_API_KEY` | Authentication key | Yes |
-| `LLM_MODEL_NAME` | Model identifier (e.g., gpt-4, gpt-3.5-turbo) | Yes |
+| `LLM_MODEL_NAME` | Model identifier (e.g., gpt-5) | Yes |
 
 **Precedence**: When both TOML and environment variables are present, the specific loading method called by the application determines which takes precedence. The factory pattern typically prioritizes explicit configuration objects over environment fallbacks.
 

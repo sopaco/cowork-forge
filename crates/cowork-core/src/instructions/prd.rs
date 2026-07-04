@@ -130,13 +130,6 @@ Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt
 - add_feature(...) ← 用于新功能
 - save_prd_doc(content) ← **Save updated PRD document (MANDATORY)**
 
-## UPDATE MODE Tools
-- update_requirement(id, title, description, priority, acceptance_criteria)
-- update_feature(id, name, description, requirement_ids, completion_criteria)
-- delete_requirement(id)
-- create_requirement(...) ← 用于新需求
-- add_feature(...) ← 用于新功能
-
 # Important Principles
 
 ## For NEW MODE

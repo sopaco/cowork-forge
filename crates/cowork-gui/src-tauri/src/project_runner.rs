@@ -17,6 +17,29 @@ pub struct ProjectRunner {
     app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
 }
 
+fn command_exists(cmd: &str) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("where")
+            .arg(cmd)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::process::Command::new("which")
+            .arg(cmd)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    }
+}
+
 struct ProjectProcess {
     child: Child,
     #[allow(dead_code)]
@@ -72,12 +95,12 @@ impl ProjectRunner {
         
         // Check if bun or sh exists
         println!("[Runner] Checking commands...");
-        if std::process::Command::new("which").arg("bun").output().map(|o| o.status.success()).unwrap_or(false) {
+        if command_exists("bun") {
             println!("[Runner] bun found");
         } else {
             println!("[Runner] bun NOT found");
         }
-        if std::process::Command::new("which").arg("sh").output().map(|o| o.status.success()).unwrap_or(false) {
+        if command_exists("sh") {
             println!("[Runner] sh found");
         } else {
             println!("[Runner] sh NOT found");

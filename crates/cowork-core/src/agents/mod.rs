@@ -1,13 +1,15 @@
 // Agents module - Agent builders using adk-rust
 //
-// IMPORTANT: This file solves a CRITICAL bug where SequentialAgent stops after
-// the first LoopAgent completes.
+// Actor-Critic Loop Design:
+// - LoopAgent runs Actor then Critic for N iterations (max_iterations)
+// - Each iteration: Actor generates/updates content → Critic reviews
+// - Actor starts each iteration by calling load_feedback_history() to get Critic feedback
+// - Critic calls provide_feedback() when issues are found; this persists to file
+// - After LoopAgent completes, stage_executor checks for unprocessed feedback
+// - If feedback exists, returns NeedsRevision so executor retries the stage
+// - executor's retry loop loads feedback and passes it to execute_with_feedback()
 //
-// PROBLEM: When a sub-agent in LoopAgent calls exit_loop(), it terminates the
-// ENTIRE SequentialAgent, not just the LoopAgent. This is adk-rust's design.
-//
-// SOLUTION: Remove exit_loop tools and use max_iterations=1 to let LoopAgent
-// complete naturally, allowing SequentialAgent to continue to next agent.
+// Anti-loop protection: MAX_STAGE_RETRIES=3 (executor level) + Critic anti-loop rules
 
 use crate::instructions::*;
 use crate::tools::*;
@@ -42,11 +44,9 @@ pub fn create_idea_agent(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>
 }
 
 pub fn create_idea_agent_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Result<Arc<dyn adk_core::Agent>> {
-    // Replace {ITERATION_ID} placeholder in instruction
     let instruction = IDEA_AGENT_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
 
     let save_idea_tool = Arc::new(SaveIdeaTool);
-    eprintln!("[DEBUG] Created SaveIdeaTool");
 
     let agent = LlmAgentBuilder::new("idea_agent")
         .instruction(&instruction)
@@ -57,7 +57,6 @@ pub fn create_idea_agent_with_id(model: Arc<dyn Llm>, iteration_id: String) -> R
         .include_contents(IncludeContents::None)
         .build()?;
 
-    eprintln!("[DEBUG] Created idea_agent successfully");
     Ok(Arc::new(agent))
 }
 
@@ -87,13 +86,11 @@ pub fn create_prd_loop(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>> 
         .include_contents(IncludeContents::None)
         .build()?;
 
-    // Create LoopAgent with agents vector
     let mut loop_agent = LoopAgent::new(
         "prd_loop",
         vec![Arc::new(prd_actor), Arc::new(prd_critic)],
     );
-    // Use max_iterations=1 to avoid SequentialAgent termination bug
-    loop_agent = loop_agent.with_max_iterations(1);
+    loop_agent = loop_agent.with_max_iterations(2);
 
     Ok(Arc::new(loop_agent))
 }
@@ -106,15 +103,15 @@ pub fn create_prd_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Res
     let prd_actor = LlmAgentBuilder::new("prd_actor")
         .instruction(&actor_instruction)
         .model(model.clone())
-        .tool(Arc::new(LoadFeedbackHistoryTool))  // For incremental update support
-        .tool(Arc::new(LoadIdeaTool))  // Load idea document
+        .tool(Arc::new(LoadFeedbackHistoryTool))
+        .tool(Arc::new(LoadIdeaTool))
         .tool(Arc::new(CreateRequirementTool))
         .tool(Arc::new(AddFeatureTool))
-        .tool(Arc::new(UpdateRequirementTool))  // For incremental updates
-        .tool(Arc::new(UpdateFeatureTool))  // For incremental updates
-        .tool(Arc::new(DeleteRequirementTool))  // For incremental updates
+        .tool(Arc::new(UpdateRequirementTool))
+        .tool(Arc::new(UpdateFeatureTool))
+        .tool(Arc::new(DeleteRequirementTool))
         .tool(Arc::new(GetRequirementsTool))
-        .tool(Arc::new(SavePrdDocTool))  // Save final PRD document
+        .tool(Arc::new(SavePrdDocTool))
         .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
         .tool(Arc::new(SaveInsightTool::new(iteration_id.clone())))
         .include_contents(IncludeContents::None)
@@ -124,20 +121,18 @@ pub fn create_prd_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Res
         .instruction(&critic_instruction)
         .model(model)
         .tool(Arc::new(GetRequirementsTool))
-        .tool(Arc::new(LoadIdeaTool))  // Load idea for context
+        .tool(Arc::new(LoadIdeaTool))
         .tool(Arc::new(ProvideFeedbackTool))
         .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
         .tool(Arc::new(SaveIssueTool::new(iteration_id.clone())))
         .include_contents(IncludeContents::None)
         .build()?;
 
-    // Create LoopAgent with agents vector
     let mut loop_agent = LoopAgent::new(
         "prd_loop",
         vec![Arc::new(prd_actor), Arc::new(prd_critic)],
     );
-    // Use max_iterations=1 to avoid SequentialAgent termination bug
-    loop_agent = loop_agent.with_max_iterations(1);
+    loop_agent = loop_agent.with_max_iterations(2);
 
     Ok(Arc::new(loop_agent))
 }
@@ -171,7 +166,7 @@ pub fn create_design_loop(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent
         .build()?;
 
     let mut loop_agent = LoopAgent::new("design_loop", vec![Arc::new(design_actor), Arc::new(design_critic)]);
-    loop_agent = loop_agent.with_max_iterations(1);
+    loop_agent = loop_agent.with_max_iterations(2);
 
     Ok(Arc::new(loop_agent))
 }
@@ -184,12 +179,12 @@ pub fn create_design_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> 
     let design_actor = LlmAgentBuilder::new("design_actor")
         .instruction(&actor_instruction)
         .model(model.clone())
-        .tool(Arc::new(LoadFeedbackHistoryTool))  // For incremental update support
+        .tool(Arc::new(LoadFeedbackHistoryTool))
         .tool(Arc::new(GetRequirementsTool))
         .tool(Arc::new(GetDesignTool))
-        .tool(Arc::new(LoadPrdDocTool))  // Load PRD document
+        .tool(Arc::new(LoadPrdDocTool))
         .tool(Arc::new(CreateDesignComponentTool))
-        .tool(Arc::new(SaveDesignDocTool))  // Save final design document
+        .tool(Arc::new(SaveDesignDocTool))
         .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
         .tool(Arc::new(SaveInsightTool::new(iteration_id.clone())))
         .tool(Arc::new(SaveIssueTool::new(iteration_id.clone())))
@@ -202,7 +197,7 @@ pub fn create_design_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> 
         .model(model)
         .tool(Arc::new(GetRequirementsTool))
         .tool(Arc::new(GetDesignTool))
-        .tool(Arc::new(LoadDesignDocTool))  // Verify design markdown
+        .tool(Arc::new(LoadDesignDocTool))
         .tool(Arc::new(CheckFeatureCoverageTool))
         .tool(Arc::new(ProvideFeedbackTool))
         .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
@@ -211,7 +206,7 @@ pub fn create_design_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> 
         .build()?;
 
     let mut loop_agent = LoopAgent::new("design_loop", vec![Arc::new(design_actor), Arc::new(design_critic)]);
-    loop_agent = loop_agent.with_max_iterations(1);
+    loop_agent = loop_agent.with_max_iterations(2);
 
     Ok(Arc::new(loop_agent))
 }
@@ -247,7 +242,7 @@ pub fn create_plan_loop(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent>>
         .build()?;
 
     let mut loop_agent = LoopAgent::new("plan_loop", vec![Arc::new(plan_actor), Arc::new(plan_critic)]);
-    loop_agent = loop_agent.with_max_iterations(1);
+    loop_agent = loop_agent.with_max_iterations(2);
 
     Ok(Arc::new(loop_agent))
 }
@@ -260,14 +255,14 @@ pub fn create_plan_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Re
     let plan_actor = LlmAgentBuilder::new("plan_actor")
         .instruction(&actor_instruction)
         .model(model.clone())
-        .tool(Arc::new(LoadFeedbackHistoryTool))  // For incremental update support
+        .tool(Arc::new(LoadFeedbackHistoryTool))
         .tool(Arc::new(GetRequirementsTool))
         .tool(Arc::new(GetDesignTool))
         .tool(Arc::new(GetPlanTool))
-        .tool(Arc::new(LoadPrdDocTool))  // Load PRD document
-        .tool(Arc::new(LoadDesignDocTool))  // Load design document
+        .tool(Arc::new(LoadPrdDocTool))
+        .tool(Arc::new(LoadDesignDocTool))
         .tool(Arc::new(CreateTaskTool))
-        .tool(Arc::new(SavePlanDocTool))  // Save final plan document
+        .tool(Arc::new(SavePlanDocTool))
         .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
         .tool(Arc::new(SaveInsightTool::new(iteration_id.clone())))
         .tool(Arc::new(SaveIssueTool::new(iteration_id.clone())))
@@ -280,7 +275,7 @@ pub fn create_plan_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Re
         .model(model)
         .tool(Arc::new(GetPlanTool))
         .tool(Arc::new(GetRequirementsTool))
-        .tool(Arc::new(LoadPlanDocTool))  // Verify plan markdown
+        .tool(Arc::new(LoadPlanDocTool))
         .tool(Arc::new(CheckTaskDependenciesTool))
         .tool(Arc::new(ProvideFeedbackTool))
         .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
@@ -289,7 +284,7 @@ pub fn create_plan_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Re
         .build()?;
 
     let mut loop_agent = LoopAgent::new("plan_loop", vec![Arc::new(plan_actor), Arc::new(plan_critic)]);
-    loop_agent = loop_agent.with_max_iterations(1);
+    loop_agent = loop_agent.with_max_iterations(2);
 
     Ok(Arc::new(loop_agent))
 }
@@ -302,6 +297,7 @@ pub fn create_coding_loop(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent
     let coding_actor = LlmAgentBuilder::new("coding_actor")
         .instruction(CODING_ACTOR_INSTRUCTION)
         .model(model.clone())
+        .tool(Arc::new(LoadFeedbackHistoryTool))
         .tool(Arc::new(GetPlanTool))
         .tool(Arc::new(UpdateTaskStatusTool))
         .tool(Arc::new(UpdateFeatureStatusTool))
@@ -320,27 +316,24 @@ pub fn create_coding_loop(model: Arc<dyn Llm>) -> Result<Arc<dyn adk_core::Agent
         .tool(Arc::new(ReadFileTool))
         .tool(Arc::new(ListFilesTool))
         .tool(Arc::new(RunCommandTool))
-        // Removed check_tests and check_lint - not applicable for pure frontend projects
         .tool(Arc::new(ProvideFeedbackTool))
         .include_contents(IncludeContents::None)
         .build()?;
 
-    // Coding needs more iterations to implement and review tasks
     let mut loop_agent = LoopAgent::new("coding_loop", vec![Arc::new(coding_actor), Arc::new(coding_critic)]);
-    loop_agent = loop_agent.with_max_iterations(5);
+    loop_agent = loop_agent.with_max_iterations(3);
 
     Ok(Arc::new(loop_agent))
 }
 
 pub fn create_coding_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> Result<Arc<dyn adk_core::Agent>> {
-    // Replace {ITERATION_ID} placeholder in instructions
     let actor_instruction = CODING_ACTOR_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
     let critic_instruction = CODING_CRITIC_INSTRUCTION.replace("{ITERATION_ID}", &iteration_id);
 
     let coding_actor = LlmAgentBuilder::new("coding_actor")
         .instruction(&actor_instruction)
         .model(model.clone())
-        .tool(Arc::new(LoadFeedbackHistoryTool))  // For incremental update support
+        .tool(Arc::new(LoadFeedbackHistoryTool))
         .tool(Arc::new(GetPlanTool))
         .tool(Arc::new(UpdateTaskStatusTool))
         .tool(Arc::new(UpdateFeatureStatusTool))
@@ -363,16 +356,14 @@ pub fn create_coding_loop_with_id(model: Arc<dyn Llm>, iteration_id: String) -> 
         .tool(Arc::new(ReadFileTool))
         .tool(Arc::new(ListFilesTool))
         .tool(Arc::new(RunCommandTool))
-        // Removed check_tests and check_lint - not applicable for pure frontend projects
         .tool(Arc::new(ProvideFeedbackTool))
         .tool(Arc::new(QueryMemoryTool::new(iteration_id.clone())))
         .tool(Arc::new(SaveIssueTool::new(iteration_id.clone())))
         .include_contents(IncludeContents::None)
         .build()?;
 
-    // Coding needs more iterations to implement and review tasks
     let mut loop_agent = LoopAgent::new("coding_loop", vec![Arc::new(coding_actor), Arc::new(coding_critic)]);
-    loop_agent = loop_agent.with_max_iterations(5);
+    loop_agent = loop_agent.with_max_iterations(3);
 
     Ok(Arc::new(loop_agent))
 }

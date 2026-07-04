@@ -10,13 +10,26 @@
 use crate::config::{get_language_instruction};
 use crate::config_definition::{global_registry, create_agent_for_stage};
 use crate::interaction::{InteractiveBackend, MessageContext};
-use crate::llm::{create_llm_client};
+use crate::llm::{create_llm_client, get_execution_llm};
 use crate::llm::config::load_config;
-use crate::pipeline::{PipelineContext, StageResult};
-use crate::persistence::set_iteration_id;
+use crate::pipeline::{PipelineContext, StageResult, clear_goto_stage_signal, take_goto_stage_signal};
+use crate::persistence::{set_iteration_id, load_feedback_history};
+use crate::tools::set_current_agent_name;
 use adk_core::{Content, Event};
 use futures::StreamExt;
 use std::sync::Arc;
+
+fn check_event_for_goto_stage(event: &Event) -> Option<(String, String)> {
+    if event.actions.escalate {
+        if let Some(target) = event.actions.state_delta.get("goto_stage").and_then(|v| v.as_str()) {
+            let reason = event.actions.state_delta.get("goto_reason")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Stage jump requested");
+            return Some((target.to_string(), reason.to_string()));
+        }
+    }
+    take_goto_stage_signal()
+}
 
 /// Map stage name to the corresponding save tool name
 fn get_save_tool_name(stage_name: &str) -> &'static str {
@@ -71,6 +84,18 @@ fn get_display_name(agent_name: &str) -> String {
     }
 }
 
+fn check_pending_critic_feedback(stage_name: &str) -> Option<String> {
+    if let Ok(history) = load_feedback_history() {
+        if let Some(fb) = history.feedbacks.iter()
+            .filter(|f| f.stage == stage_name)
+            .max_by_key(|f| f.timestamp)
+        {
+            return Some(fb.details.clone());
+        }
+    }
+    None
+}
+
 /// Execute a stage using real adk-rust Agent
 pub async fn execute_stage_with_instruction(
     ctx: &PipelineContext,
@@ -92,6 +117,7 @@ pub async fn execute_stage_with_instruction_and_context(
 ) -> StageResult {
     // Set iteration ID for data tools (V2 architecture)
     set_iteration_id(ctx.iteration.id.clone());
+    clear_goto_stage_signal();
 
     // Check for restart mode (GotoStage mechanism)
     if let Ok(Some(session_meta)) = crate::persistence::load_session_meta()
@@ -136,10 +162,14 @@ pub async fn execute_stage_with_instruction_and_context(
         let artifact_filename = get_artifact_filename(stage_name);
         let artifact_path = artifact_filename.map(|f| artifacts_dir.join(f));
 
-        // Load LLM client
-        let llm_config = load_config().map_err(|e| format!("Failed to load config: {}", e))?;
-        let model = create_llm_client(&llm_config.llm)
-            .map_err(|e| format!("Failed to create LLM client: {}", e))?;
+        // Load LLM client - reuse execution-scoped client if available, otherwise create new
+        let model = if let Some(cached) = get_execution_llm() {
+            cached
+        } else {
+            let llm_config = load_config().map_err(|e| format!("Failed to load config: {}", e))?;
+            create_llm_client(&llm_config.llm)
+                .map_err(|e| format!("Failed to create LLM client: {}", e))?
+        };
 
         // Create agent using configuration registry
         let agent = create_agent_for_stage(stage_name, model, ctx.iteration.id.clone())
@@ -157,6 +187,7 @@ pub async fn execute_stage_with_instruction_and_context(
     // Get the actual agent name and map to user-friendly display name
     let internal_name = agent.name();
     let display_name = get_display_name(internal_name);
+    set_current_agent_name(&display_name);
 
     // Build prompt with context
     let prompt = build_prompt(ctx, stage_name, feedback, extra_context);
@@ -189,14 +220,8 @@ pub async fn execute_stage_with_instruction_and_context(
         Ok(s) => s,
         Err(e) => {
             let err_msg = format!("{}", e);
-            // Check if this is a goto_stage signal
-            if err_msg.starts_with("GOTO_STAGE:") {
-                // Parse the target stage and reason
-                let parts: Vec<&str> = err_msg.strip_prefix("GOTO_STAGE:").unwrap().splitn(2, ':').collect();
-                if parts.len() == 2 {
-                    let target_stage = parts[0].to_string();
-                    let reason = parts[1].to_string();
-
+            if err_msg.contains("GOTO_STAGE_REQUESTED") {
+                if let Some((target_stage, reason)) = take_goto_stage_signal() {
                     interaction
                         .show_message_with_context(
                             crate::interaction::MessageLevel::Warning,
@@ -204,7 +229,6 @@ pub async fn execute_stage_with_instruction_and_context(
                             MessageContext::new(&display_name).with_stage(stage_name),
                         )
                         .await;
-
                     return StageResult::GotoStage(target_stage, reason);
                 }
             }
@@ -222,19 +246,16 @@ pub async fn execute_stage_with_instruction_and_context(
         match result {
             Ok(event) => {
                 event_count += 1;
-                // Extract content from the event using the event's content() method
                 if let Some(content) = event.content() {
                     if let Some(text) = extract_text_from_content(content) {
                         if !text.trim().is_empty() {
                             text_event_count += 1;
                             generated_text.push_str(&text);
-                            // Send content in real-time with display name
                             interaction
                                 .send_streaming(text.clone(), &display_name, false)
                                 .await;
                         }
                     } else {
-                        // Content exists but no text part — likely a function call
                         tool_call_count += 1;
                         tracing::debug!(
                             "[StageExecutor] Event #{} has content but no text part (likely tool call)",
@@ -242,37 +263,36 @@ pub async fn execute_stage_with_instruction_and_context(
                         );
                     }
                 } else if let Some(text) = extract_text_from_event(&event) {
-                    // Fallback: use helper function
                     if !text.trim().is_empty() {
                         text_event_count += 1;
                         generated_text.push_str(&text);
                         interaction.send_streaming(text, &display_name, false).await;
                     }
                 }
+
+                if let Some((target_stage, reason)) = check_event_for_goto_stage(&event) {
+                    interaction
+                        .show_message_with_context(
+                            crate::interaction::MessageLevel::Warning,
+                            format!("🔄 Stage jump requested: {} → {}", stage_name, target_stage),
+                            MessageContext::new(&display_name).with_stage(stage_name),
+                        )
+                        .await;
+                    return StageResult::GotoStage(target_stage, reason);
+                }
             }
             Err(e) => {
                 let err_msg = format!("{}", e);
-                // Check if this is a goto_stage signal from a tool
-                if err_msg.contains("GOTO_STAGE:") {
-                    // Extract the GOTO_STAGE message - format: "Tool execution failed: GOTO_STAGE:stage:reason"
-                    // or just "GOTO_STAGE:stage:reason"
-                    if let Some(goto_msg) = err_msg.split("GOTO_STAGE:").nth(1) {
-                        let parts: Vec<&str> = goto_msg.splitn(2, ':').collect();
-                        if parts.len() == 2 {
-                            let target_stage = parts[0].to_string();
-                            let reason = parts[1].to_string();
-
-                            interaction
-                                .show_message_with_context(
-                                    crate::interaction::MessageLevel::Warning,
-                                    format!("🔄 Stage jump requested: {} → {}", stage_name, target_stage),
-                                    MessageContext::new(&display_name).with_stage(stage_name),
-                                )
-                                .await;
-
-                            // Return immediately to trigger stage jump
-                            return StageResult::GotoStage(target_stage, reason);
-                        }
+                if err_msg.contains("GOTO_STAGE_REQUESTED") {
+                    if let Some((target_stage, reason)) = take_goto_stage_signal() {
+                        interaction
+                            .show_message_with_context(
+                                crate::interaction::MessageLevel::Warning,
+                                format!("🔄 Stage jump requested: {} → {}", stage_name, target_stage),
+                                MessageContext::new(&display_name).with_stage(stage_name),
+                            )
+                            .await;
+                        return StageResult::GotoStage(target_stage, reason);
                     }
                 }
 
@@ -303,7 +323,16 @@ pub async fn execute_stage_with_instruction_and_context(
                     "[StageExecutor] Agent produced no text in stream, but artifact was saved via tool call ({:?}, {} chars)",
                     path, content.len()
                 );
-                // Artifact exists and has content — stage is successful
+                if let Some(feedback_msg) = check_pending_critic_feedback(stage_name) {
+                    interaction
+                        .show_message_with_context(
+                            crate::interaction::MessageLevel::Warning,
+                            format!("🔄 Critic found issues, triggering revision..."),
+                            MessageContext::new(&display_name).with_stage(stage_name),
+                        )
+                        .await;
+                    return StageResult::NeedsRevision(feedback_msg);
+                }
                 interaction
                     .show_message_with_context(
                         crate::interaction::MessageLevel::Success,
@@ -314,7 +343,16 @@ pub async fn execute_stage_with_instruction_and_context(
                 return StageResult::Success(Some(path.to_string_lossy().to_string()));
             }
         } else {
-            // No artifact expected (e.g., coding stage) — just check that agent ran
+            if let Some(feedback_msg) = check_pending_critic_feedback(stage_name) {
+                interaction
+                    .show_message_with_context(
+                        crate::interaction::MessageLevel::Warning,
+                        format!("🔄 Critic found issues, triggering revision..."),
+                        MessageContext::new(&display_name).with_stage(stage_name),
+                    )
+                    .await;
+                return StageResult::NeedsRevision(feedback_msg);
+            }
             tracing::info!(
                 "[StageExecutor] Stage '{}' has no artifact file, treating empty output as acceptable",
                 stage_name
@@ -349,6 +387,16 @@ pub async fn execute_stage_with_instruction_and_context(
     let artifact_path = match artifact_path {
         Some(p) => p,
         None => {
+            if let Some(feedback_msg) = check_pending_critic_feedback(stage_name) {
+                interaction
+                    .show_message_with_context(
+                        crate::interaction::MessageLevel::Warning,
+                        format!("🔄 Critic found issues, triggering revision..."),
+                        MessageContext::new(&display_name).with_stage(stage_name),
+                    )
+                    .await;
+                return StageResult::NeedsRevision(feedback_msg);
+            }
             tracing::info!(
                 "[StageExecutor] Stage '{}' has no artifact file, text output is sufficient",
                 stage_name
@@ -357,13 +405,22 @@ pub async fn execute_stage_with_instruction_and_context(
         }
     };
 
-    // Check if artifact was saved via tool call (e.g., save_idea)
     if artifact_path.exists()
         && let Ok(content) = std::fs::read_to_string(&artifact_path)
         && !content.trim().is_empty()
     {
         if let Err(e) = validate_artifact_content(stage_name, &content) {
             return StageResult::Failed(e);
+        }
+        if let Some(feedback_msg) = check_pending_critic_feedback(stage_name) {
+            interaction
+                .show_message_with_context(
+                    crate::interaction::MessageLevel::Warning,
+                    format!("🔄 Critic found issues, triggering revision..."),
+                    MessageContext::new(&display_name).with_stage(stage_name),
+                )
+                .await;
+            return StageResult::NeedsRevision(feedback_msg);
         }
         tracing::info!(
             "[StageExecutor] Artifact saved via tool call ({:?}, {} chars)",
@@ -406,6 +463,19 @@ pub async fn execute_stage_with_instruction_and_context(
     let followup_stream = match agent.run(followup_ctx).await {
         Ok(s) => s,
         Err(e) => {
+            let err_msg = format!("{}", e);
+            if err_msg.contains("GOTO_STAGE_REQUESTED") {
+                if let Some((target_stage, reason)) = take_goto_stage_signal() {
+                    interaction
+                        .show_message_with_context(
+                            crate::interaction::MessageLevel::Warning,
+                            format!("🔄 Stage jump requested: {} → {}", stage_name, target_stage),
+                            MessageContext::new(&display_name).with_stage(stage_name),
+                        )
+                        .await;
+                    return StageResult::GotoStage(target_stage, reason);
+                }
+            }
             tracing::warn!("[StageExecutor] Follow-up agent run failed: {}", e);
             return StageResult::Failed(format!(
                 "Agent completed but did not save artifact, and follow-up failed: {}", e
@@ -413,20 +483,41 @@ pub async fn execute_stage_with_instruction_and_context(
         }
     };
 
-    // Process follow-up stream (only look for save tool execution, don't collect text)
     let mut followup_stream = std::pin::pin!(followup_stream);
     while let Some(result) = followup_stream.next().await {
         match result {
             Ok(event) => {
-                // Stream any text content from the follow-up
                 if let Some(content) = event.content()
                     && let Some(text) = extract_text_from_content(content)
                     && !text.trim().is_empty()
                 {
                     interaction.send_streaming(text, &display_name, false).await;
                 }
+                if let Some((target_stage, reason)) = check_event_for_goto_stage(&event) {
+                    interaction
+                        .show_message_with_context(
+                            crate::interaction::MessageLevel::Warning,
+                            format!("🔄 Stage jump requested: {} → {}", stage_name, target_stage),
+                            MessageContext::new(&display_name).with_stage(stage_name),
+                        )
+                        .await;
+                    return StageResult::GotoStage(target_stage, reason);
+                }
             }
             Err(e) => {
+                let err_msg = format!("{}", e);
+                if err_msg.contains("GOTO_STAGE_REQUESTED") {
+                    if let Some((target_stage, reason)) = take_goto_stage_signal() {
+                        interaction
+                            .show_message_with_context(
+                                crate::interaction::MessageLevel::Warning,
+                                format!("🔄 Stage jump requested: {} → {}", stage_name, target_stage),
+                                MessageContext::new(&display_name).with_stage(stage_name),
+                            )
+                            .await;
+                        return StageResult::GotoStage(target_stage, reason);
+                    }
+                }
                 tracing::debug!("[StageExecutor] Follow-up stream error: {}", e);
             }
         }
@@ -439,6 +530,16 @@ pub async fn execute_stage_with_instruction_and_context(
     {
         if let Err(e) = validate_artifact_content(stage_name, &content) {
             return StageResult::Failed(e);
+        }
+        if let Some(feedback_msg) = check_pending_critic_feedback(stage_name) {
+            interaction
+                .show_message_with_context(
+                    crate::interaction::MessageLevel::Warning,
+                    format!("🔄 Critic found issues, triggering revision..."),
+                    MessageContext::new(&display_name).with_stage(stage_name),
+                )
+                .await;
+            return StageResult::NeedsRevision(feedback_msg);
         }
         tracing::info!(
             "[StageExecutor] Artifact saved after follow-up ({:?}, {} chars)",

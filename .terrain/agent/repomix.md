@@ -1187,419 +1187,272 @@ LICENSE
 285: ()
 ```
 
-### AGENTS.md (351 lines)
+### AGENTS.md (262 lines)
 
 ````
 1: # AGENTS.md — Cowork Forge
 2: 
 3: > This file provides AI coding agents with the context needed to work effectively on this project.
-4: > For project knowledge (architecture, decisions, issues), see [`.ai-context/SKILL.md`](.ai-context/SKILL.md).
-5: 
-6: ---
-7: 
-8: ## Project Overview
-9: 
-10: **Cowork Forge** is an AI-native multi-agent software development platform. It orchestrates specialized AI agents (Product Manager, Architect, Project Manager, Engineer) through a 7-stage pipeline to transform ideas into production-ready software.
-11: 
-12: | Aspect | Detail |
-13: |--------|--------|
-14: | Language | Rust (edition 2024) |
-15: | Agent Framework | adk-rust 0.5.0 |
-16: | GUI | Tauri + React 18 + Ant Design |
-17: | Architecture | Hexagonal + DDD |
-18: | License | MIT |
-19: 
-20: ### Workspace Structure
-21: 
-22: ```
-23: crates/
-24: ├── cowork-core/         # Domain logic, pipeline, tools, agents (MAIN crate)
-25: │   └── src/
-26: │       ├── pipeline/    # 7-stage orchestration & stage executor
-27: │       ├── domain/      # Project, Iteration, Memory aggregates
-28: │       ├── tools/       # 40+ ADK tools + MCP integration
-29: │       ├── agents/      # Agent wrappers (iterative, PM, legacy analyzer)
-30: │       ├── interaction/ # InteractiveBackend trait (CLI/GUI abstraction)
-31: │       ├── acp/         # Agent Client Protocol for external agents
-32: │       ├── config_definition/  # Data-driven config (agents, stages, flows)
-33: │       ├── instructions/       # Agent prompt library
-34: │       ├── skills/      # agentskills.io standard skill system
-35: │       ├── integration/ # Hook manager for external integrations
-36: │       └── persistence/ # JSON-based storage
-37: ├── cowork-cli/          # CLI adapter (clap + dialoguer)
-38: └── cowork-gui/          # Tauri + React GUI
-39:     ├── src-tauri/       # Rust backend (Tauri commands + events)
-40:     └── src/             # React frontend (TypeScript + Ant Design)
-41: ```
-42: 
-43: ---
-44: 
-45: ## Dev Environment Setup
-46: 
-47: ### Prerequisites
-48: 
-49: - **Rust** (edition 2024, stable toolchain)
-50: - **Node.js** (for GUI frontend build)
-51: - **LLM API Key** (OpenAI-compatible endpoint)
-52: 
-53: ### Build
-54: 
-55: ```bash
-56: # Build entire workspace
-57: cargo build
-58: 
-59: # Release build
-60: cargo build --release
-61: 
-62: # Build GUI only (installs frontend deps automatically)
-63: cd crates/cowork-gui && cargo tauri dev
-64: ```
-65: 
-66: ### Run
-67: 
-68: ```bash
-69: # CLI
-70: cargo run --package cowork-cli -- <command>
-71: 
-72: # GUI (development mode)
-73: cd crates/cowork-gui && cargo tauri dev
-74: ```
-75: 
-76: ### Configuration
-77: 
-78: Config file location:
-79: 
-80: | Platform | Path |
-81: |----------|------|
-82: | Windows | `%APPDATA%\CoworkCreative\config.toml` |
-83: | macOS | `~/Library/Application Support/CoworkCreative/config.toml` |
-84: | Linux | `~/.config/CoworkCreative/config.toml` |
-85: 
-86: User-facing config directory:
-87: 
-88: | Platform | Path |
-89: |----------|------|
-90: | Windows | `%APPDATA%\com.cowork-forge.app\config\` |
-91: | macOS | `~/Library/Application Support/com.cowork-forge.app/config/` |
-92: | Linux | `~/.config/com.cowork-forge.app/config/` |
-93: 
-94: ---
-95: 
-96: ## Build and Test Commands
-97: 
-98: ```bash
-99: # Run all tests
-100: cargo test
-101: 
-102: # Test a specific crate
-103: cargo test -p cowork-core
-104: 
-105: # Test a specific module
-106: cargo test -p cowork-core pipeline
-107: 
-108: # Run with all features
-109: cargo test --all-features
-110: 
-111: # Check compilation without building
-112: cargo check
-113: 
-114: # Lint (if clippy configured)
-115: cargo clippy
-116: ```
-117: 
-118: ### GUI Frontend
-119: 
-120: ```bash
-121: cd crates/cowork-gui
-122: 
-123: # Install dependencies
-124: npm install    # or: bun install
-125: 
-126: # Build frontend only
-127: npm run build
-128: 
-129: # Development server
-130: npm run dev
-131: ```
-132: 
-133: ---
-134: 
-135: ## Code Style and Conventions
-136: 
-137: ### Rust
-138: 
-139: - **Error handling**: Always use `anyhow::Result`. Never use `unwrap()` in production code.
-140: - **Async traits**: Use `async_trait` for async trait methods.
-141: - **Naming**: `snake_case` for functions/variables, `PascalCase` for types/traits.
-142: - **Architecture**: Follow hexagonal architecture — domain logic has zero external dependencies. Infrastructure adapters implement domain ports.
-143: - **Trait-based abstraction**: `InteractiveBackend` is the key port for CLI/GUI abstraction. All user interaction flows through this trait.
-144: - **Serialization**: `serde` with derive macros for all domain entities.
-145: - **Async runtime**: Tokio with `features = ["full"]`.
-146: 
-147: ### TypeScript / React (GUI)
-148: 
-149: - Component-based architecture with Ant Design.
-150: - Tauri commands for request-response, events for streaming.
-151: - State management via React hooks.
-152: 
-153: ### Key Patterns
-154: 
-155: | Pattern | Where | Purpose |
-156: |---------|-------|---------|
-157: | Actor-Critic | PRD, Design, Plan, Coding stages | Iterative self-refinement |
-158: | Strategy | Stage trait implementations | Pluggable stage behavior |
-159: | Template Method | Pipeline execution flow | Fixed stage sequence with hooks |
-160: | Repository | Persistence stores | Abstract data access |
-161: | Decorator | LLM rate limiting | Transparent cross-cutting concern |
-162: 
-163: ---
-164: 
-165: ## Key Files
-166: 
-167: When working on specific areas, start from these files:
-168: 
-169: | Area | Primary File | Related |
-170: |------|-------------|---------|
-171: | Pipeline execution | `crates/cowork-core/src/pipeline/executor/mod.rs` | `stage_executor.rs`, `knowledge.rs` |
-172: | Stage implementations | `crates/cowork-core/src/pipeline/stages/*.rs` | 7 stage files: idea, prd, design, plan, coding, check, delivery |
-173: | Tool implementations | `crates/cowork-core/src/tools/mod.rs` | `file_tools.rs`, `data_tools.rs`, `hitl_tools.rs`, `pm_tools.rs`, etc. |
-174: | Domain entities | `crates/cowork-core/src/domain/mod.rs` | `project.rs`, `iteration.rs`, `memory.rs` |
-175: | HITL interface | `crates/cowork-core/src/interaction/mod.rs` | `cli.rs`, `tauri.rs` |
-176: | Agent configs | `crates/cowork-core/src/config_definition/` | `default_configs/*.json` |
-177: | Agent prompts | `crates/cowork-core/src/instructions/*.rs` | 12 instruction modules |
-178: | External agent | `crates/cowork-core/src/acp/client.rs` | ACP protocol client |
-179: | Skill system | `crates/cowork-core/src/skills/` | agentskills.io standard |
-180: 
-181: ---
-182: 
-183: ## Security Considerations
-184: 
-185: - **Path validation**: All file operations are validated against workspace boundaries. Never bypass `validate_path()` checks.
-186: - **Command sanitization**: Dangerous commands (`rm -rf`, `sudo`, etc.) are blocked. Do not circumvent the command whitelist.
-187: - **LLM rate limiting**: Global semaphore (concurrency=1) + 2s delay = 30 req/min. Do not bypass rate limiting.
-188: - **Workspace containment**: File tools must not access paths outside the project workspace.
-189: - **No secrets in code**: API keys are loaded from `config.toml` or environment variables, never hardcoded.
-190: - **Watchdog monitoring**: Agent behavior is monitored for objective deviation.
-191: 
-192: ---
-193: 
-194: ## Project Knowledge (.ai-context)
-195: 
-196: This project uses a tiered knowledge base in `.ai-context/` for architectural context that code alone cannot convey. **AGENTS.md tells you *how to work*; `.ai-context/` tells you *what the project is*.**
-197: 
-198: ### When to Read `.ai-context`
-199: 
-200: | Situation | What to Read |
-201: |-----------|-------------|
-202: | Starting a new session | `.ai-context/references/PROJECT-ESSENCE.md` |
-203: | Working across components | `.ai-context/references/ARCHITECTURE.md` |
-204: | Changing established patterns | `.ai-context/references/DECISIONS.md` |
-205: | Debugging unexpected behavior | `.ai-context/DYNAMICS.md` |
-206: | Unsure *why* something is designed a way | `.ai-context/references/DECISIONS.md` |
-207: 
-208: ### Session Start Protocol
-209: 
-210: ```
-211: 1. Read this file (AGENTS.md)
-212: 2. Read .ai-context/references/PROJECT-ESSENCE.md
-213: 3. Scan .ai-context/DYNAMICS.md for active issues
-214: 4. Proceed with code exploration
-215: ```
-216: 
-217: ### Knowledge Tiers
-218: 
-219: | Tier | File | Update Frequency |
-220: |------|------|------------------|
-221: | 0 | `references/PROJECT-ESSENCE.md` | Quarterly / Major version |
-222: | 1 | `references/ARCHITECTURE.md` | Monthly / Sprint |
-223: | 2 | `references/DECISIONS.md` | Per decision change |
-224: | 3 | `DYNAMICS.md` | As needed |
-225: 
-226: Full entry point: [`.ai-context/SKILL.md`](.ai-context/SKILL.md)
-227: 
-228: ### Updating `.ai-context`
-229: 
-230: When making significant changes, update the corresponding knowledge file:
-231: 
-232: | What Changed | Update |
-233: |-------------|--------|
-234: | New crate or major component | `.ai-context/references/ARCHITECTURE.md` |
-235: | Architecture decision | `.ai-context/references/DECISIONS.md` |
-236: | New active issue / constraint | `.ai-context/DYNAMICS.md` |
-237: | Project scope change | `.ai-context/references/PROJECT-ESSENCE.md` |
-238: 
-239: Before updating, read `.ai-context/meta/MAINTENANCE.md` for writing guidelines.
-240: 
-241: **No update needed for**: struct fields, function signatures, refactoring, bug fixes.
-242: 
-243: ---
-244: 
-245: ## PR Guidelines
-246: 
-247: - Run `cargo test` and `cargo clippy` before committing.
-248: - Ensure no `unwrap()` in production code paths.
-249: - If you added a new tool or stage, update `.ai-context/references/ARCHITECTURE.md`.
-250: - If you made a non-obvious design choice, add an ADR to `.ai-context/references/DECISIONS.md`.
-251: - Commit messages: use conventional commits format (`feat:`, `fix:`, `refactor:`, etc.).
-252: 
-253: ---
-254: 
-255: ## Common Pitfalls
-256: 
-257: - **Don't bypass `InteractiveBackend`**: Never call CLI-specific functions (e.g., `dialoguer`) from `cowork-core`. All user interaction must go through the `InteractiveBackend` trait.
-258: - **Don't ignore rate limiting**: LLM calls are serialized for a reason. Don't try to parallelize them.
-259: - **Don't access files outside workspace**: The security layer validates all paths. If you need to access a new path, update the validation logic, don't bypass it.
-260: - **Don't hardcode stage IDs**: Use `create_stage_by_id()` or flow configuration instead of string matching.
-261: - **Don't use `unwrap()`**: Use `anyhow::Result` with proper error propagation (`?` operator or `.context()`).
-262: - **Don't duplicate knowledge**: If information exists in `.ai-context/`, link to it rather than repeating it here.
-263: 
-264: <!-- terrain:begin env-overview v3 -->
-265: ## AI 工程环境（Terrain）
-266: 
-267: 本仓库由 Terrain 配置了 AI 工程环境。Coding Agent 请遵循以下约定：
-268: 
-269: - **知识资产**位于本仓库 **`.terrain/`**（Agent 友好的知识资产、人类友好的知识库、私域知识、源码索引；可随 Git 协作）
-270: - **项目登记**在本地 `~/.terrain/registry.json`（仅记录仓库路径，不含知识正文）
-271: - **Skills** 位于 `.agents/skills/`（由 Terrain 注入，可按需重新集成）
-272: - **Agent 工具**约定在 `~/.terrain/bin/`（`rtk` / `codegraph` / `terrain`）；可选本地清单 `.terrain/env/agent-tools.json`（不入库）
-273: - **无 Terrain 安装**时：RTK / CodeGraph 可降级为 `bunx` / `npx`（见 `rtk-skill`、`codegraph-skill`）
-274: - **工作流**：先读知识 → 再查关系 → 最后读源码；shell 输出优先走 RTK
-275: <!-- terrain:end env-overview -->
-276: 
-277: <!-- terrain:begin knowledge-guide v3 -->
-278: ## Terrain 知识资产
-279: 
-280: Coding Agent **必须先加载** `terrain-knowledge-skill`，并按其中分层策略查询 **`.terrain/`**（仓库内路径，非全局目录）。
-281: 
-282: | 层级 | 路径 | 何时使用 |
-283: |------|------|----------|
-284: | Agent 友好 | `.terrain/agent/context.md` | 模块划分、核心流程、系统边界 |
-285: | 私域 | `.terrain/knowledge/` | 业务术语、内部框架/API/脚手架 |
-286: | 人类友好 | `.terrain/human/` | Litho 人类友好的知识库（可选参考） |
-287: | 源码 | `.terrain/agent/repomix.md`（见 `repomix-context-skill`） | 实现细节（本地索引，不入库） |
-288: | 关系 | codegraph CLI（见 `codegraph-skill`） | 调用链、依赖关系、影响分析 |
-289: 
-290: **原则**：先宏观后微观；优先读已生成文档，再 grep 源码索引。
-291: 
-292: ## 知识保鲜（必读）
-293: 
-294: 1. 回答架构/模块问题前，读取 `.terrain/.meta/freshness.json`（或 `freshness` 工具输出）
-295: 2. `freshness_score < 70` 时：不得仅凭 `agent/context.md` 下结论，须用 `grep repomix` 或 `codegraph` 交叉验证
-296: 3. `freshness_score < 50` 时：宏观架构上下文不可信，以 repomix 源码切片为准
-297: 4. 发现矛盾时的优先级：**repomix 源码 > codegraph > agent/context.md > human/**
-298: 5. `knowledge/` 私域文档视为人为维护；若 `refs` 指向的源码路径已删除，应降权处理
-299: <!-- terrain:end knowledge-guide -->
-300: 
-301: <!-- terrain:begin skills v2 -->
-302: ### 可用 Skills
-303: 
-304: | Skill | 用途 |
-305: |-------|------|
-306: | `terrain-knowledge-skill` | `.terrain/` 知识分层与查询顺序（先读） |
-307: | `repomix-context-skill` | grep/读取 `repomix.md` 源码切片 |
-308: | `codegraph-skill` | 符号关系；`~/.terrain/bin/codegraph` 或 `bunx codegraph` |
-309: | `rtk-skill` | 冗长 shell 加 rtk 前缀；`~/.terrain/bin/rtk` 或 `bunx @terrain-ai/rtk` |
-310: 
-311: 加载顺序建议：knowledge → codegraph / repomix → rtk（执行命令时）。
-312: <!-- terrain:end skills -->
-313: 
-314: <!-- terrain:begin tools v2 -->
-315: ### 工具链
-316: 
-317: | 工具 | 约定路径 | 无 Terrain 时降级 |
-318: |------|----------|-------------------|
-319: | RTK | `~/.terrain/bin/rtk` | `bunx @terrain-ai/rtk` 或 `npx @terrain-ai/rtk` |
-320: | CodeGraph | `~/.terrain/bin/codegraph` | `bunx codegraph` 或 `npx codegraph` |
-321: | Terrain CLI | `~/.terrain/bin/terrain` | `bunx @terrain-ai/cli` 或 `npx @terrain-ai/cli` |
-322: | 知识文件 | `.terrain/` 仓库内路径 | 直接 Read/Grep，无需 CLI |
-323: 
-324: | 场景 | 用法 |
-325: |------|------|
-326: | 架构、私域知识 | 加载 `terrain-knowledge-skill` |
-327: | 源码片段 | `repomix-context-skill`；`<rtk> grep` 搜索 pack |
-328: | 符号关系 | `codegraph-skill`；检查 `~/.terrain/bin/codegraph` 是否存在（见 codegraph-skill） |
-329: | git/test/build | `rtk-skill`；检查 `~/.terrain/bin/rtk` 是否存在（见 rtk-skill） |
-330: | ACP 知识查询 | `~/.terrain/bin/terrain tools …` |
-331: 
-332: ### Agent 工具解析（必读）
-333: 
-334: **一律使用约定路径**（`~/.terrain/bin/…`、`.terrain/…`），**不要**写机器相关的绝对路径（如 `/Users/…` 或 `C:\Users\…`）。
-335: 
-336: Windows 上工具部署在 `%USERPROFILE%\.terrain\bin\`（Git Bash / PowerShell 7+ 中可写为 `~/.terrain/bin/`），二进制带 `.exe` 后缀。
-337: 
-338: 1. 执行前检查工具是否存在 — 见 `rtk-skill` / `codegraph-skill` 中的跨平台检查表（**不要**在 Windows 上使用 Unix 专用的 `test -x`）
-339: 2. 存在 → 用 `~/.terrain/bin/<tool> …`（词首 `~` 在 bash/zsh/Git Bash/PowerShell 7+ 会展开）
-340: 3. 不存在 → RTK / CodeGraph 用上表 `bunx` / `npx` 降级；Terrain CLI 请用户通过桌面应用操作
-341: 4. 可选参考：`.terrain/env/agent-tools.json`（本地生成、不入库），内容与约定路径一致
-342: 
-343: **不要**把 manifest 里的 `~` 路径赋给变量再引号调用（`"$VAR"` 不会展开 `~`）。直接写 `~/.terrain/bin/rtk` 或选用 `bunx` 前缀。
-344: 
-345: ### RTK 要点（必读 `rtk-skill`）
-346: 
-347: - **必须显式**加 rtk 前缀 — Terrain 不启用 `rtk init` 全局 hook
-348: - 内置 Read/Grep 不会自动走 RTK — 大文件用 `<rtk> read`，搜索用 `<rtk> grep`
-349: 
-350: **注意**：不要运行 `codegraph install` 或 `rtk init`（已由 Terrain + Skills 配置）。
-351: <!-- terrain:end tools -->
-````
-
-### Cargo.toml (53 lines)
-
-```
-1: [workspace]
-2: resolver = "2"
-3: members = [
-4:     "crates/cowork-core",
-5:     "crates/cowork-cli",
-6:     "crates/cowork-gui/src-tauri",
-7: ]
+4: 
+5: ---
+6: 
+7: ## Project Overview
 8: 
-9: [workspace.package]
-10: version = "2.5.2"
-11: edition = "2024"
-12: authors = ["Sopaco"]
-13: license = "MIT"
-14: repository = "https://github.com/sopaco/cowork-forge"
-15: 
-16: [workspace.dependencies]
-17: adk-rust = "1.0.0"
-18: adk-core = "1.0.0"
-19: adk-agent = "1.0.0"
-20: adk-model = { version = "1.0.0", features = ["openai"] }
-21: adk-tool = "1.0.0"
-22: adk-runner = "1.0.0"
-23: adk-session = "1.0.0"
-24: adk-skill = "1.0.0"
-25: 
-26: tokio = { version = "1", features = ["full"] }
-27: tokio-util = { version = "0.7", features = ["compat"] }
-28: anyhow = "1"
-29: thiserror = "2"
-30: serde = { version = "1", features = ["derive"] }
-31: serde_json = "1"
-32: 
-33: toml = "1.0"
-34: 
-35: clap = { version = "4", features = ["derive"] }
-36: dialoguer = "0.12"
-37: console = "0.16"
-38: 
-39: tracing = "0.1"
-40: tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-41: 
-42: chrono = { version = "0.4", features = ["serde"] }
-43: uuid = { version = "1", features = ["v4", "serde"] }
-44: 
-45: dirs = "6"
-46: walkdir = "2"
-47: ignore = "0.4"
-48: 
-49: futures = "0.3"
-50: 
-51: tempfile = "3"
+9: **Cowork Forge** is an AI-native multi-agent software development platform. It orchestrates specialized AI agents (Product Manager, Architect, Project Manager, Engineer) through a 7-stage pipeline to transform ideas into production-ready software.
+10: 
+11: ### Workspace Structure
+12: 
+13: ```
+14: crates/
+15: ├── cowork-core/         # Domain logic, pipeline, tools, agents (MAIN crate)
+16: │   └── src/
+17: │       ├── pipeline/    # 7-stage orchestration & stage executor
+18: │       ├── domain/      # Project, Iteration, Memory aggregates
+19: │       ├── tools/       # 40+ ADK tools + MCP integration
+20: │       ├── agents/      # Agent wrappers (iterative, PM, legacy analyzer)
+21: │       ├── interaction/ # InteractiveBackend trait (CLI/GUI abstraction)
+22: │       ├── acp/         # Agent Client Protocol for external agents
+23: │       ├── config_definition/  # Data-driven config (agents, stages, flows)
+24: │       ├── instructions/       # Agent prompt library
+25: │       ├── skills/      # agentskills.io standard skill system
+26: │       ├── integration/ # Hook manager for external integrations
+27: │       └── persistence/ # JSON-based storage
+28: ├── cowork-cli/          # CLI adapter (clap + dialoguer)
+29: └── cowork-gui/          # Tauri + React GUI
+30:     ├── src-tauri/       # Rust backend (Tauri commands + events)
+31:     └── src/             # React frontend (TypeScript + Ant Design)
+32: ```
+33: 
+34: ---
+35: 
+36: ## Dev Environment Setup
+37: 
+38: ### Prerequisites
+39: 
+40: - **Rust** (edition 2024, stable toolchain)
+41: - **Node.js** (for GUI frontend build)
+42: - **LLM API Key** (OpenAI-compatible endpoint)
+43: 
+44: ### Build
+45: 
+46: ```bash
+47: # Build entire workspace
+48: cargo build
+49: 
+50: # Release build
+51: cargo build --release
 52: 
-53: agent-client-protocol = "0.9"
-```
+53: # Build GUI only (installs frontend deps automatically)
+54: cd crates/cowork-gui && cargo tauri dev
+55: ```
+56: 
+57: ### Run
+58: 
+59: ```bash
+60: # CLI
+61: cargo run --package cowork-cli -- <command>
+62: 
+63: # GUI (development mode)
+64: cd crates/cowork-gui && cargo tauri dev
+65: ```
+66: 
+67: ### Configuration
+68: 
+69: Config file location:
+70: 
+71: | Platform | Path |
+72: |----------|------|
+73: | Windows | `%APPDATA%\CoworkCreative\config.toml` |
+74: | macOS | `~/Library/Application Support/CoworkCreative/config.toml` |
+75: | Linux | `~/.config/CoworkCreative/config.toml` |
+76: 
+77: User-facing config directory:
+78: 
+79: | Platform | Path |
+80: |----------|------|
+81: | Windows | `%APPDATA%\com.cowork-forge.app\config\` |
+82: | macOS | `~/Library/Application Support/com.cowork-forge.app/config/` |
+83: | Linux | `~/.config/com.cowork-forge.app/config/` |
+84: 
+85: ---
+86: 
+87: ## Build and Test Commands
+88: 
+89: ```bash
+90: # Run all tests
+91: cargo test
+92: 
+93: # Test a specific crate
+94: cargo test -p cowork-core
+95: 
+96: # Test a specific module
+97: cargo test -p cowork-core pipeline
+98: 
+99: # Run with all features
+100: cargo test --all-features
+101: 
+102: # Check compilation without building
+103: cargo check
+104: 
+105: # Lint (if clippy configured)
+106: cargo clippy
+107: ```
+108: 
+109: ### GUI Frontend
+110: 
+111: ```bash
+112: cd crates/cowork-gui
+113: 
+114: # Install dependencies
+115: npm install    # or: bun install
+116: 
+117: # Build frontend only
+118: npm run build
+119: 
+120: # Development server
+121: npm run dev
+122: ```
+123: 
+124: ---
+125: 
+126: ## Code Style and Conventions
+127: 
+128: ### Rust
+129: 
+130: - **Error handling**: Always use `anyhow::Result`. Never use `unwrap()` in production code.
+131: - **Async traits**: Use `async_trait` for async trait methods.
+132: - **Naming**: `snake_case` for functions/variables, `PascalCase` for types/traits.
+133: - **Architecture**: Follow hexagonal architecture — domain logic has zero external dependencies. Infrastructure adapters implement domain ports.
+134: - **Trait-based abstraction**: `InteractiveBackend` is the key port for CLI/GUI abstraction. All user interaction flows through this trait.
+135: - **Serialization**: `serde` with derive macros for all domain entities.
+136: - **Async runtime**: Tokio with `features = ["full"]`.
+137: 
+138: ### TypeScript / React (GUI)
+139: 
+140: - Component-based architecture with Ant Design.
+141: - Tauri commands for request-response, events for streaming.
+142: - State management via React hooks.
+143: 
+144: ### Key Patterns
+145: 
+146: | Pattern | Where | Purpose |
+147: |---------|-------|---------|
+148: | Actor-Critic | PRD, Design, Plan, Coding stages | Iterative self-refinement |
+149: | Strategy | Stage trait implementations | Pluggable stage behavior |
+150: | Template Method | Pipeline execution flow | Fixed stage sequence with hooks |
+151: | Repository | Persistence stores | Abstract data access |
+152: | Decorator | LLM rate limiting | Transparent cross-cutting concern |
+153: 
+154: ---
+155: 
+156: ## Security Considerations
+157: 
+158: - **Path validation**: All file operations are validated against workspace boundaries. Never bypass `validate_path()` checks.
+159: - **Command sanitization**: Dangerous commands (`rm -rf`, `sudo`, etc.) are blocked. Do not circumvent the command whitelist.
+160: - **LLM rate limiting**: Global semaphore (concurrency=1) + 2s delay = 30 req/min. Do not bypass rate limiting.
+161: - **Workspace containment**: File tools must not access paths outside the project workspace.
+162: - **No secrets in code**: API keys are loaded from `config.toml` or environment variables, never hardcoded.
+163: - **Watchdog monitoring**: Agent behavior is monitored for objective deviation.
+164: 
+165: ---
+166: 
+167: ## Common Pitfalls
+168: 
+169: - **Don't bypass `InteractiveBackend`**: Never call CLI-specific functions (e.g., `dialoguer`) from `cowork-core`. All user interaction must go through the `InteractiveBackend` trait.
+170: - **Don't ignore rate limiting**: LLM calls are serialized for a reason. Don't try to parallelize them.
+171: - **Don't access files outside workspace**: The security layer validates all paths. If you need to access a new path, update the validation logic, don't bypass it.
+172: - **Don't hardcode stage IDs**: Use `create_stage_by_id()` or flow configuration instead of string matching.
+173: - **Don't use `unwrap()`**: Use `anyhow::Result` with proper error propagation (`?` operator or `.context()`).
+174: 
+175: <!-- terrain:begin env-overview v3 -->
+176: ## AI 工程环境（Terrain）
+177: 
+178: 本仓库由 Terrain 配置了 AI 工程环境。Coding Agent 请遵循以下约定：
+179: 
+180: - **知识资产**位于本仓库 **`.terrain/`**（Agent 友好的知识资产、人类友好的知识库、私域知识、源码索引；可随 Git 协作）
+181: - **项目登记**在本地 `~/.terrain/registry.json`（仅记录仓库路径，不含知识正文）
+182: - **Skills** 位于 `.agents/skills/`（由 Terrain 注入，可按需重新集成）
+183: - **Agent 工具**约定在 `~/.terrain/bin/`（`rtk` / `codegraph` / `terrain`）；可选本地清单 `.terrain/env/agent-tools.json`（不入库）
+184: - **无 Terrain 安装**时：RTK / CodeGraph 可降级为 `bunx` / `npx`（见 `rtk-skill`、`codegraph-skill`）
+185: - **工作流**：先读知识 → 再查关系 → 最后读源码；shell 输出优先走 RTK
+186: <!-- terrain:end env-overview -->
+187: 
+188: <!-- terrain:begin knowledge-guide v3 -->
+189: ## Terrain 知识资产
+190: 
+191: Coding Agent **必须先加载** `terrain-knowledge-skill`，并按其中分层策略查询 **`.terrain/`**（仓库内路径，非全局目录）。
+192: 
+193: | 层级 | 路径 | 何时使用 |
+194: |------|------|----------|
+195: | Agent 友好 | `.terrain/agent/context.md` | 模块划分、核心流程、系统边界 |
+196: | 私域 | `.terrain/knowledge/` | 业务术语、内部框架/API/脚手架 |
+197: | 人类友好 | `.terrain/human/` | Litho 人类友好的知识库（可选参考） |
+198: | 源码 | `.terrain/agent/repomix.md`（见 `repomix-context-skill`） | 实现细节（本地索引，不入库） |
+199: | 关系 | codegraph CLI（见 `codegraph-skill`） | 调用链、依赖关系、影响分析 |
+200: 
+201: **原则**：先宏观后微观；优先读已生成文档，再 grep 源码索引。
+202: 
+203: ## 知识保鲜（必读）
+204: 
+205: 1. 回答架构/模块问题前，读取 `.terrain/.meta/freshness.json`（或 `freshness` 工具输出）
+206: 2. `freshness_score < 70` 时：不得仅凭 `agent/context.md` 下结论，须用 `grep repomix` 或 `codegraph` 交叉验证
+207: 3. `freshness_score < 50` 时：宏观架构上下文不可信，以 repomix 源码切片为准
+208: 4. 发现矛盾时的优先级：**repomix 源码 > codegraph > agent/context.md > human/**
+209: 5. `knowledge/` 私域文档视为人为维护；若 `refs` 指向的源码路径已删除，应降权处理
+210: <!-- terrain:end knowledge-guide -->
+211: 
+212: <!-- terrain:begin skills v2 -->
+213: ### 可用 Skills
+214: 
+215: | Skill | 用途 |
+216: |-------|------|
+217: | `terrain-knowledge-skill` | `.terrain/` 知识分层与查询顺序（先读） |
+218: | `repomix-context-skill` | grep/读取 `repomix.md` 源码切片 |
+219: | `codegraph-skill` | 符号关系；`~/.terrain/bin/codegraph` 或 `bunx codegraph` |
+220: | `rtk-skill` | 冗长 shell 加 rtk 前缀；`~/.terrain/bin/rtk` 或 `bunx @terrain-ai/rtk` |
+221: 
+222: 加载顺序建议：knowledge → codegraph / repomix → rtk（执行命令时）。
+223: <!-- terrain:end skills -->
+224: 
+225: <!-- terrain:begin tools v2 -->
+226: ### 工具链
+227: 
+228: | 工具 | 约定路径 | 无 Terrain 时降级 |
+229: |------|----------|-------------------|
+230: | RTK | `~/.terrain/bin/rtk` | `bunx @terrain-ai/rtk` 或 `npx @terrain-ai/rtk` |
+231: | CodeGraph | `~/.terrain/bin/codegraph` | `bunx codegraph` 或 `npx codegraph` |
+232: | Terrain CLI | `~/.terrain/bin/terrain` | `bunx @terrain-ai/cli` 或 `npx @terrain-ai/cli` |
+233: | 知识文件 | `.terrain/` 仓库内路径 | 直接 Read/Grep，无需 CLI |
+234: 
+235: | 场景 | 用法 |
+236: |------|------|
+237: | 架构、私域知识 | 加载 `terrain-knowledge-skill` |
+238: | 源码片段 | `repomix-context-skill`；`<rtk> grep` 搜索 pack |
+239: | 符号关系 | `codegraph-skill`；检查 `~/.terrain/bin/codegraph` 是否存在（见 codegraph-skill） |
+240: | git/test/build | `rtk-skill`；检查 `~/.terrain/bin/rtk` 是否存在（见 rtk-skill） |
+241: | ACP 知识查询 | `~/.terrain/bin/terrain tools …` |
+242: 
+243: ### Agent 工具解析（必读）
+244: 
+245: **一律使用约定路径**（`~/.terrain/bin/…`、`.terrain/…`），**不要**写机器相关的绝对路径（如 `/Users/…` 或 `C:\Users\…`）。
+246: 
+247: Windows 上工具部署在 `%USERPROFILE%\.terrain\bin\`（Git Bash / PowerShell 7+ 中可写为 `~/.terrain/bin/`），二进制带 `.exe` 后缀。
+248: 
+249: 1. 执行前检查工具是否存在 — 见 `rtk-skill` / `codegraph-skill` 中的跨平台检查表（**不要**在 Windows 上使用 Unix 专用的 `test -x`）
+250: 2. 存在 → 用 `~/.terrain/bin/<tool> …`（词首 `~` 在 bash/zsh/Git Bash/PowerShell 7+ 会展开）
+251: 3. 不存在 → RTK / CodeGraph 用上表 `bunx` / `npx` 降级；Terrain CLI 请用户通过桌面应用操作
+252: 4. 可选参考：`.terrain/env/agent-tools.json`（本地生成、不入库），内容与约定路径一致
+253: 
+254: **不要**把 manifest 里的 `~` 路径赋给变量再引号调用（`"$VAR"` 不会展开 `~`）。直接写 `~/.terrain/bin/rtk` 或选用 `bunx` 前缀。
+255: 
+256: ### RTK 要点（必读 `rtk-skill`）
+257: 
+258: - **必须显式**加 rtk 前缀 — Terrain 不启用 `rtk init` 全局 hook
+259: - 内置 Read/Grep 不会自动走 RTK — 大文件用 `<rtk> read`，搜索用 `<rtk> grep`
+260: 
+261: **注意**：不要运行 `codegraph install` 或 `rtk init`（已由 Terrain + Skills 配置）。
+262: <!-- terrain:end tools -->
+````
 
 ### crates/cowork-core/src/lib.rs (109 lines)
 
@@ -1752,6 +1605,83 @@ LICENSE
 32:   onToggleThinking: (index: number) => void;
 33:   onActionClick?: (action: PMAction) => void;
 34: }
+```
+
+### Cargo.toml (53 lines)
+
+```
+1: [workspace]
+2: resolver = "2"
+3: members = [
+4:     "crates/cowork-core",
+5:     "crates/cowork-cli",
+6:     "crates/cowork-gui/src-tauri",
+7: ]
+8: 
+9: [workspace.package]
+10: version = "2.5.2"
+11: edition = "2024"
+12: authors = ["Sopaco"]
+13: license = "MIT"
+14: repository = "https://github.com/sopaco/cowork-forge"
+15: 
+16: [workspace.dependencies]
+17: adk-rust = "1.0.0"
+18: adk-core = "1.0.0"
+19: adk-agent = "1.0.0"
+20: adk-model = { version = "1.0.0", features = ["openai"] }
+21: adk-tool = "1.0.0"
+22: adk-runner = "1.0.0"
+23: adk-session = "1.0.0"
+24: adk-skill = "1.0.0"
+25: 
+26: tokio = { version = "1", features = ["full"] }
+27: tokio-util = { version = "0.7", features = ["compat"] }
+28: anyhow = "1"
+29: thiserror = "2"
+30: serde = { version = "1", features = ["derive"] }
+31: serde_json = "1"
+32: 
+33: toml = "1.0"
+34: 
+35: clap = { version = "4", features = ["derive"] }
+36: dialoguer = "0.12"
+37: console = "0.16"
+38: 
+39: tracing = "0.1"
+40: tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+41: 
+42: chrono = { version = "0.4", features = ["serde"] }
+43: uuid = { version = "1", features = ["v4", "serde"] }
+44: 
+45: dirs = "6"
+46: walkdir = "2"
+47: ignore = "0.4"
+48: 
+49: futures = "0.3"
+50: 
+51: tempfile = "3"
+52: 
+53: agent-client-protocol = "0.9"
+```
+
+### crates/cowork-gui/src/components/chat/InputArea.tsx (14 lines)
+
+```
+1: InputAreaProps
+2: ⋮----
+3: {
+4:   userInput: string;
+5:   onUserInputChange: (value: string) => void;
+6:   onSend: () => void;
+7:   onDumpChat: () => void;
+8:   inputRequest?: InputRequest | null;
+9:   onSelectOption: (option: InputOption) => void;
+10:   onSubmitFeedback: () => void;
+11:   onCancelFeedback: () => void;
+12:   disabled?: boolean;
+13:   mode: 'pipeline' | 'pm_agent';
+14: }
 ```
 
 ### litho.docs/en/1.Overview.md (296 lines)
@@ -2369,527 +2299,6 @@ LICENSE
 309: }
 ```
 
-### crates/cowork-gui/src/App.tsx (413 lines)
-
-```
-1: import React, { useEffect, useRef, useState, useMemo, useCallback, Suspense, lazy } from 'react';
-2: import { Layout, Menu, Button, Empty, App as AntApp, Tag, Spin } from 'antd';
-3: import {
-4: 	FolderOutlined,
-5: 	FileTextOutlined,
-6: 	CodeOutlined,
-7: 	EyeOutlined,
-8: 	PlayCircleOutlined,
-9: 	ReloadOutlined,
-10: 	MessageOutlined,
-11: 	AppstoreOutlined,
-12: 	DatabaseOutlined,
-13: 	BranchesOutlined,
-14: 	CheckCircleOutlined,
-15: 	RocketOutlined,
-16: 	BookOutlined,
-17: 	SettingOutlined,
-18: 	ControlOutlined
-19: } from '@ant-design/icons';
-20: 
-21: import { useProjectStore, useAgentStore, useUIStore } from './stores';
-22: import { LoadingScreen, StatusBadge } from './components/common';
-23: import { useAppEvents, usePMAgent, useIterationActions, useChatInput } from './hooks';
-24: 
-25: import type { ChatMode, PMAction, PMAgentMessage, ChatMessage } from './stores';
-26: 
-27: 
-28: import ProjectsPanel from './components/ProjectsPanel';
-29: 
-30: 
-31: const ArtifactsViewer = lazy(() => import('./components/ArtifactsViewer'));
-32: const CodeEditor = lazy(() => import('./components/CodeEditor'));
-33: const RunnerPanel = lazy(() => import('./components/RunnerPanel'));
-34: const MemoryPanel = lazy(() => import('./components/MemoryPanel'));
-35: const KnowledgePanel = lazy(() => import('./components/KnowledgePanel'));
-36: const CommandPalette = lazy(() => import('./components/CommandPalette'));
-37: const IterationsPanel = lazy(() => import('./components/IterationsPanel'));
-38: const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
-39: 
-40: const ChatPanel = lazy(() => import('./components/chat').then(m => ({ default: m.ChatPanel })));
-41: 
-42: const AgentsSetupPanel = lazy(() => import('./components/config').then(m => ({ default: m.AgentsSetupPanel })));
-43: 
-44: const { Sider, Content, Header, Footer } = Layout;
-45: 
-46: function App() {
-47: 	
-48: 	const [userInput, setUserInput] = useState('');
-49: 	const messagesContainerRef = useRef<HTMLDivElement>(null);
-50: 	const pmMessagesContainerRef = useRef<HTMLDivElement>(null);
-51: 
-52: 	
-53: 	const project = useProjectStore(state => state.project);
-54: 	const iterations = useProjectStore(state => state.iterations);
-55: 	const currentIteration = useProjectStore(state => state.currentIteration);
-56: 	const loading = useProjectStore(state => state.loading);
-57: 	const loadProject = useProjectStore(state => state.loadProject);
-58: 	const setCurrentIteration = useProjectStore(state => state.setCurrentIteration);
-59: 	const updateCurrentIterationStatus = useProjectStore(state => state.updateCurrentIterationStatus);
-60: 
-61: 	
-62: 	const messages = useAgentStore(state => state.messages);
-63: 	const pmMessages = useAgentStore(state => state.pmMessages);
-64: 	const isProcessing = useAgentStore(state => state.isProcessing);
-65: 	const currentAgent = useAgentStore(state => state.currentAgent);
-66: 	const currentStage = useAgentStore(state => state.currentStage);
-67: 	const inputRequest = useAgentStore(state => state.inputRequest);
-68: 	const pmProcessing = useAgentStore(state => state.pmProcessing);
-69: 	const setInputRequest = useAgentStore(state => state.setInputRequest);
-70: 	const loadPMWelcomeMessage = useAgentStore(state => state.loadPMWelcomeMessage);
-71: 
-72: 	
-73: 	const activeView = useUIStore(state => state.activeView);
-74: 	const commandPaletteVisible = useUIStore(state => state.commandPaletteVisible);
-75: 	const activeArtifactTab = useUIStore(state => state.activeArtifactTab);
-76: 	const artifactsRefreshTrigger = useUIStore(state => state.artifactsRefreshTrigger);
-77: 	const codeRefreshTrigger = useUIStore(state => state.codeRefreshTrigger);
-78: 	const memoryRefreshTrigger = useUIStore(state => state.memoryRefreshTrigger);
-79: 	const knowledgeRefreshTrigger = useUIStore(state => state.knowledgeRefreshTrigger);
-80: 	const setActiveView = useUIStore(state => state.setActiveView);
-81: 	const setCommandPaletteVisible = useUIStore(state => state.setCommandPaletteVisible);
-82: 	const setActiveArtifactTab = useUIStore(state => state.setActiveArtifactTab);
-83: 
-84: 	
-85: 	useAppEvents(userInput, setUserInput);
-86: 	const { handlePMSendMessage, handlePMAction } = usePMAgent();
-87: 	const { handleSelectIteration, handleExecuteIteration, handleOpenProjectFolder, handleOpenIterationFolder, handleCommandSelect } = useIterationActions();
-88: 	const {
-89: 		inputRequest: chatInputRequest,
-90: 		handleSendUserMessage,
-91: 		handleSelectOption,
-92: 		handleSubmitFeedback,
-93: 		handleToggleThinking,
-94: 		handleCancelFeedback
-95: 	} = useChatInput();
-96: 
-97: 	
-98: 	const chatMode = useMemo<ChatMode>(() => {
-99: 		if (!currentIteration) return 'disabled';
-100: 		if (currentIteration.status === 'Completed') return 'pm_agent';
-101: 		if (isProcessing || currentIteration.status === 'Running') return 'pipeline';
-102: 		return 'pipeline';
-103: 	}, [currentIteration, isProcessing]);
-104: 
-105: 	
-106: 	useEffect(() => {
-107: 		if (chatMode === 'pm_agent' && currentIteration) {
-108: 			const pmMessages = useAgentStore.getState().pmMessages;
-109: 			if (pmMessages.length === 0) {
-110: 				loadPMWelcomeMessage(currentIteration.id);
-111: 			}
-112: 		}
-113: 	}, [chatMode, currentIteration?.id, loadPMWelcomeMessage]);
-114: 
-115: 	
-116: 	useEffect(() => {
-117: 		if (messagesContainerRef.current) {
-118: 			messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-119: 		}
-120: 	}, [messages]);
-121: 
-122: 	useEffect(() => {
-123: 		if (pmMessagesContainerRef.current && pmMessages.length > 0) {
-124: 			pmMessagesContainerRef.current.scrollTop = pmMessagesContainerRef.current.scrollHeight;
-125: 		}
-126: 	}, [pmMessages]);
-127: 
-128: 	
-129: 	const handleSend = useCallback(() => {
-130: 		if (chatMode === 'pm_agent') {
-131: 			handlePMSendMessage(userInput, setUserInput);
-132: 		} else {
-133: 			handleSendUserMessage(userInput, setUserInput);
-134: 		}
-135: 	}, [chatMode, userInput, handlePMSendMessage, handleSendUserMessage]);
-136: 
-137: 	const handleSelectOptionWrapper = useCallback((option: Parameters<typeof handleSelectOption>[0]) => {
-138: 		handleSelectOption(option, userInput, setUserInput);
-139: 	}, [handleSelectOption, userInput]);
-140: 
-141: 	const handleSubmitFeedbackWrapper = useCallback(() => {
-142: 		handleSubmitFeedback(userInput, setUserInput, updateCurrentIterationStatus);
-143: 	}, [handleSubmitFeedback, userInput, updateCurrentIterationStatus]);
-144: 
-145: 	const handlePMActionWrapper = useCallback((action: PMAction) => {
-146: 		handlePMAction(action, pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]);
-147: 	}, [handlePMAction, pmMessages]);
-148: 
-149: 	
-150: 	const loadingFallback = (
-151: 		<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-152: 			<Spin size="large" tip="Loading..." />
-153: 		</div>
-154: 	);
-155: 
-156: 	
-157: 	const renderContent = () => (
-158: 		<div style={{ height: '100%' }}>
-159: 			<div style={{ height: '100%', display: activeView === 'iterations' ? 'block' : 'none' }}>
-160: 				<Suspense fallback={loadingFallback}>
-161: 					<IterationsPanel
-162: 						key="iterations"
-163: 						onSelectIteration={handleSelectIteration}
-164: 						selectedIterationId={currentIteration?.id}
-165: 					/>
-166: 				</Suspense>
-167: 			</div>
-168: 
-169: 			<div style={{ height: '100%', display: activeView === 'projects' ? 'block' : 'none' }}>
-170: 				<ProjectsPanel key="projects" />
-171: 			</div>
-172: 
-173: 			<div style={{ height: '100%', display: activeView === 'artifacts' ? 'block' : 'none' }}>
-174: 				{currentIteration ? (
-175: 					<Suspense fallback={loadingFallback}>
-176: 						<ArtifactsViewer
-177: 							key={`artifacts-${currentIteration.id}`}
-178: 							iterationId={currentIteration.id}
-179: 							activeTab={activeArtifactTab}
-180: 							onTabChange={setActiveArtifactTab}
-181: 							refreshTrigger={artifactsRefreshTrigger}
-182: 						/>
-183: 					</Suspense>
-184: 				) : (
-185: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-186: 				)}
-187: 			</div>
-188: 
-189: 			<div style={{ height: '100%', display: activeView === 'code' ? 'block' : 'none' }}>
-190: 				{currentIteration ? (
-191: 					<Suspense fallback={loadingFallback}>
-192: 						<CodeEditor
-193: 							key={`code-${currentIteration.id}`}
-194: 							iterationId={currentIteration.id}
-195: 							refreshTrigger={codeRefreshTrigger}
-196: 						/>
-197: 					</Suspense>
-198: 				) : (
-199: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-200: 				)}
-201: 			</div>
-202: 
-203: 			<div style={{ height: '100%', display: activeView === 'run' ? 'block' : 'none' }}>
-204: 				{currentIteration ? (
-205: 					<Suspense fallback={loadingFallback}>
-206: 						<RunnerPanel key={`run-${currentIteration.id}`} iterationId={currentIteration.id} />
-207: 					</Suspense>
-208: 				) : (
-209: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-210: 				)}
-211: 			</div>
-212: 
-213: 			<div style={{ height: '100%', display: activeView === 'execution-memory' ? 'block' : 'none' }}>
-214: 				<Suspense fallback={loadingFallback}>
-215: 					<MemoryPanel
-216: 						key={`memory-${memoryRefreshTrigger}`}
-217: 						currentSession={currentIteration?.id}
-218: 						refreshTrigger={memoryRefreshTrigger}
-219: 					/>
-220: 				</Suspense>
-221: 			</div>
-222: 
-223: 			<div style={{ height: '100%', display: activeView === 'project-knowledge' ? 'block' : 'none' }}>
-224: 				<Suspense fallback={loadingFallback}>
-225: 					<KnowledgePanel
-226: 						key={`knowledge-${knowledgeRefreshTrigger}`}
-227: 						currentSession={project?.id}
-228: 						currentIterationId={currentIteration?.id}
-229: 						refreshTrigger={knowledgeRefreshTrigger}
-230: 					/>
-231: 				</Suspense>
-232: 			</div>
-233: 
-234: 			<div style={{ height: '100%', display: activeView === 'settings' ? 'block' : 'none', overflow: 'auto' }}>
-235: 				<Suspense fallback={loadingFallback}>
-236: 					<SettingsPanel />
-237: 				</Suspense>
-238: 			</div>
-239: 
-240: 			<div style={{ height: '100%', display: activeView === 'config' ? 'block' : 'none', overflow: 'auto' }}>
-241: 				<Suspense fallback={loadingFallback}>
-242: 					<AgentsSetupPanel />
-243: 				</Suspense>
-244: 			</div>
-245: 
-246: 			<div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
-247: 				{currentIteration ? (
-248: 					<Suspense fallback={loadingFallback}>
-249: 						<ChatPanel
-250: 							messages={messages}
-251: 							pmMessages={pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]}
-252: 							mode={chatMode}
-253: 							isProcessing={isProcessing}
-254: 							pmProcessing={pmProcessing}
-255: 							currentAgent={currentAgent}
-256: 							iterationTitle={currentIteration.title}
-257: 							iterationDescription={currentIteration.description}
-258: 							currentStage={currentStage}
-259: 							inputRequest={inputRequest}
-260: 							userInput={userInput}
-261: 							messagesContainerRef={messagesContainerRef as React.RefObject<HTMLDivElement>}
-262: 							pmMessagesContainerRef={pmMessagesContainerRef as React.RefObject<HTMLDivElement>}
-263: 							onUserInputChange={setUserInput}
-264: 							onSend={handleSend}
-265: 							onSelectOption={handleSelectOptionWrapper}
-266: 							onSubmitFeedback={handleSubmitFeedbackWrapper}
-267: 							onCancelFeedback={handleCancelFeedback}
-268: 							onToggleThinking={handleToggleThinking}
-269: 							onActionClick={handlePMActionWrapper}
-270: 						/>
-271: 					</Suspense>
-272: 				) : (
-273: 					<Empty description="Select an iteration to view chat" style={{ marginTop: '40px' }} />
-274: 				)}
-275: 			</div>
-276: 		</div>
-277: 	);
-278: 
-279: 	if (loading) {
-280: 		return <LoadingScreen />;
-281: 	}
-282: 
-283: 	return (
-284: 		<Layout style={{ minHeight: '100vh' }}>
-285: 			<Header
-286: 				style={{
-287: 					background: '#fff',
-288: 					borderBottom: '1px solid #e8e8e8',
-289: 					padding: '0 24px',
-290: 					display: 'flex',
-291: 					alignItems: 'center',
-292: 					justifyContent: 'space-between'
-293: 				}}
-294: 			>
-295: 				<div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-296: 					<h1 style={{ margin: 0, fontSize: '18px' }}>
-297: 						<RocketOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
-298: 						Cowork Forge
-299: 					</h1>
-300: 					{project && (
-301: 						<Tag color="blue" style={{ cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
-302: 							{project.name}
-303: 						</Tag>
-304: 					)}
-305: 				</div>
-306: 
-307: 				<div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-308: 					{currentIteration && (
-309: 						<>
-310: 							<StatusBadge status={currentIteration.status} />
-311: 							{(currentIteration.status === 'Draft' || currentIteration.status === 'Paused') && (
-312: 								<Button
-313: 									type="primary"
-314: 									icon={
-315: 										currentIteration.status === 'Draft' ? (
-316: 											<PlayCircleOutlined />
-317: 										) : (
-318: 											<ReloadOutlined />
-319: 										)
-320: 									}
-321: 									onClick={handleExecuteIteration}
-322: 									loading={isProcessing}
-323: 								>
-324: 									{currentIteration.status === 'Draft' ? 'Start Iteration' : 'Continue'}
-325: 								</Button>
-326: 							)}
-327: 						</>
-328: 					)}
-329: 				</div>
-330: 			</Header>
-331: 
-332: 			<Layout style={{ height: 'calc(100vh - 64px - 48px)' }}>
-333: 				<Sider width={200} style={{ background: '#fff', borderRight: '1px solid #e8e8e8' }}>
-334: 					<Menu
-335: 						mode="inline"
-336: 						selectedKeys={[activeView]}
-337: 						onClick={({ key }) => setActiveView(key as typeof activeView)}
-338: 						style={{ height: '100%', borderRight: 0 }}
-339: 						items={[
-340: 							{ key: 'projects', icon: <AppstoreOutlined />, label: 'Projects' },
-341: 							{ key: 'iterations', icon: <BranchesOutlined />, label: 'Iterations' },
-342: 							{ key: 'chat', icon: <MessageOutlined />, label: 'Collaborate' },
-343: 							{ key: 'artifacts', icon: <FileTextOutlined />, label: 'Artifacts' },
-344: 							{ key: 'code', icon: <CodeOutlined />, label: 'Code' },
-345: 							{ key: 'run', icon: <PlayCircleOutlined />, label: 'Run' },
-346: 							{ key: 'execution-memory', icon: <DatabaseOutlined />, label: 'Memory' },
-347: 							{ key: 'project-knowledge', icon: <BookOutlined />, label: 'Knowledge' },
-348: 							{ type: 'divider' },
-349: 							{ key: 'config', icon: <ControlOutlined />, label: 'Agents Setup' },
-350: 							{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' }
-351: 						]}
-352: 					/>
-353: 				</Sider>
-354: 
-355: 				<Content style={{ overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
-356: 					{renderContent()}
-357: 				</Content>
-358: 			</Layout>
-359: 
-360: 			<Footer
-361: 				style={{
-362: 					background: '#fff',
-363: 					borderTop: '1px solid #e8e8e8',
-364: 					padding: '12px 24px',
-365: 					display: 'flex',
-366: 					justifyContent: 'space-between',
-367: 					alignItems: 'center'
-368: 				}}
-369: 			>
-370: 				<div style={{ fontSize: '12px', color: '#888' }}>
-371: 					{project ? (
-372: 						<>
-373: 							<span style={{ marginRight: '16px', cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
-374: 								Project: <strong>{project.name}</strong>
-375: 							</span>
-376: 							<span
-377: 								style={{ cursor: currentIteration ? 'pointer' : 'default' }}
-378: 								onClick={() => currentIteration && handleOpenIterationFolder(currentIteration.id)}
-379: 								title={currentIteration ? `Click to open iteration folder: ${currentIteration.id}` : undefined}
-380: 							>
-381: 								Iterations: <strong>{iterations.length}</strong>
-382: 								{currentIteration && <span style={{ marginLeft: '4px', color: '#1890ff' }}>(#{currentIteration.number})</span>}
-383: 							</span>
-384: 						</>
-385: 					) : (
-386: 						'No project loaded'
-387: 					)}
-388: 				</div>
-389: 				<div style={{ fontSize: '12px', color: '#888' }}>
-390: 					{isProcessing ? (
-391: 						<span style={{ color: '#1890ff' }}>
-392: 							<Spin size="small" style={{ marginRight: '8px' }} />
-393: 							{currentAgent ? `${currentAgent} is working...` : 'Processing...'}
-394: 						</span>
-395: 					) : (
-396: 						<span style={{ color: '#52c41a' }}>
-397: 							<CheckCircleOutlined style={{ marginRight: '4px' }} />
-398: 							Ready
-399: 						</span>
-400: 					)}
-401: 				</div>
-402: 			</Footer>
-403: 
-404: 			<CommandPalette
-405: 				visible={commandPaletteVisible}
-406: 				onClose={() => setCommandPaletteVisible(false)}
-407: 				onCommandSelect={handleCommandSelect}
-408: 			/>
-409: 		</Layout>
-410: 	);
-411: }
-412: 
-413: export default App;
-```
-
-### crates/cowork-gui/src/components/chat/ChatPanel.tsx (24 lines)
-
-```
-1: ChatPanelProps
-2: ⋮----
-3: {
-4:   messages: ChatMessage[];
-5:   pmMessages: (ChatMessage & { type: 'user' | 'pm_agent' })[];
-6:   mode: 'pipeline' | 'pm_agent' | 'disabled';
-7:   isProcessing: boolean;
-8:   pmProcessing: boolean;
-9:   currentAgent: string | null;
-10:   iterationTitle: string;
-11:   iterationDescription?: string;
-12:   currentStage?: string | null;
-13:   inputRequest?: InputRequest | null;
-14:   userInput: string;
-15:   messagesContainerRef: React.RefObject<HTMLDivElement>;
-16:   pmMessagesContainerRef: React.RefObject<HTMLDivElement>;
-17:   onUserInputChange: (value: string) => void;
-18:   onSend: () => void;
-19:   onSelectOption: (option: InputOption) => void;
-20:   onSubmitFeedback: () => void;
-21:   onCancelFeedback: () => void;
-22:   onToggleThinking: (index: number) => void;
-23:   onActionClick?: (action: PMAction) => void;
-24: }
-```
-
-### crates/cowork-gui/src/components/chat/InputArea.tsx (14 lines)
-
-```
-1: InputAreaProps
-2: ⋮----
-3: {
-4:   userInput: string;
-5:   onUserInputChange: (value: string) => void;
-6:   onSend: () => void;
-7:   onDumpChat: () => void;
-8:   inputRequest?: InputRequest | null;
-9:   onSelectOption: (option: InputOption) => void;
-10:   onSubmitFeedback: () => void;
-11:   onCancelFeedback: () => void;
-12:   disabled?: boolean;
-13:   mode: 'pipeline' | 'pm_agent';
-14: }
-```
-
-### crates/cowork-gui/src-tauri/Cargo.toml (50 lines)
-
-```
-1: [package]
-2: name = "cowork-gui"
-3: version.workspace = true
-4: edition.workspace = true
-5: authors.workspace = true
-6: license.workspace = true
-7: description = "Cowork Forge GUI"
-8: 
-9: [lib]
-10: name = "cowork_gui_lib"
-11: crate-type = ["staticlib", "cdylib", "rlib"]
-12: 
-13: [build-dependencies]
-14: tauri-build = { version = "2.6.3", features = [] }
-15: 
-16: [dependencies]
-17: tauri = { version = "2.11.5", features = [] }
-18: tauri-plugin-opener = "2.5.4"
-19: tauri-plugin-dialog = "2.7.1"
-20: serde = { version = "1", features = ["derive"] }
-21: serde_json = "1"
-22: tokio = { version = "1", features = ["sync", "full"] }
-23: tokio-stream = "0.1"
-24: async-trait = "0.1"
-25: chrono = "0.4"
-26: uuid = { workspace = true }
-27: anyhow = "1"
-28: thiserror = "2"
-29: futures = "0.3"
-30: 
-31: tiny_http = "0.12"
-32: attohttpc = "0.30"
-33: urlencoding = "2.1"
-34: 
-35: lazy_static = "1.5"
-36: 
-37: tracing = "0.1"
-38: 
-39: dirs = { workspace = true }
-40: 
-41: sys-locale = "0.3"
-42: 
-43: cowork-core = { path = "../../cowork-core" }
-44: 
-45: adk-core = { workspace = true }
-46: adk-runner = { workspace = true }
-47: adk-session = { workspace = true }
-48: adk-skill = { workspace = true }
-49: adk-tool = { workspace = true, features = ["http-transport"] }
-50: which = "8.0.0"
-```
-
 ### crates/cowork-core/src/agents/mod.rs (134 lines)
 
 ```
@@ -3029,1671 +2438,89 @@ LICENSE
 134: )
 ```
 
-### crates/cowork-gui/src/hooks/useAppEvents.ts (432 lines)
+### crates/cowork-gui/src/components/chat/ChatPanel.tsx (24 lines)
 
 ```
-1: function useAppEvents(userInput: string, setUserInput: (input: string) => void) {
-2: 	const { message } = AntApp.useApp();
-3: 	const listenersRegistered = useRef(false);
-4: 
-5: 	
-6: 	const {
-7: 		loadProject,
-8: 		loadIterations,
-9: 		setCurrentIteration,
-10: 		updateCurrentIterationStatus,
-11: 		setIsExecuting
-12: 	} = useProjectStore();
-13: 
-14: 	
-15: 	const {
-16: 		setMessages,
-17: 		clearMessages,
-18: 		setPMMessages,
-19: 		clearPMMessages,
-20: 		setProcessing,
-21: 		setCurrentAgent,
-22: 		setCurrentStage,
-23: 		setInputRequest,
-24: 		setPmProcessing,
-25: 		submitInput,
-26: 		loadPMWelcomeMessage
-27: 	} = useAgentStore();
-28: 
-29: 	
-30: 	const {
-31: 		commandPaletteVisible,
-32: 		setActiveView,
-33: 		setCommandPaletteVisible,
-34: 		setActiveArtifactTab,
-35: 		triggerArtifactsRefresh,
-36: 		triggerCodeRefresh,
-37: 		triggerMemoryRefresh,
-38: 		triggerKnowledgeRefresh
-39: 	} = useUIStore();
-40: 
-41: 	useEffect(() => {
-42: 		const setupListeners = async () => {
-43: 			if (listenersRegistered.current) return;
-44: 			listenersRegistered.current = true;
-45: 
-46: 			
-47: 			const listenerPromises = [
-48: 				
-49: 				listen('iteration_created', () => {
-50: 					loadProject();
-51: 					message.success('Iteration created');
-52: 				}),
-53: 
-54: 				listen('iteration_started', (event) => {
-55: 					const iterationId = event.payload as string;
-56: 					setProcessing(true);
-57: 					setIsExecuting(true);
-58: 					updateCurrentIterationStatus('Running');
-59: 					setActiveView('chat');
-60: 					message.info('Iteration started');
-61: 				}),
-62: 
-63: 				listen('iteration_continued', (event) => {
-64: 					const iterationId = event.payload as string;
-65: 					setProcessing(true);
-66: 					setIsExecuting(true);
-67: 					updateCurrentIterationStatus('Running');
-68: 					setActiveView('chat');
-69: 					message.info('Iteration continued');
-70: 				}),
-71: 
-72: 				listen('iteration_retrying', (event) => {
-73: 					const iterationId = event.payload as string;
-74: 					setProcessing(true);
-75: 					setIsExecuting(true);
-76: 					updateCurrentIterationStatus('Running');
-77: 					setActiveView('chat');
-78: 					message.info('Retrying iteration...');
-79: 				}),
-80: 
-81: 				listen('iteration_completed', (event) => {
-82: 					const iterationId = event.payload as string;
-83: 					setProcessing(false);
-84: 					setIsExecuting(false);
-85: 					setCurrentAgent(null);
-86: 					setCurrentStage(null);
-87: 					setInputRequest(null);
-88: 					updateCurrentIterationStatus('Completed');
-89: 					loadProject();
-90: 					triggerMemoryRefresh();
-91: 					triggerKnowledgeRefresh();
-92: 					clearPMMessages();
-93: 					setActiveView('chat');
-94: 					loadPMWelcomeMessage(iterationId);
-95: 					message.success('Iteration completed');
-96: 				}),
-97: 
-98: 				listen('iteration_failed', (event) => {
-99: 					const [, error] = event.payload as [string, string];
-100: 					setProcessing(false);
-101: 					setIsExecuting(false);
-102: 					setCurrentAgent(null);
-103: 					setCurrentStage(null);
-104: 					setInputRequest(null);
-105: 					updateCurrentIterationStatus('Failed');
-106: 					loadProject();
-107: 					message.error('Iteration failed: ' + error);
-108: 				}),
-109: 
-110: 				
-111: 				listen('agent_event', (event) => {
-112: 					const { content, agent_name, message_type, stage_name, level } = event.payload as {
-113: 						content?: string;
-114: 						agent_name?: string;
-115: 						message_type?: string;
-116: 						stage_name?: string;
-117: 						level?: string;
-118: 					};
-119: 
-120: 					if (agent_name) setCurrentAgent(agent_name);
-121: 					if (stage_name) setCurrentStage(stage_name);
-122: 					if (!content) return;
-123: 
-124: 					setMessages((prev) => {
-125: 						const lastMsg = prev[prev.length - 1];
-126: 						const isThinking = message_type === 'thinking';
-127: 
-128: 						if (isThinking) {
-129: 							if (
-130: 								lastMsg?.type === 'thinking' &&
-131: 								(lastMsg as ThinkingMessage).isStreaming &&
-132: 								(lastMsg as ThinkingMessage).agentName === agent_name
-133: 							) {
-134: 								return [
-135: 									...prev.slice(0, -1),
-136: 									{
-137: 										...lastMsg,
-138: 										content: (lastMsg as ThinkingMessage).content + content
-139: 									} as ChatMessage
-140: 								];
-141: 							}
-142: 							return [
-143: 								...prev,
-144: 								{
-145: 									type: 'thinking',
-146: 									content,
-147: 									agentName: agent_name || 'AI Agent',
-148: 									stageName: stage_name,
-149: 									isStreaming: true,
-150: 									isExpanded: false,
-151: 									timestamp: new Date().toISOString()
-152: 								} as ThinkingMessage
-153: 							] as ChatMessage[];
-154: 						} else {
-155: 							if (
-156: 								lastMsg?.type === 'agent' &&
-157: 								(lastMsg as { isStreaming?: boolean }).isStreaming &&
-158: 								(lastMsg as { agentName?: string }).agentName === agent_name
-159: 							) {
-160: 								return [
-161: 									...prev.slice(0, -1),
-162: 									{
-163: 										...lastMsg,
-164: 										content: (lastMsg as { content: string }).content + content
-165: 									} as ChatMessage
-166: 								];
-167: 							}
-168: 							return [
-169: 								...prev,
-170: 								{
-171: 									type: 'agent',
-172: 									content,
-173: 									agentName: agent_name || 'AI Agent',
-174: 									stageName: stage_name,
-175: 									level,
-176: 									isStreaming: true,
-177: 									timestamp: new Date().toISOString()
-178: 								} as ChatMessage
-179: 							];
-180: 						}
-181: 					});
-182: 				}),
-183: 
-184: 				
-185: 				listen('agent_streaming', (event) => {
-186: 					const { content, agent_name, is_thinking, is_first, is_last } = event.payload as {
-187: 						content?: string;
-188: 						agent_name?: string;
-189: 						is_thinking?: boolean;
-190: 						is_first?: boolean;
-191: 						is_last?: boolean;
-192: 					};
-193: 
-194: 					
-195: 					if (agent_name === 'PM Agent') {
-196: 						if (is_last && !content) {
-197: 							setPMMessages((prev) => {
-198: 								const lastMsg = prev[prev.length - 1];
-199: 								if (lastMsg?.type === 'pm_agent') {
-200: 									return [...prev.slice(0, -1), { ...lastMsg } as PMAgentMessage];
-201: 								}
-202: 								return prev;
-203: 							});
-204: 							setPmProcessing(false);
-205: 							return;
-206: 						}
-207: 
-208: 						if (!content) return;
-209: 
-210: 						setPMMessages((prev) => {
-211: 							const lastMsg = prev[prev.length - 1];
-212: 							if (
-213: 								is_first ||
-214: 								!lastMsg ||
-215: 								lastMsg.type !== 'pm_agent' ||
-216: 								!(lastMsg as PMAgentMessage & { isStreaming?: boolean }).isStreaming
-217: 							) {
-218: 								return [
-219: 									...prev,
-220: 									{
-221: 										type: 'pm_agent' as const,
-222: 										content,
-223: 										isStreaming: !is_last,
-224: 										timestamp: new Date().toISOString()
-225: 									} as PMAgentMessage & { isStreaming?: boolean }
-226: 								];
-227: 							}
-228: 							return [
-229: 								...prev.slice(0, -1),
-230: 								{
-231: 									...lastMsg,
-232: 									content: (lastMsg as PMAgentMessage).content + content,
-233: 									isStreaming: !is_last
-234: 								} as PMAgentMessage & { isStreaming?: boolean }
-235: 							];
-236: 						});
-237: 						return;
-238: 					}
-239: 
-240: 					
-241: 					if (!content) return;
-242: 					const msgType = is_thinking ? 'thinking' : 'agent';
-243: 
-244: 					setMessages((prev) => {
-245: 						const lastMsg = prev[prev.length - 1];
-246: 						if (
-247: 							lastMsg?.type === msgType &&
-248: 							(lastMsg as { isStreaming?: boolean }).isStreaming &&
-249: 							(lastMsg as { agentName?: string }).agentName === agent_name
-250: 						) {
-251: 							return [
-252: 								...prev.slice(0, -1),
-253: 								{
-254: 									...lastMsg,
-255: 									content: (lastMsg as { content: string }).content + content,
-256: 									isStreaming: !is_last
-257: 								} as ChatMessage
-258: 							];
-259: 						}
-260: 						return [
-261: 							...prev,
-262: 							{
-263: 								type: msgType,
-264: 								content,
-265: 								agentName: agent_name || 'AI Agent',
-266: 								isStreaming: !is_last,
-267: 								isExpanded: false,
-268: 								timestamp: new Date().toISOString()
-269: 							} as ChatMessage
-270: 						];
-271: 					});
-272: 				}),
-273: 
-274: 				
-275: 				listen('tool_call', (event) => {
-276: 					const { tool_name, arguments: args, agent_name } = event.payload as {
-277: 						tool_name: string;
-278: 						arguments: Record<string, unknown>;
-279: 						agent_name?: string;
-280: 					};
-281: 					setMessages((prev) => [
-282: 						...prev,
-283: 						{
-284: 							type: 'tool_call',
-285: 							toolName: tool_name,
-286: 							arguments: args,
-287: 							agentName: agent_name || 'AI Agent',
-288: 							timestamp: new Date().toISOString()
-289: 						} as ChatMessage
-290: 					]);
-291: 				}),
-292: 
-293: 				listen('tool_result', (event) => {
-294: 					const { tool_name, result, success, agent_name } = event.payload as {
-295: 						tool_name: string;
-296: 						result: string;
-297: 						success: boolean;
-298: 						agent_name?: string;
-299: 					};
-300: 					setMessages((prev) => [
-301: 						...prev,
-302: 						{
-303: 							type: 'tool_result',
-304: 							toolName: tool_name,
-305: 							result,
-306: 							success,
-307: 							agentName: agent_name || 'AI Agent',
-308: 							timestamp: new Date().toISOString()
-309: 						} as ChatMessage
-310: 					]);
-311: 				}),
-312: 
-313: 				
-314: 				listen('pm_actions', (event) => {
-315: 					const { actions } = event.payload as { actions: PMAction[] };
-316: 					setPMMessages((prev) => {
-317: 						const lastMsg = prev[prev.length - 1];
-318: 						if (lastMsg?.type === 'pm_agent') {
-319: 							return [
-320: 								...prev.slice(0, -1),
-321: 								{
-322: 									...lastMsg,
-323: 									actions: [...((lastMsg as PMAgentMessage).actions || []), ...actions]
-324: 								} as PMAgentMessage
-325: 							];
-326: 						}
-327: 						return prev;
-328: 					});
-329: 				}),
-330: 
-331: 				
-332: 				listen('input_request', async (event) => {
-333: 					const [requestId, prompt, options] = event.payload as [string, string, InputOption[]];
-334: 					updateCurrentIterationStatus('Paused');
-335: 
-336: 					const artifactMatch = prompt.match(/\[ARTIFACT_TYPE:(\w+)\]$/);
-337: 					if (artifactMatch) {
-338: 						const artifactType = artifactMatch[1];
-339: 						const cleanPrompt = prompt.replace(/\[ARTIFACT_TYPE:\w+\]$/, '').trim();
-340: 
-341: 						await loadIterations();
-342: 						const latestIterations = useProjectStore.getState().iterations;
-343: 						if (latestIterations && latestIterations.length > 0) {
-344: 							const latestIteration = latestIterations[latestIterations.length - 1];
-345: 							const fullIteration = await API.iteration.get(latestIteration.id);
-346: 							setCurrentIteration(fullIteration);
-347: 						}
-348: 
-349: 						setInputRequest({
-350: 							requestId,
-351: 							prompt: cleanPrompt,
-352: 							options,
-353: 							isArtifactConfirmation: true,
-354: 							artifactType
-355: 						});
-356: 					} else {
-357: 						setInputRequest({ requestId, prompt, options });
-358: 					}
-359: 					setUserInput('');
-360: 				}),
-361: 
-362: 				
-363: 				listen('project_loaded', async () => {
-364: 					setProcessing(false);
-365: 					setCurrentAgent(null);
-366: 					setInputRequest(null);
-367: 					clearMessages();
-368: 					setCurrentIteration(null);
-369: 					await loadProject();
-370: 					setActiveView('iterations');
-371: 					message.success('Project loaded');
-372: 				}),
-373: 
-374: 				listen('project_initialized', async () => {
-375: 					setProcessing(false);
-376: 					setCurrentAgent(null);
-377: 					setInputRequest(null);
-378: 					clearMessages();
-379: 					setCurrentIteration(null);
-380: 					await loadProject();
-381: 					setActiveView('iterations');
-382: 					message.success('Project initialized');
-383: 				}),
-384: 
-385: 				
-386: 				listen('knowledge_regeneration_completed', () => {
-387: 					triggerKnowledgeRefresh();
-388: 					message.success('Knowledge updated');
-389: 				}),
-390: 
-391: 				listen<[string, string]>('knowledge_regeneration_failed', (event) => {
-392: 					const [iterationId, error] = event.payload;
-393: 					console.error('[App] Knowledge regeneration failed:', iterationId, error);
-394: 					message.error('Knowledge generation failed: ' + error);
-395: 				}),
-396: 			];
-397: 
-398: 			
-399: 			await Promise.all(listenerPromises);
-400: 
-401: 			
-402: 			
-403: 			try {
-404: 				const hasOpenProject = await API.workspace.hasOpen();
-405: 				if (hasOpenProject) {
-406: 					console.log('[App] Detected open project on startup, loading project...');
-407: 					await loadProject();
-408: 					setActiveView('iterations');
-409: 				}
-410: 			} catch (error) {
-411: 				console.error('[App] Failed to check for open project:', error);
-412: 			}
-413: 		};
-414: 
-415: 		setupListeners();
-416: 
-417: 		
-418: 		const handleKeyDown = (e: KeyboardEvent) => {
-419: 			if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-420: 				e.preventDefault();
-421: 				setCommandPaletteVisible(!commandPaletteVisible);
-422: 			}
-423: 		};
-424: 
-425: 		window.addEventListener('keydown', handleKeyDown);
-426: 		return () => window.removeEventListener('keydown', handleKeyDown);
-427: 	}, []);
-428: 
-429: 	return {
-430: 		
-431: 	};
-432: }
+1: ChatPanelProps
+2: ⋮----
+3: {
+4:   messages: ChatMessage[];
+5:   pmMessages: (ChatMessage & { type: 'user' | 'pm_agent' })[];
+6:   mode: 'pipeline' | 'pm_agent' | 'disabled';
+7:   isProcessing: boolean;
+8:   pmProcessing: boolean;
+9:   currentAgent: string | null;
+10:   iterationTitle: string;
+11:   iterationDescription?: string;
+12:   currentStage?: string | null;
+13:   inputRequest?: InputRequest | null;
+14:   userInput: string;
+15:   messagesContainerRef: React.RefObject<HTMLDivElement>;
+16:   pmMessagesContainerRef: React.RefObject<HTMLDivElement>;
+17:   onUserInputChange: (value: string) => void;
+18:   onSend: () => void;
+19:   onSelectOption: (option: InputOption) => void;
+20:   onSubmitFeedback: () => void;
+21:   onCancelFeedback: () => void;
+22:   onToggleThinking: (index: number) => void;
+23:   onActionClick?: (action: PMAction) => void;
+24: }
 ```
 
-### litho.docs/en/2.Architecture.md (1224 lines)
+### crates/cowork-gui/src-tauri/Cargo.toml (50 lines)
 
-````
-1: # System Architecture Documentation: Cowork Forge
-2: 
-3: **Document Version**: 1.0  
-4: **Generation Time**: 2026-02-14 05:10:16 (UTC)  
-5: **Classification**: Architecture Overview  
-6: **Target Audience**: Software Architects, Senior Developers, DevOps Engineers
-7: 
-8: ---
-9: 
-10: ## 1. Architecture Overview
-11: 
-12: ### 1.1 Design Philosophy
-13: 
-14: Cowork Forge embodies a **Hybrid AI-Human Collaborative Architecture** designed to orchestrate autonomous software development while maintaining human oversight through structured intervention points. The architecture is built upon three foundational principles:
+```
+1: [package]
+2: name = "cowork-gui"
+3: version.workspace = true
+4: edition.workspace = true
+5: authors.workspace = true
+6: license.workspace = true
+7: description = "Cowork Forge GUI"
+8: 
+9: [lib]
+10: name = "cowork_gui_lib"
+11: crate-type = ["staticlib", "cdylib", "rlib"]
+12: 
+13: [build-dependencies]
+14: tauri-build = { version = "2.6.3", features = [] }
 15: 
-16: 1. **Cognitive Augmentation**: The system acts as an extension of human developer cognition, preserving institutional knowledge across iterations while automating mechanical development tasks through AI agents.
-17: 
-18: 2. **Structured Autonomy**: Rather than unconstrained AI generation, the system enforces a rigorous 7-stage pipeline (Idea→PRD→Design→Plan→Coding→Check→Delivery) with validation gates, ensuring quality assurance through the Actor-Critic pattern.
-19: 
-20: 3. **Interface Agnosticism**: The core domain logic remains pure and independent of interface concerns, enabling simultaneous support for automation-focused CLI workflows and interactive GUI experiences through the Ports and Adapters pattern.
-21: 
-22: ### 1.2 Core Architecture Patterns
-23: 
-24: #### Hexagonal Architecture (Ports and Adapters)
-25: The system implements a strict **Hexagonal Architecture** with the `cowork-core` crate at the center containing pure domain logic. All external concerns (LLM APIs, file systems, user interfaces) connect through well-defined ports:
-26: 
-27: - **Inbound Ports**: `InteractiveBackend` trait enabling CLI and GUI implementations
-28: - **Outbound Ports**: Repository abstractions for persistence, LLM client interfaces for AI integration
-29: - **Adapters**: Concrete implementations in `cowork-cli`, `cowork-gui`, and infrastructure modules
+16: [dependencies]
+17: tauri = { version = "2.11.5", features = [] }
+18: tauri-plugin-opener = "2.5.4"
+19: tauri-plugin-dialog = "2.7.1"
+20: serde = { version = "1", features = ["derive"] }
+21: serde_json = "1"
+22: tokio = { version = "1", features = ["sync", "full"] }
+23: tokio-stream = "0.1"
+24: async-trait = "0.1"
+25: chrono = "0.4"
+26: uuid = { workspace = true }
+27: anyhow = "1"
+28: thiserror = "2"
+29: futures = "0.3"
 30: 
-31: #### Domain-Driven Design (DDD)
-32: The architecture follows DDD tactical patterns:
-33: - **Aggregates**: `Project` (root), `Iteration`, `ProjectMemory` enforcing consistency boundaries
-34: - **Value Objects**: `Artifacts`, `StageResult`, `InheritanceMode` (Full/Partial/None)
-35: - **Domain Services**: Pipeline orchestration, inheritance analysis, change scope detection
-36: - **Repositories**: `ProjectStore`, `IterationStore`, `MemoryStore` abstracting persistence
-37: 
-38: #### Event-Driven Architecture (GUI Layer)
-39: The Tauri-based desktop application implements an event-driven architecture:
-40: - **Asymmetric Communication**: Commands (invoke) for requests, Events (emit) for streaming responses
-41: - **Real-time Streaming**: LLM token streams, process logs, and agent activities flow through Tauri's event system
-42: - **State Synchronization**: React frontend maintains local state while backend emits state change events
-43: 
-44: #### Actor-Critic Pattern
-45: Each pipeline stage implements the Actor-Critic pattern:
-46: - **Actor**: Generates artifacts (code, documents, plans) based on instructions
-47: - **Critic**: Validates quality, checks constraints, suggests improvements
-48: - **Feedback Loop**: Human input regenerates Actor outputs with critique context
-49: 
-50: ### 1.3 Technology Stack Overview
-51: 
-52: | Layer | Technology | Purpose | Architectural Role |
-53: |-------|-----------|---------|-------------------|
-54: | **Core Domain** | Rust + Tokio | Async runtime for pipeline execution | Domain logic isolation |
-55: | **AI Orchestration** | adk-rust | Agent framework and tool ecosystem | AI agent lifecycle management |
-56: | **LLM Integration** | OpenAI-compatible APIs | Code generation and reasoning | Infrastructure adapter |
-57: | **Rate Limiting** | Custom Semaphore + Delay | 30 req/min compliance | Cross-cutting concern |
-58: | **CLI Interface** | clap + dialoguer | Command parsing and terminal UI | Primary adapter |
-59: | **GUI Backend** | Tauri | Desktop runtime and system integration | Secondary adapter |
-60: | **GUI Frontend** | React 18 + Ant Design | Component-based interactive UI | Presentation layer |
-61: | **Persistence** | JSON + serde | Schema evolution and storage | Repository implementation |
-62: | **Security** | Path validation + Sandboxing | Workspace containment | Security boundary |
-63: 
-64: ---
-65: 
-66: ## 2. System Context (C4 Level 1)
-67: 
-68: ### 2.1 System Positioning and Value
-69: 
-70: Cowork Forge operates as a **Local-First AI Development Environment** positioned between traditional IDEs and cloud-based AI coding assistants. Unlike cloud solutions, it maintains complete data locality while providing structured AI orchestration that simple code completion tools cannot achieve.
-71: 
-72: **Core Value Propositions**:
-73: - **Continuity**: Memory system preserves architectural decisions across development sessions
-74: - **Consistency**: Enforced 7-stage pipeline ensures systematic development methodology
-75: - **Control**: Human-in-the-Loop gates at critical stages prevent AI hallucinations from propagating
-76: - **Flexibility**: Dual interface support accommodates both automation scripts and exploratory development
-77: 
-78: ### 2.2 User Roles and Scenarios
-79: 
-80: ```mermaid
-81: flowchart TB
-82:     subgraph Users["User Ecosystem"]
-83:         ID["Individual Developers<br/>Automation-focused"]
-84:         DT["Development Teams<br/>Standardization-focused"]
-85:         AD["AI-Augmented Developers<br/>Exploration-focused"]
-86:     end
-87:     
-88:     subgraph Value["Value Delivery"]
-89:         RP["Rapid Prototyping<br/>Idea → Code in minutes"]
-90:         KM["Knowledge Management<br/>Cross-iteration memory"]
-91:         QC["Quality Control<br/>Actor-Critic validation"]
-92:     end
-93:     
-94:     ID -->|CLI Automation| RP
-95:     DT -->|Standardized Workflows| KM
-96:     AD -->|Interactive GUI| QC
-97: ```
-98: 
-99: **Primary User Archetypes**:
-100: 
-101: 1. **Individual Developers**: Utilize CLI for rapid prototyping, leveraging automation to generate boilerplate and scaffolding from natural language descriptions.
-102: 
-103: 2. **Development Teams**: Employ the memory system to maintain architectural standards across multiple projects, using inheritance modes to evolve existing codebases systematically.
-104: 
-105: 3. **AI-Augmented Developers**: Prefer GUI interface for visibility into AI decision-making, utilizing real-time streaming and HITL validation to guide the development process interactively.
-106: 
-107: ### 2.3 External System Interactions
-108: 
-109: ```mermaid
-110: flowchart TB
-111:     subgraph CoworkForge["Cowork Forge System Boundary"]
-112:         Core["Core Domain Engine<br/>(Rust)"]
-113:         CLI["CLI Interface"]
-114:         GUI["Desktop GUI<br/>(Tauri + React)"]
-115:     end
-116:     
-117:     subgraph External["External Systems"]
-118:         LLM["LLM Provider APIs<br/>(OpenAI-compatible)"]
-119:         FS["Local File System"]
-120:         Shell["Shell/Command Executor"]
-121:         Editor["External Editor<br/>(System Default)"]
-122:         DevServer["Development Server<br/>(Vite/etc.)"]
-123:         MCP["MCP Servers<br/>(Tavily/DeepWiki)"]
-124:     end
-125:     
-126:     User["Developer/User"] -->|Commands| CLI
-127:     User -->|Interacts| GUI
-128:     GUI <-->|Events/Commands| Core
-129:     CLI -->|Invokes| Core
-130:     
-131:     Core -->|API Calls<br/>Rate: 30 req/min| LLM
-132:     Core -->|Validated I/O| FS
-133:     Core -->|Process Spawning| Shell
-134:     Core -->|Edit Invocation| Editor
-135:     Core -->|Process Management| DevServer
-136:     Core -->|Remote Tool Queries| MCP
-137: ```
-138: 
-139: **External Dependencies**:
-140: 
-141: - **LLM Provider APIs**: OpenAI-compatible endpoints for agent reasoning. Interactions are rate-limited (30 requests/minute) with concurrency control (single semaphore) to manage API quotas and costs.
-142: 
-143: - **Local File System**: Primary persistence mechanism for projects, iterations, and memory. Access is constrained through workspace validation to prevent path traversal attacks.
-144: 
-145: - **Shell/Command Executor**: Used for project validation (dependency installation, builds, tests) and development server management. Commands are sanitized and executed within project workspace boundaries.
-146: 
-147: - **External Editor**: System default editor invoked during HITL flows for content review and modification (e.g., vim, VS Code, nano).
-148: 
-149: - **Development Server**: User-provided server processes (Vite, Webpack dev server) managed through ProcessRunner for live preview capabilities.
-150: 
-151: - **MCP Servers**: Provide external AI capabilities via Model Context Protocol (e.g., Tavily web search, DeepWiki code documentation queries). Configured through `config.toml` under `[mcp]` section, with automatic initialization and tool injection into all Agents at startup.
-152: 
-153: ### 2.4 System Boundary Definition
-154: 
-155: **In-Scope Components**:
-156: - Core domain logic (iterations, projects, memory aggregates)
-157: - 7-stage AI agent pipeline with stage executors
-158: - Agent instruction library (~2000 lines of prompt engineering)
-159: - Tool ecosystem (40+ ADK tools: file, data, validation, HITL, memory, deployment, legacy analysis) with MCP Remote Tool Integration (Tavily, DeepWiki, etc.)
-160: - Persistence layer with JSON-based project/iteration stores
-161: - CLI command interface with argument parsing
-162: - Tauri-based GUI with React frontend
-163: - Real-time process runner for development servers
-164: - Rate-limited LLM client factory
-165: - Cross-platform desktop application shell
-166: 
-167: **Out-of-Scope Components**:
-168: - Third-party LLM training infrastructure
-169: - Version control system integration (Git operations)
-170: - External package registry management (npm, crates.io)
-171: - Cloud deployment platforms and CI/CD pipelines
-172: - Remote collaboration features (real-time multi-user editing)
-173: 
-174: ---
-175: 
-176: ## 3. Container View (C4 Level 2)
-177: 
-178: ### 3.1 Domain Module Division
-179: 
-180: Cowork Forge is structured as a **Multi-Crate Rust Workspace** with clear domain boundaries following DDD strategic design:
-181: 
-182: ```mermaid
-183: flowchart TB
-184:     subgraph Workspace["Cowork Forge Workspace"]
-185:         subgraph Presentation["Presentation Layer"]
-186:             CLI["cowork-cli<br/>Command Router"]
-187:             GUI["cowork-gui<br/>Tauri + React"]
-188:         end
-189:         
-190:         subgraph Application["Application Layer"]
-191:             CLIBackend["CLI Backend<br/>InteractiveBackend Impl"]
-192:             GUIBackend["GUI Backend<br/>Tauri Commands"]
-193:             ProjectRunner["Project Runner<br/>Process Management"]
-194:         end
-195:         
-196:         subgraph Domain["Domain Layer (cowork-core)"]
-197:             subgraph CoreDomains["Core Business Domains"]
-198:                 ProjectDomain["Project Domain<br/>Aggregate Root"]
-199:                 IterationDomain["Iteration Domain<br/>Lifecycle Management"]
-200:                 PipelineDomain["Pipeline Domain<br/>7-Stage Orchestration"]
-201:                 MemoryDomain["Memory Domain<br/>Knowledge Management"]
-202:             end
-203:             
-204:             subgraph SupportingDomains["Supporting Domains"]
-205:                 ToolsDomain["Tools Domain<br/>40+ ADK Tools + MCP Remote Integration"]
-206:                 InteractionDomain["Interaction Domain<br/>Backend Abstraction"]
-207:             end
-208:             
-209:             subgraph Infrastructure["Infrastructure Layer"]
-210:                 Persistence["Persistence<br/>JSON Stores"]
-211:                 LLMIntegration["LLM Integration<br/>Rate-Limited Client"]
-212:                 Security["Security<br/>Path Validation"]
-213:             end
-214:         end
-215:     end
-216:     
-217:     CLI -->|implements| CLIBackend
-218:     GUI -->|invokes| GUIBackend
-219:     CLIBackend -->|uses| InteractionDomain
-220:     GUIBackend -->|uses| InteractionDomain
-221:     
-222:     InteractionDomain -->|drives| PipelineDomain
-223:     PipelineDomain -->|manages| IterationDomain
-224:     PipelineDomain -->|uses| ToolsDomain
-225:     IterationDomain -->|belongs to| ProjectDomain
-226:     
-227:     ToolsDomain -->|access| Persistence
-228:     ToolsDomain -->|query| MemoryDomain
-229:     PipelineDomain -->|calls| LLMIntegration
-230:     ToolsDomain -->|validated by| Security
-231: ```
-232: 
-233: ### 3.2 Container Architecture
-234: 
-235: #### Core Domain Container (`cowork-core`)
-236: The heart of the system containing pure business logic with no external dependencies:
-237: 
-238: - **Domain Layer**: Entities (`Project`, `Iteration`, `Memory`), Value Objects (`InheritanceMode`), and Domain Services (Pipeline orchestration)
-239: - **Pipeline Layer**: Stage trait implementations, Stage Executor, and instruction library
-240: - **Tool Layer**: 30+ ADK tools organized by function (File, Data, HITL, Memory, Validation)
-241: - **Tool Layer**: 40+ ADK tools (File, Data, HITL, Memory, Validation, Deployment, Legacy analysis) with MCP Remote Tool Integration (Tavily, DeepWiki, etc.)
-242: 
-243: #### CLI Container (`cowork-cli`)
-244: Thin adapter implementing terminal-based interaction:
-245: - **Clap Parser**: Command-line argument parsing and routing
-246: - **InteractiveBackend Impl**: Terminal-based HITL with dialoguer prompts and colored output
-247: - **Command Handlers**: Thin wrappers delegating to core domain
-248: 
-249: #### GUI Container (`cowork-gui`)
-250: Tauri-based desktop application with React frontend:
-251: - **Tauri Backend**: Rust commands exposing core functionality via IPC
-252: - **React Frontend**: 8-panel interface (Projects, Iterations, Editor, Runner, Memory, Knowledge)
-253: - **Event System**: Real-time bidirectional communication for streaming and HITL
-254: 
-255: ### 3.3 Storage Design
-256: 
-257: The system implements **JSON-First Persistence** for portability and version control compatibility:
-258: 
-259: ```mermaid
-260: flowchart LR
-261:     subgraph Storage["Local Storage (.cowork-v2/)"]
-262:         ProjectStore[(Project Store<br/>project.json)]
-263:         IterationStore[(Iteration Store<br/>iterations/*/)]
-264:         MemoryStore[(Memory Store<br/>memory.json)]
-265:         Workspace[(Workspace Directories<br/>artifacts/)]
-266:     end
-267:     
-268:     subgraph Domain["Domain Layer"]
-269:         Project["Project Aggregate"]
-270:         Iteration["Iteration Entity"]
-271:         Memory["ProjectMemory Aggregate"]
-272:     end
-273:     
-274:     Persistence["Persistence Layer<br/>(Stores)"] -->|manages| ProjectStore
-275:     Persistence -->|manages| IterationStore
-276:     Persistence -->|manages| MemoryStore
-277:     
-278:     Project -->|persists to| ProjectStore
-279:     Iteration -->|persists to| IterationStore
-280:     Memory -->|persists to| MemoryStore
-281:     
-282:     Iteration -->|generates artifacts| Workspace
-283: ```
-284: 
-285: **Storage Characteristics**:
-286: - **Project Store**: Metadata, tech stack detection, iteration summaries
-287: - **Iteration Store**: Stage artifacts (idea.md, prd.md, design.md, plan.md, code files), execution state
-288: - **Memory Store**: Architectural decisions, patterns, issues, learnings across iterations
-289: - **Workspace**: File system artifacts generated by AI agents during pipeline execution
-290: 
-291: ### 3.4 Inter-Domain Communication
-292: 
-293: **Synchronous Communication**:
-294: - **Command Pattern**: CLI/GUI invoke domain operations through command handlers
-295: - **Repository Pattern**: Domain aggregates persist through store abstractions
-296: - **Trait Abstraction**: `InteractiveBackend` trait enables polymorphic user interaction
-297: 
-298: **Asynchronous Communication** (GUI only):
-299: - **Event Streaming**: Tauri backend emits events (`agent_event`, `tool_call`, `input_request`) for real-time UI updates
-300: - **Process Streaming**: Development server logs stream via `project_log` events
-301: - **Backpressure Handling**: Tokio channels manage streaming LLM responses without blocking
-302: 
-303: ---
-304: 
-305: ## 4. Component View (C4 Level 3)
-306: 
-307: ### 4.1 Core Functional Components
-308: 
-309: #### Pipeline Orchestration Component
-310: 
-311: ```mermaid
-312: flowchart TB
-313:     subgraph Pipeline["Pipeline Domain"]
-314:         Controller["Pipeline Controller<br/>(mod.rs)"]
-315:         Executor["Stage Executor<br/>(stage_executor.rs)"]
-316:         Context["Pipeline Context<br/>(Execution State)"]
-317:         
-318:         subgraph Stages["Stage Implementations"]
-319:             Idea["Idea Stage<br/>(Actor + Critic)"]
-320:             PRD["PRD Stage<br/>(Actor + Critic)"]
-321:             Design["Design Stage"]
-322:             Plan["Plan Stage"]
-323:             Coding["Coding Stage"]
-324:             Check["Check Stage"]
-325:             Delivery["Delivery Stage"]
-326:         end
-327:         
-328:         Controller -->|initializes| Context
-329:         Controller -->|executes| Executor
-330:         Executor -->|runs| Stages
-331:         Stages -->|update| Context
-332:     end
-333:     
-334:     subgraph Agents["Agent System"]
-335:         Assistant["Iterative Assistant<br/>(adk-rust)"]
-336:         Instructions["Instruction Library<br/>(~2000 lines)"]
-337:     end
-338:     
-339:     subgraph Tools["Tool Ecosystem"]
-340:         FileTools["File Tools<br/>(6 tools)"]
-341:         DataTools["Data Tools<br/>(12 tools)"]
-342:         HITL["HITL Tools<br/>(Content/File Review)"]
-343:         Memory["Memory Tools<br/>(6 tools)"]
-344:     end
-345:     
-346:     Executor -->|creates| Assistant
-347:     Assistant -->|uses| Instructions
-348:     Assistant -->|calls| Tools
-349:     Assistant -->|streams| LLM["LLM API"]
-350: ```
-351: 
-352: **Component Responsibilities**:
-353: - **Pipeline Controller**: Manages iteration lifecycle, stage sequencing, and error handling
-354: - **Stage Executor**: Bridges domain logic with adk-rust framework, manages agent lifecycle
-355: - **Stage Implementations**: Seven concrete strategies following the Strategy pattern, each with specific instructions and artifact generation logic
-356: - **Iterative Assistant**: AI agent wrapper handling streaming, tool calls, and human interaction
-357: 
-358: #### Memory Management Component
-359: 
-360: ```mermaid
-361: flowchart TB
-362:     subgraph MemoryDomain["Memory Domain"]
-363:         ProjectMemory["ProjectMemory<br/>(Aggregate Root)"]
-364:         IterationKnowledge["IterationKnowledge<br/>(Entity)"]
-365:         
-366:         subgraph Inheritance["Inheritance System"]
-367:             Full["Full Mode<br/>(Artifacts + Code)"]
-368:             Partial["Partial Mode<br/>(Code Only)"]
-369:             None["None Mode<br/>(Fresh Start)"]
-370:         end
-371:         
-372:         QueryEngine["Query Engine<br/>(Fuzzy Search)"]
-373:     end
-374:     
-375:     subgraph Tools["Memory Tools"]
-376:         Query["QueryMemoryTool"]
-377:         Save["Save*Tool<br/>(Insight/Issue/Learning)"]
-378:         Promote["Promote*Tool<br/>(To Decision/Pattern)"]
-379:         Knowledge["Knowledge Generation"]
-380:     end
-381:     
-382:     ProjectMemory -->|contains| IterationKnowledge
-383:     IterationKnowledge -->|uses| Inheritance
-384:     ProjectMemory -->|queried by| QueryEngine
-385:     
-386:     Tools -->|operate on| MemoryDomain
-387:     Knowledge -->|generates| IterationKnowledge
-388: ```
-389: 
-390: **Memory Inheritance Modes**:
-391: - **Full**: Complete artifact and code transfer for major refactoring (continues from any stage)
-392: - **Partial**: Code-only inheritance for incremental feature development (typically starts at Coding stage)
-393: - **None**: Fresh iteration without historical baggage (starts at Idea stage)
-394: 
-395: ### 4.2 Technical Support Components
-396: 
-397: #### LLM Integration with Rate Limiting
-398: 
-399: ```mermaid
-400: flowchart LR
-401:     subgraph LLM["LLM Integration Domain"]
-402:         Config["LlmConfig<br/>(TOML/Env)"]
-403:         Factory["Client Factory"]
-404:         
-405:         subgraph RateLimiting["Rate Limiting Decorator"]
-406:             Semaphore["Global Semaphore<br/>(Concurrency=1)"]
-407:             Delay["2s Delay<br/>(30 req/min)"]
-408:         end
-409:         
-410:         Client["OpenAI Client<br/>(adk-rust)"]
-411:     end
-412:     
-413:     Config -->|creates| Factory
-414:     Factory -->|wraps with| RateLimiting
-415:     RateLimiting -->|uses| Client
-416:     Client -->|calls| API["LLM Provider API"]
-417:     
-418:     Pipeline -->|requests| Factory
-419: ```
-420: 
-421: **Rate Limiting Strategy**:
-422: - **Token Bucket Alternative**: Uses semaphore (concurrency=1) combined with fixed delay (2 seconds) to enforce 30 requests/minute
-423: - **Global Scope**: Rate limiter is shared across all pipeline stages to prevent API quota exhaustion
-424: - **Backpressure**: Requests block until capacity available, ensuring compliance without dropping requests
-425: 
-426: #### Security and Validation Layer
-427: 
-428: ```mermaid
-429: flowchart TB
-430:     subgraph Security["Security Components"]
-431:         PathValidation["Path Validation<br/>(UNC Normalization)"]
-432:         WorkspaceContainment["Workspace Containment<br/>(Project Boundary)"]
-433:         CommandSanitization["Command Sanitization"]
-434:     end
-435:     
-436:     subgraph Runtime["Runtime Security"]
-437:         Analyzer["Runtime Analyzer<br/>(Behavior Monitoring)"]
-438:         SecurityCheck["Security Checks<br/>(runtime_security.rs)"]
-439:     end
-440:     
-441:     FileTools["File Tools"] -->|validated by| PathValidation
-442:     FileTools -->|constrained by| WorkspaceContainment
-443:     ProcessRunner["Process Runner"] -->|sanitized by| CommandSanitization
-444:     
-445:     Pipeline -->|monitored by| Analyzer
-446:     Tools -->|enforced by| SecurityCheck
-447: ```
-448: 
-449: ### 4.3 Component Interaction Relationships
-450: 
-451: **Critical Path Dependencies**:
-452: 1. **Pipeline → Tools**: Pipeline executor injects tool set into AI agents; tools access file system and memory
-453: 2. **Tools → Persistence**: All data modifications flow through repository pattern to JSON stores
-454: 3. **Pipeline → Interaction**: HITL gates suspend execution until InteractiveBackend returns user input
-455: 4. **GUI ↔ Backend**: Tauri commands trigger domain operations; events stream progress back to React
-456: 
-457: **Decoupling Mechanisms**:
-458: - **Trait-Based Backend**: `InteractiveBackend` trait decouples pipeline from specific UI implementations
-459: - **Dependency Injection**: Stage executor receives tool dependencies rather than constructing them
-460: - **Event-Driven Updates**: GUI components react to events rather than polling, reducing coupling
-461: 
-462: ---
-463: 
-464: ## 5. Key Processes
-465: 
-466: ### 5.1 Genesis Iteration Creation Flow
-467: 
-468: The primary workflow transforming natural language ideas into complete software projects:
-469: 
-470: ```mermaid
-471: flowchart TD
-472:     Start([User Provides Idea]) --> Entry{Entry Point}
-473:     Entry -->|CLI: cowork iter| CLI[CLI Parser]
-474:     Entry -->|GUI: Create Button| GUI[React Frontend]
-475:     
-476:     CLI --> Init[Initialize Pipeline Context]
-477:     GUI --> Init
-478:     
-479:     Init --> Stage1[Idea Stage<br/>Capture Requirements<br/>Output: idea.md]
-480:     Stage1 -->|HITL Gate| Confirm1{User Confirmation}
-481:     Confirm1 -->|Edit/Feedback| Stage1
-482:     Confirm1 -->|Approve| Stage2
-483:     
-484:     Stage2[PRD Stage<br/>Actor/Critic Pattern<br/>Output: prd.md] -->|HITL Gate| Confirm2{User Confirmation}
-485:     Confirm2 -->|Edit/Feedback| Stage2
-486:     Confirm2 -->|Approve| Stage3
-487:     
-488:     Stage3[Design Stage<br/>System Architecture<br/>Output: design.md] -->|HITL Gate| Confirm3{User Confirmation}
-489:     Confirm3 -->|Edit/Feedback| Stage3
-490:     Confirm3 -->|Approve| Stage4
-491:     
-492:     Stage4[Plan Stage<br/>Task Generation<br/>Output: plan.md] -->|HITL Gate| Confirm4{User Confirmation}
-493:     Confirm4 -->|Edit/Feedback| Stage4
-494:     Confirm4 -->|Approve| Stage5
-495:     
-496:     Stage5[Coding Stage<br/>Code Implementation<br/>Output: Source Files] -->|HITL Gate| Confirm5{User Confirmation}
-497:     Confirm5 -->|Edit/Feedback| Stage5
-498:     Confirm5 -->|Approve| Stage6
-499:     
-500:     Stage6[Check Stage<br/>Quality Validation<br/>Output: check_report.md] -->|HITL Gate| Confirm6{User Confirmation}
-501:     Confirm6 -->|Edit/Feedback| Stage6
-502:     Confirm6 -->|Approve| Stage7
-503:     
-504:     Stage7[Delivery Stage<br/>Final Report<br/>Output: delivery_report.md] --> Deploy[Deploy to Project Root]
-505:     
-506:     Deploy --> Knowledge[Generate Knowledge Snapshot<br/>Decisions, Patterns, Tech Stack]
-507:     Knowledge --> Persist[Persist to Memory Store]
-508:     Persist --> Complete([Iteration Complete])
-509:     
-510:     style Start fill:#e1f5fe
-511:     style Complete fill:#c8e6c9
-512:     style Stage1 fill:#fff3e0
-513:     style Stage2 fill:#fff3e0
-514:     style Stage3 fill:#fff3e0
-515:     style Stage4 fill:#fff3e0
-516:     style Stage5 fill:#fff3e0
-517:     style Stage6 fill:#fff3e0
-518:     style Stage7 fill:#fff3e0
-519: ```
-520: 
-521: **Process Characteristics**:
-522: - **Stage Gates**: Each stage includes optional HITL confirmation; user can pass, edit, or request regeneration with feedback
-523: - **Artifact Accumulation**: Each stage generates persistent artifacts (markdown documents, code files) visible in workspace
-524: - **Actor-Critic Validation**: PRD and Design stages employ dual-agent validation where Critic agents review Actor outputs
-525: - **Knowledge Capture**: Upon completion, system extracts architectural decisions, patterns, and tech stack for future iterations
-526: 
-527: ### 5.2 Evolution Iteration Flow
-528: 
-529: Enables incremental development by building upon previous iterations with intelligent change scope analysis:
-530: 
-531: ```mermaid
-532: flowchart TD
-533:     Start([Request Evolution]) --> Analyze[Analyze Change Description<br/>Keyword-Based NLP]
-534:     
-535:     Analyze --> Scope{Determine Scope}
-536:     Scope -->|Architectural| Full[Full Inheritance<br/>Artifacts + Code]
-537:     Scope -->|Feature| Partial[Partial Inheritance<br/>Code Only]
-538:     Scope -->|Minor| None[No Inheritance<br/>Fresh Start]
-539:     
-540:     Full --> StageSelect{Select Start Stage}
-541:     Partial --> StageSelect
-542:     None --> StageSelect
-543:     
-544:     StageSelect -->|Redesign| Idea[Idea Stage]
-545:     StageSelect -->|Requirements| PRD[PRD Stage]
-546:     StageSelect -->|Architecture| Design[Design Stage]
-547:     StageSelect -->|Implementation| Plan[Plan Stage]
-548:     
-549:     Idea --> Load[Load Base Knowledge<br/>From Previous Iteration]
-550:     PRD --> Load
-551:     Design --> Load
-552:     Plan --> Load
-553:     
-554:     Load --> Resume[Resume Pipeline<br/>From Selected Stage]
-555:     Resume --> Continue[Execute Remaining Stages]
-556:     Continue --> Complete([Evolution Complete])
-557:     
-558:     style Start fill:#e1f5fe
-559:     style Complete fill:#c8e6c9
-560: ```
-561: 
-562: **Inheritance Strategy**:
-563: - **Change Scope Analysis**: NLP keyword matching determines optimal starting stage ("redesign" → Idea, "add feature" → Coding, "fix bug" → Check)
-564: - **Knowledge Transfer**: Base knowledge (decisions, patterns, issues) from parent iteration loads into agent context
-565: - **Workspace Management**: Inheritance mode determines which files copy to new iteration workspace
-566: 
-567: ### 5.3 GUI Real-Time Execution Flow
-568: 
-569: Event-driven architecture for interactive development monitoring:
-570: 
-571: ```mermaid
-572: sequenceDiagram
-573:     participant UI as React Frontend
-574:     participant TC as Tauri Commands
-575:     participant EB as Event Backend
-576:     participant Core as Core Pipeline
-577:     participant LLM as LLM API
-578:     
-579:     UI->>TC: Invoke iteration execution
-580:     TC->>Core: Start iteration process
-581:     
-582:     loop Execution Loop
-583:         Core->>EB: Emit agent streaming event with chunk
-584:         EB->>UI: Update via event listener
-585:         
-586:         Core->>LLM: Send request
-587:         LLM-->>Core: Receive streamed response
-588:         
-589:         Core->>EB: Emit tool call event with data
-590:         EB->>UI: Update frontend UI
-591:         
-592:         alt Hitl Pause Triggered
-593:             Core->>EB: Emit input request event
-594:             EB->>UI: Show modal dialog
-595:             UI->>TC: Submit user input
-596:             TC->>Core: Resume execution process
-597:         end
-598:     end
-599:     
-600:     Core->>EB: Emit iteration complete event
-601:     EB->>UI: Update final status
-602: ```
-603: 
-604: **Event Types**:
-605: - `agent_event`: High-level agent messages (stage transitions, completion)
-606: - `agent_streaming`: Token-by-token LLM output for real-time display
-607: - `tool_call`/`tool_result`: Tool execution visualization
-608: - `input_request`: HITL modal trigger with oneshot channel response
-609: - `project_log`: Development server stdout/stderr streaming
-610: 
-611: ### 5.4 Human-in-the-Loop Validation Flow
-612: 
-613: Structured human oversight at critical decision points:
-614: 
-615: ```mermaid
-616: flowchart TD
-617:     Start([Agent Requires<br/>Confirmation]) --> Interface{Interface Type}
-618:     
-619:     Interface -->|CLI| CLIDisplay[Display Content<br/>Terminal Preview]
-620:     Interface -->|GUI| GUIEmit[Emit input_request<br/>Tauri Event]
-621:     
-622:     CLIDisplay --> CLIInput[Collect Input<br/>pass/edit/feedback]
-623:     GUIEmit --> GUIModal[Show Modal<br/>React Component]
-624:     GUIModal --> GUIInput[Collect Response<br/>Invoke Command]
-625:     
-626:     CLIInput --> Process{Process Action}
-627:     GUIInput --> Process
-628:     
-629:     Process -->|Pass| Resume[Resume Pipeline]
-630:     Process -->|Edit| Editor[Open External Editor<br/>Wait for Changes]
-631:     Process -->|Feedback| Regenerate[Execute with Feedback<br/>Agent Regenerates]
-632:     
-633:     Editor --> Detect{Changes?}
-634:     Detect -->|Yes| Resume
-635:     Detect -->|No| Resume
-636:     
-637:     Regenerate --> Review{Approved?}
-638:     Review -->|Yes| Resume
-639:     Review -->|No| Regenerate
-640:     
-641:     Resume --> Complete([Continue])
-642:     
-643:     style Start fill:#e1f5fe
-644:     style Complete fill:#c8e6c9
-645: ```
-646: 
-647: ---
-648: 
-649: ## 6. Technical Implementation
-650: 
-651: ### 6.1 Core Module Implementation
-652: 
-653: #### Pipeline Controller (`crates/cowork-core/src/pipeline/mod.rs`)
-654: 
-655: The pipeline implements the **Template Method Pattern** with stage-specific implementations:
-656: 
-657: ```rust
-658: // Conceptual structure based on architecture analysis
-659: pub struct PipelineController {
-660:     context: PipelineContext,
-661:     backend: Arc<dyn InteractiveBackend>,
-662: }
-663: 
-664: impl PipelineController {
-665:     pub async fn execute_genesis_iteration(&mut self, idea: &str) -> Result<Iteration> {
-666:         // Stage sequence: Idea -> PRD -> Design -> Plan -> Coding -> Check -> Delivery
-667:         let stages = vec![
-668:             Box::new(IdeaStage) as Box<dyn Stage>,
-669:             Box::new(PRDStage),
-670:             // ... remaining stages
-671:         ];
-672:         
-673:         for stage in stages {
-674:             let result = self.execute_stage_with_hitl(stage).await?;
-675:             self.context.update(result);
-676:         }
-677:         
-678:         self.generate_knowledge_snapshot().await
-679:     }
-680:     
-681:     async fn execute_stage_with_hitl(&self, stage: Box<dyn Stage>) -> Result<StageResult> {
-682:         let result = stage.execute(&self.context).await?;
-683:         
-684:         if stage.requires_confirmation() {
-685:             match self.backend.request_confirmation(&result).await? {
-686:                 UserAction::Pass => Ok(result),
-687:                 UserAction::Edit => self.open_editor_and_reload().await,
-688:                 UserAction::Feedback(feedback) => {
-689:                     stage.execute_with_feedback(&self.context, feedback).await
-690:                 }
-691:             }
-692:         } else {
-693:             Ok(result)
-694:         }
-695:     }
-696: }
-697: ```
-698: 
-699: #### InteractiveBackend Trait (`crates/cowork-core/src/interaction/mod.rs`)
-700: 
-701: Defines the port for user interaction, enabling hexagonal architecture:
-702: 
-703: ```rust
-704: #[async_trait]
-705: pub trait InteractiveBackend: Send + Sync {
-706:     // Display methods
-707:     async fn display_message(&self, msg: &str);
-708:     async fn display_stream(&self, content: &str);
-709:     async fn display_tool_call(&self, tool_name: &str, params: &Value);
-710:     
-711:     // HITL methods
-712:     async fn request_confirmation(&self, content: &Artifact) -> Result<UserAction>;
-713:     async fn request_input(&self, prompt: &str) -> Result<String>;
-714:     
-715:     // Progress tracking
-716:     async fn update_progress(&self, stage: &str, progress: f32);
-717: }
-718: ```
-719: 
-720: Implementations:
-721: - **CLI Backend**: Uses `dialoguer` for prompts, `console` for colors, terminal tables for iteration listings
-722: - **Tauri Backend**: Uses `AppHandle` for event emission, `tokio::sync::oneshot` for HITL response channels
-723: 
-724: ### 6.2 Key Algorithm Design
-725: 
-726: #### Change Scope Analysis Algorithm
-727: 
-728: Determines optimal starting stage for evolution iterations:
-729: 
-730: ```rust
-731: fn analyze_change_scope(description: &str) -> Stage {
-732:     let lower = description.to_lowercase();
-733:     
-734:     if lower.contains("redesign") || lower.contains("architectural") {
-735:         Stage::Idea
-736:     } else if lower.contains("requirement") || lower.contains("feature spec") {
-737:         Stage::PRD
-738:     } else if lower.contains("design") || lower.contains("component") {
-739:         Stage::Design
-740:     } else if lower.contains("implement") || lower.contains("code") {
-741:         Stage::Coding
-742:     } else {
-743:         Stage::Idea // Default to full reconsideration
-744:     }
-745: }
-746: ```
-747: 
-748: #### Memory Query with Fuzzy Matching
-749: 
-750: Supports three query scopes with keyword filtering:
-751: 
-752: ```rust
-753: pub fn query_memories(
-754:     &self,
-755:     scope: QueryScope,
-756:     category: Option<MemoryCategory>,
-757:     keywords: &[String],
-758:     limit: usize,
-759: ) -> Vec<MemoryEntry> {
-760:     let candidates = match scope {
-761:         QueryScope::Project => self.load_project_memories(),
-762:         QueryScope::Iteration(id) => self.load_iteration_memories(id),
-763:         QueryScope::Latest => self.merge_latest_memories(),
-764:     };
-765:     
-766:     candidates
-767:         .filter(|m| category.map_or(true, |c| m.category == c))
-768:         .filter(|m| keywords.iter().any(|k| m.content.contains(k)))
-769:         .take(limit)
-770:         .collect()
-771: }
-772: ```
-773: 
-774: ### 6.3 Data Structure Design
-775: 
-776: #### Project Aggregate
-777: 
-778: ```rust
-779: pub struct Project {
-780:     pub id: ProjectId,
-781:     pub name: String,
-782:     pub project_type: ProjectType,
-783:     pub tech_stack: TechStack,
-784:     pub created_at: DateTime<Utc>,
-785:     pub iterations: Vec<IterationSummary>,
-786:     pub current_iteration: Option<IterationId>,
-787: }
-788: 
-789: pub struct Iteration {
-790:     pub id: IterationId,
-791:     pub project_id: ProjectId,
-792:     pub mode: IterationMode, // Genesis or Evolution
-793:     pub inheritance: InheritanceMode,
-794:     pub status: IterationStatus, // Draft, Running, Completed, Failed
-795:     pub stages: HashMap<Stage, StageResult>,
-796:     pub workspace_path: PathBuf,
-797: }
-798: ```
-799: 
-800: #### Memory Aggregate
-801: 
-802: ```rust
-803: pub struct ProjectMemory {
-804:     pub project_id: ProjectId,
-805:     pub decisions: Vec<Decision>,
-806:     pub patterns: Vec<Pattern>,
-807:     pub insights: Vec<Insight>,
-808:     pub issues: Vec<Issue>,
-809:     pub tech_stack: TechStackKnowledge,
-810: }
-811: 
-812: pub struct IterationKnowledge {
-813:     pub iteration_id: IterationId,
-814:     pub summary: String,
-815:     pub promoted_memories: Vec<MemoryId>, // Elevated to project level
-816:     pub stage_insights: HashMap<Stage, Vec<Insight>>,
-817: }
-818: ```
-819: 
-820: ### 6.4 Performance Optimization Strategies
-821: 
-822: #### Async Pipeline Execution
-823: - **Tokio Runtime**: Multi-threaded async execution for I/O bound operations (LLM calls, file I/O)
-824: - **Streaming Architecture**: LLM responses stream directly to UI without buffering, reducing latency perception
-825: - **Concurrent Tool Calls**: Independent tool executions run concurrently where dependencies permit
-826: 
-827: #### Memory Management
-828: - **Lazy Loading**: Project memories load on-demand rather than at startup
-829: - **Incremental Persistence**: Only modified entities serialize to disk, not entire aggregates
-830: - **Workspace Isolation**: Each iteration has isolated workspace preventing file contention
-831: 
-832: #### Rate Limiting Optimization
-833: - **Token Bucket Alternative**: Fixed delay + semaphore simpler than token bucket for single-user scenarios
-834: - **Request Batching**: Where possible, multiple small requests coalesce (though limited by chat-based LLM APIs)
-835: 
-836: ---
-837: 
-838: ## 7. Deployment Architecture
-839: 
-840: ### 7.1 Runtime Environment Requirements
-841: 
-842: **System Requirements**:
-843: - **Operating System**: Cross-platform (Windows 10+, macOS 12+, Linux Ubuntu 20.04+)
-844: - **Runtime**: Rust runtime (Tokio) for core, Node.js (for Tauri build only)
-845: - **Memory**: Minimum 4GB RAM (8GB recommended for large projects)
-846: - **Storage**: 500MB application + project workspace (typically 50-200MB per project)
-847: - **Network**: Internet connection required for LLM API access (OpenAI-compatible endpoints)
-848: 
-849: **Dependencies**:
-850: - **External**: LLM API key (OpenAI, Anthropic, or compatible)
-851: - **System**: Default text editor (vim, nano, VS Code, etc.), Node.js (for generated projects)
-852: - **Optional**: Development servers (Vite, Webpack) for preview functionality
-853: 
-854: ### 7.2 Deployment Topology
-855: 
-856: ```mermaid
-857: flowchart TB
-858:     subgraph Desktop["User Workstation"]
-859:         subgraph App["Cowork Forge Application"]
-860:             Core["Core Domain<br/>Rust Binary"]
-861:             GUI["Tauri Runtime<br/>WebView2/WebKit"]
-862:             CLI["CLI Binary"]
-863:         end
-864:         
-865:         subgraph Storage["Local Storage"]
-866:             Projects["Project Workspaces<br/>~/.cowork-v2/"]
-867:             Config["Configuration<br/>~/.config/cowork/"]
-868:         end
-869:     end
-870:     
-871:     subgraph External["External Services"]
-872:         LLM["LLM Provider APIs<br/>(OpenAI/Anthropic)"]
-873:         Git["Version Control<br/>(User-managed)"]
-874:         Registry["Package Registries<br/>(npm/crates.io)"]
-875:     end
-876:     
-877:     Core -->|File I/O| Storage
-878:     GUI -->|Embeds| Core
-879:     CLI -->|Links| Core
-880:     
-881:     Core -->|HTTPS| LLM
-882:     Projects -->|User manages| Git
-883:     Projects -->|User manages| Registry
-884: ```
-885: 
-886: **Distribution Model**:
-887: - **Desktop Application**: Tauri-based installer (.dmg for macOS, .msi for Windows, .AppImage/.deb for Linux)
-888: - **CLI Tool**: Cargo installable crate or standalone binary
-889: - **Core Library**: Published as Rust crate for potential embedding in other tools
-890: 
-891: ### 7.3 Scalability Design
-892: 
-893: **Current Architecture Limitations**:
-894: - **Single-User**: No multi-user collaboration features; designed for individual workstations
-895: - **Local-First**: All computation and storage local; no horizontal scaling required
-896: - **Synchronous LLM**: Rate limiting (30 req/min) prevents parallel LLM request scaling
-897: 
-898: **Extension Points**:
-899: - **Plugin Architecture**: Tool system supports custom ADK tool injection for domain-specific operations
-900: - **Custom Stages**: Pipeline trait system allows custom stage implementations (e.g., Security Review stage)
-901: - **Multi-Model Support**: LLM configuration supports multiple providers; could extend to local models (Llama, Mistral)
-902: - **Memory Backends**: Repository pattern allows replacement of JSON storage with database backends (SQLite, PostgreSQL) for team scenarios
-903: 
-904: ### 7.4 Monitoring and Operations
-905: 
-906: **Observability**:
-907: - **Logging**: Structured logging via `tracing` crate with configurable levels (DEBUG for development, INFO for production)
-908: - **Metrics**: Pipeline execution duration, stage success rates, LLM token consumption
-909: - **Event Tracing**: Tauri events provide real-time execution visibility in GUI mode
-910: 
-911: **Operational Considerations**:
-912: - **Backup**: Projects stored as plain text (JSON + Markdown) in user directories; standard backup solutions apply
-913: - **Migration**: JSON schema versioning supports forward compatibility; `.cowork-v2` directory naming allows side-by-side version installation
-914: - **Security**: Workspace path validation prevents unauthorized file access; no network listeners exposed (outbound-only LLM calls)
-915: 
-916: **Health Checks**:
-917: - **LLM Connectivity**: Validation command (`cowork status`) tests API key and connectivity
-918: - **Workspace Integrity**: Automatic validation of project structure on load
-919: - **Tool Availability**: Runtime checks for required external tools (editors, shell commands)
-920: 
-921: ---
-922: 
-923: ## Configuration System Architecture
-924: 
-925: Cowork Forge introduces a data-driven configuration system that transforms previously hardcoded Agent, Stage, Flow, Skill, and Integration definitions into configurable JSON formats. This makes the system more flexible and extensible, allowing users to customize development workflows without modifying code.
-926: 
-927: ### Configuration Registry
-928: 
-929: At the core of the configuration system is the global Config Registry, managing all configuration definitions:
-930: 
-931: ```mermaid
-932: flowchart TB
-933:     subgraph Registry["Config Registry"]
-934:         Agents["Agents<br/>(Agent Definitions)"]
-935:         Stages["Stages<br/>(Stage Definitions)"]
-936:         Flows["Flows<br/>(Flow Definitions)"]
-937:         Skills["Skills<br/>(Skill Definitions)"]
-938:         Integrations["Integrations<br/>(External Integrations)"]
-939:         Settings["Settings<br/>(User Settings)"]
-940:     end
-941:     
-942:     subgraph Sources["Configuration Sources"]
-943:         Builtin["Built-in Configs<br/>(Embedded JSON)"]
-944:         User["User Configs<br/>(~/.cowork/config/)"]
-945:     end
-946:     
-947:     subgraph Consumers["Consumers"]
-948:         Pipeline["Pipeline Executor"]
-949:         AgentFactory["Agent Factory"]
-950:         GUI["GUI Config Panel"]
-951:     end
-952:     
-953:     Sources -->|Load| Registry
-954:     Registry -->|Query| Consumers
-955: ```
-956: 
-957: ### Configuration Types
-958: 
-959: | Type | Description | Key Fields |
-960: |------|-------------|------------|
-961: | **Agent** | AI agent definition | id, name, instruction, tools, skills, model |
-962: | **Stage** | Development stage definition | id, stage_type, agent/actor_critic, hooks, artifacts |
-963: | **Flow** | Workflow definition | id, stages[], start_stage, config, stage_mapping |
-964: | **Skill** | Skill extension package | id, category, tools[], prompts[], dependencies |
-965: | **Integration** | External system integration | id, integration_type, connection, auth, events |
-966: 
-967: ### Configuration Loading Flow
-968: 
-969: ```mermaid
-970: sequenceDiagram
-971:     participant App as App Startup
-972:     participant Registry as Config Registry
-973:     participant Builtin as Built-in Configs
-974:     participant User as User Configs
-975:     participant FS as File System
-976:     
-977:     App->>Registry: Initialize registry
-978:     Registry->>Builtin: Load embedded configs
-979:     Builtin-->>Registry: Agent/Stage/Flow definitions
-980:     
-981:     Registry->>FS: Check user config directory
-982:     FS-->>Registry: Config file list
-983:     
-984:     alt User configs exist
-985:         Registry->>User: Load user configs
-986:         User-->>Registry: Custom definitions
-987:         Registry->>Registry: Merge/Override configs
-988:     end
-989:     
-990:     Registry->>Registry: Validate config integrity
-991:     Registry-->>App: Configuration ready
-992: ```
-993: 
-994: ### Custom Workflows
-995: 
-996: Enterprises can implement standardized development processes through custom Flow configurations:
-997: 
-998: ```json
-999: {
-1000:   "id": "enterprise-web-flow",
-1001:   "name": "Enterprise Web Application Flow",
-1002:   "description": "Standard development workflow for enterprise web applications",
-1003:   "stages": [
-1004:     { "stage_id": "idea" },
-1005:     { "stage_id": "prd", "overrides": { "needs_confirmation": true } },
-1006:     { "stage_id": "design" },
-1007:     { "stage_id": "security-review", "overrides": { "needs_confirmation": true } },
-1008:     { "stage_id": "plan" },
-1009:     { "stage_id": "coding" },
-1010:     { "stage_id": "check" },
-1011:     { "stage_id": "delivery" }
-1012:   ],
-1013:   "config": {
-1014:     "stop_on_failure": true,
-1015:     "inheritance": {
-1016:       "default_mode": "partial",
-1017:       "stage_mapping": {
-1018:         "none": "idea",
-1019:         "partial": "plan",
-1020:         "full": "idea"
-1021:       }
-1022:     }
-1023:   }
-1024: }
-1025: ```
-1026: 
-1027: ### Skill Extension Mechanism
-1028: 
-1029: The Skill system allows injecting domain-specific capabilities into Agents:
-1030: 
-1031: ```mermaid
-1032: flowchart LR
-1033:     subgraph Skill["Skill Package"]
-1034:         Manifest["manifest.json"]
-1035:         Tools["Tool Definitions"]
-1036:         Prompts["Prompt Templates"]
-1037:         Deps["Dependency Declarations"]
-1038:     end
-1039:     
-1040:     subgraph Agent["Agent"]
-1041:         BaseTools["Base Tools"]
-1042:         BaseInst["Base Instructions"]
-1043:     end
-1044:     
-1045:     Skill -->|Inject| Agent
-1046:     Agent -->|Enhanced Capabilities| Execution["Execution Context"]
-1047: ```
-1048: 
-1049: **Skill Categories**:
-1050: - `general`: General-purpose skills
-1051: - `web_frontend`: Web frontend development
-1052: - `web_backend`: Web backend development
-1053: - `mobile`: Mobile application development
-1054: - `devops`: DevOps automation
-1055: - `testing`: Test automation
-1056: - `security`: Security auditing
-1057: 
-1058: ### Skills Module Architecture
-1059: 
-1060: The Skills module implements the [agentskills.io](https://agentskills.io) standard for maximum compatibility:
-1061: 
-1062: ```mermaid
-1063: flowchart TB
-1064:     subgraph Discovery["Skill Discovery"]
-1065:         FS[".skills/ directory scan"]
-1066:         Parse["Parse SKILL.md files"]
-1067:         Index["Build SkillIndex"]
-1068:     end
-1069:     
-1070:     subgraph Selection["Skill Selection"]
-1071:         Query["User Query"]
-1072:         Match["Semantic Matching"]
-1073:         Score["Relevance Scoring"]
-1074:     end
-1075:     
-1076:     subgraph Injection["Context Injection"]
-1077:         Context["Agent Context"]
-1078:         Tools["Tool Registration"]
-1079:         Prompts["Prompt Enhancement"]
-1080:     end
-1081:     
-1082:     FS --> Parse --> Index
-1083:     Query --> Match --> Score
-1084:     Index --> Match
-1085:     Score --> Injection
-1086:     Injection --> Context
-1087:     Injection --> Tools
-1088:     Injection --> Prompts
-1089: ```
-1090: 
-1091: **SkillManager API**:
-1092: - `SkillManager::for_project(path)`: Initialize for a project
-1093: - `select(query)`: Find matching skills
-1094: - `select_best(query)`: Get top match
-1095: - `install_skill_from_dir(path)`: Install from local directory
-1096: 
-1097: ### PM Agent Architecture
-1098: 
-1099: The Project Manager Agent provides post-delivery interaction capabilities:
-1100: 
-1101: ```mermaid
-1102: flowchart TB
-1103:     subgraph Trigger["Activation Trigger"]
-1104:         Complete["Iteration Status = Completed"]
-1105:         Switch["GUI Switches to Chat Mode"]
-1106:     end
-1107:     
-1108:     subgraph Intent["Intent Recognition"]
-1109:         Input["User Input"]
-1110:         NLP["Keyword Analysis"]
-1111:         Classify["Intent Classification"]
-1112:     end
-1113:     
-1114:     subgraph Actions["Available Actions"]
-1115:         Goto["goto_stage<br/>Return to previous stage"]
-1116:         Create["create_iteration<br/>Start evolution iteration"]
-1117:         Respond["respond_to_user<br/>Answer questions"]
-1118:         Clarify["ask_clarification<br/>Request details"]
-1119:     end
-1120:     
-1121:     Complete --> Switch --> Input
-1122:     Input --> NLP --> Classify
-1123:     Classify -->|bug_fix| Goto
-1124:     Classify -->|new_feature| Create
-1125:     Classify -->|consultation| Respond
-1126:     Classify -->|ambiguous| Clarify
-1127: ```
-1128: 
-1129: **Intent Types**:
-1130: | Intent | Trigger Keywords | Action |
-1131: |--------|------------------|--------|
-1132: | `bug_fix` | bug, error, issue, crash, fail | `goto_stage(coding)` |
-1133: | `requirement_change` | modify, change, adjust, update | `goto_stage(appropriate)` |
-1134: | `new_feature` | add, new feature, create | `create_iteration()` |
-1135: | `consultation` | how, what, why, can you | `respond_to_user()` |
-1136: | `ambiguous` | unclear input | `ask_clarification()` |
-1137: 
-1138: **PM Agent Tools**:
-1139: - `pm_goto_stage`: Navigate to specified development stage
-1140: - `pm_create_iteration`: Create new evolution iteration
-1141: - `pm_respond`: Respond to user questions
-1142: - `pm_save_decision`: Save project decisions
-1143: - `query_memory`: Query project memory for context
-1144: 
-1145: ### Configuration File Locations
-1146: 
-1147: | Platform | User Config Directory |
-1148: |----------|----------------------|
-1149: | Windows | `%APPDATA%\.cowork\config\` |
-1150: | macOS | `~/.cowork/config/` |
-1151: | Linux | `~/.cowork/config/` |
-1152: 
-1153: Directory structure:
-1154: ```
-1155: config/
-1156: ├── agents/           # Custom agents
-1157: │   └── custom_agent.json
-1158: ├── stages/           # Custom stages
-1159: ├── flows/            # Custom flows
-1160: │   └── enterprise-flow.json
-1161: ├── skills/           # Skill packages
-1162: │   └── my-skill/
-1163: │       ├── manifest.json
-1164: │       └── prompts/
-1165: ├── integrations/     # External integrations
-1166: └── settings.json     # Global settings
-1167: ```
-1168: 
-1169: ---
-1170: 
-1171: ## Architectural Decision Records (ADRs)
-1172: 
-1173: ### ADR-001: Multi-Crate Workspace Structure
-1174: **Decision**: Separate CLI, GUI, and Core into distinct crates within a Cargo workspace.  
-1175: **Rationale**: Enables independent deployment (CLI for automation, GUI for interaction) while sharing domain logic. Prevents GUI dependencies (Tauri, WebView) from bloating CLI binary.
-1176: 
-1177: ### ADR-002: Trait-Based Backend Abstraction
-1178: **Decision**: `InteractiveBackend` trait to unify CLI and GUI interactions.  
-1179: **Rationale**: Single pipeline code path supports both automation and interactive modes without conditional logic throughout domain layer.
-1180: 
-1181: ### ADR-003: JSON-First Persistence
-1182: **Decision**: File-based JSON storage instead of database.  
-1183: **Rationale**: Portability, version control compatibility, and local-first architecture. Enables users to inspect and modify project state with standard tools.
-1184: 
-1185: ### ADR-004: Rate Limiting at Infrastructure Layer
-1186: **Decision**: Decorator pattern for LLM rate limiting (30 req/min) with semaphore concurrency control.  
-1187: **Rationale**: API quota protection and cost control. Global rate limiter ensures compliance regardless of pipeline stage parallelism.
-1188: 
-1189: ### ADR-005: Event-Driven GUI with Asymmetric Communication
-1190: **Decision**: Tauri commands for requests, events for streaming responses.  
-1191: **Rationale**: Commands provide request-response semantics for operations; events enable server-push for streaming LLM tokens and process logs without polling overhead.
-1192: 
-1193: ### ADR-006: Post-Delivery PM Agent
-1194: **Decision**: Dedicated PM Agent for post-delivery user interaction with intent recognition.  
-1195: **Rationale**: Automated pipeline execution needs a bridge to ongoing project maintenance. PM Agent provides natural language interface for bug fixes, requirement changes, and new features without requiring users to understand pipeline internals.
-1196: 
-1197: ### ADR-007: agentskills.io Standard for Skills
-1198: **Decision**: Implement agentskills.io standard for skill definitions.  
-1199: **Rationale**: Industry standard ensures compatibility with external skill packages and community contributions. Simple markdown-based format (SKILL.md) lowers barrier for skill authoring.
-1200: 
-1201: ---
-1202: 
-1203: ### ADR-008: Model Context Protocol (MCP) Integration
-1204: **Decision**: Introduce MCP protocol integration to support external tool server connectivity.
-1205: **Rationale**: Through standardized Model Context Protocol, system can seamlessly integrate third-party AI services (e.g., Tavily web search, DeepWiki code documentation queries), expanding Agents' tool and capability range without requiring complex local external API adaptation. MCP connects via HTTP transport, and configuration-driven auto-initialization ensures global toolset availability at startup with automatic injection into all Agents.
-1206: **Implementation**:
-1207: - `McpConfig` configuration structure (`tavily_api_key`, `deepwiki_enabled`)
-1208: - `McpManager` for multi-server connection and toolset aggregation
-1209: - Global static `GLOBAL_MCP_TOOLSETS` initialized at application startup
-1210: - `add_mcp_toolsets_to_builder` automatically injects all MCP tools into Agent builder
-1211: - GUI Settings panel with config UI and connection test
-1212: 
-1213: 
-1214: ## Conclusion
-1215: 
-1216: Cowork Forge demonstrates a mature application of **Hexagonal Architecture** and **Domain-Driven Design** principles to the AI-assisted development domain. The architecture successfully balances AI autonomy with human oversight through the 7-stage pipeline and HITL validation gates. 
-1217: 
-1218: Key architectural strengths include:
-1219: - **Clean Separation**: Core domain remains pure and testable, isolated from UI and infrastructure concerns
-1220: - **Dual Interface Strategy**: Elegant trait-based abstraction enabling both CLI automation and GUI interactivity
-1221: - **Knowledge Persistence**: Memory system bridges the gap between stateless AI agents and stateful software development
-1222: - **Security-First**: Workspace containment and path validation protect against prompt injection attacks attempting file system traversal
-1223: 
-1224: The system is well-positioned for evolutionary extension, with clear domain boundaries supporting future enhancements such as team collaboration features, additional AI model integrations, or custom pipeline stages.
-````
+31: tiny_http = "0.12"
+32: attohttpc = "0.30"
+33: urlencoding = "2.1"
+34: 
+35: lazy_static = "1.5"
+36: 
+37: tracing = "0.1"
+38: 
+39: dirs = { workspace = true }
+40: 
+41: sys-locale = "0.3"
+42: 
+43: cowork-core = { path = "../../cowork-core" }
+44: 
+45: adk-core = { workspace = true }
+46: adk-runner = { workspace = true }
+47: adk-session = { workspace = true }
+48: adk-skill = { workspace = true }
+49: adk-tool = { workspace = true, features = ["http-transport"] }
+50: which = "8.0.0"
+```
 
 ### crates/cowork-core/src/config_definition/mod.rs (17 lines)
 
@@ -7360,47 +5187,422 @@ LICENSE
 23: (tool_name: &str, result: &Result<Value, AdkError>)
 ```
 
-### crates/cowork-gui/package.json (38 lines)
+### crates/cowork-gui/src/App.tsx (413 lines)
 
 ```
-1: {
-2:   "name": "cowork-gui",
-3:   "private": true,
-4:   "type": "module",
-5:   "version": "2.5.2",
-6:   "scripts": {
-7:     "dev": "vite --port 15173",
-8:     "build": "tsc && vite build",
-9:     "tauri": "tauri",
-10:     "tauri:dev": "tauri dev --port 15173",
-11:     "tauri:build": "tauri build",
-12:     "typecheck": "tsc --noEmit"
-13:   },
-14:   "dependencies": {
-15:     "@monaco-editor/react": "^4.6.0",
-16:     "@tauri-apps/api": "^2.11.1",
-17:     "@tauri-apps/plugin-dialog": "^2.7.1",
-18:     "antd": "^5.12.0",
-19:     "react": "^18.3.1",
-20:     "react-dom": "^18.3.1",
-21:     "react-json-view": "^1.21.3",
-22:     "react-markdown": "^9.0.1",
-23:     "react-window": "^2.2.6",
-24:     "rehype-highlight": "^7.0.2",
-25:     "rehype-raw": "^7.0.0",
-26:     "remark-gfm": "^4.0.1",
-27:     "zustand": "^4.5.0"
-28:   },
-29:   "devDependencies": {
-30:     "@tauri-apps/cli": "^2.11.4",
-31:     "@types/node": "^20.0.0",
-32:     "@types/react": "^18.3.0",
-33:     "@types/react-dom": "^18.3.0",
-34:     "@vitejs/plugin-react": "^4.3.0",
-35:     "typescript": "^5.3.0",
-36:     "vite": "^5.0.0"
-37:   }
-38: }
+1: import React, { useEffect, useRef, useState, useMemo, useCallback, Suspense, lazy } from 'react';
+2: import { Layout, Menu, Button, Empty, App as AntApp, Tag, Spin } from 'antd';
+3: import {
+4: 	FolderOutlined,
+5: 	FileTextOutlined,
+6: 	CodeOutlined,
+7: 	EyeOutlined,
+8: 	PlayCircleOutlined,
+9: 	ReloadOutlined,
+10: 	MessageOutlined,
+11: 	AppstoreOutlined,
+12: 	DatabaseOutlined,
+13: 	BranchesOutlined,
+14: 	CheckCircleOutlined,
+15: 	RocketOutlined,
+16: 	BookOutlined,
+17: 	SettingOutlined,
+18: 	ControlOutlined
+19: } from '@ant-design/icons';
+20: 
+21: import { useProjectStore, useAgentStore, useUIStore } from './stores';
+22: import { LoadingScreen, StatusBadge } from './components/common';
+23: import { useAppEvents, usePMAgent, useIterationActions, useChatInput } from './hooks';
+24: 
+25: import type { ChatMode, PMAction, PMAgentMessage, ChatMessage } from './stores';
+26: 
+27: 
+28: import ProjectsPanel from './components/ProjectsPanel';
+29: 
+30: 
+31: const ArtifactsViewer = lazy(() => import('./components/ArtifactsViewer'));
+32: const CodeEditor = lazy(() => import('./components/CodeEditor'));
+33: const RunnerPanel = lazy(() => import('./components/RunnerPanel'));
+34: const MemoryPanel = lazy(() => import('./components/MemoryPanel'));
+35: const KnowledgePanel = lazy(() => import('./components/KnowledgePanel'));
+36: const CommandPalette = lazy(() => import('./components/CommandPalette'));
+37: const IterationsPanel = lazy(() => import('./components/IterationsPanel'));
+38: const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
+39: 
+40: const ChatPanel = lazy(() => import('./components/chat').then(m => ({ default: m.ChatPanel })));
+41: 
+42: const AgentsSetupPanel = lazy(() => import('./components/config').then(m => ({ default: m.AgentsSetupPanel })));
+43: 
+44: const { Sider, Content, Header, Footer } = Layout;
+45: 
+46: function App() {
+47: 	
+48: 	const [userInput, setUserInput] = useState('');
+49: 	const messagesContainerRef = useRef<HTMLDivElement>(null);
+50: 	const pmMessagesContainerRef = useRef<HTMLDivElement>(null);
+51: 
+52: 	
+53: 	const project = useProjectStore(state => state.project);
+54: 	const iterations = useProjectStore(state => state.iterations);
+55: 	const currentIteration = useProjectStore(state => state.currentIteration);
+56: 	const loading = useProjectStore(state => state.loading);
+57: 	const loadProject = useProjectStore(state => state.loadProject);
+58: 	const setCurrentIteration = useProjectStore(state => state.setCurrentIteration);
+59: 	const updateCurrentIterationStatus = useProjectStore(state => state.updateCurrentIterationStatus);
+60: 
+61: 	
+62: 	const messages = useAgentStore(state => state.messages);
+63: 	const pmMessages = useAgentStore(state => state.pmMessages);
+64: 	const isProcessing = useAgentStore(state => state.isProcessing);
+65: 	const currentAgent = useAgentStore(state => state.currentAgent);
+66: 	const currentStage = useAgentStore(state => state.currentStage);
+67: 	const inputRequest = useAgentStore(state => state.inputRequest);
+68: 	const pmProcessing = useAgentStore(state => state.pmProcessing);
+69: 	const setInputRequest = useAgentStore(state => state.setInputRequest);
+70: 	const loadPMWelcomeMessage = useAgentStore(state => state.loadPMWelcomeMessage);
+71: 
+72: 	
+73: 	const activeView = useUIStore(state => state.activeView);
+74: 	const commandPaletteVisible = useUIStore(state => state.commandPaletteVisible);
+75: 	const activeArtifactTab = useUIStore(state => state.activeArtifactTab);
+76: 	const artifactsRefreshTrigger = useUIStore(state => state.artifactsRefreshTrigger);
+77: 	const codeRefreshTrigger = useUIStore(state => state.codeRefreshTrigger);
+78: 	const memoryRefreshTrigger = useUIStore(state => state.memoryRefreshTrigger);
+79: 	const knowledgeRefreshTrigger = useUIStore(state => state.knowledgeRefreshTrigger);
+80: 	const setActiveView = useUIStore(state => state.setActiveView);
+81: 	const setCommandPaletteVisible = useUIStore(state => state.setCommandPaletteVisible);
+82: 	const setActiveArtifactTab = useUIStore(state => state.setActiveArtifactTab);
+83: 
+84: 	
+85: 	useAppEvents(userInput, setUserInput);
+86: 	const { handlePMSendMessage, handlePMAction } = usePMAgent();
+87: 	const { handleSelectIteration, handleExecuteIteration, handleOpenProjectFolder, handleOpenIterationFolder, handleCommandSelect } = useIterationActions();
+88: 	const {
+89: 		inputRequest: chatInputRequest,
+90: 		handleSendUserMessage,
+91: 		handleSelectOption,
+92: 		handleSubmitFeedback,
+93: 		handleToggleThinking,
+94: 		handleCancelFeedback
+95: 	} = useChatInput();
+96: 
+97: 	
+98: 	const chatMode = useMemo<ChatMode>(() => {
+99: 		if (!currentIteration) return 'disabled';
+100: 		if (currentIteration.status === 'Completed') return 'pm_agent';
+101: 		if (isProcessing || currentIteration.status === 'Running') return 'pipeline';
+102: 		return 'pipeline';
+103: 	}, [currentIteration, isProcessing]);
+104: 
+105: 	
+106: 	useEffect(() => {
+107: 		if (chatMode === 'pm_agent' && currentIteration) {
+108: 			const pmMessages = useAgentStore.getState().pmMessages;
+109: 			if (pmMessages.length === 0) {
+110: 				loadPMWelcomeMessage(currentIteration.id);
+111: 			}
+112: 		}
+113: 	}, [chatMode, currentIteration?.id, loadPMWelcomeMessage]);
+114: 
+115: 	
+116: 	useEffect(() => {
+117: 		if (messagesContainerRef.current) {
+118: 			messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+119: 		}
+120: 	}, [messages]);
+121: 
+122: 	useEffect(() => {
+123: 		if (pmMessagesContainerRef.current && pmMessages.length > 0) {
+124: 			pmMessagesContainerRef.current.scrollTop = pmMessagesContainerRef.current.scrollHeight;
+125: 		}
+126: 	}, [pmMessages]);
+127: 
+128: 	
+129: 	const handleSend = useCallback(() => {
+130: 		if (chatMode === 'pm_agent') {
+131: 			handlePMSendMessage(userInput, setUserInput);
+132: 		} else {
+133: 			handleSendUserMessage(userInput, setUserInput);
+134: 		}
+135: 	}, [chatMode, userInput, handlePMSendMessage, handleSendUserMessage]);
+136: 
+137: 	const handleSelectOptionWrapper = useCallback((option: Parameters<typeof handleSelectOption>[0]) => {
+138: 		handleSelectOption(option, userInput, setUserInput);
+139: 	}, [handleSelectOption, userInput]);
+140: 
+141: 	const handleSubmitFeedbackWrapper = useCallback(() => {
+142: 		handleSubmitFeedback(userInput, setUserInput, updateCurrentIterationStatus);
+143: 	}, [handleSubmitFeedback, userInput, updateCurrentIterationStatus]);
+144: 
+145: 	const handlePMActionWrapper = useCallback((action: PMAction) => {
+146: 		handlePMAction(action, pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]);
+147: 	}, [handlePMAction, pmMessages]);
+148: 
+149: 	
+150: 	const loadingFallback = (
+151: 		<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+152: 			<Spin size="large" tip="Loading..." />
+153: 		</div>
+154: 	);
+155: 
+156: 	
+157: 	const renderContent = () => (
+158: 		<div style={{ height: '100%' }}>
+159: 			<div style={{ height: '100%', display: activeView === 'iterations' ? 'block' : 'none' }}>
+160: 				<Suspense fallback={loadingFallback}>
+161: 					<IterationsPanel
+162: 						key="iterations"
+163: 						onSelectIteration={handleSelectIteration}
+164: 						selectedIterationId={currentIteration?.id}
+165: 					/>
+166: 				</Suspense>
+167: 			</div>
+168: 
+169: 			<div style={{ height: '100%', display: activeView === 'projects' ? 'block' : 'none' }}>
+170: 				<ProjectsPanel key="projects" />
+171: 			</div>
+172: 
+173: 			<div style={{ height: '100%', display: activeView === 'artifacts' ? 'block' : 'none' }}>
+174: 				{currentIteration ? (
+175: 					<Suspense fallback={loadingFallback}>
+176: 						<ArtifactsViewer
+177: 							key={`artifacts-${currentIteration.id}`}
+178: 							iterationId={currentIteration.id}
+179: 							activeTab={activeArtifactTab}
+180: 							onTabChange={setActiveArtifactTab}
+181: 							refreshTrigger={artifactsRefreshTrigger}
+182: 						/>
+183: 					</Suspense>
+184: 				) : (
+185: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
+186: 				)}
+187: 			</div>
+188: 
+189: 			<div style={{ height: '100%', display: activeView === 'code' ? 'block' : 'none' }}>
+190: 				{currentIteration ? (
+191: 					<Suspense fallback={loadingFallback}>
+192: 						<CodeEditor
+193: 							key={`code-${currentIteration.id}`}
+194: 							iterationId={currentIteration.id}
+195: 							refreshTrigger={codeRefreshTrigger}
+196: 						/>
+197: 					</Suspense>
+198: 				) : (
+199: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
+200: 				)}
+201: 			</div>
+202: 
+203: 			<div style={{ height: '100%', display: activeView === 'run' ? 'block' : 'none' }}>
+204: 				{currentIteration ? (
+205: 					<Suspense fallback={loadingFallback}>
+206: 						<RunnerPanel key={`run-${currentIteration.id}`} iterationId={currentIteration.id} />
+207: 					</Suspense>
+208: 				) : (
+209: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
+210: 				)}
+211: 			</div>
+212: 
+213: 			<div style={{ height: '100%', display: activeView === 'execution-memory' ? 'block' : 'none' }}>
+214: 				<Suspense fallback={loadingFallback}>
+215: 					<MemoryPanel
+216: 						key={`memory-${memoryRefreshTrigger}`}
+217: 						currentSession={currentIteration?.id}
+218: 						refreshTrigger={memoryRefreshTrigger}
+219: 					/>
+220: 				</Suspense>
+221: 			</div>
+222: 
+223: 			<div style={{ height: '100%', display: activeView === 'project-knowledge' ? 'block' : 'none' }}>
+224: 				<Suspense fallback={loadingFallback}>
+225: 					<KnowledgePanel
+226: 						key={`knowledge-${knowledgeRefreshTrigger}`}
+227: 						currentSession={project?.id}
+228: 						currentIterationId={currentIteration?.id}
+229: 						refreshTrigger={knowledgeRefreshTrigger}
+230: 					/>
+231: 				</Suspense>
+232: 			</div>
+233: 
+234: 			<div style={{ height: '100%', display: activeView === 'settings' ? 'block' : 'none', overflow: 'auto' }}>
+235: 				<Suspense fallback={loadingFallback}>
+236: 					<SettingsPanel />
+237: 				</Suspense>
+238: 			</div>
+239: 
+240: 			<div style={{ height: '100%', display: activeView === 'config' ? 'block' : 'none', overflow: 'auto' }}>
+241: 				<Suspense fallback={loadingFallback}>
+242: 					<AgentsSetupPanel />
+243: 				</Suspense>
+244: 			</div>
+245: 
+246: 			<div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
+247: 				{currentIteration ? (
+248: 					<Suspense fallback={loadingFallback}>
+249: 						<ChatPanel
+250: 							messages={messages}
+251: 							pmMessages={pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]}
+252: 							mode={chatMode}
+253: 							isProcessing={isProcessing}
+254: 							pmProcessing={pmProcessing}
+255: 							currentAgent={currentAgent}
+256: 							iterationTitle={currentIteration.title}
+257: 							iterationDescription={currentIteration.description}
+258: 							currentStage={currentStage}
+259: 							inputRequest={inputRequest}
+260: 							userInput={userInput}
+261: 							messagesContainerRef={messagesContainerRef as React.RefObject<HTMLDivElement>}
+262: 							pmMessagesContainerRef={pmMessagesContainerRef as React.RefObject<HTMLDivElement>}
+263: 							onUserInputChange={setUserInput}
+264: 							onSend={handleSend}
+265: 							onSelectOption={handleSelectOptionWrapper}
+266: 							onSubmitFeedback={handleSubmitFeedbackWrapper}
+267: 							onCancelFeedback={handleCancelFeedback}
+268: 							onToggleThinking={handleToggleThinking}
+269: 							onActionClick={handlePMActionWrapper}
+270: 						/>
+271: 					</Suspense>
+272: 				) : (
+273: 					<Empty description="Select an iteration to view chat" style={{ marginTop: '40px' }} />
+274: 				)}
+275: 			</div>
+276: 		</div>
+277: 	);
+278: 
+279: 	if (loading) {
+280: 		return <LoadingScreen />;
+281: 	}
+282: 
+283: 	return (
+284: 		<Layout style={{ minHeight: '100vh' }}>
+285: 			<Header
+286: 				style={{
+287: 					background: '#fff',
+288: 					borderBottom: '1px solid #e8e8e8',
+289: 					padding: '0 24px',
+290: 					display: 'flex',
+291: 					alignItems: 'center',
+292: 					justifyContent: 'space-between'
+293: 				}}
+294: 			>
+295: 				<div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+296: 					<h1 style={{ margin: 0, fontSize: '18px' }}>
+297: 						<RocketOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
+298: 						Cowork Forge
+299: 					</h1>
+300: 					{project && (
+301: 						<Tag color="blue" style={{ cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
+302: 							{project.name}
+303: 						</Tag>
+304: 					)}
+305: 				</div>
+306: 
+307: 				<div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+308: 					{currentIteration && (
+309: 						<>
+310: 							<StatusBadge status={currentIteration.status} />
+311: 							{(currentIteration.status === 'Draft' || currentIteration.status === 'Paused') && (
+312: 								<Button
+313: 									type="primary"
+314: 									icon={
+315: 										currentIteration.status === 'Draft' ? (
+316: 											<PlayCircleOutlined />
+317: 										) : (
+318: 											<ReloadOutlined />
+319: 										)
+320: 									}
+321: 									onClick={handleExecuteIteration}
+322: 									loading={isProcessing}
+323: 								>
+324: 									{currentIteration.status === 'Draft' ? 'Start Iteration' : 'Continue'}
+325: 								</Button>
+326: 							)}
+327: 						</>
+328: 					)}
+329: 				</div>
+330: 			</Header>
+331: 
+332: 			<Layout style={{ height: 'calc(100vh - 64px - 48px)' }}>
+333: 				<Sider width={200} style={{ background: '#fff', borderRight: '1px solid #e8e8e8' }}>
+334: 					<Menu
+335: 						mode="inline"
+336: 						selectedKeys={[activeView]}
+337: 						onClick={({ key }) => setActiveView(key as typeof activeView)}
+338: 						style={{ height: '100%', borderRight: 0 }}
+339: 						items={[
+340: 							{ key: 'projects', icon: <AppstoreOutlined />, label: 'Projects' },
+341: 							{ key: 'iterations', icon: <BranchesOutlined />, label: 'Iterations' },
+342: 							{ key: 'chat', icon: <MessageOutlined />, label: 'Collaborate' },
+343: 							{ key: 'artifacts', icon: <FileTextOutlined />, label: 'Artifacts' },
+344: 							{ key: 'code', icon: <CodeOutlined />, label: 'Code' },
+345: 							{ key: 'run', icon: <PlayCircleOutlined />, label: 'Run' },
+346: 							{ key: 'execution-memory', icon: <DatabaseOutlined />, label: 'Memory' },
+347: 							{ key: 'project-knowledge', icon: <BookOutlined />, label: 'Knowledge' },
+348: 							{ type: 'divider' },
+349: 							{ key: 'config', icon: <ControlOutlined />, label: 'Agents Setup' },
+350: 							{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' }
+351: 						]}
+352: 					/>
+353: 				</Sider>
+354: 
+355: 				<Content style={{ overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
+356: 					{renderContent()}
+357: 				</Content>
+358: 			</Layout>
+359: 
+360: 			<Footer
+361: 				style={{
+362: 					background: '#fff',
+363: 					borderTop: '1px solid #e8e8e8',
+364: 					padding: '12px 24px',
+365: 					display: 'flex',
+366: 					justifyContent: 'space-between',
+367: 					alignItems: 'center'
+368: 				}}
+369: 			>
+370: 				<div style={{ fontSize: '12px', color: '#888' }}>
+371: 					{project ? (
+372: 						<>
+373: 							<span style={{ marginRight: '16px', cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
+374: 								Project: <strong>{project.name}</strong>
+375: 							</span>
+376: 							<span
+377: 								style={{ cursor: currentIteration ? 'pointer' : 'default' }}
+378: 								onClick={() => currentIteration && handleOpenIterationFolder(currentIteration.id)}
+379: 								title={currentIteration ? `Click to open iteration folder: ${currentIteration.id}` : undefined}
+380: 							>
+381: 								Iterations: <strong>{iterations.length}</strong>
+382: 								{currentIteration && <span style={{ marginLeft: '4px', color: '#1890ff' }}>(#{currentIteration.number})</span>}
+383: 							</span>
+384: 						</>
+385: 					) : (
+386: 						'No project loaded'
+387: 					)}
+388: 				</div>
+389: 				<div style={{ fontSize: '12px', color: '#888' }}>
+390: 					{isProcessing ? (
+391: 						<span style={{ color: '#1890ff' }}>
+392: 							<Spin size="small" style={{ marginRight: '8px' }} />
+393: 							{currentAgent ? `${currentAgent} is working...` : 'Processing...'}
+394: 						</span>
+395: 					) : (
+396: 						<span style={{ color: '#52c41a' }}>
+397: 							<CheckCircleOutlined style={{ marginRight: '4px' }} />
+398: 							Ready
+399: 						</span>
+400: 					)}
+401: 				</div>
+402: 			</Footer>
+403: 
+404: 			<CommandPalette
+405: 				visible={commandPaletteVisible}
+406: 				onClose={() => setCommandPaletteVisible(false)}
+407: 				onCommandSelect={handleCommandSelect}
+408: 			/>
+409: 		</Layout>
+410: 	);
+411: }
+412: 
+413: export default App;
 ```
 
 ### crates/cowork-gui/src/components/common/MarkdownMessage.tsx (5 lines)
@@ -7411,6 +5613,443 @@ LICENSE
 3: {
 4:   content: string;
 5: }
+```
+
+### crates/cowork-gui/src/hooks/useAppEvents.ts (432 lines)
+
+```
+1: function useAppEvents(userInput: string, setUserInput: (input: string) => void) {
+2: 	const { message } = AntApp.useApp();
+3: 	const listenersRegistered = useRef(false);
+4: 
+5: 	
+6: 	const {
+7: 		loadProject,
+8: 		loadIterations,
+9: 		setCurrentIteration,
+10: 		updateCurrentIterationStatus,
+11: 		setIsExecuting
+12: 	} = useProjectStore();
+13: 
+14: 	
+15: 	const {
+16: 		setMessages,
+17: 		clearMessages,
+18: 		setPMMessages,
+19: 		clearPMMessages,
+20: 		setProcessing,
+21: 		setCurrentAgent,
+22: 		setCurrentStage,
+23: 		setInputRequest,
+24: 		setPmProcessing,
+25: 		submitInput,
+26: 		loadPMWelcomeMessage
+27: 	} = useAgentStore();
+28: 
+29: 	
+30: 	const {
+31: 		commandPaletteVisible,
+32: 		setActiveView,
+33: 		setCommandPaletteVisible,
+34: 		setActiveArtifactTab,
+35: 		triggerArtifactsRefresh,
+36: 		triggerCodeRefresh,
+37: 		triggerMemoryRefresh,
+38: 		triggerKnowledgeRefresh
+39: 	} = useUIStore();
+40: 
+41: 	useEffect(() => {
+42: 		const setupListeners = async () => {
+43: 			if (listenersRegistered.current) return;
+44: 			listenersRegistered.current = true;
+45: 
+46: 			
+47: 			const listenerPromises = [
+48: 				
+49: 				listen('iteration_created', () => {
+50: 					loadProject();
+51: 					message.success('Iteration created');
+52: 				}),
+53: 
+54: 				listen('iteration_started', (event) => {
+55: 					const iterationId = event.payload as string;
+56: 					setProcessing(true);
+57: 					setIsExecuting(true);
+58: 					updateCurrentIterationStatus('Running');
+59: 					setActiveView('chat');
+60: 					message.info('Iteration started');
+61: 				}),
+62: 
+63: 				listen('iteration_continued', (event) => {
+64: 					const iterationId = event.payload as string;
+65: 					setProcessing(true);
+66: 					setIsExecuting(true);
+67: 					updateCurrentIterationStatus('Running');
+68: 					setActiveView('chat');
+69: 					message.info('Iteration continued');
+70: 				}),
+71: 
+72: 				listen('iteration_retrying', (event) => {
+73: 					const iterationId = event.payload as string;
+74: 					setProcessing(true);
+75: 					setIsExecuting(true);
+76: 					updateCurrentIterationStatus('Running');
+77: 					setActiveView('chat');
+78: 					message.info('Retrying iteration...');
+79: 				}),
+80: 
+81: 				listen('iteration_completed', (event) => {
+82: 					const iterationId = event.payload as string;
+83: 					setProcessing(false);
+84: 					setIsExecuting(false);
+85: 					setCurrentAgent(null);
+86: 					setCurrentStage(null);
+87: 					setInputRequest(null);
+88: 					updateCurrentIterationStatus('Completed');
+89: 					loadProject();
+90: 					triggerMemoryRefresh();
+91: 					triggerKnowledgeRefresh();
+92: 					clearPMMessages();
+93: 					setActiveView('chat');
+94: 					loadPMWelcomeMessage(iterationId);
+95: 					message.success('Iteration completed');
+96: 				}),
+97: 
+98: 				listen('iteration_failed', (event) => {
+99: 					const [, error] = event.payload as [string, string];
+100: 					setProcessing(false);
+101: 					setIsExecuting(false);
+102: 					setCurrentAgent(null);
+103: 					setCurrentStage(null);
+104: 					setInputRequest(null);
+105: 					updateCurrentIterationStatus('Failed');
+106: 					loadProject();
+107: 					message.error('Iteration failed: ' + error);
+108: 				}),
+109: 
+110: 				
+111: 				listen('agent_event', (event) => {
+112: 					const { content, agent_name, message_type, stage_name, level } = event.payload as {
+113: 						content?: string;
+114: 						agent_name?: string;
+115: 						message_type?: string;
+116: 						stage_name?: string;
+117: 						level?: string;
+118: 					};
+119: 
+120: 					if (agent_name) setCurrentAgent(agent_name);
+121: 					if (stage_name) setCurrentStage(stage_name);
+122: 					if (!content) return;
+123: 
+124: 					setMessages((prev) => {
+125: 						const lastMsg = prev[prev.length - 1];
+126: 						const isThinking = message_type === 'thinking';
+127: 
+128: 						if (isThinking) {
+129: 							if (
+130: 								lastMsg?.type === 'thinking' &&
+131: 								(lastMsg as ThinkingMessage).isStreaming &&
+132: 								(lastMsg as ThinkingMessage).agentName === agent_name
+133: 							) {
+134: 								return [
+135: 									...prev.slice(0, -1),
+136: 									{
+137: 										...lastMsg,
+138: 										content: (lastMsg as ThinkingMessage).content + content
+139: 									} as ChatMessage
+140: 								];
+141: 							}
+142: 							return [
+143: 								...prev,
+144: 								{
+145: 									type: 'thinking',
+146: 									content,
+147: 									agentName: agent_name || 'AI Agent',
+148: 									stageName: stage_name,
+149: 									isStreaming: true,
+150: 									isExpanded: false,
+151: 									timestamp: new Date().toISOString()
+152: 								} as ThinkingMessage
+153: 							] as ChatMessage[];
+154: 						} else {
+155: 							if (
+156: 								lastMsg?.type === 'agent' &&
+157: 								(lastMsg as { isStreaming?: boolean }).isStreaming &&
+158: 								(lastMsg as { agentName?: string }).agentName === agent_name
+159: 							) {
+160: 								return [
+161: 									...prev.slice(0, -1),
+162: 									{
+163: 										...lastMsg,
+164: 										content: (lastMsg as { content: string }).content + content
+165: 									} as ChatMessage
+166: 								];
+167: 							}
+168: 							return [
+169: 								...prev,
+170: 								{
+171: 									type: 'agent',
+172: 									content,
+173: 									agentName: agent_name || 'AI Agent',
+174: 									stageName: stage_name,
+175: 									level,
+176: 									isStreaming: true,
+177: 									timestamp: new Date().toISOString()
+178: 								} as ChatMessage
+179: 							];
+180: 						}
+181: 					});
+182: 				}),
+183: 
+184: 				
+185: 				listen('agent_streaming', (event) => {
+186: 					const { content, agent_name, is_thinking, is_first, is_last } = event.payload as {
+187: 						content?: string;
+188: 						agent_name?: string;
+189: 						is_thinking?: boolean;
+190: 						is_first?: boolean;
+191: 						is_last?: boolean;
+192: 					};
+193: 
+194: 					
+195: 					if (agent_name === 'PM Agent') {
+196: 						if (is_last && !content) {
+197: 							setPMMessages((prev) => {
+198: 								const lastMsg = prev[prev.length - 1];
+199: 								if (lastMsg?.type === 'pm_agent') {
+200: 									return [...prev.slice(0, -1), { ...lastMsg } as PMAgentMessage];
+201: 								}
+202: 								return prev;
+203: 							});
+204: 							setPmProcessing(false);
+205: 							return;
+206: 						}
+207: 
+208: 						if (!content) return;
+209: 
+210: 						setPMMessages((prev) => {
+211: 							const lastMsg = prev[prev.length - 1];
+212: 							if (
+213: 								is_first ||
+214: 								!lastMsg ||
+215: 								lastMsg.type !== 'pm_agent' ||
+216: 								!(lastMsg as PMAgentMessage & { isStreaming?: boolean }).isStreaming
+217: 							) {
+218: 								return [
+219: 									...prev,
+220: 									{
+221: 										type: 'pm_agent' as const,
+222: 										content,
+223: 										isStreaming: !is_last,
+224: 										timestamp: new Date().toISOString()
+225: 									} as PMAgentMessage & { isStreaming?: boolean }
+226: 								];
+227: 							}
+228: 							return [
+229: 								...prev.slice(0, -1),
+230: 								{
+231: 									...lastMsg,
+232: 									content: (lastMsg as PMAgentMessage).content + content,
+233: 									isStreaming: !is_last
+234: 								} as PMAgentMessage & { isStreaming?: boolean }
+235: 							];
+236: 						});
+237: 						return;
+238: 					}
+239: 
+240: 					
+241: 					if (!content) return;
+242: 					const msgType = is_thinking ? 'thinking' : 'agent';
+243: 
+244: 					setMessages((prev) => {
+245: 						const lastMsg = prev[prev.length - 1];
+246: 						if (
+247: 							lastMsg?.type === msgType &&
+248: 							(lastMsg as { isStreaming?: boolean }).isStreaming &&
+249: 							(lastMsg as { agentName?: string }).agentName === agent_name
+250: 						) {
+251: 							return [
+252: 								...prev.slice(0, -1),
+253: 								{
+254: 									...lastMsg,
+255: 									content: (lastMsg as { content: string }).content + content,
+256: 									isStreaming: !is_last
+257: 								} as ChatMessage
+258: 							];
+259: 						}
+260: 						return [
+261: 							...prev,
+262: 							{
+263: 								type: msgType,
+264: 								content,
+265: 								agentName: agent_name || 'AI Agent',
+266: 								isStreaming: !is_last,
+267: 								isExpanded: false,
+268: 								timestamp: new Date().toISOString()
+269: 							} as ChatMessage
+270: 						];
+271: 					});
+272: 				}),
+273: 
+274: 				
+275: 				listen('tool_call', (event) => {
+276: 					const { tool_name, arguments: args, agent_name } = event.payload as {
+277: 						tool_name: string;
+278: 						arguments: Record<string, unknown>;
+279: 						agent_name?: string;
+280: 					};
+281: 					setMessages((prev) => [
+282: 						...prev,
+283: 						{
+284: 							type: 'tool_call',
+285: 							toolName: tool_name,
+286: 							arguments: args,
+287: 							agentName: agent_name || 'AI Agent',
+288: 							timestamp: new Date().toISOString()
+289: 						} as ChatMessage
+290: 					]);
+291: 				}),
+292: 
+293: 				listen('tool_result', (event) => {
+294: 					const { tool_name, result, success, agent_name } = event.payload as {
+295: 						tool_name: string;
+296: 						result: string;
+297: 						success: boolean;
+298: 						agent_name?: string;
+299: 					};
+300: 					setMessages((prev) => [
+301: 						...prev,
+302: 						{
+303: 							type: 'tool_result',
+304: 							toolName: tool_name,
+305: 							result,
+306: 							success,
+307: 							agentName: agent_name || 'AI Agent',
+308: 							timestamp: new Date().toISOString()
+309: 						} as ChatMessage
+310: 					]);
+311: 				}),
+312: 
+313: 				
+314: 				listen('pm_actions', (event) => {
+315: 					const { actions } = event.payload as { actions: PMAction[] };
+316: 					setPMMessages((prev) => {
+317: 						const lastMsg = prev[prev.length - 1];
+318: 						if (lastMsg?.type === 'pm_agent') {
+319: 							return [
+320: 								...prev.slice(0, -1),
+321: 								{
+322: 									...lastMsg,
+323: 									actions: [...((lastMsg as PMAgentMessage).actions || []), ...actions]
+324: 								} as PMAgentMessage
+325: 							];
+326: 						}
+327: 						return prev;
+328: 					});
+329: 				}),
+330: 
+331: 				
+332: 				listen('input_request', async (event) => {
+333: 					const [requestId, prompt, options] = event.payload as [string, string, InputOption[]];
+334: 					updateCurrentIterationStatus('Paused');
+335: 
+336: 					const artifactMatch = prompt.match(/\[ARTIFACT_TYPE:(\w+)\]$/);
+337: 					if (artifactMatch) {
+338: 						const artifactType = artifactMatch[1];
+339: 						const cleanPrompt = prompt.replace(/\[ARTIFACT_TYPE:\w+\]$/, '').trim();
+340: 
+341: 						await loadIterations();
+342: 						const latestIterations = useProjectStore.getState().iterations;
+343: 						if (latestIterations && latestIterations.length > 0) {
+344: 							const latestIteration = latestIterations[latestIterations.length - 1];
+345: 							const fullIteration = await API.iteration.get(latestIteration.id);
+346: 							setCurrentIteration(fullIteration);
+347: 						}
+348: 
+349: 						setInputRequest({
+350: 							requestId,
+351: 							prompt: cleanPrompt,
+352: 							options,
+353: 							isArtifactConfirmation: true,
+354: 							artifactType
+355: 						});
+356: 					} else {
+357: 						setInputRequest({ requestId, prompt, options });
+358: 					}
+359: 					setUserInput('');
+360: 				}),
+361: 
+362: 				
+363: 				listen('project_loaded', async () => {
+364: 					setProcessing(false);
+365: 					setCurrentAgent(null);
+366: 					setInputRequest(null);
+367: 					clearMessages();
+368: 					setCurrentIteration(null);
+369: 					await loadProject();
+370: 					setActiveView('iterations');
+371: 					message.success('Project loaded');
+372: 				}),
+373: 
+374: 				listen('project_initialized', async () => {
+375: 					setProcessing(false);
+376: 					setCurrentAgent(null);
+377: 					setInputRequest(null);
+378: 					clearMessages();
+379: 					setCurrentIteration(null);
+380: 					await loadProject();
+381: 					setActiveView('iterations');
+382: 					message.success('Project initialized');
+383: 				}),
+384: 
+385: 				
+386: 				listen('knowledge_regeneration_completed', () => {
+387: 					triggerKnowledgeRefresh();
+388: 					message.success('Knowledge updated');
+389: 				}),
+390: 
+391: 				listen<[string, string]>('knowledge_regeneration_failed', (event) => {
+392: 					const [iterationId, error] = event.payload;
+393: 					console.error('[App] Knowledge regeneration failed:', iterationId, error);
+394: 					message.error('Knowledge generation failed: ' + error);
+395: 				}),
+396: 			];
+397: 
+398: 			
+399: 			await Promise.all(listenerPromises);
+400: 
+401: 			
+402: 			
+403: 			try {
+404: 				const hasOpenProject = await API.workspace.hasOpen();
+405: 				if (hasOpenProject) {
+406: 					console.log('[App] Detected open project on startup, loading project...');
+407: 					await loadProject();
+408: 					setActiveView('iterations');
+409: 				}
+410: 			} catch (error) {
+411: 				console.error('[App] Failed to check for open project:', error);
+412: 			}
+413: 		};
+414: 
+415: 		setupListeners();
+416: 
+417: 		
+418: 		const handleKeyDown = (e: KeyboardEvent) => {
+419: 			if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+420: 				e.preventDefault();
+421: 				setCommandPaletteVisible(!commandPaletteVisible);
+422: 			}
+423: 		};
+424: 
+425: 		window.addEventListener('keydown', handleKeyDown);
+426: 		return () => window.removeEventListener('keydown', handleKeyDown);
+427: 	}, []);
+428: 
+429: 	return {
+430: 		
+431: 	};
+432: }
 ```
 
 ### crates/cowork-gui/src/types/config.ts (291 lines)
@@ -7859,42 +6498,6 @@ LICENSE
 52: (config: &cowork_core::ProjectRuntimeConfig)
 ```
 
-### crates/cowork-gui/src-tauri/tauri.conf.json (31 lines)
-
-```
-1: {
-2:   "$schema": "https://schema.tauri.app/config/2",
-3:   "productName": "Cowork Forge",
-4:   "version": "2.5.2",
-5:   "identifier": "com.coworkforge.gui",
-6:   "build": {
-7:     "beforeDevCommand": "bun run dev",
-8:     "beforeBuildCommand": "bun run build",
-9:     "devUrl": "http://localhost:15173",
-10:     "frontendDist": "../dist"
-11:   },
-12:   "app": {
-13:     "withGlobalTauri": true,
-14:     "windows": [
-15:       {
-16:         "title": "Cowork Forge",
-17:         "width": 1200,
-18:         "height": 720,
-19:         "center": true,
-20:         "minWidth": 800,
-21:         "minHeight": 600
-22:       }
-23:     ],
-24:     "security": { "csp": null }
-25:   },
-26:   "bundle": {
-27:     "active": true,
-28:     "targets": "all",
-29:     "icon": ["icons/icon-rgba.png", "icons/icon.icns", "icons/icon.ico"]
-30:   }
-31: }
-```
-
 ### crates/cowork-gui/vite.config.js (40 lines)
 
 ```
@@ -7939,6 +6542,1235 @@ LICENSE
 39:   },
 40: });
 ```
+
+### litho.docs/en/2.Architecture.md (1224 lines)
+
+````
+1: # System Architecture Documentation: Cowork Forge
+2: 
+3: **Document Version**: 1.0  
+4: **Generation Time**: 2026-02-14 05:10:16 (UTC)  
+5: **Classification**: Architecture Overview  
+6: **Target Audience**: Software Architects, Senior Developers, DevOps Engineers
+7: 
+8: ---
+9: 
+10: ## 1. Architecture Overview
+11: 
+12: ### 1.1 Design Philosophy
+13: 
+14: Cowork Forge embodies a **Hybrid AI-Human Collaborative Architecture** designed to orchestrate autonomous software development while maintaining human oversight through structured intervention points. The architecture is built upon three foundational principles:
+15: 
+16: 1. **Cognitive Augmentation**: The system acts as an extension of human developer cognition, preserving institutional knowledge across iterations while automating mechanical development tasks through AI agents.
+17: 
+18: 2. **Structured Autonomy**: Rather than unconstrained AI generation, the system enforces a rigorous 7-stage pipeline (Idea→PRD→Design→Plan→Coding→Check→Delivery) with validation gates, ensuring quality assurance through the Actor-Critic pattern.
+19: 
+20: 3. **Interface Agnosticism**: The core domain logic remains pure and independent of interface concerns, enabling simultaneous support for automation-focused CLI workflows and interactive GUI experiences through the Ports and Adapters pattern.
+21: 
+22: ### 1.2 Core Architecture Patterns
+23: 
+24: #### Hexagonal Architecture (Ports and Adapters)
+25: The system implements a strict **Hexagonal Architecture** with the `cowork-core` crate at the center containing pure domain logic. All external concerns (LLM APIs, file systems, user interfaces) connect through well-defined ports:
+26: 
+27: - **Inbound Ports**: `InteractiveBackend` trait enabling CLI and GUI implementations
+28: - **Outbound Ports**: Repository abstractions for persistence, LLM client interfaces for AI integration
+29: - **Adapters**: Concrete implementations in `cowork-cli`, `cowork-gui`, and infrastructure modules
+30: 
+31: #### Domain-Driven Design (DDD)
+32: The architecture follows DDD tactical patterns:
+33: - **Aggregates**: `Project` (root), `Iteration`, `ProjectMemory` enforcing consistency boundaries
+34: - **Value Objects**: `Artifacts`, `StageResult`, `InheritanceMode` (Full/Partial/None)
+35: - **Domain Services**: Pipeline orchestration, inheritance analysis, change scope detection
+36: - **Repositories**: `ProjectStore`, `IterationStore`, `MemoryStore` abstracting persistence
+37: 
+38: #### Event-Driven Architecture (GUI Layer)
+39: The Tauri-based desktop application implements an event-driven architecture:
+40: - **Asymmetric Communication**: Commands (invoke) for requests, Events (emit) for streaming responses
+41: - **Real-time Streaming**: LLM token streams, process logs, and agent activities flow through Tauri's event system
+42: - **State Synchronization**: React frontend maintains local state while backend emits state change events
+43: 
+44: #### Actor-Critic Pattern
+45: Each pipeline stage implements the Actor-Critic pattern:
+46: - **Actor**: Generates artifacts (code, documents, plans) based on instructions
+47: - **Critic**: Validates quality, checks constraints, suggests improvements
+48: - **Feedback Loop**: Human input regenerates Actor outputs with critique context
+49: 
+50: ### 1.3 Technology Stack Overview
+51: 
+52: | Layer | Technology | Purpose | Architectural Role |
+53: |-------|-----------|---------|-------------------|
+54: | **Core Domain** | Rust + Tokio | Async runtime for pipeline execution | Domain logic isolation |
+55: | **AI Orchestration** | adk-rust | Agent framework and tool ecosystem | AI agent lifecycle management |
+56: | **LLM Integration** | OpenAI-compatible APIs | Code generation and reasoning | Infrastructure adapter |
+57: | **Rate Limiting** | Custom Semaphore + Delay | 30 req/min compliance | Cross-cutting concern |
+58: | **CLI Interface** | clap + dialoguer | Command parsing and terminal UI | Primary adapter |
+59: | **GUI Backend** | Tauri | Desktop runtime and system integration | Secondary adapter |
+60: | **GUI Frontend** | React 18 + Ant Design | Component-based interactive UI | Presentation layer |
+61: | **Persistence** | JSON + serde | Schema evolution and storage | Repository implementation |
+62: | **Security** | Path validation + Sandboxing | Workspace containment | Security boundary |
+63: 
+64: ---
+65: 
+66: ## 2. System Context (C4 Level 1)
+67: 
+68: ### 2.1 System Positioning and Value
+69: 
+70: Cowork Forge operates as a **Local-First AI Development Environment** positioned between traditional IDEs and cloud-based AI coding assistants. Unlike cloud solutions, it maintains complete data locality while providing structured AI orchestration that simple code completion tools cannot achieve.
+71: 
+72: **Core Value Propositions**:
+73: - **Continuity**: Memory system preserves architectural decisions across development sessions
+74: - **Consistency**: Enforced 7-stage pipeline ensures systematic development methodology
+75: - **Control**: Human-in-the-Loop gates at critical stages prevent AI hallucinations from propagating
+76: - **Flexibility**: Dual interface support accommodates both automation scripts and exploratory development
+77: 
+78: ### 2.2 User Roles and Scenarios
+79: 
+80: ```mermaid
+81: flowchart TB
+82:     subgraph Users["User Ecosystem"]
+83:         ID["Individual Developers<br/>Automation-focused"]
+84:         DT["Development Teams<br/>Standardization-focused"]
+85:         AD["AI-Augmented Developers<br/>Exploration-focused"]
+86:     end
+87:     
+88:     subgraph Value["Value Delivery"]
+89:         RP["Rapid Prototyping<br/>Idea → Code in minutes"]
+90:         KM["Knowledge Management<br/>Cross-iteration memory"]
+91:         QC["Quality Control<br/>Actor-Critic validation"]
+92:     end
+93:     
+94:     ID -->|CLI Automation| RP
+95:     DT -->|Standardized Workflows| KM
+96:     AD -->|Interactive GUI| QC
+97: ```
+98: 
+99: **Primary User Archetypes**:
+100: 
+101: 1. **Individual Developers**: Utilize CLI for rapid prototyping, leveraging automation to generate boilerplate and scaffolding from natural language descriptions.
+102: 
+103: 2. **Development Teams**: Employ the memory system to maintain architectural standards across multiple projects, using inheritance modes to evolve existing codebases systematically.
+104: 
+105: 3. **AI-Augmented Developers**: Prefer GUI interface for visibility into AI decision-making, utilizing real-time streaming and HITL validation to guide the development process interactively.
+106: 
+107: ### 2.3 External System Interactions
+108: 
+109: ```mermaid
+110: flowchart TB
+111:     subgraph CoworkForge["Cowork Forge System Boundary"]
+112:         Core["Core Domain Engine<br/>(Rust)"]
+113:         CLI["CLI Interface"]
+114:         GUI["Desktop GUI<br/>(Tauri + React)"]
+115:     end
+116:     
+117:     subgraph External["External Systems"]
+118:         LLM["LLM Provider APIs<br/>(OpenAI-compatible)"]
+119:         FS["Local File System"]
+120:         Shell["Shell/Command Executor"]
+121:         Editor["External Editor<br/>(System Default)"]
+122:         DevServer["Development Server<br/>(Vite/etc.)"]
+123:         MCP["MCP Servers<br/>(Tavily/DeepWiki)"]
+124:     end
+125:     
+126:     User["Developer/User"] -->|Commands| CLI
+127:     User -->|Interacts| GUI
+128:     GUI <-->|Events/Commands| Core
+129:     CLI -->|Invokes| Core
+130:     
+131:     Core -->|API Calls<br/>Rate: 30 req/min| LLM
+132:     Core -->|Validated I/O| FS
+133:     Core -->|Process Spawning| Shell
+134:     Core -->|Edit Invocation| Editor
+135:     Core -->|Process Management| DevServer
+136:     Core -->|Remote Tool Queries| MCP
+137: ```
+138: 
+139: **External Dependencies**:
+140: 
+141: - **LLM Provider APIs**: OpenAI-compatible endpoints for agent reasoning. Interactions are rate-limited (30 requests/minute) with concurrency control (single semaphore) to manage API quotas and costs.
+142: 
+143: - **Local File System**: Primary persistence mechanism for projects, iterations, and memory. Access is constrained through workspace validation to prevent path traversal attacks.
+144: 
+145: - **Shell/Command Executor**: Used for project validation (dependency installation, builds, tests) and development server management. Commands are sanitized and executed within project workspace boundaries.
+146: 
+147: - **External Editor**: System default editor invoked during HITL flows for content review and modification (e.g., vim, VS Code, nano).
+148: 
+149: - **Development Server**: User-provided server processes (Vite, Webpack dev server) managed through ProcessRunner for live preview capabilities.
+150: 
+151: - **MCP Servers**: Provide external AI capabilities via Model Context Protocol (e.g., Tavily web search, DeepWiki code documentation queries). Configured through `config.toml` under `[mcp]` section, with automatic initialization and tool injection into all Agents at startup.
+152: 
+153: ### 2.4 System Boundary Definition
+154: 
+155: **In-Scope Components**:
+156: - Core domain logic (iterations, projects, memory aggregates)
+157: - 7-stage AI agent pipeline with stage executors
+158: - Agent instruction library (~2000 lines of prompt engineering)
+159: - Tool ecosystem (40+ ADK tools: file, data, validation, HITL, memory, deployment, legacy analysis) with MCP Remote Tool Integration (Tavily, DeepWiki, etc.)
+160: - Persistence layer with JSON-based project/iteration stores
+161: - CLI command interface with argument parsing
+162: - Tauri-based GUI with React frontend
+163: - Real-time process runner for development servers
+164: - Rate-limited LLM client factory
+165: - Cross-platform desktop application shell
+166: 
+167: **Out-of-Scope Components**:
+168: - Third-party LLM training infrastructure
+169: - Version control system integration (Git operations)
+170: - External package registry management (npm, crates.io)
+171: - Cloud deployment platforms and CI/CD pipelines
+172: - Remote collaboration features (real-time multi-user editing)
+173: 
+174: ---
+175: 
+176: ## 3. Container View (C4 Level 2)
+177: 
+178: ### 3.1 Domain Module Division
+179: 
+180: Cowork Forge is structured as a **Multi-Crate Rust Workspace** with clear domain boundaries following DDD strategic design:
+181: 
+182: ```mermaid
+183: flowchart TB
+184:     subgraph Workspace["Cowork Forge Workspace"]
+185:         subgraph Presentation["Presentation Layer"]
+186:             CLI["cowork-cli<br/>Command Router"]
+187:             GUI["cowork-gui<br/>Tauri + React"]
+188:         end
+189:         
+190:         subgraph Application["Application Layer"]
+191:             CLIBackend["CLI Backend<br/>InteractiveBackend Impl"]
+192:             GUIBackend["GUI Backend<br/>Tauri Commands"]
+193:             ProjectRunner["Project Runner<br/>Process Management"]
+194:         end
+195:         
+196:         subgraph Domain["Domain Layer (cowork-core)"]
+197:             subgraph CoreDomains["Core Business Domains"]
+198:                 ProjectDomain["Project Domain<br/>Aggregate Root"]
+199:                 IterationDomain["Iteration Domain<br/>Lifecycle Management"]
+200:                 PipelineDomain["Pipeline Domain<br/>7-Stage Orchestration"]
+201:                 MemoryDomain["Memory Domain<br/>Knowledge Management"]
+202:             end
+203:             
+204:             subgraph SupportingDomains["Supporting Domains"]
+205:                 ToolsDomain["Tools Domain<br/>40+ ADK Tools + MCP Remote Integration"]
+206:                 InteractionDomain["Interaction Domain<br/>Backend Abstraction"]
+207:             end
+208:             
+209:             subgraph Infrastructure["Infrastructure Layer"]
+210:                 Persistence["Persistence<br/>JSON Stores"]
+211:                 LLMIntegration["LLM Integration<br/>Rate-Limited Client"]
+212:                 Security["Security<br/>Path Validation"]
+213:             end
+214:         end
+215:     end
+216:     
+217:     CLI -->|implements| CLIBackend
+218:     GUI -->|invokes| GUIBackend
+219:     CLIBackend -->|uses| InteractionDomain
+220:     GUIBackend -->|uses| InteractionDomain
+221:     
+222:     InteractionDomain -->|drives| PipelineDomain
+223:     PipelineDomain -->|manages| IterationDomain
+224:     PipelineDomain -->|uses| ToolsDomain
+225:     IterationDomain -->|belongs to| ProjectDomain
+226:     
+227:     ToolsDomain -->|access| Persistence
+228:     ToolsDomain -->|query| MemoryDomain
+229:     PipelineDomain -->|calls| LLMIntegration
+230:     ToolsDomain -->|validated by| Security
+231: ```
+232: 
+233: ### 3.2 Container Architecture
+234: 
+235: #### Core Domain Container (`cowork-core`)
+236: The heart of the system containing pure business logic with no external dependencies:
+237: 
+238: - **Domain Layer**: Entities (`Project`, `Iteration`, `Memory`), Value Objects (`InheritanceMode`), and Domain Services (Pipeline orchestration)
+239: - **Pipeline Layer**: Stage trait implementations, Stage Executor, and instruction library
+240: - **Tool Layer**: 30+ ADK tools organized by function (File, Data, HITL, Memory, Validation)
+241: - **Tool Layer**: 40+ ADK tools (File, Data, HITL, Memory, Validation, Deployment, Legacy analysis) with MCP Remote Tool Integration (Tavily, DeepWiki, etc.)
+242: 
+243: #### CLI Container (`cowork-cli`)
+244: Thin adapter implementing terminal-based interaction:
+245: - **Clap Parser**: Command-line argument parsing and routing
+246: - **InteractiveBackend Impl**: Terminal-based HITL with dialoguer prompts and colored output
+247: - **Command Handlers**: Thin wrappers delegating to core domain
+248: 
+249: #### GUI Container (`cowork-gui`)
+250: Tauri-based desktop application with React frontend:
+251: - **Tauri Backend**: Rust commands exposing core functionality via IPC
+252: - **React Frontend**: 8-panel interface (Projects, Iterations, Editor, Runner, Memory, Knowledge)
+253: - **Event System**: Real-time bidirectional communication for streaming and HITL
+254: 
+255: ### 3.3 Storage Design
+256: 
+257: The system implements **JSON-First Persistence** for portability and version control compatibility:
+258: 
+259: ```mermaid
+260: flowchart LR
+261:     subgraph Storage["Local Storage (.cowork-v2/)"]
+262:         ProjectStore[(Project Store<br/>project.json)]
+263:         IterationStore[(Iteration Store<br/>iterations/*/)]
+264:         MemoryStore[(Memory Store<br/>memory.json)]
+265:         Workspace[(Workspace Directories<br/>artifacts/)]
+266:     end
+267:     
+268:     subgraph Domain["Domain Layer"]
+269:         Project["Project Aggregate"]
+270:         Iteration["Iteration Entity"]
+271:         Memory["ProjectMemory Aggregate"]
+272:     end
+273:     
+274:     Persistence["Persistence Layer<br/>(Stores)"] -->|manages| ProjectStore
+275:     Persistence -->|manages| IterationStore
+276:     Persistence -->|manages| MemoryStore
+277:     
+278:     Project -->|persists to| ProjectStore
+279:     Iteration -->|persists to| IterationStore
+280:     Memory -->|persists to| MemoryStore
+281:     
+282:     Iteration -->|generates artifacts| Workspace
+283: ```
+284: 
+285: **Storage Characteristics**:
+286: - **Project Store**: Metadata, tech stack detection, iteration summaries
+287: - **Iteration Store**: Stage artifacts (idea.md, prd.md, design.md, plan.md, code files), execution state
+288: - **Memory Store**: Architectural decisions, patterns, issues, learnings across iterations
+289: - **Workspace**: File system artifacts generated by AI agents during pipeline execution
+290: 
+291: ### 3.4 Inter-Domain Communication
+292: 
+293: **Synchronous Communication**:
+294: - **Command Pattern**: CLI/GUI invoke domain operations through command handlers
+295: - **Repository Pattern**: Domain aggregates persist through store abstractions
+296: - **Trait Abstraction**: `InteractiveBackend` trait enables polymorphic user interaction
+297: 
+298: **Asynchronous Communication** (GUI only):
+299: - **Event Streaming**: Tauri backend emits events (`agent_event`, `tool_call`, `input_request`) for real-time UI updates
+300: - **Process Streaming**: Development server logs stream via `project_log` events
+301: - **Backpressure Handling**: Tokio channels manage streaming LLM responses without blocking
+302: 
+303: ---
+304: 
+305: ## 4. Component View (C4 Level 3)
+306: 
+307: ### 4.1 Core Functional Components
+308: 
+309: #### Pipeline Orchestration Component
+310: 
+311: ```mermaid
+312: flowchart TB
+313:     subgraph Pipeline["Pipeline Domain"]
+314:         Controller["Pipeline Controller<br/>(mod.rs)"]
+315:         Executor["Stage Executor<br/>(stage_executor.rs)"]
+316:         Context["Pipeline Context<br/>(Execution State)"]
+317:         
+318:         subgraph Stages["Stage Implementations"]
+319:             Idea["Idea Stage<br/>(Actor + Critic)"]
+320:             PRD["PRD Stage<br/>(Actor + Critic)"]
+321:             Design["Design Stage"]
+322:             Plan["Plan Stage"]
+323:             Coding["Coding Stage"]
+324:             Check["Check Stage"]
+325:             Delivery["Delivery Stage"]
+326:         end
+327:         
+328:         Controller -->|initializes| Context
+329:         Controller -->|executes| Executor
+330:         Executor -->|runs| Stages
+331:         Stages -->|update| Context
+332:     end
+333:     
+334:     subgraph Agents["Agent System"]
+335:         Assistant["Iterative Assistant<br/>(adk-rust)"]
+336:         Instructions["Instruction Library<br/>(~2000 lines)"]
+337:     end
+338:     
+339:     subgraph Tools["Tool Ecosystem"]
+340:         FileTools["File Tools<br/>(6 tools)"]
+341:         DataTools["Data Tools<br/>(12 tools)"]
+342:         HITL["HITL Tools<br/>(Content/File Review)"]
+343:         Memory["Memory Tools<br/>(6 tools)"]
+344:     end
+345:     
+346:     Executor -->|creates| Assistant
+347:     Assistant -->|uses| Instructions
+348:     Assistant -->|calls| Tools
+349:     Assistant -->|streams| LLM["LLM API"]
+350: ```
+351: 
+352: **Component Responsibilities**:
+353: - **Pipeline Controller**: Manages iteration lifecycle, stage sequencing, and error handling
+354: - **Stage Executor**: Bridges domain logic with adk-rust framework, manages agent lifecycle
+355: - **Stage Implementations**: Seven concrete strategies following the Strategy pattern, each with specific instructions and artifact generation logic
+356: - **Iterative Assistant**: AI agent wrapper handling streaming, tool calls, and human interaction
+357: 
+358: #### Memory Management Component
+359: 
+360: ```mermaid
+361: flowchart TB
+362:     subgraph MemoryDomain["Memory Domain"]
+363:         ProjectMemory["ProjectMemory<br/>(Aggregate Root)"]
+364:         IterationKnowledge["IterationKnowledge<br/>(Entity)"]
+365:         
+366:         subgraph Inheritance["Inheritance System"]
+367:             Full["Full Mode<br/>(Artifacts + Code)"]
+368:             Partial["Partial Mode<br/>(Code Only)"]
+369:             None["None Mode<br/>(Fresh Start)"]
+370:         end
+371:         
+372:         QueryEngine["Query Engine<br/>(Fuzzy Search)"]
+373:     end
+374:     
+375:     subgraph Tools["Memory Tools"]
+376:         Query["QueryMemoryTool"]
+377:         Save["Save*Tool<br/>(Insight/Issue/Learning)"]
+378:         Promote["Promote*Tool<br/>(To Decision/Pattern)"]
+379:         Knowledge["Knowledge Generation"]
+380:     end
+381:     
+382:     ProjectMemory -->|contains| IterationKnowledge
+383:     IterationKnowledge -->|uses| Inheritance
+384:     ProjectMemory -->|queried by| QueryEngine
+385:     
+386:     Tools -->|operate on| MemoryDomain
+387:     Knowledge -->|generates| IterationKnowledge
+388: ```
+389: 
+390: **Memory Inheritance Modes**:
+391: - **Full**: Complete artifact and code transfer for major refactoring (continues from any stage)
+392: - **Partial**: Code-only inheritance for incremental feature development (typically starts at Coding stage)
+393: - **None**: Fresh iteration without historical baggage (starts at Idea stage)
+394: 
+395: ### 4.2 Technical Support Components
+396: 
+397: #### LLM Integration with Rate Limiting
+398: 
+399: ```mermaid
+400: flowchart LR
+401:     subgraph LLM["LLM Integration Domain"]
+402:         Config["LlmConfig<br/>(TOML/Env)"]
+403:         Factory["Client Factory"]
+404:         
+405:         subgraph RateLimiting["Rate Limiting Decorator"]
+406:             Semaphore["Global Semaphore<br/>(Concurrency=1)"]
+407:             Delay["2s Delay<br/>(30 req/min)"]
+408:         end
+409:         
+410:         Client["OpenAI Client<br/>(adk-rust)"]
+411:     end
+412:     
+413:     Config -->|creates| Factory
+414:     Factory -->|wraps with| RateLimiting
+415:     RateLimiting -->|uses| Client
+416:     Client -->|calls| API["LLM Provider API"]
+417:     
+418:     Pipeline -->|requests| Factory
+419: ```
+420: 
+421: **Rate Limiting Strategy**:
+422: - **Token Bucket Alternative**: Uses semaphore (concurrency=1) combined with fixed delay (2 seconds) to enforce 30 requests/minute
+423: - **Global Scope**: Rate limiter is shared across all pipeline stages to prevent API quota exhaustion
+424: - **Backpressure**: Requests block until capacity available, ensuring compliance without dropping requests
+425: 
+426: #### Security and Validation Layer
+427: 
+428: ```mermaid
+429: flowchart TB
+430:     subgraph Security["Security Components"]
+431:         PathValidation["Path Validation<br/>(UNC Normalization)"]
+432:         WorkspaceContainment["Workspace Containment<br/>(Project Boundary)"]
+433:         CommandSanitization["Command Sanitization"]
+434:     end
+435:     
+436:     subgraph Runtime["Runtime Security"]
+437:         Analyzer["Runtime Analyzer<br/>(Behavior Monitoring)"]
+438:         SecurityCheck["Security Checks<br/>(runtime_security.rs)"]
+439:     end
+440:     
+441:     FileTools["File Tools"] -->|validated by| PathValidation
+442:     FileTools -->|constrained by| WorkspaceContainment
+443:     ProcessRunner["Process Runner"] -->|sanitized by| CommandSanitization
+444:     
+445:     Pipeline -->|monitored by| Analyzer
+446:     Tools -->|enforced by| SecurityCheck
+447: ```
+448: 
+449: ### 4.3 Component Interaction Relationships
+450: 
+451: **Critical Path Dependencies**:
+452: 1. **Pipeline → Tools**: Pipeline executor injects tool set into AI agents; tools access file system and memory
+453: 2. **Tools → Persistence**: All data modifications flow through repository pattern to JSON stores
+454: 3. **Pipeline → Interaction**: HITL gates suspend execution until InteractiveBackend returns user input
+455: 4. **GUI ↔ Backend**: Tauri commands trigger domain operations; events stream progress back to React
+456: 
+457: **Decoupling Mechanisms**:
+458: - **Trait-Based Backend**: `InteractiveBackend` trait decouples pipeline from specific UI implementations
+459: - **Dependency Injection**: Stage executor receives tool dependencies rather than constructing them
+460: - **Event-Driven Updates**: GUI components react to events rather than polling, reducing coupling
+461: 
+462: ---
+463: 
+464: ## 5. Key Processes
+465: 
+466: ### 5.1 Genesis Iteration Creation Flow
+467: 
+468: The primary workflow transforming natural language ideas into complete software projects:
+469: 
+470: ```mermaid
+471: flowchart TD
+472:     Start([User Provides Idea]) --> Entry{Entry Point}
+473:     Entry -->|CLI: cowork iter| CLI[CLI Parser]
+474:     Entry -->|GUI: Create Button| GUI[React Frontend]
+475:     
+476:     CLI --> Init[Initialize Pipeline Context]
+477:     GUI --> Init
+478:     
+479:     Init --> Stage1[Idea Stage<br/>Capture Requirements<br/>Output: idea.md]
+480:     Stage1 -->|HITL Gate| Confirm1{User Confirmation}
+481:     Confirm1 -->|Edit/Feedback| Stage1
+482:     Confirm1 -->|Approve| Stage2
+483:     
+484:     Stage2[PRD Stage<br/>Actor/Critic Pattern<br/>Output: prd.md] -->|HITL Gate| Confirm2{User Confirmation}
+485:     Confirm2 -->|Edit/Feedback| Stage2
+486:     Confirm2 -->|Approve| Stage3
+487:     
+488:     Stage3[Design Stage<br/>System Architecture<br/>Output: design.md] -->|HITL Gate| Confirm3{User Confirmation}
+489:     Confirm3 -->|Edit/Feedback| Stage3
+490:     Confirm3 -->|Approve| Stage4
+491:     
+492:     Stage4[Plan Stage<br/>Task Generation<br/>Output: plan.md] -->|HITL Gate| Confirm4{User Confirmation}
+493:     Confirm4 -->|Edit/Feedback| Stage4
+494:     Confirm4 -->|Approve| Stage5
+495:     
+496:     Stage5[Coding Stage<br/>Code Implementation<br/>Output: Source Files] -->|HITL Gate| Confirm5{User Confirmation}
+497:     Confirm5 -->|Edit/Feedback| Stage5
+498:     Confirm5 -->|Approve| Stage6
+499:     
+500:     Stage6[Check Stage<br/>Quality Validation<br/>Output: check_report.md] -->|HITL Gate| Confirm6{User Confirmation}
+501:     Confirm6 -->|Edit/Feedback| Stage6
+502:     Confirm6 -->|Approve| Stage7
+503:     
+504:     Stage7[Delivery Stage<br/>Final Report<br/>Output: delivery_report.md] --> Deploy[Deploy to Project Root]
+505:     
+506:     Deploy --> Knowledge[Generate Knowledge Snapshot<br/>Decisions, Patterns, Tech Stack]
+507:     Knowledge --> Persist[Persist to Memory Store]
+508:     Persist --> Complete([Iteration Complete])
+509:     
+510:     style Start fill:#e1f5fe
+511:     style Complete fill:#c8e6c9
+512:     style Stage1 fill:#fff3e0
+513:     style Stage2 fill:#fff3e0
+514:     style Stage3 fill:#fff3e0
+515:     style Stage4 fill:#fff3e0
+516:     style Stage5 fill:#fff3e0
+517:     style Stage6 fill:#fff3e0
+518:     style Stage7 fill:#fff3e0
+519: ```
+520: 
+521: **Process Characteristics**:
+522: - **Stage Gates**: Each stage includes optional HITL confirmation; user can pass, edit, or request regeneration with feedback
+523: - **Artifact Accumulation**: Each stage generates persistent artifacts (markdown documents, code files) visible in workspace
+524: - **Actor-Critic Validation**: PRD and Design stages employ dual-agent validation where Critic agents review Actor outputs
+525: - **Knowledge Capture**: Upon completion, system extracts architectural decisions, patterns, and tech stack for future iterations
+526: 
+527: ### 5.2 Evolution Iteration Flow
+528: 
+529: Enables incremental development by building upon previous iterations with intelligent change scope analysis:
+530: 
+531: ```mermaid
+532: flowchart TD
+533:     Start([Request Evolution]) --> Analyze[Analyze Change Description<br/>Keyword-Based NLP]
+534:     
+535:     Analyze --> Scope{Determine Scope}
+536:     Scope -->|Architectural| Full[Full Inheritance<br/>Artifacts + Code]
+537:     Scope -->|Feature| Partial[Partial Inheritance<br/>Code Only]
+538:     Scope -->|Minor| None[No Inheritance<br/>Fresh Start]
+539:     
+540:     Full --> StageSelect{Select Start Stage}
+541:     Partial --> StageSelect
+542:     None --> StageSelect
+543:     
+544:     StageSelect -->|Redesign| Idea[Idea Stage]
+545:     StageSelect -->|Requirements| PRD[PRD Stage]
+546:     StageSelect -->|Architecture| Design[Design Stage]
+547:     StageSelect -->|Implementation| Plan[Plan Stage]
+548:     
+549:     Idea --> Load[Load Base Knowledge<br/>From Previous Iteration]
+550:     PRD --> Load
+551:     Design --> Load
+552:     Plan --> Load
+553:     
+554:     Load --> Resume[Resume Pipeline<br/>From Selected Stage]
+555:     Resume --> Continue[Execute Remaining Stages]
+556:     Continue --> Complete([Evolution Complete])
+557:     
+558:     style Start fill:#e1f5fe
+559:     style Complete fill:#c8e6c9
+560: ```
+561: 
+562: **Inheritance Strategy**:
+563: - **Change Scope Analysis**: NLP keyword matching determines optimal starting stage ("redesign" → Idea, "add feature" → Coding, "fix bug" → Check)
+564: - **Knowledge Transfer**: Base knowledge (decisions, patterns, issues) from parent iteration loads into agent context
+565: - **Workspace Management**: Inheritance mode determines which files copy to new iteration workspace
+566: 
+567: ### 5.3 GUI Real-Time Execution Flow
+568: 
+569: Event-driven architecture for interactive development monitoring:
+570: 
+571: ```mermaid
+572: sequenceDiagram
+573:     participant UI as React Frontend
+574:     participant TC as Tauri Commands
+575:     participant EB as Event Backend
+576:     participant Core as Core Pipeline
+577:     participant LLM as LLM API
+578:     
+579:     UI->>TC: Invoke iteration execution
+580:     TC->>Core: Start iteration process
+581:     
+582:     loop Execution Loop
+583:         Core->>EB: Emit agent streaming event with chunk
+584:         EB->>UI: Update via event listener
+585:         
+586:         Core->>LLM: Send request
+587:         LLM-->>Core: Receive streamed response
+588:         
+589:         Core->>EB: Emit tool call event with data
+590:         EB->>UI: Update frontend UI
+591:         
+592:         alt Hitl Pause Triggered
+593:             Core->>EB: Emit input request event
+594:             EB->>UI: Show modal dialog
+595:             UI->>TC: Submit user input
+596:             TC->>Core: Resume execution process
+597:         end
+598:     end
+599:     
+600:     Core->>EB: Emit iteration complete event
+601:     EB->>UI: Update final status
+602: ```
+603: 
+604: **Event Types**:
+605: - `agent_event`: High-level agent messages (stage transitions, completion)
+606: - `agent_streaming`: Token-by-token LLM output for real-time display
+607: - `tool_call`/`tool_result`: Tool execution visualization
+608: - `input_request`: HITL modal trigger with oneshot channel response
+609: - `project_log`: Development server stdout/stderr streaming
+610: 
+611: ### 5.4 Human-in-the-Loop Validation Flow
+612: 
+613: Structured human oversight at critical decision points:
+614: 
+615: ```mermaid
+616: flowchart TD
+617:     Start([Agent Requires<br/>Confirmation]) --> Interface{Interface Type}
+618:     
+619:     Interface -->|CLI| CLIDisplay[Display Content<br/>Terminal Preview]
+620:     Interface -->|GUI| GUIEmit[Emit input_request<br/>Tauri Event]
+621:     
+622:     CLIDisplay --> CLIInput[Collect Input<br/>pass/edit/feedback]
+623:     GUIEmit --> GUIModal[Show Modal<br/>React Component]
+624:     GUIModal --> GUIInput[Collect Response<br/>Invoke Command]
+625:     
+626:     CLIInput --> Process{Process Action}
+627:     GUIInput --> Process
+628:     
+629:     Process -->|Pass| Resume[Resume Pipeline]
+630:     Process -->|Edit| Editor[Open External Editor<br/>Wait for Changes]
+631:     Process -->|Feedback| Regenerate[Execute with Feedback<br/>Agent Regenerates]
+632:     
+633:     Editor --> Detect{Changes?}
+634:     Detect -->|Yes| Resume
+635:     Detect -->|No| Resume
+636:     
+637:     Regenerate --> Review{Approved?}
+638:     Review -->|Yes| Resume
+639:     Review -->|No| Regenerate
+640:     
+641:     Resume --> Complete([Continue])
+642:     
+643:     style Start fill:#e1f5fe
+644:     style Complete fill:#c8e6c9
+645: ```
+646: 
+647: ---
+648: 
+649: ## 6. Technical Implementation
+650: 
+651: ### 6.1 Core Module Implementation
+652: 
+653: #### Pipeline Controller (`crates/cowork-core/src/pipeline/mod.rs`)
+654: 
+655: The pipeline implements the **Template Method Pattern** with stage-specific implementations:
+656: 
+657: ```rust
+658: // Conceptual structure based on architecture analysis
+659: pub struct PipelineController {
+660:     context: PipelineContext,
+661:     backend: Arc<dyn InteractiveBackend>,
+662: }
+663: 
+664: impl PipelineController {
+665:     pub async fn execute_genesis_iteration(&mut self, idea: &str) -> Result<Iteration> {
+666:         // Stage sequence: Idea -> PRD -> Design -> Plan -> Coding -> Check -> Delivery
+667:         let stages = vec![
+668:             Box::new(IdeaStage) as Box<dyn Stage>,
+669:             Box::new(PRDStage),
+670:             // ... remaining stages
+671:         ];
+672:         
+673:         for stage in stages {
+674:             let result = self.execute_stage_with_hitl(stage).await?;
+675:             self.context.update(result);
+676:         }
+677:         
+678:         self.generate_knowledge_snapshot().await
+679:     }
+680:     
+681:     async fn execute_stage_with_hitl(&self, stage: Box<dyn Stage>) -> Result<StageResult> {
+682:         let result = stage.execute(&self.context).await?;
+683:         
+684:         if stage.requires_confirmation() {
+685:             match self.backend.request_confirmation(&result).await? {
+686:                 UserAction::Pass => Ok(result),
+687:                 UserAction::Edit => self.open_editor_and_reload().await,
+688:                 UserAction::Feedback(feedback) => {
+689:                     stage.execute_with_feedback(&self.context, feedback).await
+690:                 }
+691:             }
+692:         } else {
+693:             Ok(result)
+694:         }
+695:     }
+696: }
+697: ```
+698: 
+699: #### InteractiveBackend Trait (`crates/cowork-core/src/interaction/mod.rs`)
+700: 
+701: Defines the port for user interaction, enabling hexagonal architecture:
+702: 
+703: ```rust
+704: #[async_trait]
+705: pub trait InteractiveBackend: Send + Sync {
+706:     // Display methods
+707:     async fn display_message(&self, msg: &str);
+708:     async fn display_stream(&self, content: &str);
+709:     async fn display_tool_call(&self, tool_name: &str, params: &Value);
+710:     
+711:     // HITL methods
+712:     async fn request_confirmation(&self, content: &Artifact) -> Result<UserAction>;
+713:     async fn request_input(&self, prompt: &str) -> Result<String>;
+714:     
+715:     // Progress tracking
+716:     async fn update_progress(&self, stage: &str, progress: f32);
+717: }
+718: ```
+719: 
+720: Implementations:
+721: - **CLI Backend**: Uses `dialoguer` for prompts, `console` for colors, terminal tables for iteration listings
+722: - **Tauri Backend**: Uses `AppHandle` for event emission, `tokio::sync::oneshot` for HITL response channels
+723: 
+724: ### 6.2 Key Algorithm Design
+725: 
+726: #### Change Scope Analysis Algorithm
+727: 
+728: Determines optimal starting stage for evolution iterations:
+729: 
+730: ```rust
+731: fn analyze_change_scope(description: &str) -> Stage {
+732:     let lower = description.to_lowercase();
+733:     
+734:     if lower.contains("redesign") || lower.contains("architectural") {
+735:         Stage::Idea
+736:     } else if lower.contains("requirement") || lower.contains("feature spec") {
+737:         Stage::PRD
+738:     } else if lower.contains("design") || lower.contains("component") {
+739:         Stage::Design
+740:     } else if lower.contains("implement") || lower.contains("code") {
+741:         Stage::Coding
+742:     } else {
+743:         Stage::Idea // Default to full reconsideration
+744:     }
+745: }
+746: ```
+747: 
+748: #### Memory Query with Fuzzy Matching
+749: 
+750: Supports three query scopes with keyword filtering:
+751: 
+752: ```rust
+753: pub fn query_memories(
+754:     &self,
+755:     scope: QueryScope,
+756:     category: Option<MemoryCategory>,
+757:     keywords: &[String],
+758:     limit: usize,
+759: ) -> Vec<MemoryEntry> {
+760:     let candidates = match scope {
+761:         QueryScope::Project => self.load_project_memories(),
+762:         QueryScope::Iteration(id) => self.load_iteration_memories(id),
+763:         QueryScope::Latest => self.merge_latest_memories(),
+764:     };
+765:     
+766:     candidates
+767:         .filter(|m| category.map_or(true, |c| m.category == c))
+768:         .filter(|m| keywords.iter().any(|k| m.content.contains(k)))
+769:         .take(limit)
+770:         .collect()
+771: }
+772: ```
+773: 
+774: ### 6.3 Data Structure Design
+775: 
+776: #### Project Aggregate
+777: 
+778: ```rust
+779: pub struct Project {
+780:     pub id: ProjectId,
+781:     pub name: String,
+782:     pub project_type: ProjectType,
+783:     pub tech_stack: TechStack,
+784:     pub created_at: DateTime<Utc>,
+785:     pub iterations: Vec<IterationSummary>,
+786:     pub current_iteration: Option<IterationId>,
+787: }
+788: 
+789: pub struct Iteration {
+790:     pub id: IterationId,
+791:     pub project_id: ProjectId,
+792:     pub mode: IterationMode, // Genesis or Evolution
+793:     pub inheritance: InheritanceMode,
+794:     pub status: IterationStatus, // Draft, Running, Completed, Failed
+795:     pub stages: HashMap<Stage, StageResult>,
+796:     pub workspace_path: PathBuf,
+797: }
+798: ```
+799: 
+800: #### Memory Aggregate
+801: 
+802: ```rust
+803: pub struct ProjectMemory {
+804:     pub project_id: ProjectId,
+805:     pub decisions: Vec<Decision>,
+806:     pub patterns: Vec<Pattern>,
+807:     pub insights: Vec<Insight>,
+808:     pub issues: Vec<Issue>,
+809:     pub tech_stack: TechStackKnowledge,
+810: }
+811: 
+812: pub struct IterationKnowledge {
+813:     pub iteration_id: IterationId,
+814:     pub summary: String,
+815:     pub promoted_memories: Vec<MemoryId>, // Elevated to project level
+816:     pub stage_insights: HashMap<Stage, Vec<Insight>>,
+817: }
+818: ```
+819: 
+820: ### 6.4 Performance Optimization Strategies
+821: 
+822: #### Async Pipeline Execution
+823: - **Tokio Runtime**: Multi-threaded async execution for I/O bound operations (LLM calls, file I/O)
+824: - **Streaming Architecture**: LLM responses stream directly to UI without buffering, reducing latency perception
+825: - **Concurrent Tool Calls**: Independent tool executions run concurrently where dependencies permit
+826: 
+827: #### Memory Management
+828: - **Lazy Loading**: Project memories load on-demand rather than at startup
+829: - **Incremental Persistence**: Only modified entities serialize to disk, not entire aggregates
+830: - **Workspace Isolation**: Each iteration has isolated workspace preventing file contention
+831: 
+832: #### Rate Limiting Optimization
+833: - **Token Bucket Alternative**: Fixed delay + semaphore simpler than token bucket for single-user scenarios
+834: - **Request Batching**: Where possible, multiple small requests coalesce (though limited by chat-based LLM APIs)
+835: 
+836: ---
+837: 
+838: ## 7. Deployment Architecture
+839: 
+840: ### 7.1 Runtime Environment Requirements
+841: 
+842: **System Requirements**:
+843: - **Operating System**: Cross-platform (Windows 10+, macOS 12+, Linux Ubuntu 20.04+)
+844: - **Runtime**: Rust runtime (Tokio) for core, Node.js (for Tauri build only)
+845: - **Memory**: Minimum 4GB RAM (8GB recommended for large projects)
+846: - **Storage**: 500MB application + project workspace (typically 50-200MB per project)
+847: - **Network**: Internet connection required for LLM API access (OpenAI-compatible endpoints)
+848: 
+849: **Dependencies**:
+850: - **External**: LLM API key (OpenAI, Anthropic, or compatible)
+851: - **System**: Default text editor (vim, nano, VS Code, etc.), Node.js (for generated projects)
+852: - **Optional**: Development servers (Vite, Webpack) for preview functionality
+853: 
+854: ### 7.2 Deployment Topology
+855: 
+856: ```mermaid
+857: flowchart TB
+858:     subgraph Desktop["User Workstation"]
+859:         subgraph App["Cowork Forge Application"]
+860:             Core["Core Domain<br/>Rust Binary"]
+861:             GUI["Tauri Runtime<br/>WebView2/WebKit"]
+862:             CLI["CLI Binary"]
+863:         end
+864:         
+865:         subgraph Storage["Local Storage"]
+866:             Projects["Project Workspaces<br/>~/.cowork-v2/"]
+867:             Config["Configuration<br/>~/.config/cowork/"]
+868:         end
+869:     end
+870:     
+871:     subgraph External["External Services"]
+872:         LLM["LLM Provider APIs<br/>(OpenAI/Anthropic)"]
+873:         Git["Version Control<br/>(User-managed)"]
+874:         Registry["Package Registries<br/>(npm/crates.io)"]
+875:     end
+876:     
+877:     Core -->|File I/O| Storage
+878:     GUI -->|Embeds| Core
+879:     CLI -->|Links| Core
+880:     
+881:     Core -->|HTTPS| LLM
+882:     Projects -->|User manages| Git
+883:     Projects -->|User manages| Registry
+884: ```
+885: 
+886: **Distribution Model**:
+887: - **Desktop Application**: Tauri-based installer (.dmg for macOS, .msi for Windows, .AppImage/.deb for Linux)
+888: - **CLI Tool**: Cargo installable crate or standalone binary
+889: - **Core Library**: Published as Rust crate for potential embedding in other tools
+890: 
+891: ### 7.3 Scalability Design
+892: 
+893: **Current Architecture Limitations**:
+894: - **Single-User**: No multi-user collaboration features; designed for individual workstations
+895: - **Local-First**: All computation and storage local; no horizontal scaling required
+896: - **Synchronous LLM**: Rate limiting (30 req/min) prevents parallel LLM request scaling
+897: 
+898: **Extension Points**:
+899: - **Plugin Architecture**: Tool system supports custom ADK tool injection for domain-specific operations
+900: - **Custom Stages**: Pipeline trait system allows custom stage implementations (e.g., Security Review stage)
+901: - **Multi-Model Support**: LLM configuration supports multiple providers; could extend to local models (Llama, Mistral)
+902: - **Memory Backends**: Repository pattern allows replacement of JSON storage with database backends (SQLite, PostgreSQL) for team scenarios
+903: 
+904: ### 7.4 Monitoring and Operations
+905: 
+906: **Observability**:
+907: - **Logging**: Structured logging via `tracing` crate with configurable levels (DEBUG for development, INFO for production)
+908: - **Metrics**: Pipeline execution duration, stage success rates, LLM token consumption
+909: - **Event Tracing**: Tauri events provide real-time execution visibility in GUI mode
+910: 
+911: **Operational Considerations**:
+912: - **Backup**: Projects stored as plain text (JSON + Markdown) in user directories; standard backup solutions apply
+913: - **Migration**: JSON schema versioning supports forward compatibility; `.cowork-v2` directory naming allows side-by-side version installation
+914: - **Security**: Workspace path validation prevents unauthorized file access; no network listeners exposed (outbound-only LLM calls)
+915: 
+916: **Health Checks**:
+917: - **LLM Connectivity**: Validation command (`cowork status`) tests API key and connectivity
+918: - **Workspace Integrity**: Automatic validation of project structure on load
+919: - **Tool Availability**: Runtime checks for required external tools (editors, shell commands)
+920: 
+921: ---
+922: 
+923: ## Configuration System Architecture
+924: 
+925: Cowork Forge introduces a data-driven configuration system that transforms previously hardcoded Agent, Stage, Flow, Skill, and Integration definitions into configurable JSON formats. This makes the system more flexible and extensible, allowing users to customize development workflows without modifying code.
+926: 
+927: ### Configuration Registry
+928: 
+929: At the core of the configuration system is the global Config Registry, managing all configuration definitions:
+930: 
+931: ```mermaid
+932: flowchart TB
+933:     subgraph Registry["Config Registry"]
+934:         Agents["Agents<br/>(Agent Definitions)"]
+935:         Stages["Stages<br/>(Stage Definitions)"]
+936:         Flows["Flows<br/>(Flow Definitions)"]
+937:         Skills["Skills<br/>(Skill Definitions)"]
+938:         Integrations["Integrations<br/>(External Integrations)"]
+939:         Settings["Settings<br/>(User Settings)"]
+940:     end
+941:     
+942:     subgraph Sources["Configuration Sources"]
+943:         Builtin["Built-in Configs<br/>(Embedded JSON)"]
+944:         User["User Configs<br/>(~/.cowork/config/)"]
+945:     end
+946:     
+947:     subgraph Consumers["Consumers"]
+948:         Pipeline["Pipeline Executor"]
+949:         AgentFactory["Agent Factory"]
+950:         GUI["GUI Config Panel"]
+951:     end
+952:     
+953:     Sources -->|Load| Registry
+954:     Registry -->|Query| Consumers
+955: ```
+956: 
+957: ### Configuration Types
+958: 
+959: | Type | Description | Key Fields |
+960: |------|-------------|------------|
+961: | **Agent** | AI agent definition | id, name, instruction, tools, skills, model |
+962: | **Stage** | Development stage definition | id, stage_type, agent/actor_critic, hooks, artifacts |
+963: | **Flow** | Workflow definition | id, stages[], start_stage, config, stage_mapping |
+964: | **Skill** | Skill extension package | id, category, tools[], prompts[], dependencies |
+965: | **Integration** | External system integration | id, integration_type, connection, auth, events |
+966: 
+967: ### Configuration Loading Flow
+968: 
+969: ```mermaid
+970: sequenceDiagram
+971:     participant App as App Startup
+972:     participant Registry as Config Registry
+973:     participant Builtin as Built-in Configs
+974:     participant User as User Configs
+975:     participant FS as File System
+976:     
+977:     App->>Registry: Initialize registry
+978:     Registry->>Builtin: Load embedded configs
+979:     Builtin-->>Registry: Agent/Stage/Flow definitions
+980:     
+981:     Registry->>FS: Check user config directory
+982:     FS-->>Registry: Config file list
+983:     
+984:     alt User configs exist
+985:         Registry->>User: Load user configs
+986:         User-->>Registry: Custom definitions
+987:         Registry->>Registry: Merge/Override configs
+988:     end
+989:     
+990:     Registry->>Registry: Validate config integrity
+991:     Registry-->>App: Configuration ready
+992: ```
+993: 
+994: ### Custom Workflows
+995: 
+996: Enterprises can implement standardized development processes through custom Flow configurations:
+997: 
+998: ```json
+999: {
+1000:   "id": "enterprise-web-flow",
+1001:   "name": "Enterprise Web Application Flow",
+1002:   "description": "Standard development workflow for enterprise web applications",
+1003:   "stages": [
+1004:     { "stage_id": "idea" },
+1005:     { "stage_id": "prd", "overrides": { "needs_confirmation": true } },
+1006:     { "stage_id": "design" },
+1007:     { "stage_id": "security-review", "overrides": { "needs_confirmation": true } },
+1008:     { "stage_id": "plan" },
+1009:     { "stage_id": "coding" },
+1010:     { "stage_id": "check" },
+1011:     { "stage_id": "delivery" }
+1012:   ],
+1013:   "config": {
+1014:     "stop_on_failure": true,
+1015:     "inheritance": {
+1016:       "default_mode": "partial",
+1017:       "stage_mapping": {
+1018:         "none": "idea",
+1019:         "partial": "plan",
+1020:         "full": "idea"
+1021:       }
+1022:     }
+1023:   }
+1024: }
+1025: ```
+1026: 
+1027: ### Skill Extension Mechanism
+1028: 
+1029: The Skill system allows injecting domain-specific capabilities into Agents:
+1030: 
+1031: ```mermaid
+1032: flowchart LR
+1033:     subgraph Skill["Skill Package"]
+1034:         Manifest["manifest.json"]
+1035:         Tools["Tool Definitions"]
+1036:         Prompts["Prompt Templates"]
+1037:         Deps["Dependency Declarations"]
+1038:     end
+1039:     
+1040:     subgraph Agent["Agent"]
+1041:         BaseTools["Base Tools"]
+1042:         BaseInst["Base Instructions"]
+1043:     end
+1044:     
+1045:     Skill -->|Inject| Agent
+1046:     Agent -->|Enhanced Capabilities| Execution["Execution Context"]
+1047: ```
+1048: 
+1049: **Skill Categories**:
+1050: - `general`: General-purpose skills
+1051: - `web_frontend`: Web frontend development
+1052: - `web_backend`: Web backend development
+1053: - `mobile`: Mobile application development
+1054: - `devops`: DevOps automation
+1055: - `testing`: Test automation
+1056: - `security`: Security auditing
+1057: 
+1058: ### Skills Module Architecture
+1059: 
+1060: The Skills module implements the [agentskills.io](https://agentskills.io) standard for maximum compatibility:
+1061: 
+1062: ```mermaid
+1063: flowchart TB
+1064:     subgraph Discovery["Skill Discovery"]
+1065:         FS[".skills/ directory scan"]
+1066:         Parse["Parse SKILL.md files"]
+1067:         Index["Build SkillIndex"]
+1068:     end
+1069:     
+1070:     subgraph Selection["Skill Selection"]
+1071:         Query["User Query"]
+1072:         Match["Semantic Matching"]
+1073:         Score["Relevance Scoring"]
+1074:     end
+1075:     
+1076:     subgraph Injection["Context Injection"]
+1077:         Context["Agent Context"]
+1078:         Tools["Tool Registration"]
+1079:         Prompts["Prompt Enhancement"]
+1080:     end
+1081:     
+1082:     FS --> Parse --> Index
+1083:     Query --> Match --> Score
+1084:     Index --> Match
+1085:     Score --> Injection
+1086:     Injection --> Context
+1087:     Injection --> Tools
+1088:     Injection --> Prompts
+1089: ```
+1090: 
+1091: **SkillManager API**:
+1092: - `SkillManager::for_project(path)`: Initialize for a project
+1093: - `select(query)`: Find matching skills
+1094: - `select_best(query)`: Get top match
+1095: - `install_skill_from_dir(path)`: Install from local directory
+1096: 
+1097: ### PM Agent Architecture
+1098: 
+1099: The Project Manager Agent provides post-delivery interaction capabilities:
+1100: 
+1101: ```mermaid
+1102: flowchart TB
+1103:     subgraph Trigger["Activation Trigger"]
+1104:         Complete["Iteration Status = Completed"]
+1105:         Switch["GUI Switches to Chat Mode"]
+1106:     end
+1107:     
+1108:     subgraph Intent["Intent Recognition"]
+1109:         Input["User Input"]
+1110:         NLP["Keyword Analysis"]
+1111:         Classify["Intent Classification"]
+1112:     end
+1113:     
+1114:     subgraph Actions["Available Actions"]
+1115:         Goto["goto_stage<br/>Return to previous stage"]
+1116:         Create["create_iteration<br/>Start evolution iteration"]
+1117:         Respond["respond_to_user<br/>Answer questions"]
+1118:         Clarify["ask_clarification<br/>Request details"]
+1119:     end
+1120:     
+1121:     Complete --> Switch --> Input
+1122:     Input --> NLP --> Classify
+1123:     Classify -->|bug_fix| Goto
+1124:     Classify -->|new_feature| Create
+1125:     Classify -->|consultation| Respond
+1126:     Classify -->|ambiguous| Clarify
+1127: ```
+1128: 
+1129: **Intent Types**:
+1130: | Intent | Trigger Keywords | Action |
+1131: |--------|------------------|--------|
+1132: | `bug_fix` | bug, error, issue, crash, fail | `goto_stage(coding)` |
+1133: | `requirement_change` | modify, change, adjust, update | `goto_stage(appropriate)` |
+1134: | `new_feature` | add, new feature, create | `create_iteration()` |
+1135: | `consultation` | how, what, why, can you | `respond_to_user()` |
+1136: | `ambiguous` | unclear input | `ask_clarification()` |
+1137: 
+1138: **PM Agent Tools**:
+1139: - `pm_goto_stage`: Navigate to specified development stage
+1140: - `pm_create_iteration`: Create new evolution iteration
+1141: - `pm_respond`: Respond to user questions
+1142: - `pm_save_decision`: Save project decisions
+1143: - `query_memory`: Query project memory for context
+1144: 
+1145: ### Configuration File Locations
+1146: 
+1147: | Platform | User Config Directory |
+1148: |----------|----------------------|
+1149: | Windows | `%APPDATA%\.cowork\config\` |
+1150: | macOS | `~/.cowork/config/` |
+1151: | Linux | `~/.cowork/config/` |
+1152: 
+1153: Directory structure:
+1154: ```
+1155: config/
+1156: ├── agents/           # Custom agents
+1157: │   └── custom_agent.json
+1158: ├── stages/           # Custom stages
+1159: ├── flows/            # Custom flows
+1160: │   └── enterprise-flow.json
+1161: ├── skills/           # Skill packages
+1162: │   └── my-skill/
+1163: │       ├── manifest.json
+1164: │       └── prompts/
+1165: ├── integrations/     # External integrations
+1166: └── settings.json     # Global settings
+1167: ```
+1168: 
+1169: ---
+1170: 
+1171: ## Architectural Decision Records (ADRs)
+1172: 
+1173: ### ADR-001: Multi-Crate Workspace Structure
+1174: **Decision**: Separate CLI, GUI, and Core into distinct crates within a Cargo workspace.  
+1175: **Rationale**: Enables independent deployment (CLI for automation, GUI for interaction) while sharing domain logic. Prevents GUI dependencies (Tauri, WebView) from bloating CLI binary.
+1176: 
+1177: ### ADR-002: Trait-Based Backend Abstraction
+1178: **Decision**: `InteractiveBackend` trait to unify CLI and GUI interactions.  
+1179: **Rationale**: Single pipeline code path supports both automation and interactive modes without conditional logic throughout domain layer.
+1180: 
+1181: ### ADR-003: JSON-First Persistence
+1182: **Decision**: File-based JSON storage instead of database.  
+1183: **Rationale**: Portability, version control compatibility, and local-first architecture. Enables users to inspect and modify project state with standard tools.
+1184: 
+1185: ### ADR-004: Rate Limiting at Infrastructure Layer
+1186: **Decision**: Decorator pattern for LLM rate limiting (30 req/min) with semaphore concurrency control.  
+1187: **Rationale**: API quota protection and cost control. Global rate limiter ensures compliance regardless of pipeline stage parallelism.
+1188: 
+1189: ### ADR-005: Event-Driven GUI with Asymmetric Communication
+1190: **Decision**: Tauri commands for requests, events for streaming responses.  
+1191: **Rationale**: Commands provide request-response semantics for operations; events enable server-push for streaming LLM tokens and process logs without polling overhead.
+1192: 
+1193: ### ADR-006: Post-Delivery PM Agent
+1194: **Decision**: Dedicated PM Agent for post-delivery user interaction with intent recognition.  
+1195: **Rationale**: Automated pipeline execution needs a bridge to ongoing project maintenance. PM Agent provides natural language interface for bug fixes, requirement changes, and new features without requiring users to understand pipeline internals.
+1196: 
+1197: ### ADR-007: agentskills.io Standard for Skills
+1198: **Decision**: Implement agentskills.io standard for skill definitions.  
+1199: **Rationale**: Industry standard ensures compatibility with external skill packages and community contributions. Simple markdown-based format (SKILL.md) lowers barrier for skill authoring.
+1200: 
+1201: ---
+1202: 
+1203: ### ADR-008: Model Context Protocol (MCP) Integration
+1204: **Decision**: Introduce MCP protocol integration to support external tool server connectivity.
+1205: **Rationale**: Through standardized Model Context Protocol, system can seamlessly integrate third-party AI services (e.g., Tavily web search, DeepWiki code documentation queries), expanding Agents' tool and capability range without requiring complex local external API adaptation. MCP connects via HTTP transport, and configuration-driven auto-initialization ensures global toolset availability at startup with automatic injection into all Agents.
+1206: **Implementation**:
+1207: - `McpConfig` configuration structure (`tavily_api_key`, `deepwiki_enabled`)
+1208: - `McpManager` for multi-server connection and toolset aggregation
+1209: - Global static `GLOBAL_MCP_TOOLSETS` initialized at application startup
+1210: - `add_mcp_toolsets_to_builder` automatically injects all MCP tools into Agent builder
+1211: - GUI Settings panel with config UI and connection test
+1212: 
+1213: 
+1214: ## Conclusion
+1215: 
+1216: Cowork Forge demonstrates a mature application of **Hexagonal Architecture** and **Domain-Driven Design** principles to the AI-assisted development domain. The architecture successfully balances AI autonomy with human oversight through the 7-stage pipeline and HITL validation gates. 
+1217: 
+1218: Key architectural strengths include:
+1219: - **Clean Separation**: Core domain remains pure and testable, isolated from UI and infrastructure concerns
+1220: - **Dual Interface Strategy**: Elegant trait-based abstraction enabling both CLI automation and GUI interactivity
+1221: - **Knowledge Persistence**: Memory system bridges the gap between stateless AI agents and stateful software development
+1222: - **Security-First**: Workspace containment and path validation protect against prompt injection attacks attempting file system traversal
+1223: 
+1224: The system is well-positioned for evolutionary extension, with clear domain boundaries supporting future enhancements such as team collaboration features, additional AI model integrations, or custom pipeline stages.
+````
 
 ### crates/cowork-core/Cargo.toml (63 lines)
 
@@ -12795,6 +12627,49 @@ LICENSE
 167:     )
 ```
 
+### crates/cowork-gui/package.json (38 lines)
+
+```
+1: {
+2:   "name": "cowork-gui",
+3:   "private": true,
+4:   "type": "module",
+5:   "version": "2.5.2",
+6:   "scripts": {
+7:     "dev": "vite --port 15173",
+8:     "build": "tsc && vite build",
+9:     "tauri": "tauri",
+10:     "tauri:dev": "tauri dev --port 15173",
+11:     "tauri:build": "tauri build",
+12:     "typecheck": "tsc --noEmit"
+13:   },
+14:   "dependencies": {
+15:     "@monaco-editor/react": "^4.6.0",
+16:     "@tauri-apps/api": "^2.11.1",
+17:     "@tauri-apps/plugin-dialog": "^2.7.1",
+18:     "antd": "^5.12.0",
+19:     "react": "^18.3.1",
+20:     "react-dom": "^18.3.1",
+21:     "react-json-view": "^1.21.3",
+22:     "react-markdown": "^9.0.1",
+23:     "react-window": "^2.2.6",
+24:     "rehype-highlight": "^7.0.2",
+25:     "rehype-raw": "^7.0.0",
+26:     "remark-gfm": "^4.0.1",
+27:     "zustand": "^4.5.0"
+28:   },
+29:   "devDependencies": {
+30:     "@tauri-apps/cli": "^2.11.4",
+31:     "@types/node": "^20.0.0",
+32:     "@types/react": "^18.3.0",
+33:     "@types/react-dom": "^18.3.0",
+34:     "@vitejs/plugin-react": "^4.3.0",
+35:     "typescript": "^5.3.0",
+36:     "vite": "^5.0.0"
+37:   }
+38: }
+```
+
 ### crates/cowork-gui/src/components/IterationsPanel.tsx (7 lines)
 
 ```
@@ -13805,6 +13680,42 @@ LICENSE
 9: get_system_locale
 10: ⋮----
 11: ()
+```
+
+### crates/cowork-gui/src-tauri/tauri.conf.json (31 lines)
+
+```
+1: {
+2:   "$schema": "https://schema.tauri.app/config/2",
+3:   "productName": "Cowork Forge",
+4:   "version": "2.5.2",
+5:   "identifier": "com.coworkforge.gui",
+6:   "build": {
+7:     "beforeDevCommand": "bun run dev",
+8:     "beforeBuildCommand": "bun run build",
+9:     "devUrl": "http://localhost:15173",
+10:     "frontendDist": "../dist"
+11:   },
+12:   "app": {
+13:     "withGlobalTauri": true,
+14:     "windows": [
+15:       {
+16:         "title": "Cowork Forge",
+17:         "width": 1200,
+18:         "height": 720,
+19:         "center": true,
+20:         "minWidth": 800,
+21:         "minHeight": 600
+22:       }
+23:     ],
+24:     "security": { "csp": null }
+25:   },
+26:   "bundle": {
+27:     "active": true,
+28:     "targets": "all",
+29:     "icon": ["icons/icon-rgba.png", "icons/icon.icns", "icons/icon.ico"]
+30:   }
+31: }
 ```
 
 ### litho.docs/en/4.Deep-Exploration/Persistence Domain.md (436 lines)
@@ -17507,86 +17418,6 @@ LICENSE
 156: "#;
 ````
 
-### crates/cowork-core/src/integration/adapters.rs (75 lines)
-
-```
-1: AdapterError
-2: ⋮----
-3: {
-4:     #[error("Connection failed: {0}")]
-5:     ConnectionFailed(String),
-6: 
-7:     #[error("Authentication failed: {0}")]
-8:     AuthenticationFailed(String),
-9: 
-10:     #[error("Request failed: {0}")]
-11:     RequestFailed(String),
-12: 
-13:     #[error("Timeout exceeded")]
-14:     TimeoutExceeded,
-15: 
-16:     #[error("Invalid response: {0}")]
-17:     InvalidResponse(String),
-18: 
-19:     #[error("Retry limit exceeded: {0}")]
-20:     RetryLimitExceeded(String),
-21: 
-22:     #[error("Configuration error: {0}")]
-23:     ConfigurationError(String),
-24: 
-25:     #[error("IO error: {0}")]
-26:     IoError(#[from] std::io::Error),
-27: 
-28:     #[error("HTTP error: {0}")]
-29:     HttpError(#[from] reqwest::Error),
-30: 
-31:     #[error("JSON error: {0}")]
-32:     JsonError(#[from] serde_json::Error),
-33: }
-34: ⋮----
-35: IntegrationAdapter
-36: ⋮----
-37: {
-38:     
-39:     async fn execute(
-40:         &self,
-41:         integration: &IntegrationDefinition,
-42:         event: IntegrationEvent,
-43:     ) -> Result<IntegrationResponse>;
-44: 
-45:     
-46:     async fn test_connection(&self, integration: &IntegrationDefinition) -> Result<bool>;
-47: 
-48:     
-49:     fn adapter_type(&self) -> &str;
-50: }
-51: ⋮----
-52: NoOpAdapter
-53: ⋮----
-54: {
-55:     async fn execute(
-56:         &self,
-57:         _integration: &IntegrationDefinition,
-58:         _event: IntegrationEvent,
-59:     ) -> Result<IntegrationResponse> {
-60:         Ok(IntegrationResponse {
-61:             success: true,
-62:             data: None,
-63:             error: None,
-64:             actions: vec![],
-65:         })
-66:     }
-67: 
-68:     async fn test_connection(&self, _integration: &IntegrationDefinition) -> Result<bool> {
-69:         Ok(true)
-70:     }
-71: 
-72:     fn adapter_type(&self) -> &str {
-73:         "noop"
-74:     }
-75: }
-```
-
 ### crates/cowork-core/src/integration/hooks.rs (251 lines)
 
 ```
@@ -21090,24 +20921,6 @@ LICENSE
 712: export default AgentConfigForm;
 ```
 
-### crates/cowork-gui/src/components/config/AgentsSetupPanel.tsx (3 lines)
-
-```
-1: ConfigTab
-2: ⋮----
-3: 'flows' | 'agents' | 'skills' | 'integrations'
-```
-
-### crates/cowork-gui/src/components/config/index.ts (5 lines)
-
-```
-1: export { default as AgentsSetupPanel } from './AgentsSetupPanel';
-2: export { default as FlowConfigPanel } from './FlowConfigPanel';
-3: export { default as AgentConfigForm } from './AgentConfigForm';
-4: export { default as SkillManager } from './SkillManager';
-5: export { default as IntegrationConfig } from './IntegrationConfig';
-```
-
 ### crates/cowork-gui/src/components/projects/ImportProjectModal.tsx (37 lines)
 
 ```
@@ -21156,124 +20969,6 @@ LICENSE
 1: export { default as CreateProjectModal } from './CreateProjectModal';
 2: export { default as EditProjectModal } from './EditProjectModal';
 3: export { default as ImportProjectModal } from './ImportProjectModal';
-```
-
-### crates/cowork-gui/src/stores/agentStore.ts (113 lines)
-
-```
-1: ThinkingMessage
-2: ⋮----
-3: {
-4:   type: 'thinking';
-5:   content: string;
-6:   agentName: string;
-7:   stageName?: string;
-8:   isStreaming?: boolean;
-9:   isExpanded: boolean;
-10:   timestamp: string;
-11: }
-12: ⋮----
-13: ChatMessage
-14: ⋮----
-15: {
-16:   type: string;
-17:   content: string;
-18:   agentName?: string;
-19:   stageName?: string;
-20:   level?: string;
-21:   isStreaming?: boolean;
-22:   isExpanded?: boolean;
-23:   timestamp: string;
-24:   toolName?: string;
-25:   arguments?: Record<string, unknown>;
-26:   result?: string;
-27:   success?: boolean;
-28:   actions?: PMAction[];
-29: }
-30: ⋮----
-31: UserMessage
-32: ⋮----
-33: {
-34:   type: 'user';
-35:   content: string;
-36:   timestamp: string;
-37: }
-38: ⋮----
-39: PMAgentMessage
-40: ⋮----
-41: {
-42:   type: 'pm_agent';
-43:   content: string;
-44:   actions?: PMAction[];
-45:   timestamp: string;
-46: }
-47: ⋮----
-48: PMAction
-49: ⋮----
-50: {
-51:   action_type: 'pm_goto_stage' | 'pm_create_iteration' | 'pm_start_app' | 'pm_open_folder' | 'pm_view_knowledge' | 'pm_view_artifacts' | 'pm_view_code';
-52:   target_stage?: string;
-53:   iteration_id?: string;
-54:   title?: string;
-55:   description?: string;
-56:   label: string;
-57: }
-58: ⋮----
-59: InputRequest
-60: ⋮----
-61: {
-62:   requestId: string;
-63:   prompt: string;
-64:   options: InputOption[];
-65:   isArtifactConfirmation?: boolean;
-66:   artifactType?: string;
-67:   isFeedbackMode?: boolean;
-68:   feedbackPrompt?: string;
-69: }
-70: ⋮----
-71: InputOption
-72: ⋮----
-73: {
-74:   id: string;
-75:   label: string;
-76:   description?: string;
-77: }
-78: ⋮----
-79: ChatMode
-80: ⋮----
-81: 'disabled' | 'pipeline' | 'pm_agent'
-82: ⋮----
-83: AgentState
-84: ⋮----
-85: {
-86:   messages: ChatMessage[];
-87:   pmMessages: (UserMessage | PMAgentMessage)[];
-88:   isProcessing: boolean;
-89:   currentAgent: string | null;
-90:   currentStage: string | null;
-91:   inputRequest: InputRequest | null;
-92:   chatMode: ChatMode;
-93:   pmProcessing: boolean;
-94:   
-95:   addMessage: (message: ChatMessage) => void;
-96:   setMessages: (messages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
-97:   clearMessages: () => void;
-98:   
-99:   addPMMessage: (message: UserMessage | PMAgentMessage) => void;
-100:   setPMMessages: (messages: (UserMessage | PMAgentMessage)[] | ((prev: (UserMessage | PMAgentMessage)[]) => (UserMessage | PMAgentMessage)[])) => void;
-101:   clearPMMessages: () => void;
-102:   
-103:   setProcessing: (isProcessing: boolean) => void;
-104:   setCurrentAgent: (agent: string | null) => void;
-105:   setCurrentStage: (stage: string | null) => void;
-106:   setInputRequest: (request: InputRequest | null) => void;
-107:   setChatMode: (mode: ChatMode) => void;
-108:   setPmProcessing: (processing: boolean) => void;
-109:   
-110:   submitInput: (response: string, responseType: string) => Promise<void>;
-111:   sendPMMessage: (iterationId: string, message: string) => Promise<void>;
-112:   loadPMWelcomeMessage: (iterationId: string) => Promise<void>;
-113: }
 ```
 
 ### crates/cowork-gui/src/stores/projectStore.ts (58 lines)
@@ -28530,6 +28225,86 @@ LICENSE
 232: ```
 ````
 
+### crates/cowork-core/src/integration/adapters.rs (75 lines)
+
+```
+1: AdapterError
+2: ⋮----
+3: {
+4:     #[error("Connection failed: {0}")]
+5:     ConnectionFailed(String),
+6: 
+7:     #[error("Authentication failed: {0}")]
+8:     AuthenticationFailed(String),
+9: 
+10:     #[error("Request failed: {0}")]
+11:     RequestFailed(String),
+12: 
+13:     #[error("Timeout exceeded")]
+14:     TimeoutExceeded,
+15: 
+16:     #[error("Invalid response: {0}")]
+17:     InvalidResponse(String),
+18: 
+19:     #[error("Retry limit exceeded: {0}")]
+20:     RetryLimitExceeded(String),
+21: 
+22:     #[error("Configuration error: {0}")]
+23:     ConfigurationError(String),
+24: 
+25:     #[error("IO error: {0}")]
+26:     IoError(#[from] std::io::Error),
+27: 
+28:     #[error("HTTP error: {0}")]
+29:     HttpError(#[from] reqwest::Error),
+30: 
+31:     #[error("JSON error: {0}")]
+32:     JsonError(#[from] serde_json::Error),
+33: }
+34: ⋮----
+35: IntegrationAdapter
+36: ⋮----
+37: {
+38:     
+39:     async fn execute(
+40:         &self,
+41:         integration: &IntegrationDefinition,
+42:         event: IntegrationEvent,
+43:     ) -> Result<IntegrationResponse>;
+44: 
+45:     
+46:     async fn test_connection(&self, integration: &IntegrationDefinition) -> Result<bool>;
+47: 
+48:     
+49:     fn adapter_type(&self) -> &str;
+50: }
+51: ⋮----
+52: NoOpAdapter
+53: ⋮----
+54: {
+55:     async fn execute(
+56:         &self,
+57:         _integration: &IntegrationDefinition,
+58:         _event: IntegrationEvent,
+59:     ) -> Result<IntegrationResponse> {
+60:         Ok(IntegrationResponse {
+61:             success: true,
+62:             data: None,
+63:             error: None,
+64:             actions: vec![],
+65:         })
+66:     }
+67: 
+68:     async fn test_connection(&self, _integration: &IntegrationDefinition) -> Result<bool> {
+69:         Ok(true)
+70:     }
+71: 
+72:     fn adapter_type(&self) -> &str {
+73:         "noop"
+74:     }
+75: }
+```
+
 ### crates/cowork-core/src/integration/mod.rs (14 lines)
 
 ```
@@ -31236,6 +31011,14 @@ LICENSE
 3: export { LoadingScreen } from './LoadingScreen';
 ```
 
+### crates/cowork-gui/src/components/config/AgentsSetupPanel.tsx (3 lines)
+
+```
+1: ConfigTab
+2: ⋮----
+3: 'flows' | 'agents' | 'skills' | 'integrations'
+```
+
 ### crates/cowork-gui/src/components/config/FlowConfigPanel.tsx (3 lines)
 
 ```
@@ -31250,6 +31033,16 @@ LICENSE
 1: getTypeColor
 2: ⋮----
 3: (integration.integration_type)
+```
+
+### crates/cowork-gui/src/components/config/index.ts (5 lines)
+
+```
+1: export { default as AgentsSetupPanel } from './AgentsSetupPanel';
+2: export { default as FlowConfigPanel } from './FlowConfigPanel';
+3: export { default as AgentConfigForm } from './AgentConfigForm';
+4: export { default as SkillManager } from './SkillManager';
+5: export { default as IntegrationConfig } from './IntegrationConfig';
 ```
 
 ### crates/cowork-gui/src/components/iterations/CreateIterationModal.tsx (8 lines)
@@ -32255,6 +32048,124 @@ LICENSE
 84:     </ConfigProvider>
 85:   </React.StrictMode>
 86: );
+```
+
+### crates/cowork-gui/src/stores/agentStore.ts (113 lines)
+
+```
+1: ThinkingMessage
+2: ⋮----
+3: {
+4:   type: 'thinking';
+5:   content: string;
+6:   agentName: string;
+7:   stageName?: string;
+8:   isStreaming?: boolean;
+9:   isExpanded: boolean;
+10:   timestamp: string;
+11: }
+12: ⋮----
+13: ChatMessage
+14: ⋮----
+15: {
+16:   type: string;
+17:   content: string;
+18:   agentName?: string;
+19:   stageName?: string;
+20:   level?: string;
+21:   isStreaming?: boolean;
+22:   isExpanded?: boolean;
+23:   timestamp: string;
+24:   toolName?: string;
+25:   arguments?: Record<string, unknown>;
+26:   result?: string;
+27:   success?: boolean;
+28:   actions?: PMAction[];
+29: }
+30: ⋮----
+31: UserMessage
+32: ⋮----
+33: {
+34:   type: 'user';
+35:   content: string;
+36:   timestamp: string;
+37: }
+38: ⋮----
+39: PMAgentMessage
+40: ⋮----
+41: {
+42:   type: 'pm_agent';
+43:   content: string;
+44:   actions?: PMAction[];
+45:   timestamp: string;
+46: }
+47: ⋮----
+48: PMAction
+49: ⋮----
+50: {
+51:   action_type: 'pm_goto_stage' | 'pm_create_iteration' | 'pm_start_app' | 'pm_open_folder' | 'pm_view_knowledge' | 'pm_view_artifacts' | 'pm_view_code';
+52:   target_stage?: string;
+53:   iteration_id?: string;
+54:   title?: string;
+55:   description?: string;
+56:   label: string;
+57: }
+58: ⋮----
+59: InputRequest
+60: ⋮----
+61: {
+62:   requestId: string;
+63:   prompt: string;
+64:   options: InputOption[];
+65:   isArtifactConfirmation?: boolean;
+66:   artifactType?: string;
+67:   isFeedbackMode?: boolean;
+68:   feedbackPrompt?: string;
+69: }
+70: ⋮----
+71: InputOption
+72: ⋮----
+73: {
+74:   id: string;
+75:   label: string;
+76:   description?: string;
+77: }
+78: ⋮----
+79: ChatMode
+80: ⋮----
+81: 'disabled' | 'pipeline' | 'pm_agent'
+82: ⋮----
+83: AgentState
+84: ⋮----
+85: {
+86:   messages: ChatMessage[];
+87:   pmMessages: (UserMessage | PMAgentMessage)[];
+88:   isProcessing: boolean;
+89:   currentAgent: string | null;
+90:   currentStage: string | null;
+91:   inputRequest: InputRequest | null;
+92:   chatMode: ChatMode;
+93:   pmProcessing: boolean;
+94:   
+95:   addMessage: (message: ChatMessage) => void;
+96:   setMessages: (messages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
+97:   clearMessages: () => void;
+98:   
+99:   addPMMessage: (message: UserMessage | PMAgentMessage) => void;
+100:   setPMMessages: (messages: (UserMessage | PMAgentMessage)[] | ((prev: (UserMessage | PMAgentMessage)[]) => (UserMessage | PMAgentMessage)[])) => void;
+101:   clearPMMessages: () => void;
+102:   
+103:   setProcessing: (isProcessing: boolean) => void;
+104:   setCurrentAgent: (agent: string | null) => void;
+105:   setCurrentStage: (stage: string | null) => void;
+106:   setInputRequest: (request: InputRequest | null) => void;
+107:   setChatMode: (mode: ChatMode) => void;
+108:   setPmProcessing: (processing: boolean) => void;
+109:   
+110:   submitInput: (response: string, responseType: string) => Promise<void>;
+111:   sendPMMessage: (iterationId: string, message: string) => Promise<void>;
+112:   loadPMWelcomeMessage: (iterationId: string) => Promise<void>;
+113: }
 ```
 
 ### crates/cowork-gui/src/stores/index.ts (8 lines)

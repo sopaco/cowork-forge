@@ -247,7 +247,7 @@ pub fn save_json<T: Serialize>(path: &Path, data: &T) -> anyhow::Result<()> {
   "id": "pm-agent",
   "name": "Product Manager Agent",
   "description": "Transforms ideas into structured PRDs",
-  "model": "gpt-4",
+  "model": "gpt-5",
   "temperature": 0.7,
   "max_tokens": 4096,
   "system_prompt": "You are a product manager...",

@@ -8,6 +8,8 @@ use std::sync::Arc;
 
 use crate::domain::{IterationStatus, Project};
 use crate::interaction::{InteractiveBackend, MessageContext};
+use crate::llm::{set_execution_llm, clear_execution_llm, create_llm_client};
+use crate::llm::config::load_config;
 use crate::persistence::{IterationStore, ProjectStore};
 
 use super::{PipelineContext, StageResult, get_stages_from_flow, get_flow_config, is_critical_stage};
@@ -81,9 +83,32 @@ impl IterationExecutor {
         project: &mut Project,
         iteration_id: &str,
         resume_stage: Option<String>,
-        _model: Option<Arc<dyn adk_core::Llm>>,
+        model: Option<Arc<dyn adk_core::Llm>>,
     ) -> anyhow::Result<()> {
         let mut iteration = self.iteration_store.load(iteration_id)?;
+
+        let model = match model {
+            Some(m) => m,
+            None => {
+                let llm_config = load_config()?;
+                create_llm_client(&llm_config.llm)?
+            }
+        };
+        set_execution_llm(model.clone());
+
+        let result = self.execute_inner(project, &mut iteration, resume_stage, model).await;
+        
+        clear_execution_llm();
+        result
+    }
+
+    async fn execute_inner(
+        &self,
+        project: &mut Project,
+        iteration: &mut crate::domain::Iteration,
+        resume_stage: Option<String>,
+        _model: Arc<dyn adk_core::Llm>,
+    ) -> anyhow::Result<()> {
 
         // Prepare workspace
         let workspace = workspace::prepare_workspace(
@@ -113,11 +138,11 @@ impl IterationExecutor {
         iteration.start();
         self.iteration_store.save(&iteration)?;
         self.project_store
-            .set_current_iteration(project, iteration_id.to_string())?;
+            .set_current_iteration(project, iteration.id.clone())?;
 
         // Ensure iteration memory exists
         let memory_store = crate::persistence::MemoryStore::new();
-        if let Err(e) = memory_store.ensure_iteration_memory(iteration_id) {
+        if let Err(e) = memory_store.ensure_iteration_memory(&iteration.id) {
             println!("[Executor] Warning: Failed to create iteration memory: {}", e);
         }
 
@@ -147,7 +172,7 @@ impl IterationExecutor {
         }
 
         println!("[Executor] Starting stage execution loop...");
-        self.execute_stages_from(project, &mut iteration, stages, workspace, flow_config, 0).await
+        self.execute_stages_from(project, iteration, stages, workspace, flow_config, 0).await
     }
 
     /// Execute stages starting from a given list.
@@ -561,6 +586,7 @@ impl IterationExecutor {
         &self,
         project: &mut Project,
         iteration_id: &str,
+        model: Option<Arc<dyn adk_core::Llm>>,
     ) -> anyhow::Result<()> {
         let mut iteration = self.iteration_store.load(iteration_id)?;
 
@@ -591,7 +617,7 @@ impl IterationExecutor {
             )
             .await;
 
-        self.execute(project, iteration_id, Some(retry_stage), None).await
+        self.execute(project, iteration_id, Some(retry_stage), model).await
     }
 
     // ========================================================================

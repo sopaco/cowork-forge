@@ -323,8 +323,6 @@ fn should_ignore(path: &str) -> bool {
         "./dist",
         "./build",
         "./docs",
-        "./tests",
-        "__tests__",
         "./.archived",
         ".DS_Store",
         "Thumbs.db",

@@ -144,7 +144,7 @@ hitl_tools::show_progress(
 [llm]
 provider = "openai"
 api_key = "your-api-key"
-model = "gpt-4"
+model = "gpt-5"
 
 [pipeline]
 max_iterations = 10

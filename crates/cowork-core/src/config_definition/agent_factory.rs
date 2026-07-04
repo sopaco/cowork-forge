@@ -229,9 +229,9 @@ pub fn create_agent_from_config_with_stage(
     // Add MCP toolsets if available
     builder = add_mcp_toolsets_to_builder(builder);
 
-    // Set content inclusion mode
-    // Note: Current adk_core only supports None, LastN, All variants may not be available
-    let include_contents = IncludeContents::None; // All agents use None for now
+    // Set content inclusion mode:
+    // Simple standalone agents use None to keep context focused.
+    let include_contents = IncludeContents::None;
     builder = builder.include_contents(include_contents);
 
     // Build the agent
@@ -319,9 +319,14 @@ fn create_simple_agent_from_config_with_stage(
     // Add MCP toolsets if available
     builder = add_mcp_toolsets_to_builder(builder);
 
-    // Set content inclusion mode
-    // Note: Current adk_core only supports None, LastN, All variants may not be available
-    let include_contents = IncludeContents::None; // All agents use None for now
+    // Set content inclusion mode:
+    // - ActorCritic sub-agents use Default so Critic can see Actor's tool calls/outputs
+    //   within the same LoopAgent run, enabling proper multi-turn feedback loops.
+    // - Simple agents use None to keep context focused and avoid token bloat.
+    let include_contents = match stage_type {
+        Some(StageType::ActorCritic) => IncludeContents::Default,
+        _ => IncludeContents::None,
+    };
     builder = builder.include_contents(include_contents);
 
     let agent = builder.build()
@@ -401,6 +406,7 @@ fn create_tool_from_reference(tool_id: &str, iteration_id: &str) -> Result<Arc<d
         "get_requirements" => Arc::new(GetRequirementsTool),
         "add_feature" => Arc::new(AddFeatureTool),
         "update_feature" => Arc::new(UpdateFeatureTool),
+        "update_feature_status" => Arc::new(UpdateFeatureStatusTool),
         "create_task" => Arc::new(CreateTaskTool),
         "update_task_status" => Arc::new(UpdateTaskStatusTool),
         "get_design" => Arc::new(GetDesignTool),

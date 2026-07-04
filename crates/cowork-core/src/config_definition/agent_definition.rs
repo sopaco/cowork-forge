@@ -23,7 +23,7 @@ pub enum AgentType {
 /// Model configuration for an agent
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ModelConfig {
-    /// Model identifier (e.g., "gpt-4", "claude-3-opus")
+    /// Model identifier (e.g., "gpt-5")
     pub model_id: Option<String>,
     /// Temperature for sampling (0.0 - 2.0)
     pub temperature: Option<f32>,
@@ -64,34 +64,34 @@ pub struct AgentDefinition {
     pub description: Option<String>,
     /// Version of this definition (semver)
     pub version: Option<String>,
-    
+
     /// Agent type (Simple or Loop)
     #[serde(default)]
     pub agent_type: AgentType,
-    
+
     /// Prompt template path or inline content
-    /// Can reference: 
+    /// Can reference:
     /// - Built-in: "builtin://idea_actor"
     /// - File: "file://./prompts/idea_actor.md"
     /// - Inline: "inline://..."
     pub instruction: String,
-    
+
     /// List of tools this agent can use
     #[serde(default)]
     pub tools: Vec<ToolReference>,
-    
+
     /// Model configuration (overrides global default)
     #[serde(default)]
     pub model: ModelConfig,
-    
+
     /// Content inclusion mode for context
     #[serde(default)]
     pub include_contents: IncludeContentsMode,
-    
+
     /// Tags for categorization and skill matching
     #[serde(default)]
     pub tags: Vec<String>,
-    
+
     /// Metadata for extensions
     #[serde(default)]
     pub metadata: HashMap<String, serde_json::Value>,
@@ -138,7 +138,7 @@ impl AgentDefinition {
             metadata: HashMap::new(),
         }
     }
-    
+
     /// Add a tool reference
     pub fn with_tool(mut self, tool_id: impl Into<String>) -> Self {
         self.tools.push(ToolReference {
@@ -147,7 +147,7 @@ impl AgentDefinition {
         });
         self
     }
-    
+
     /// Add a tool with configuration
     pub fn with_tool_config(mut self, tool_id: impl Into<String>, config: HashMap<String, serde_json::Value>) -> Self {
         self.tools.push(ToolReference {
@@ -156,19 +156,19 @@ impl AgentDefinition {
         });
         self
     }
-    
+
     /// Add a tag for skill matching
     pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
         self.tags.push(tag.into());
         self
     }
-    
+
     /// Set the agent type to Loop
     pub fn as_loop(mut self, max_iterations: Option<u32>) -> Self {
         self.agent_type = AgentType::Loop { max_iterations };
         self
     }
-    
+
     /// Set model configuration
     pub fn with_model(mut self, model: ModelConfig) -> Self {
         self.model = model;
@@ -179,16 +179,16 @@ impl AgentDefinition {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_agent_definition_serialization() {
         let agent = AgentDefinition::new("idea_agent", "Idea Agent", "builtin://idea_actor")
             .with_tool("save_idea")
             .with_tool("query_memory");
-        
+
         let json = serde_json::to_string_pretty(&agent).unwrap();
         println!("{}", json);
-        
+
         let parsed: AgentDefinition = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.id, "idea_agent");
         assert_eq!(parsed.tools.len(), 2);

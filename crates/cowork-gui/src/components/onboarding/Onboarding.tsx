@@ -24,7 +24,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ visible, onComplete }) =
   const [config, setConfig] = useState({
     api_base_url: 'https://api.openai.com/v1',
     api_key: '',
-    model_name: 'gpt-4',
+    model_name: 'gpt-5',
   });
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
@@ -49,7 +49,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ visible, onComplete }) =
   const handleTestConnection = async () => {
     setTesting(true);
     setTestResult(null);
-    
+
     try {
       await API.config.save({
         llm: {
@@ -58,10 +58,10 @@ export const Onboarding: React.FC<OnboardingProps> = ({ visible, onComplete }) =
           model_name: config.model_name,
         },
       });
-      
+
       const result = await API.config.testConnection();
       setTestResult(result.success ? 'success' : 'error');
-      
+
       if (result.success) {
         showSuccess('连接成功！');
       } else {
@@ -130,7 +130,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ visible, onComplete }) =
             showIcon
             style={{ marginBottom: 24 }}
           />
-          
+
           <Form layout="vertical">
             <Form.Item label="API Base URL" required>
               <Input
@@ -139,7 +139,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ visible, onComplete }) =
                 placeholder="https://api.openai.com/v1"
               />
             </Form.Item>
-            
+
             <Form.Item label="API Key" required>
               <Input.Password
                 value={config.api_key}
@@ -147,15 +147,15 @@ export const Onboarding: React.FC<OnboardingProps> = ({ visible, onComplete }) =
                 placeholder="sk-..."
               />
             </Form.Item>
-            
+
             <Form.Item label="模型名称">
               <Input
                 value={config.model_name}
                 onChange={(e) => setConfig({ ...config, model_name: e.target.value })}
-                placeholder="gpt-4"
+                placeholder="gpt-5"
               />
             </Form.Item>
-            
+
             <Form.Item>
               <Button
                 type="primary"
@@ -184,7 +184,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ visible, onComplete }) =
           <Paragraph>
             选择一个目录作为您的工作空间，项目将在此创建。
           </Paragraph>
-          
+
           <Card style={{ marginBottom: 16 }}>
             <Space direction="vertical" style={{ width: '100%' }}>
               <Text strong>当前选择：</Text>
@@ -196,7 +196,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ visible, onComplete }) =
               </Button>
             </Space>
           </Card>
-          
+
           <Alert
             message="可以稍后设置"
             description="您也可以跳过此步骤，在项目面板中选择或创建目录。"
@@ -249,11 +249,11 @@ export const Onboarding: React.FC<OnboardingProps> = ({ visible, onComplete }) =
         items={steps.map((s) => ({ title: s.title, icon: s.icon }))}
         style={{ marginBottom: 24 }}
       />
-      
+
       <div style={{ minHeight: 300 }}>
         {steps[currentStep].content}
       </div>
-      
+
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
         <Button
           onClick={() => setCurrentStep(currentStep - 1)}
@@ -261,7 +261,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ visible, onComplete }) =
         >
           上一步
         </Button>
-        
+
         {currentStep < steps.length - 1 ? (
           <Button
             type="primary"

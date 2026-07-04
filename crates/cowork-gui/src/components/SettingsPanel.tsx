@@ -238,7 +238,7 @@ const SettingsPanel: React.FC = () => {
             <Password placeholder="sk-..." />
           </Form.Item>
           <Form.Item name={["llm", "model_name"]} label="Model Name" rules={[{ required: true, message: "Please input model name" }]}>
-            <Input placeholder="gpt-4o" />
+            <Input placeholder="gpt-5" />
           </Form.Item>
           <Button icon={<CheckCircleOutlined />} onClick={handleTestConnection} loading={saving}>Test Connection</Button>
         </Card>

@@ -36,7 +36,15 @@ impl Tool for ProvideFeedbackTool {
                 },
                 "feedback_type": {
                     "type": "string",
-                    "enum": ["build_error", "quality_issue", "missing_requirement", "suggestion"],
+                    "enum": [
+                        "build_error",
+                        "quality_issue",
+                        "missing_requirement",
+                        "missing_artifact",
+                        "architecture_issue",
+                        "task_scope_issue",
+                        "suggestion"
+                    ],
                 },
                 "severity": {
                     "type": "string",
@@ -56,6 +64,9 @@ impl Tool for ProvideFeedbackTool {
             "build_error" => FeedbackType::BuildError,
             "quality_issue" => FeedbackType::QualityIssue,
             "missing_requirement" => FeedbackType::MissingRequirement,
+            "missing_artifact" => FeedbackType::MissingArtifact,
+            "architecture_issue" => FeedbackType::ArchitectureIssue,
+            "task_scope_issue" => FeedbackType::TaskScopeIssue,
             _ => FeedbackType::Suggestion,
         };
 

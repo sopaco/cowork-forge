@@ -286,7 +286,7 @@ pub async fn gui_retry_iteration(
     let model_config = load_config()
         .map_err(|e| format!("Failed to load LLM configuration: {}", e))?;
 
-    let _model = create_llm_client(&model_config.llm)
+    let model = create_llm_client(&model_config.llm)
         .map_err(|e| format!("Failed to create LLM client: {}", e))?;
 
     // Emit started event
@@ -298,7 +298,7 @@ pub async fn gui_retry_iteration(
 
     tokio::spawn(async move {
         println!("[GUI] Starting retry_iteration for iteration: {}", iteration_id_clone);
-        match executor.retry_iteration(&mut project, &iteration_id_clone).await {
+        match executor.retry_iteration(&mut project, &iteration_id_clone, Some(model)).await {
             Ok(_) => {
                 println!("[GUI] retry_iteration completed successfully");
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);

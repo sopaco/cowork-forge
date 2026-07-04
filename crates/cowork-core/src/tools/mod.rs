@@ -5,6 +5,19 @@
 use adk_core::AdkError;
 use serde_json::Value;
 use std::sync::RwLock;
+use std::sync::LazyLock;
+
+static CURRENT_AGENT_NAME: LazyLock<RwLock<String>> = LazyLock::new(|| RwLock::new(String::new()));
+
+pub fn set_current_agent_name(name: &str) {
+    if let Ok(mut guard) = CURRENT_AGENT_NAME.write() {
+        *guard = name.to_string();
+    }
+}
+
+fn get_current_agent_name() -> String {
+    CURRENT_AGENT_NAME.read().map(|g| g.clone()).unwrap_or_default()
+}
 
 // Helper functions for safe parameter extraction
 /// Safely get a required string parameter from args
@@ -33,7 +46,7 @@ pub fn get_required_array_param<'a>(args: &'a Value, key: &str) -> Result<&'a Ve
 // ============================================================================
 
 /// Type alias for tool notification callback
-type ToolNotifyFn = Box<dyn Fn(&str, &Value, bool, &str) + Send + Sync>;
+type ToolNotifyFn = Box<dyn Fn(&str, &Value, bool, &str, &str) + Send + Sync>;
 
 /// Global tool notification callback storage
 static TOOL_NOTIFIER: RwLock<Option<ToolNotifyFn>> = RwLock::new(None);
@@ -42,7 +55,7 @@ static TOOL_NOTIFIER: RwLock<Option<ToolNotifyFn>> = RwLock::new(None);
 /// This should be called once at application startup (GUI backend)
 pub fn set_tool_notify_callback<F>(callback: F)
 where
-    F: Fn(&str, &Value, bool, &str) + Send + Sync + 'static,
+    F: Fn(&str, &Value, bool, &str, &str) + Send + Sync + 'static,
 {
     let mut guard = TOOL_NOTIFIER.write().unwrap();
     *guard = Some(Box::new(callback));
@@ -50,26 +63,25 @@ where
 
 /// Notify about a tool call (call this before tool execution)
 pub fn notify_tool_call(tool_name: &str, args: &Value) {
-    // Print to console for debugging
+    let agent_name = get_current_agent_name();
     let args_str = if args.is_object() {
         let keys: Vec<&str> = args.as_object().unwrap().keys().map(|s| s.as_str()).collect();
         format!("{:?}", keys)
     } else {
         args.to_string()
     };
-    println!("🔧 Tool call: {} {}", tool_name, args_str);
+    println!("🔧 [{}] Tool call: {} {}", agent_name, tool_name, args_str);
 
-    // Call registered callback if exists
     if let Ok(guard) = TOOL_NOTIFIER.read() {
         if let Some(ref callback) = *guard {
-            callback(tool_name, args, true, "");
+            callback(tool_name, args, true, "", &agent_name);
         }
     }
 }
 
 /// Notify about a tool result (call this after tool execution)
 pub fn notify_tool_result(tool_name: &str, result: &Result<Value, AdkError>) {
-    // Print to console for debugging
+    let agent_name = get_current_agent_name();
     match result {
         Ok(v) => {
             let preview = if v.is_object() {
@@ -85,12 +97,11 @@ pub fn notify_tool_result(tool_name: &str, result: &Result<Value, AdkError>) {
             } else {
                 v.to_string()
             };
-            println!("✓ Tool result: {} -> {}", tool_name, preview);
+            println!("✓ [{}] Tool result: {} -> {}", agent_name, tool_name, preview);
         }
-        Err(e) => println!("✗ Tool result: {} - error: {}", tool_name, e),
+        Err(e) => println!("✗ [{}] Tool result: {} - error: {}", agent_name, tool_name, e),
     }
 
-    // Call registered callback if exists
     if let Ok(guard) = TOOL_NOTIFIER.read() {
         if let Some(ref callback) = *guard {
             let success = result.is_ok();
@@ -98,7 +109,7 @@ pub fn notify_tool_result(tool_name: &str, result: &Result<Value, AdkError>) {
                 Ok(v) => v.to_string(),
                 Err(e) => e.to_string(),
             };
-            callback(tool_name, &Value::Null, success, &result_str);
+            callback(tool_name, &Value::Null, success, &result_str, &agent_name);
         }
     }
 }

@@ -21,11 +21,6 @@ source: .
 
   - .agents/
     - skills/
-  - .ai-context/
-    - DYNAMICS.md
-    - meta/
-    - references/
-    - SKILL.md
   - .codegraph/
     - .gitignore
     - codegraph.db
