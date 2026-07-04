@@ -3,115 +3,98 @@
   "project": "cowork-forge",
   "repo_path": ".",
   "baseline": {
-    "git_head": "2d0fa142353c44f3bd3cffb7d0e4e670653bccca",
-    "git_head_at": "2026-07-04T15:54:26.144480800+00:00",
-    "dirty": true
+    "git_head": "91da8fcd659e2eb2d7e5922bc304a90e9221faa5",
+    "git_head_at": "2026-07-04T16:08:54.782353+00:00",
+    "dirty": false
   },
   "assets": {
     "agent_pack": {
       "path": "agent/repomix.md",
-      "synced_at": "2026-07-04T02:30:40.992643800+00:00",
-      "baseline_git_head": "0063d857ce13b366ae440fa1073a0b61cf14ebd0",
+      "synced_at": "2026-07-04T15:57:12.794890400+00:00",
+      "baseline_git_head": "a8309def51162e5b19b275c03dce315c6cd1d770",
       "stale": false,
-      "freshness_score": 88
+      "freshness_score": 95
     },
     "agent_context": {
       "path": "agent/context.md",
-      "stale": true,
-      "stale_reason": "repo_advanced_2_commits",
-      "freshness_score": 79
+      "synced_at": "2026-07-04T16:08:53.870290600+00:00",
+      "baseline_git_head": "91da8fcd659e2eb2d7e5922bc304a90e9221faa5",
+      "stale": false,
+      "freshness_score": 90
     },
     "human_docs": {
       "path": "human/",
-      "synced_at": "2026-07-04T02:30:40.995935300+00:00",
+      "synced_at": "2026-07-04T15:57:12.879091200+00:00",
       "stale": false,
-      "freshness_score": 88
+      "freshness_score": 95
     }
   },
   "drift": {
     "commits_since_baseline": 2,
-    "changed_files_since_baseline": 30,
+    "changed_files_since_baseline": 7,
     "sample_changed_files": [
-      ".agents/skills/ai-context-generator/README.md",
-      ".agents/skills/ai-context-generator/SKILL.md",
-      ".agents/skills/ai-context-generator/_meta.json",
-      ".agents/skills/ai-context-generator/references/WRITING-GUIDE.md",
-      ".agents/skills/ai-context-generator/scripts/generate.ts",
-      ".agents/skills/codegraph-skill/SKILL.md",
-      ".agents/skills/repomix-context-skill/SKILL.md",
-      ".agents/skills/rtk-skill/SKILL.md",
-      ".agents/skills/terrain-knowledge-skill/SKILL.md",
-      "\".terrain/human/1\\343\\200\\201\\351\\241\\271\\347\\233\\256\\346\\246\\202\\350\\277\\260.md\"",
-      "\".terrain/human/2\\343\\200\\201\\346\\236\\266\\346\\236\\204\\346\\246\\202\\350\\247\\210.md\"",
-      "\".terrain/human/3\\343\\200\\201\\345\\267\\245\\344\\275\\234\\346\\265\\201\\347\\250\\213.md\""
+      ".ai-context/DYNAMICS.md",
+      ".ai-context/SKILL.md",
+      ".ai-context/meta/MAINTENANCE.md",
+      ".ai-context/references/ARCHITECTURE.md",
+      ".ai-context/references/DECISIONS.md",
+      ".ai-context/references/PROJECT-ESSENCE.md",
+      "AGENTS.md"
     ]
   },
   "summary": {
-    "overall_score": 79,
-    "overall_stale": true,
+    "overall_score": 90,
+    "overall_stale": false,
     "commits_since_baseline": 2,
-    "changed_files_count": 30,
-    "current_git_head": "2d0fa14",
-    "working_tree_dirty": true,
+    "changed_files_count": 7,
+    "current_git_head": "91da8fc",
+    "working_tree_dirty": false,
     "is_git_repo": true,
-    "last_computed_at": "2026-07-04T15:54:26.144480800+00:00",
-    "stale_reason": "repo_advanced_2_commits",
-    "agent_pack_score": 88,
-    "agent_context_score": 79,
-    "human_docs_score": 88,
+    "last_computed_at": "2026-07-04T16:08:54.782353+00:00",
+    "agent_pack_score": 95,
+    "agent_context_score": 90,
+    "human_docs_score": 95,
     "macro_preload_allowed": true,
     "drift_factors": [
       {
         "id": "commits_behind",
         "severity": "medium",
         "title": "代码已前进 2 个提交",
-        "detail": "知识资产 baseline 为 0063d857ce13b366ae440fa1073a0b61cf14ebd0，当前 HEAD 为 2d0fa14。每多 1 个提交约扣 2 分（上限 40 分）。",
+        "detail": "知识资产 baseline 为 a8309def51162e5b19b275c03dce315c6cd1d770，当前 HEAD 为 91da8fc。每多 1 个提交约扣 2 分（上限 40 分）。",
         "points_lost": 4
       },
       {
         "id": "files_changed",
         "severity": "medium",
-        "title": "30 个文件相对 baseline 有变更",
+        "title": "7 个文件相对 baseline 有变更",
         "detail": "变更文件占索引规模的比例越高，扣分越多（上限 30 分）。下方列出部分路径。",
-        "points_lost": 3
-      },
-      {
-        "id": "dirty_tree",
-        "severity": "medium",
-        "title": "工作区有未提交修改",
-        "detail": "Git 工作区在源码路径上有未提交改动（已排除 `.terrain/` 等知识产出目录）。知识资产基于某次提交快照，与磁盘上的未提交源码改动不一致，扣 5 分。",
-        "points_lost": 5
+        "points_lost": 1
       },
       {
         "id": "context_lineage",
         "severity": "info",
         "title": "Agent 上下文受源码索引牵连",
-        "detail": "架构上下文原始分 88/100，按规则不超过源码索引分数的 90%，现为 79/100。",
-        "points_lost": 9
+        "detail": "架构上下文原始分 100/100，按规则不超过源码索引分数的 90%，现为 90/100。",
+        "points_lost": 10
       },
       {
         "id": "overall_driver",
         "severity": "info",
         "title": "总分由 Agent 架构上下文决定",
-        "detail": "综合分取三层最低值：源码索引 88、Agent 上下文 79、人类文档 88。"
+        "detail": "综合分取三层最低值：源码索引 95、Agent 上下文 90、人类文档 95。"
       }
     ],
     "sample_changed_files": [
-      ".agents/skills/ai-context-generator/README.md",
-      ".agents/skills/ai-context-generator/SKILL.md",
-      ".agents/skills/ai-context-generator/_meta.json",
-      ".agents/skills/ai-context-generator/references/WRITING-GUIDE.md",
-      ".agents/skills/ai-context-generator/scripts/generate.ts",
-      ".agents/skills/codegraph-skill/SKILL.md",
-      ".agents/skills/repomix-context-skill/SKILL.md",
-      ".agents/skills/rtk-skill/SKILL.md",
-      ".agents/skills/terrain-knowledge-skill/SKILL.md",
-      "\".terrain/human/1\\343\\200\\201\\351\\241\\271\\347\\233\\256\\346\\246\\202\\350\\277\\260.md\"",
-      "\".terrain/human/2\\343\\200\\201\\346\\236\\266\\346\\236\\204\\346\\246\\202\\350\\247\\210.md\"",
-      "\".terrain/human/3\\343\\200\\201\\345\\267\\245\\344\\275\\234\\346\\265\\201\\347\\250\\213.md\""
+      ".ai-context/DYNAMICS.md",
+      ".ai-context/SKILL.md",
+      ".ai-context/meta/MAINTENANCE.md",
+      ".ai-context/references/ARCHITECTURE.md",
+      ".ai-context/references/DECISIONS.md",
+      ".ai-context/references/PROJECT-ESSENCE.md",
+      "AGENTS.md"
     ],
-    "pack_baseline_short": "0063d85",
-    "context_baseline_short": "0063d85"
+    "pack_baseline_short": "a8309de",
+    "context_baseline_short": "91da8fc"
   },
-  "last_computed_at": "2026-07-04T15:54:26.144480800+00:00"
+  "last_computed_at": "2026-07-04T16:08:54.782353+00:00"
 }
