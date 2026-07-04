@@ -1,0 +1,40 @@
+{
+  "context.md": {
+    "created_at": "2026-07-04T02:35:00.000000000+00:00",
+    "updated_at": "2026-07-04T02:35:00.000000000+00:00",
+    "drift_score": 0.0,
+    "version": 1
+  },
+  "meta-inputs.md": {
+    "created_at": "2026-07-04T02:35:00.000000000+00:00",
+    "updated_at": "2026-07-04T02:35:00.000000000+00:00",
+    "drift_score": 0.0,
+    "version": 1
+  },
+  "knowledge": {
+    "00-glossary.md": {
+      "created_at": "2026-07-04T02:35:00.000000000+00:00",
+      "updated_at": "2026-07-04T02:35:00.000000000+00:00",
+      "drift_score": 0.0,
+      "version": 1
+    },
+    "10-internal-framework.md": {
+      "created_at": "2026-07-04T02:35:00.000000000+00:00",
+      "updated_at": "2026-07-04T02:35:00.000000000+00:00",
+      "drift_score": 0.0,
+      "version": 1
+    },
+    "20-api-usage.md": {
+      "created_at": "2026-07-04T02:35:00.000000000+00:00",
+      "updated_at": "2026-07-04T02:35:00.000000000+00:00",
+      "drift_score": 0.0,
+      "version": 1
+    },
+    "30-scaffolding.md": {
+      "created_at": "2026-07-04T02:35:00.000000000+00:00",
+      "updated_at": "2026-07-04T02:35:00.000000000+00:00",
+      "drift_score": 0.0,
+      "version": 1
+    }
+  }
+}
