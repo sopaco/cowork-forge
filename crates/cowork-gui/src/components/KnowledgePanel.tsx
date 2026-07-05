@@ -182,7 +182,7 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: "16px" }}>
       <Card size="small" style={{ marginBottom: "16px" }}>
-        <Space direction="vertical" style={{ width: "100%" }}>
+        <Space orientation="vertical" style={{ width: "100%" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <Space>
               <BookOutlined style={{ fontSize: "16px", color: "#1890ff" }} />
@@ -339,7 +339,7 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
                 label: <span><FileTextOutlined /> Summary</span>,
                 children: (
                   <div style={{ padding: "12px 0" }}>
-                    <Space direction="vertical" style={{ width: "100%" }} size="large">
+                    <Space orientation="vertical" style={{ width: "100%" }} size="large">
                       {selectedKnowledge.idea_summary && (
                         <div style={{ padding: "16px", backgroundColor: "#f6ffed", borderRadius: "8px", border: "1px solid #b7eb8f" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
@@ -413,7 +413,7 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
                 children: (
                   <div style={{ padding: "12px 0" }}>
                     {selectedKnowledge.key_patterns?.length > 0 ? (
-                      <Space direction="vertical" style={{ width: "100%" }} size="middle">
+                      <Space orientation="vertical" style={{ width: "100%" }} size="middle">
                         {selectedKnowledge.key_patterns.map((pattern, idx) => (
                           <div key={`pattern-${idx}`} style={{ padding: "16px", backgroundColor: "#f9f0ff", borderRadius: "8px", border: "1px solid #d3adf7" }}>
                             <Paragraph style={{ margin: 0, lineHeight: "1.8", color: "#333" }}>{pattern}</Paragraph>
@@ -430,7 +430,7 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
                 children: (
                   <div style={{ padding: "12px 0" }}>
                     {selectedKnowledge.known_issues?.length > 0 ? (
-                      <Space direction="vertical" style={{ width: "100%" }} size="middle">
+                      <Space orientation="vertical" style={{ width: "100%" }} size="middle">
                         {selectedKnowledge.known_issues.map((issue, idx) => (
                           <div key={`issue-${idx}`} style={{ padding: "16px", backgroundColor: "#fff2f0", borderRadius: "8px", border: "1px solid #ffccc7" }}>
                             <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>

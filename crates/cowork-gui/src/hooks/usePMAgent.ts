@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { App as AntApp, Modal } from 'antd';
 import { invoke } from '@tauri-apps/api/core';
 import { useProjectStore, useAgentStore, useUIStore } from '../stores';
+import { useShallow } from 'zustand/react/shallow';
 import API from '../api';
 import type { ChatMessage, PMAction, PMAgentMessage } from '../stores';
 
@@ -12,14 +13,23 @@ import type { ChatMessage, PMAction, PMAgentMessage } from '../stores';
 export function usePMAgent() {
 	const { message } = AntApp.useApp();
 
-	// Project store
-	const { currentIteration, loadProject, setCurrentIteration } = useProjectStore();
+	// Project store: 用 selector + useShallow 避免订阅整个 store
+	const projectActions = useProjectStore(
+		useShallow(s => ({ currentIteration: s.currentIteration, loadProject: s.loadProject, setCurrentIteration: s.setCurrentIteration }))
+	);
+	const { currentIteration, loadProject, setCurrentIteration } = projectActions;
 
 	// Agent store
-	const { setMessages, clearPMMessages, setPmProcessing, sendPMMessage } = useAgentStore();
+	const agentActions = useAgentStore(
+		useShallow(s => ({ setMessages: s.setMessages, clearPMMessages: s.clearPMMessages, setPmProcessing: s.setPmProcessing, sendPMMessage: s.sendPMMessage }))
+	);
+	const { setMessages, clearPMMessages, setPmProcessing, sendPMMessage } = agentActions;
 
 	// UI store
-	const { setActiveView, setActiveArtifactTab } = useUIStore();
+	const uiActions = useUIStore(
+		useShallow(s => ({ setActiveView: s.setActiveView, setActiveArtifactTab: s.setActiveArtifactTab }))
+	);
+	const { setActiveView, setActiveArtifactTab } = uiActions;
 
 	/**
 	 * Build feedback text from PM Chat user messages

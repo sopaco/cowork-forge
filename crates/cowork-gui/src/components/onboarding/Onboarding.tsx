@@ -110,7 +110,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ visible, onComplete }) =
           <Paragraph>
             接下来将引导您完成基本配置，让您快速开始创建项目。
           </Paragraph>
-          <Space direction="vertical" size="small" style={{ marginTop: 24 }}>
+          <Space orientation="vertical" size="small" style={{ marginTop: 24 }}>
             <Text type="secondary">• 配置 AI 模型 API</Text>
             <Text type="secondary">• 选择工作目录</Text>
             <Text type="secondary">• 开始创建您的第一个项目</Text>
@@ -186,7 +186,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ visible, onComplete }) =
           </Paragraph>
 
           <Card style={{ marginBottom: 16 }}>
-            <Space direction="vertical" style={{ width: '100%' }}>
+            <Space orientation="vertical" style={{ width: '100%' }}>
               <Text strong>当前选择：</Text>
               <Text code style={{ wordBreak: 'break-all' }}>
                 {workspacePath || '（未选择）'}

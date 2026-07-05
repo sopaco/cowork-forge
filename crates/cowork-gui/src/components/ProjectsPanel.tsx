@@ -198,7 +198,7 @@ const ProjectsPanel: React.FC = () => {
       {/* Project list */}
       {projects.length === 0 ? (
         <Empty description="No projects yet" image={Empty.PRESENTED_IMAGE_SIMPLE}>
-          <Space direction="vertical">
+          <Space orientation="vertical">
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>
               Create Your First Project
             </Button>

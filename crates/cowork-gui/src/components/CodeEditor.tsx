@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import Editor from '@monaco-editor/react';
+import Editor, { type OnMount } from '@monaco-editor/react';
+import type { editor as MonacoEditor } from 'monaco-editor';
+import { FixedSizeList as List } from 'react-window';
 import { Tabs, Spin, Alert, Empty, Dropdown, Button, Space } from 'antd';
 import { FolderOutlined, FileOutlined, ReloadOutlined, CaretRightOutlined, CaretDownOutlined, CodeOutlined, DownOutlined } from '@ant-design/icons';
 import { showError, showSuccess, showWarning, tryExecute } from '../utils/errorHandler';
@@ -45,6 +47,25 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
   const [error, setError] = useState<string | null>(null);
   const [formatting, setFormatting] = useState(false);
   const prevRefreshTriggerRef = useRef(0);
+
+  // ===== Monaco viewState 持久化（切 tab 不丢光标/折叠/scroll） =====
+  const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
+  const viewStatesRef = useRef<Record<string, MonacoEditor.ICodeEditorViewState | null>>({});
+  const monacoRef = useRef<typeof import('monaco-editor') | null>(null);
+
+  // ===== 文件树虚拟化 =====
+  const fileTreeContainerRef = useRef<HTMLDivElement>(null);
+  const [treeHeight, setTreeHeight] = useState(600);
+  const fileTreeListRef = useRef<List>(null);
+
+  useEffect(() => {
+    if (!fileTreeContainerRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) setTreeHeight(entry.contentRect.height);
+    });
+    observer.observe(fileTreeContainerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (iterationId) {
@@ -199,6 +220,32 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
     }
   };
 
+  // 切 tab 前保存旧 tab 的 viewState
+  const handleFileSelectWithViewState = useCallback(async (filePath: string) => {
+    if (editorRef.current && activeFile) {
+      viewStatesRef.current[activeFile] = editorRef.current.saveViewState();
+    }
+    await handleFileSelect(filePath);
+    // 切换后恢复新 tab 的 viewState
+    if (editorRef.current && viewStatesRef.current[filePath]) {
+      editorRef.current.restoreViewState(viewStatesRef.current[filePath]!);
+    }
+  }, [activeFile, handleFileSelect]);
+
+  // Editor 挂载：恢复 viewState，注册保存快捷键
+  const handleEditorMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+    if (activeFile && viewStatesRef.current[activeFile]) {
+      editor.restoreViewState(viewStatesRef.current[activeFile]!);
+    }
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      if (activeFile) {
+        saveFileContent(activeFile, editor.getValue());
+      }
+    });
+  };
+
   const getLanguageFromPath = (filePath: string): string => {
     const ext = filePath.split('.').pop()?.toLowerCase() || '';
     const langMap: Record<string, string> = {
@@ -209,8 +256,9 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
     return langMap[ext] || 'plaintext';
   };
 
-  const renderFileTreeRow = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
-    const node = flatFileTree[index];
+  // react-window 兼容的 Row 组件（接收 data prop）
+  const FileTreeRow = useCallback(({ index, style, data }: { index: number; style: React.CSSProperties; data: FlatFileTreeNode[] }) => {
+    const node = data[index];
     if (!node) return null;
 
     return (
@@ -250,7 +298,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
         <span style={{ fontSize: '13px' }}>{node.name}</span>
       </div>
     );
-  }, [flatFileTree, handleToggleFolder, handleFileSelect]);
+  }, [handleToggleFolder, handleFileSelect]);
 
   if (loading) {
     return (
@@ -295,14 +343,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
                 scrollBeyondLastLine: false,
                 automaticLayout: true,
               }}
-              saveViewState={true}
-              onMount={(editor) => {
-                editor.addCommand(0, () => {
-                  if (activeFile) {
-                    saveFileContent(activeFile, editor.getValue());
-                  }
-                }, 'save');
-              }}
+              onMount={handleEditorMount}
             />
           ) : null}
         </div>
@@ -331,14 +372,18 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
             </button>
           </h3>
         </div>
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <div style={{ overflow: 'auto', height: '100%' }}>
-            {flatFileTree.map((node, index) => (
-              <div key={node.path || index}>
-                {renderFileTreeRow({ index, style: {} })}
-              </div>
-            ))}
-          </div>
+        <div ref={fileTreeContainerRef} style={{ flex: 1, overflow: 'hidden' }}>
+          <List
+            ref={fileTreeListRef}
+            height={treeHeight}
+            itemCount={flatFileTree.length}
+            itemSize={26}
+            width="100%"
+            itemData={flatFileTree}
+            overscanCount={8}
+          >
+            {FileTreeRow}
+          </List>
         </div>
       </div>
 
@@ -346,7 +391,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
         <Tabs
           type="editable-card"
           activeKey={activeFile}
-          onChange={handleFileSelect}
+          onChange={handleFileSelectWithViewState}
           onEdit={(targetKey, action) => {
             if (action === 'remove' && typeof targetKey === 'string') {
               handleCloseFile(targetKey);

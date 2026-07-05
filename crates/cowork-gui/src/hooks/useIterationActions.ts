@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { App as AntApp } from 'antd';
 import { useProjectStore, useAgentStore, useUIStore } from '../stores';
+import { useShallow } from 'zustand/react/shallow';
 import API from '../api';
 
 /**
@@ -10,14 +11,20 @@ import API from '../api';
 export function useIterationActions() {
 	const { message } = AntApp.useApp();
 
-	// Project store
-	const { currentIteration, setCurrentIteration, setIsExecuting } = useProjectStore();
+	// Project store: selector + useShallow
+	const projectActions = useProjectStore(
+		useShallow(s => ({ currentIteration: s.currentIteration, setCurrentIteration: s.setCurrentIteration, setIsExecuting: s.setIsExecuting }))
+	);
+	const { currentIteration, setCurrentIteration, setIsExecuting } = projectActions;
 
 	// Agent store
-	const { setProcessing } = useAgentStore();
+	const setProcessing = useAgentStore(s => s.setProcessing);
 
 	// UI store
-	const { activeView, setActiveView } = useUIStore();
+	const uiState = useUIStore(
+		useShallow(s => ({ activeView: s.activeView, setActiveView: s.setActiveView }))
+	);
+	const { activeView, setActiveView } = uiState;
 
 	/**
 	 * Handle selecting an iteration

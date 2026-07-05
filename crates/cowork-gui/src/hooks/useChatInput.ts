@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useAgentStore, useUIStore, useProjectStore } from '../stores';
+import { useShallow } from 'zustand/react/shallow';
 import type { ChatMessage, ThinkingMessage, InputOption } from '../stores';
 
 /**
@@ -7,25 +8,31 @@ import type { ChatMessage, ThinkingMessage, InputOption } from '../stores';
  * Extracts chat input logic from App.tsx
  */
 export function useChatInput() {
-	// Project store
-	const { updateCurrentIterationStatus } = useProjectStore();
+	// Project store: selector + useShallow
+	const updateCurrentIterationStatus = useProjectStore(s => s.updateCurrentIterationStatus);
 
-	// Agent store
-	const {
-		inputRequest,
-		addMessage,
-		setMessages,
-		setInputRequest,
-		submitInput
-	} = useAgentStore();
+	// Agent store: 多字段 selector + useShallow
+	const agentState = useAgentStore(
+		useShallow(s => ({
+			inputRequest: s.inputRequest,
+			addMessage: s.addMessage,
+			setMessages: s.setMessages,
+			setInputRequest: s.setInputRequest,
+			submitInput: s.submitInput,
+		}))
+	);
+	const { inputRequest, addMessage, setMessages, setInputRequest, submitInput } = agentState;
 
 	// UI store
-	const {
-		setActiveView,
-		setActiveArtifactTab,
-		triggerCodeRefresh,
-		triggerArtifactsRefresh
-	} = useUIStore();
+	const uiActions = useUIStore(
+		useShallow(s => ({
+			setActiveView: s.setActiveView,
+			setActiveArtifactTab: s.setActiveArtifactTab,
+			triggerCodeRefresh: s.triggerCodeRefresh,
+			triggerArtifactsRefresh: s.triggerArtifactsRefresh,
+		}))
+	);
+	const { setActiveView, setActiveArtifactTab, triggerCodeRefresh, triggerArtifactsRefresh } = uiActions;
 
 	/**
 	 * Handle sending user message

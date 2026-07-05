@@ -1,9 +1,10 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import { ConfigProvider, theme, App as AntApp } from 'antd';
 import App from './App';
 import './styles.css';
 
+// React 19: 直接用 createRoot，不再包 StrictMode
+// StrictMode 双调用会放大流式 setState 的调试卡顿（每 token 跑两次 reducer）
 const lightTheme = {
   algorithm: theme.defaultAlgorithm,
   token: {
@@ -75,12 +76,10 @@ const lightTheme = {
   },
 };
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ConfigProvider theme={lightTheme}>
-      <AntApp>
-        <App />
-      </AntApp>
-    </ConfigProvider>
-  </React.StrictMode>
+createRoot(document.getElementById('root')!).render(
+  <ConfigProvider theme={lightTheme}>
+    <AntApp>
+      <App />
+    </AntApp>
+  </ConfigProvider>
 );

@@ -376,7 +376,7 @@ const AgentConfigForm: React.FC = () => {
                   </Space>
                 }
                 description={
-                  <Space direction="vertical" size="small">
+                  <Space orientation="vertical" size="small">
                     <Text type="secondary">{agent.description || 'No description'}</Text>
                     <Space size={4}>
                       {agent.tools.slice(0, 5).map((t, i) => (
@@ -649,7 +649,7 @@ const AgentConfigForm: React.FC = () => {
         open={detailDrawerVisible}
       >
         {selectedAgentData && (
-          <Space direction="vertical" style={{ width: '100%' }} size="large">
+          <Space orientation="vertical" style={{ width: '100%' }} size="large">
             <Descriptions column={1} bordered size="small">
               <Descriptions.Item label="ID">{selectedAgentData.id}</Descriptions.Item>
               <Descriptions.Item label="Version">{selectedAgentData.version || '-'}</Descriptions.Item>

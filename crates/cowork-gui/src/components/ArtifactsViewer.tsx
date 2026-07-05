@@ -146,13 +146,16 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
     return <Empty description="No artifacts available" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
   }
 
+  // ====== tab 懒构造：只有 activeTab 的 children 才包含 ReactMarkdown 节点 ======
+  // 其他 tab 的 children 设为 null，切到该 tab 时才重新渲染（Antd Tabs 默认会重新挂载 children）
   const items = [];
+  const isActive = (key: string) => activeTab === key;
 
   if (artifacts.idea) {
     items.push({
       key: 'idea',
       label: <span><FileTextOutlined /> Idea</span>,
-      children: (
+      children: isActive('idea') ? (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 20px', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', flexShrink: 0 }}>
             <span style={{ fontWeight: 'bold', color: '#fff' }}>Idea Document</span>
@@ -164,7 +167,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, rehypeRaw]}>{artifacts.idea}</ReactMarkdown>
           </div>
         </div>
-      ),
+      ) : null,
     });
   }
 
@@ -172,7 +175,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
     items.push({
       key: 'requirements',
       label: <span><ProjectOutlined /> Requirements</span>,
-      children: (
+      children: isActive('requirements') ? (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 20px', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', flexShrink: 0 }}>
             <span style={{ fontWeight: 'bold', color: '#fff' }}>Requirements Document</span>
@@ -184,7 +187,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, rehypeRaw]}>{artifacts.requirements}</ReactMarkdown>
           </div>
         </div>
-      ),
+      ) : null,
     });
   }
 
@@ -194,7 +197,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
     items.push({
       key: 'design',
       label: <span><BuildOutlined /> Design</span>,
-      children: (
+      children: isActive('design') ? (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 20px', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', flexShrink: 0 }}>
             <span style={{ fontWeight: 'bold', color: '#fff' }}>Design Specification</span>
@@ -222,7 +225,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
             )}
           </div>
         </div>
-      ),
+      ) : null,
     });
   }
 
@@ -232,7 +235,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
     items.push({
       key: 'plan',
       label: <span><CheckCircleOutlined /> Plan</span>,
-      children: (
+      children: isActive('plan') ? (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 20px', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', flexShrink: 0 }}>
             <span style={{ fontWeight: 'bold', color: '#fff' }}>Implementation Plan</span>
@@ -260,7 +263,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
             )}
           </div>
         </div>
-      ),
+      ) : null,
     });
   }
 
@@ -268,7 +271,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
     items.push({
       key: 'code',
       label: <span><FileTextOutlined /> Code Files</span>,
-      children: (
+      children: isActive('code') ? (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 20px', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', flexShrink: 0 }}>
             <span style={{ fontWeight: 'bold', color: '#fff' }}>Code Files ({artifacts.code_files.length})</span>
@@ -282,7 +285,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
             </div>
           </div>
         </div>
-      ),
+      ) : null,
     });
   }
 
@@ -290,7 +293,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
     items.push({
       key: 'check_report',
       label: <span><CheckCircleOutlined /> Check Report</span>,
-      children: (
+      children: isActive('check_report') ? (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 20px', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', flexShrink: 0 }}>
             <span style={{ fontWeight: 'bold', color: '#fff' }}>Check Report</span>
@@ -302,7 +305,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, rehypeRaw]}>{artifacts.check_report}</ReactMarkdown>
           </div>
         </div>
-      ),
+      ) : null,
     });
   }
 
@@ -310,7 +313,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
     items.push({
       key: 'delivery_report',
       label: <span><CheckCircleOutlined /> Delivery Report</span>,
-      children: (
+      children: isActive('delivery_report') ? (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 20px', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', flexShrink: 0 }}>
             <span style={{ fontWeight: 'bold', color: '#fff' }}>Delivery Report</span>
@@ -322,7 +325,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, rehypeRaw]}>{artifacts.delivery_report}</ReactMarkdown>
           </div>
         </div>
-      ),
+      ) : null,
     });
   }
 
@@ -344,7 +347,16 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
           <Button size="small" icon={<ReloadOutlined />} onClick={loadArtifacts} loading={loading}>Refresh</Button>
         </Space>
       </div>
-      <Tabs activeKey={activeTab} onChange={handleTabChange} type="card" size="large" items={items} style={{ height: '100%' }} className="artifacts-tabs" />
+      <Tabs
+        activeKey={activeTab}
+        onChange={handleTabChange}
+        type="card"
+        size="large"
+        items={items}
+        style={{ height: '100%' }}
+        className="artifacts-tabs"
+        destroyOnHidden
+      />
     </div>
   );
 };

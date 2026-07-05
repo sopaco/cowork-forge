@@ -2685,65 +2685,7 @@ LICENSE
 643: }
 ```
 
-### Cargo.toml (53 lines)
-
-```
-1: [workspace]
-2: resolver = "2"
-3: members = [
-4:     "crates/cowork-core",
-5:     "crates/cowork-cli",
-6:     "crates/cowork-gui/src-tauri",
-7: ]
-8: 
-9: [workspace.package]
-10: version = "2.5.2"
-11: edition = "2024"
-12: authors = ["Sopaco"]
-13: license = "MIT"
-14: repository = "https://github.com/sopaco/cowork-forge"
-15: 
-16: [workspace.dependencies]
-17: adk-rust = "1.0.0"
-18: adk-core = "1.0.0"
-19: adk-agent = "1.0.0"
-20: adk-model = { version = "1.0.0", features = ["openai"] }
-21: adk-tool = "1.0.0"
-22: adk-runner = "1.0.0"
-23: adk-session = "1.0.0"
-24: adk-skill = "1.0.0"
-25: 
-26: tokio = { version = "1", features = ["full"] }
-27: tokio-util = { version = "0.7", features = ["compat"] }
-28: anyhow = "1"
-29: thiserror = "2"
-30: serde = { version = "1", features = ["derive"] }
-31: serde_json = "1"
-32: 
-33: toml = "1.0"
-34: 
-35: clap = { version = "4", features = ["derive"] }
-36: dialoguer = "0.12"
-37: console = "0.16"
-38: 
-39: tracing = "0.1"
-40: tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-41: 
-42: chrono = { version = "0.4", features = ["serde"] }
-43: uuid = { version = "1", features = ["v4", "serde"] }
-44: 
-45: dirs = "6"
-46: walkdir = "2"
-47: ignore = "0.4"
-48: 
-49: futures = "0.3"
-50: 
-51: tempfile = "3"
-52: 
-53: agent-client-protocol = "0.9"
-```
-
-### crates/cowork-core/src/pipeline/stages/coding.rs (289 lines)
+### crates/cowork-core/src/pipeline/stages/coding.rs (358 lines)
 
 ```
 1: CodingStage
@@ -2869,172 +2811,299 @@ LICENSE
 121:         
 122:         
 123:         
-124:         let message_handle = tokio::spawn(async move {
-125:             let mut thinking_buffer = String::new();
-126:             let mut output_buffer = String::new();
-127:             
-128:             loop {
-129:                 tokio::select! {
-130:                     msg = messages.recv() => {
-131:                         match msg {
-132:                             Some(AgentMessage::Thinking(text)) => {
-133:                                 
-134:                                 thinking_buffer.push_str(&text);
-135:                                 
-136:                                 if thinking_buffer.chars().count() > 100 {
-137:                                     let truncated: String = thinking_buffer.chars().take(100).collect();
-138:                                     let display = format!("💭 Thinking: {}...", truncated);
-139:                                     interaction_clone.show_message_with_context(MessageLevel::Info, display, ctx_external.clone()).await;
-140:                                     thinking_buffer.clear();
-141:                                 }
-142:                             }
-143:                             Some(AgentMessage::Output(text)) => {
-144:                                 output_buffer.push_str(&text);
-145:                                 
-146:                                 if output_buffer.chars().count() > 200 {
-147:                                     let truncated: String = output_buffer.chars().take(200).collect();
-148:                                     let display = format!("📝 Output: {}...", truncated);
-149:                                     interaction_clone.show_message_with_context(MessageLevel::Info, display, ctx_external.clone()).await;
-150:                                     output_buffer.clear();
-151:                                 }
-152:                             }
-153:                             Some(AgentMessage::Status(text)) => {
-154:                                 interaction_clone.show_message_with_context(MessageLevel::Info, format!("⏳ {}", text), ctx_external.clone()).await;
-155:                             }
-156:                             Some(AgentMessage::Error(text)) => {
-157:                                 interaction_clone.show_message_with_context(MessageLevel::Error, format!("❌ {}", text), ctx_external.clone()).await;
-158:                             }
-159:                             Some(AgentMessage::Completed) => {
-160:                                 interaction_clone.show_message_with_context(MessageLevel::Info, "✅ Task completed".to_string(), ctx_external.clone()).await;
-161:                                 
+124:         
+125:         
+126:         
+127:         
+128:         
+129:         
+130:         let completed_received = Arc::new(std::sync::atomic::AtomicBool::new(false));
+131:         let completed_flag = completed_received.clone();
+132:         let completed_notify = Arc::new(tokio::sync::Notify::new());
+133:         let completed_notify_clone = completed_notify.clone();
+134: 
+135:         let message_handle = tokio::spawn(async move {
+136:             loop {
+137:                 tokio::select! {
+138:                     msg = messages.recv() => {
+139:                         match msg {
+140:                             Some(AgentMessage::Thinking(text)) => {
+141:                                 
+142:                                 
+143:                                 
+144:                                 if !text.is_empty() {
+145:                                     interaction_clone
+146:                                         .send_streaming(text, AGENT_NAME_EXTERNAL, true)
+147:                                         .await;
+148:                                 }
+149:                             }
+150:                             Some(AgentMessage::Output(text)) => {
+151:                                 
+152:                                 
+153:                                 
+154:                                 
+155:                                 if !text.is_empty() {
+156:                                     interaction_clone
+157:                                         .send_streaming(text, AGENT_NAME_EXTERNAL, false)
+158:                                         .await;
+159:                                 }
+160:                             }
+161:                             Some(AgentMessage::Status(text)) => {
 162:                                 
-163:                                 beak;
-164:                             }
-165:                             None => {
-166:                                 
-167:                                 beak;
+163:                                 
+164:                                 interaction_clone.show_message_with_context(MessageLevel::Info, format!("⏳ {}", text), ctx_external.clone()).await;
+165:                             }
+166:                             Some(AgentMessage::Error(text)) => {
+167:                                 interaction_clone.show_message_with_context(MessageLevel::Error, format!("❌ {}", text), ctx_external.clone()).await;
 168:                             }
-169:                         }
-170:                     }
-171:                     _ = tokio::time::sleep(tokio::time::Duration::from_secs(60)) => {
-172:                         
-173:                         interaction_clone.show_message_with_context(MessageLevel::Info, "⏳ Waiting for agent...".to_string(), ctx_external.clone()).await;
-174:                     }
-175:                 }
-176:             }
-177:         });
-178: 
-179:         
-180:         match result.await {
-181:             
-182:             Ok(Ok(_output)) => {
-183:                 
-184:                 
-185:                 
-186:                 
-187:                 let _ = tokio::time::timeout(
-188:                     tokio::time::Duration::from_secs(10),
-189:                     message_handle,
-190:                 ).await;
-191: 
-192:                 interaction
-193:                     .show_message_with_context(
-194:                         MessageLevel::Info,
-195:                         "External coding agent completed successfully".to_string(),
-196:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
-197:                     )
-198:                     .await;
-199:                 StageResult::Success(None)
-200:             }
-201:             
-202:             Ok(Err(e)) => {
-203:                 
-204:                 message_handle.abort();
-205:                 let error_msg = format!("External agent execution error: {}", e);
-206:                 interaction
-207:                     .show_message_with_context(
-208:                         MessageLevel::Error,
-209:                         error_msg.clone(),
-210:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
-211:                     )
-212:                     .await;
-213:                 StageResult::Failed(e.to_string())
-214:             }
-215:             
-216:             Err(e) => {
-217:                 
-218:                 message_handle.abort();
-219:                 let error_msg = format!("External agent error: {}", e);
-220:                 interaction
-221:                     .show_message_with_context(
-222:                         MessageLevel::Error,
-223:                         error_msg.clone(),
-224:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
-225:                     )
-226:                     .await;
-227:                 StageResult::Failed(e.to_string())
-228:             }
-229:         }
-230:     }
-231: }
-232: ⋮----
-233: CodingStage
-234: ⋮----
-235: {
-236:     fn name(&self) -> &str {
-237:         "coding"
-238:     }
-239: 
-240:     fn description(&self) -> &str {
-241:         "Coding - Generate code implementation using Agent with Memory and Tools"
-242:     }
-243: 
-244:     fn needs_confirmation(&self) -> bool {
-245:         true
-246:     }
-247: 
-248:     async fn execute(
-249:         &self,
-250:         ctx: &PipelineContext,
-251:         interaction: Arc<dyn InteractiveBackend>,
-252:     ) -> StageResult {
-253:         
-254:         if Self::is_external_enabled() {
-255:             return Self::execute_external(ctx, interaction, None).await;
-256:         }
-257:         
-258:         execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, None).await
-259:     }
-260: 
-261:     async fn execute_with_feedback(
-262:         &self,
-263:         ctx: &PipelineContext,
-264:         interaction: Arc<dyn InteractiveBackend>,
-265:         feedback: &str,
-266:     ) -> StageResult {
-267:         
-268:         let agent_name = if Self::is_external_enabled() {
-269:             AGENT_NAME_EXTERNAL
-270:         } else {
-271:             AGENT_NAME_BUILTIN
-272:         };
-273: 
-274:         interaction
-275:             .show_message_with_context(
-276:                 MessageLevel::Info,
-277:                 "Regenerating code based on your feedback...".to_string(),
-278:                 MessageContext::new(agent_name).with_stage("coding"),
-279:             )
-280:             .await;
-281: 
-282:         
-283:         if Self::is_external_enabled() {
-284:             return Self::execute_external(ctx, interaction, Some(feedback)).await;
-285:         }
-286:         
-287:         execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, Some(feedback)).await
-288:     }
-289: }
+169:                             Some(AgentMessage::Completed) => {
+170:                                 interaction_clone.show_message_with_context(MessageLevel::Info, "✅ Task completed".to_string(), ctx_external.clone()).await;
+171:                                 
+172:                                 
+173:                                 completed_flag.store(true, std::sync::atomic::Ordering::SeqCst);
+174:                                 
+175:                                 
+176:                                 
+177:                                 
+178:                                 
+179:                                 completed_notify_clone.notify_one();
+180:                                 
+181:                                 
+182:                                 beak;
+183:                             }
+184:                             None => {
+185:                                 
+186:                                 beak;
+187:                             }
+188:                         }
+189:                     }
+190:                     _ = tokio::time::sleep(tokio::time::Duration::from_secs(60)) => {
+191:                         
+192:                         
+193:                         interaction_clone.show_message_with_context(MessageLevel::Info, "⏳ Waiting for agent...".to_string(), ctx_external.clone()).await;
+194:                     }
+195:                 }
+196:             }
+197:         });
+198: 
+199:         
+200:         
+201:         
+202:         
+203:         
+204:         
+205:         
+206:         
+207:         
+208:         
+209:         tracing::info!("Awaiting external agent result (no timeout until Completed)");
+210:         let mut result = std::pin::pin!(result);
+211: 
+212:         let outcome = tokio::select! {
+213:             
+214:             
+215:             res = &mut result => {
+216:                 tracing::info!("External agent result received directly");
+217:                 res
+218:             }
+219:             
+220:             
+221:             
+222:             
+223:             _ = completed_notify.notified() => {
+224:                 tracing::info!("Completed received, waiting for result cleanup (30s)");
+225:                 match tokio::time::timeout(
+226:                     tokio::time::Duration::from_secs(30),
+227:                     &mut result,
+228:                 ).await {
+229:                     Ok(res) => {
+230:                         tracing::info!("Result cleanup completed within window");
+231:                         res
+232:                     }
+233:                     Err(_) => {
+234:                         
+235:                         
+236:                         tracing::warn!("Result cleanup timed out after Completed, proceeding to Success");
+237:                         interaction
+238:                             .show_message_with_context(
+239:                                 MessageLevel::Info,
+240:                                 "External coding agent completed (cleanup timed out, proceeding)".to_string(),
+241:                                 MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
+242:                             )
+243:                             .await;
+244:                         
+245:                         let _ = tokio::time::timeout(
+246:                             tokio::time::Duration::from_secs(5),
+247:                             message_handle,
+248:                         ).await;
+249:                         return StageResult::Success(None);
+250:                     }
+251:                 }
+252:             }
+253:         };
+254: 
+255:         
+256:         match outcome {
+257:             Ok(Ok(_output)) => {
+258:                 tracing::info!("External agent result Ok");
+259:                 let _ = tokio::time::timeout(
+260:                     tokio::time::Duration::from_secs(10),
+261:                     message_handle,
+262:                 ).await;
+263:                 interaction
+264:                     .show_message_with_context(
+265:                         MessageLevel::Info,
+266:                         "External coding agent completed successfully".to_string(),
+267:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
+268:                     )
+269:                     .await;
+270:                 StageResult::Success(None)
+271:             }
+272:             Ok(Err(e)) => {
+273:                 tracing::warn!(error = %e, "External agent returned error");
+274:                 message_handle.abort();
+275:                 let error_msg = format!("External agent execution error: {}", e);
+276:                 interaction
+277:                     .show_message_with_context(
+278:                         MessageLevel::Error,
+279:                         error_msg.clone(),
+280:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
+281:                     )
+282:                     .await;
+283:                 StageResult::Failed(e.to_string())
+284:             }
+285:             Err(e) => {
+286:                 tracing::warn!(error = %e, "External agent channel error");
+287:                 message_handle.abort();
+288:                 let error_msg = format!("External agent error: {}", e);
+289:                 interaction
+290:                     .show_message_with_context(
+291:                         MessageLevel::Error,
+292:                         error_msg.clone(),
+293:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
+294:                     )
+295:                     .await;
+296:                 StageResult::Failed(e.to_string())
+297:             }
+298:         }
+299:     }
+300: }
+301: ⋮----
+302: CodingStage
+303: ⋮----
+304: {
+305:     fn name(&self) -> &str {
+306:         "coding"
+307:     }
+308: 
+309:     fn description(&self) -> &str {
+310:         "Coding - Generate code implementation using Agent with Memory and Tools"
+311:     }
+312: 
+313:     fn needs_confirmation(&self) -> bool {
+314:         true
+315:     }
+316: 
+317:     async fn execute(
+318:         &self,
+319:         ctx: &PipelineContext,
+320:         interaction: Arc<dyn InteractiveBackend>,
+321:     ) -> StageResult {
+322:         
+323:         if Self::is_external_enabled() {
+324:             return Self::execute_external(ctx, interaction, None).await;
+325:         }
+326:         
+327:         execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, None).await
+328:     }
+329: 
+330:     async fn execute_with_feedback(
+331:         &self,
+332:         ctx: &PipelineContext,
+333:         interaction: Arc<dyn InteractiveBackend>,
+334:         feedback: &str,
+335:     ) -> StageResult {
+336:         
+337:         let agent_name = if Self::is_external_enabled() {
+338:             AGENT_NAME_EXTERNAL
+339:         } else {
+340:             AGENT_NAME_BUILTIN
+341:         };
+342: 
+343:         interaction
+344:             .show_message_with_context(
+345:                 MessageLevel::Info,
+346:                 "Regenerating code based on your feedback...".to_string(),
+347:                 MessageContext::new(agent_name).with_stage("coding"),
+348:             )
+349:             .await;
+350: 
+351:         
+352:         if Self::is_external_enabled() {
+353:             return Self::execute_external(ctx, interaction, Some(feedback)).await;
+354:         }
+355:         
+356:         execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, Some(feedback)).await
+357:     }
+358: }
+```
+
+### Cargo.toml (53 lines)
+
+```
+1: [workspace]
+2: resolver = "2"
+3: members = [
+4:     "crates/cowork-core",
+5:     "crates/cowork-cli",
+6:     "crates/cowork-gui/src-tauri",
+7: ]
+8: 
+9: [workspace.package]
+10: version = "2.5.2"
+11: edition = "2024"
+12: authors = ["Sopaco"]
+13: license = "MIT"
+14: repository = "https://github.com/sopaco/cowork-forge"
+15: 
+16: [workspace.dependencies]
+17: adk-rust = "1.0.0"
+18: adk-core = "1.0.0"
+19: adk-agent = "1.0.0"
+20: adk-model = { version = "1.0.0", features = ["openai"] }
+21: adk-tool = "1.0.0"
+22: adk-runner = "1.0.0"
+23: adk-session = "1.0.0"
+24: adk-skill = "1.0.0"
+25: 
+26: tokio = { version = "1", features = ["full"] }
+27: tokio-util = { version = "0.7", features = ["compat"] }
+28: anyhow = "1"
+29: thiserror = "2"
+30: serde = { version = "1", features = ["derive"] }
+31: serde_json = "1"
+32: 
+33: toml = "1.0"
+34: 
+35: clap = { version = "4", features = ["derive"] }
+36: dialoguer = "0.12"
+37: console = "0.16"
+38: 
+39: tracing = "0.1"
+40: tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+41: 
+42: chrono = { version = "0.4", features = ["serde"] }
+43: uuid = { version = "1", features = ["v4", "serde"] }
+44: 
+45: dirs = "6"
+46: walkdir = "2"
+47: ignore = "0.4"
+48: 
+49: futures = "0.3"
+50: 
+51: tempfile = "3"
+52: 
+53: agent-client-protocol = "0.9"
 ```
 
 ### crates/cowork-core/src/tools/control_tools.rs (263 lines)
@@ -3303,6 +3372,35 @@ LICENSE
 261:         }))
 262:     }
 263: }
+```
+
+### crates/cowork-gui/src/components/chat/ChatPanel.tsx (24 lines)
+
+```
+1: ChatPanelProps
+2: ⋮----
+3: {
+4:   messages: ChatMessage[];
+5:   pmMessages: (ChatMessage & { type: 'user' | 'pm_agent' })[];
+6:   mode: 'pipeline' | 'pm_agent' | 'disabled';
+7:   isProcessing: boolean;
+8:   pmProcessing: boolean;
+9:   currentAgent: string | null;
+10:   iterationTitle: string;
+11:   iterationDescription?: string;
+12:   currentStage?: string | null;
+13:   inputRequest?: InputRequest | null;
+14:   userInput: string;
+15:   messagesContainerRef: React.RefObject<HTMLDivElement>;
+16:   pmMessagesContainerRef: React.RefObject<HTMLDivElement>;
+17:   onUserInputChange: (value: string) => void;
+18:   onSend: () => void;
+19:   onSelectOption: (option: InputOption) => void;
+20:   onSubmitFeedback: () => void;
+21:   onCancelFeedback: () => void;
+22:   onToggleThinking: (index: number) => void;
+23:   onActionClick?: (action: PMAction) => void;
+24: }
 ```
 
 ### crates/cowork-gui/src/components/chat/InputArea.tsx (14 lines)
@@ -3857,33 +3955,449 @@ LICENSE
 90: }
 ```
 
-### crates/cowork-gui/src/components/chat/ChatPanel.tsx (24 lines)
+### crates/cowork-gui/src/hooks/useAppEvents.ts (440 lines)
 
 ```
-1: ChatPanelProps
-2: ⋮----
-3: {
-4:   messages: ChatMessage[];
-5:   pmMessages: (ChatMessage & { type: 'user' | 'pm_agent' })[];
-6:   mode: 'pipeline' | 'pm_agent' | 'disabled';
-7:   isProcessing: boolean;
-8:   pmProcessing: boolean;
-9:   currentAgent: string | null;
-10:   iterationTitle: string;
-11:   iterationDescription?: string;
-12:   currentStage?: string | null;
-13:   inputRequest?: InputRequest | null;
-14:   userInput: string;
-15:   messagesContainerRef: React.RefObject<HTMLDivElement>;
-16:   pmMessagesContainerRef: React.RefObject<HTMLDivElement>;
-17:   onUserInputChange: (value: string) => void;
-18:   onSend: () => void;
-19:   onSelectOption: (option: InputOption) => void;
-20:   onSubmitFeedback: () => void;
-21:   onCancelFeedback: () => void;
-22:   onToggleThinking: (index: number) => void;
-23:   onActionClick?: (action: PMAction) => void;
-24: }
+1: function useAppEvents(userInput: string, setUserInput: (input: string) => void) {
+2: 	const { message } = AntApp.useApp();
+3: 	const listenersRegistered = useRef(false);
+4: 
+5: 	
+6: 	const {
+7: 		loadProject,
+8: 		loadIterations,
+9: 		setCurrentIteration,
+10: 		updateCurrentIterationStatus,
+11: 		setIsExecuting
+12: 	} = useProjectStore();
+13: 
+14: 	
+15: 	const {
+16: 		setMessages,
+17: 		clearMessages,
+18: 		setPMMessages,
+19: 		clearPMMessages,
+20: 		setProcessing,
+21: 		setCurrentAgent,
+22: 		setCurrentStage,
+23: 		setInputRequest,
+24: 		setPmProcessing,
+25: 		submitInput,
+26: 		loadPMWelcomeMessage
+27: 	} = useAgentStore();
+28: 
+29: 	
+30: 	const {
+31: 		commandPaletteVisible,
+32: 		setActiveView,
+33: 		setCommandPaletteVisible,
+34: 		setActiveArtifactTab,
+35: 		triggerArtifactsRefresh,
+36: 		triggerCodeRefresh,
+37: 		triggerMemoryRefresh,
+38: 		triggerKnowledgeRefresh
+39: 	} = useUIStore();
+40: 
+41: 	useEffect(() => {
+42: 		const setupListeners = async () => {
+43: 			if (listenersRegistered.current) return;
+44: 			listenersRegistered.current = true;
+45: 
+46: 			
+47: 			const listenerPromises = [
+48: 				
+49: 				listen('iteration_created', () => {
+50: 					loadProject();
+51: 					message.success('Iteration created');
+52: 				}),
+53: 
+54: 				listen('iteration_started', (event) => {
+55: 					const iterationId = event.payload as string;
+56: 					setProcessing(true);
+57: 					setIsExecuting(true);
+58: 					updateCurrentIterationStatus('Running');
+59: 					setActiveView('chat');
+60: 					message.info('Iteration started');
+61: 				}),
+62: 
+63: 				listen('iteration_continued', (event) => {
+64: 					const iterationId = event.payload as string;
+65: 					setProcessing(true);
+66: 					setIsExecuting(true);
+67: 					updateCurrentIterationStatus('Running');
+68: 					setActiveView('chat');
+69: 					message.info('Iteration continued');
+70: 				}),
+71: 
+72: 				listen('iteration_retrying', (event) => {
+73: 					const iterationId = event.payload as string;
+74: 					setProcessing(true);
+75: 					setIsExecuting(true);
+76: 					updateCurrentIterationStatus('Running');
+77: 					setActiveView('chat');
+78: 					message.info('Retrying iteration...');
+79: 				}),
+80: 
+81: 				listen('iteration_completed', (event) => {
+82: 					const iterationId = event.payload as string;
+83: 					setProcessing(false);
+84: 					setIsExecuting(false);
+85: 					setCurrentAgent(null);
+86: 					setCurrentStage(null);
+87: 					setInputRequest(null);
+88: 					updateCurrentIterationStatus('Completed');
+89: 					loadProject();
+90: 					triggerMemoryRefresh();
+91: 					triggerKnowledgeRefresh();
+92: 					clearPMMessages();
+93: 					setActiveView('chat');
+94: 					loadPMWelcomeMessage(iterationId);
+95: 					message.success('Iteration completed');
+96: 				}),
+97: 
+98: 				listen('iteration_failed', (event) => {
+99: 					const [, error] = event.payload as [string, string];
+100: 					setProcessing(false);
+101: 					setIsExecuting(false);
+102: 					setCurrentAgent(null);
+103: 					setCurrentStage(null);
+104: 					setInputRequest(null);
+105: 					updateCurrentIterationStatus('Failed');
+106: 					loadProject();
+107: 					message.error('Iteration failed: ' + error);
+108: 				}),
+109: 
+110: 				
+111: 				listen('agent_event', (event) => {
+112: 					const { content, agent_name, message_type, stage_name, level } = event.payload as {
+113: 						content?: string;
+114: 						agent_name?: string;
+115: 						message_type?: string;
+116: 						stage_name?: string;
+117: 						level?: string;
+118: 					};
+119: 
+120: 					if (agent_name) setCurrentAgent(agent_name);
+121: 					if (stage_name) setCurrentStage(stage_name);
+122: 					if (!content) return;
+123: 
+124: 					setMessages((prev) => {
+125: 						const lastMsg = prev[prev.length - 1];
+126: 						const isThinking = message_type === 'thinking';
+127: 
+128: 						if (isThinking) {
+129: 							if (
+130: 								lastMsg?.type === 'thinking' &&
+131: 								(lastMsg as ThinkingMessage).isStreaming &&
+132: 								(lastMsg as ThinkingMessage).agentName === agent_name
+133: 							) {
+134: 								return [
+135: 									...prev.slice(0, -1),
+136: 									{
+137: 										...lastMsg,
+138: 										content: (lastMsg as ThinkingMessage).content + content
+139: 									} as ChatMessage
+140: 								];
+141: 							}
+142: 							return [
+143: 								...prev,
+144: 								{
+145: 									type: 'thinking',
+146: 									content,
+147: 									agentName: agent_name || 'AI Agent',
+148: 									stageName: stage_name,
+149: 									isStreaming: true,
+150: 									isExpanded: false,
+151: 									timestamp: new Date().toISOString()
+152: 								} as ThinkingMessage
+153: 							] as ChatMessage[];
+154: 						} else {
+155: 							if (
+156: 								lastMsg?.type === 'agent' &&
+157: 								(lastMsg as { isStreaming?: boolean }).isStreaming &&
+158: 								(lastMsg as { agentName?: string }).agentName === agent_name
+159: 							) {
+160: 								return [
+161: 									...prev.slice(0, -1),
+162: 									{
+163: 										...lastMsg,
+164: 										content: (lastMsg as { content: string }).content + content
+165: 									} as ChatMessage
+166: 								];
+167: 							}
+168: 							return [
+169: 								...prev,
+170: 								{
+171: 									type: 'agent',
+172: 									content,
+173: 									agentName: agent_name || 'AI Agent',
+174: 									stageName: stage_name,
+175: 									level,
+176: 									isStreaming: true,
+177: 									timestamp: new Date().toISOString()
+178: 								} as ChatMessage
+179: 							];
+180: 						}
+181: 					});
+182: 				}),
+183: 
+184: 				
+185: 				listen('agent_streaming', (event) => {
+186: 					const { content, agent_name, is_thinking, is_first, is_last } = event.payload as {
+187: 						content?: string;
+188: 						agent_name?: string;
+189: 						is_thinking?: boolean;
+190: 						is_first?: boolean;
+191: 						is_last?: boolean;
+192: 					};
+193: 
+194: 					
+195: 					if (agent_name === 'PM Agent') {
+196: 						if (is_last && !content) {
+197: 							setPMMessages((prev) => {
+198: 								const lastMsg = prev[prev.length - 1];
+199: 								if (lastMsg?.type === 'pm_agent') {
+200: 									return [...prev.slice(0, -1), { ...lastMsg } as PMAgentMessage];
+201: 								}
+202: 								return prev;
+203: 							});
+204: 							setPmProcessing(false);
+205: 							return;
+206: 						}
+207: 
+208: 						if (!content) return;
+209: 
+210: 						setPMMessages((prev) => {
+211: 							const lastMsg = prev[prev.length - 1];
+212: 							if (
+213: 								is_first ||
+214: 								!lastMsg ||
+215: 								lastMsg.type !== 'pm_agent' ||
+216: 								!(lastMsg as PMAgentMessage & { isStreaming?: boolean }).isStreaming
+217: 							) {
+218: 								return [
+219: 									...prev,
+220: 									{
+221: 										type: 'pm_agent' as const,
+222: 										content,
+223: 										isStreaming: !is_last,
+224: 										timestamp: new Date().toISOString()
+225: 									} as PMAgentMessage & { isStreaming?: boolean }
+226: 								];
+227: 							}
+228: 							return [
+229: 								...prev.slice(0, -1),
+230: 								{
+231: 									...lastMsg,
+232: 									content: (lastMsg as PMAgentMessage).content + content,
+233: 									isStreaming: !is_last
+234: 								} as PMAgentMessage & { isStreaming?: boolean }
+235: 							];
+236: 						});
+237: 						return;
+238: 					}
+239: 
+240: 					
+241: 					if (!content) return;
+242: 					const msgType = is_thinking ? 'thinking' : 'agent';
+243: 
+244: 					setMessages((prev) => {
+245: 						const lastMsg = prev[prev.length - 1];
+246: 						if (
+247: 							lastMsg?.type === msgType &&
+248: 							(lastMsg as { isStreaming?: boolean }).isStreaming &&
+249: 							(lastMsg as { agentName?: string }).agentName === agent_name
+250: 						) {
+251: 							return [
+252: 								...prev.slice(0, -1),
+253: 								{
+254: 									...lastMsg,
+255: 									content: (lastMsg as { content: string }).content + content,
+256: 									isStreaming: !is_last
+257: 								} as ChatMessage
+258: 							];
+259: 						}
+260: 						return [
+261: 							...prev,
+262: 							{
+263: 								type: msgType,
+264: 								content,
+265: 								agentName: agent_name || 'AI Agent',
+266: 								isStreaming: !is_last,
+267: 								isExpanded: false,
+268: 								timestamp: new Date().toISOString()
+269: 							} as ChatMessage
+270: 						];
+271: 					});
+272: 				}),
+273: 
+274: 				
+275: 				listen('tool_call', (event) => {
+276: 					const { tool_name, arguments: args, agent_name } = event.payload as {
+277: 						tool_name: string;
+278: 						arguments: Record<string, unknown>;
+279: 						agent_name?: string;
+280: 					};
+281: 					setMessages((prev) => [
+282: 						...prev,
+283: 						{
+284: 							type: 'tool_call',
+285: 							toolName: tool_name,
+286: 							arguments: args,
+287: 							agentName: agent_name || 'AI Agent',
+288: 							timestamp: new Date().toISOString()
+289: 						} as ChatMessage
+290: 					]);
+291: 				}),
+292: 
+293: 				listen('tool_result', (event) => {
+294: 					const { tool_name, result, success, agent_name } = event.payload as {
+295: 						tool_name: string;
+296: 						result: string;
+297: 						success: boolean;
+298: 						agent_name?: string;
+299: 					};
+300: 					setMessages((prev) => [
+301: 						...prev,
+302: 						{
+303: 							type: 'tool_result',
+304: 							toolName: tool_name,
+305: 							result,
+306: 							success,
+307: 							agentName: agent_name || 'AI Agent',
+308: 							timestamp: new Date().toISOString()
+309: 						} as ChatMessage
+310: 					]);
+311: 				}),
+312: 
+313: 				
+314: 				listen('pm_actions', (event) => {
+315: 					const { actions } = event.payload as { actions: PMAction[] };
+316: 					setPMMessages((prev) => {
+317: 						const lastMsg = prev[prev.length - 1];
+318: 						if (lastMsg?.type === 'pm_agent') {
+319: 							return [
+320: 								...prev.slice(0, -1),
+321: 								{
+322: 									...lastMsg,
+323: 									actions: [...((lastMsg as PMAgentMessage).actions || []), ...actions]
+324: 								} as PMAgentMessage
+325: 							];
+326: 						}
+327: 						return prev;
+328: 					});
+329: 				}),
+330: 
+331: 				
+332: 			listen('input_request', async (event) => {
+333: 				const [requestId, prompt, options] = event.payload as [string, string, InputOption[]];
+334: 				updateCurrentIterationStatus('Paused');
+335: 
+336: 				const artifactMatch = prompt.match(/\[ARTIFACT_TYPE:(\w+)\]$/);
+337: 				if (artifactMatch) {
+338: 					const artifactType = artifactMatch[1];
+339: 					const cleanPrompt = prompt.replace(/\[ARTIFACT_TYPE:\w+\]$/, '').trim();
+340: 
+341: 					
+342: 					
+343: 					
+344: 					
+345: 					try {
+346: 						await loadIterations();
+347: 						const latestIterations = useProjectStore.getState().iterations;
+348: 						if (latestIterations && latestIterations.length > 0) {
+349: 							const latestIteration = latestIterations[latestIterations.length - 1];
+350: 							const fullIteration = await API.iteration.get(latestIteration.id);
+351: 							setCurrentIteration(fullIteration);
+352: 						}
+353: 					} catch (err) {
+354: 						console.error('[App] Failed to refresh iteration before confirmation:', err);
+355: 					}
+356: 
+357: 					setInputRequest({
+358: 						requestId,
+359: 						prompt: cleanPrompt,
+360: 						options,
+361: 						isArtifactConfirmation: true,
+362: 						artifactType
+363: 					});
+364: 				} else {
+365: 					setInputRequest({ requestId, prompt, options });
+366: 				}
+367: 				setUserInput('');
+368: 			}),
+369: 
+370: 				
+371: 				listen('project_loaded', async () => {
+372: 					setProcessing(false);
+373: 					setCurrentAgent(null);
+374: 					setInputRequest(null);
+375: 					clearMessages();
+376: 					setCurrentIteration(null);
+377: 					await loadProject();
+378: 					setActiveView('iterations');
+379: 					message.success('Project loaded');
+380: 				}),
+381: 
+382: 				listen('project_initialized', async () => {
+383: 					setProcessing(false);
+384: 					setCurrentAgent(null);
+385: 					setInputRequest(null);
+386: 					clearMessages();
+387: 					setCurrentIteration(null);
+388: 					await loadProject();
+389: 					setActiveView('iterations');
+390: 					message.success('Project initialized');
+391: 				}),
+392: 
+393: 				
+394: 				listen('knowledge_regeneration_completed', () => {
+395: 					triggerKnowledgeRefresh();
+396: 					message.success('Knowledge updated');
+397: 				}),
+398: 
+399: 				listen<[string, string]>('knowledge_regeneration_failed', (event) => {
+400: 					const [iterationId, error] = event.payload;
+401: 					console.error('[App] Knowledge regeneration failed:', iterationId, error);
+402: 					message.error('Knowledge generation failed: ' + error);
+403: 				}),
+404: 			];
+405: 
+406: 			
+407: 			await Promise.all(listenerPromises);
+408: 
+409: 			
+410: 			
+411: 			try {
+412: 				const hasOpenProject = await API.workspace.hasOpen();
+413: 				if (hasOpenProject) {
+414: 					console.log('[App] Detected open project on startup, loading project...');
+415: 					await loadProject();
+416: 					setActiveView('iterations');
+417: 				}
+418: 			} catch (error) {
+419: 				console.error('[App] Failed to check for open project:', error);
+420: 			}
+421: 		};
+422: 
+423: 		setupListeners();
+424: 
+425: 		
+426: 		const handleKeyDown = (e: KeyboardEvent) => {
+427: 			if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+428: 				e.preventDefault();
+429: 				setCommandPaletteVisible(!commandPaletteVisible);
+430: 			}
+431: 		};
+432: 
+433: 		window.addEventListener('keydown', handleKeyDown);
+434: 		return () => window.removeEventListener('keydown', handleKeyDown);
+435: 	}, []);
+436: 
+437: 	return {
+438: 		
+439: 	};
+440: }
 ```
 
 ### crates/cowork-gui/src-tauri/Cargo.toml (50 lines)
@@ -4519,330 +5033,6 @@ LICENSE
 15: pub use validator::*;
 16: pub use builtin::load_builtin_configs;
 17: pub use agent_factory::{create_agent_for_stage, create_agent_from_config, initialize_config_registry, initialize_mcp_toolsets, is_mcp_initialized};
-```
-
-### crates/cowork-core/src/domain/iteration.rs (319 lines)
-
-```
-1: Iteration
-2: ⋮----
-3: {
-4:     pub id: String,
-5:     pub number: u32,
-6:     pub title: String,
-7:     pub description: String,
-8: 
-9:     
-10:     pub base_iteration_id: Option<String>,
-11:     pub inheritance: InheritanceMode,
-12: 
-13:     
-14:     pub status: IterationStatus,
-15:     pub started_at: DateTime<Utc>,
-16:     pub completed_at: Option<DateTime<Utc>>,
-17:     pub current_stage: Option<String>,
-18:     pub completed_stages: Vec<String>,
-19: 
-20:     
-21:     pub artifacts: Artifacts,
-22: }
-23: ⋮----
-24: Iteration
-25: ⋮----
-26: {
-27:     pub fn create_genesis(project: &Project, title: String, description: String) -> Self {
-28:         let now = Utc::now();
-29:         Self {
-30:             id: format!("iter-{}-{}", project.next_iteration_number(), now.timestamp()),
-31:             number: project.next_iteration_number(),
-32:             title,
-33:             description,
-34:             base_iteration_id: None,
-35:             inheritance: InheritanceMode::None,
-36:             status: IterationStatus::Draft,
-37:             started_at: now,
-38:             completed_at: None,
-39:             current_stage: None,
-40:             completed_stages: Vec::new(),
-41:             artifacts: Artifacts::default(),
-42:         }
-43:     }
-44: 
-45:     pub fn create_evolution(
-46:         project: &Project,
-47:         title: String,
-48:         description: String,
-49:         base_iteration_id: String,
-50:         inheritance: InheritanceMode,
-51:     ) -> Self {
-52:         let now = Utc::now();
-53:         Self {
-54:             id: format!("iter-{}-{}", project.next_iteration_number(), now.timestamp()),
-55:             number: project.next_iteration_number(),
-56:             title,
-57:             description,
-58:             base_iteration_id: Some(base_iteration_id),
-59:             inheritance,
-60:             status: IterationStatus::Draft,
-61:             started_at: now,
-62:             completed_at: None,
-63:             current_stage: None,
-64:             completed_stages: Vec::new(),
-65:             artifacts: Artifacts::default(),
-66:         }
-67:     }
-68: 
-69:     pub fn start(&mut self) {
-70:         self.status = IterationStatus::Running;
-71:         self.started_at = Utc::now();
-72:     }
-73: 
-74:     pub fn pause(&mut self) {
-75:         self.status = IterationStatus::Paused;
-76:     }
-77: 
-78:     pub fn resume(&mut self) {
-79:         self.status = IterationStatus::Running;
-80:     }
-81: 
-82:     pub fn complete(&mut self) {
-83:         self.status = IterationStatus::Completed;
-84:         self.completed_at = Some(Utc::now());
-85:         self.current_stage = None;
-86:         
-87:         
-88:         
-89:         
-90:         self.finalize_completed_stages();
-91:     }
-92:     
-93:     
-94:     
-95:     fn finalize_completed_stages(&mut self) {
-96:         
-97:         let flow_stages = self.get_flow_stages();
-98:         
-99:         
-100:         let artifact_stages = [
-101:             ("idea", &self.artifacts.idea),
-102:             ("prd", &self.artifacts.prd),
-103:             ("design", &self.artifacts.design),
-104:             ("plan", &self.artifacts.plan),
-105:             ("coding", &self.artifacts.coding),
-106:             ("delivery", &self.artifacts.delivery),
-107:         ];
-108:         
-109:         for (stage_name, artifact) in artifact_stages {
-110:             if artifact.is_some() && !self.completed_stages.contains(&stage_name.to_string()) {
-111:                 self.completed_stages.push(stage_name.to_string());
-112:             }
-113:         }
-114:         
-115:         
-116:         
-117:         if self.completed_stages.is_empty() && !flow_stages.is_empty() {
-118:             self.completed_stages = flow_stages;
-119:         }
-120:     }
-121:     
-122:     
-123:     fn get_flow_stages(&self) -> Vec<String> {
-124:         use crate::config_definition::registry::global_registry;
-125:         
-126:         if let Some(flow) = global_registry().get_default_flow() {
-127:             flow.stages.iter().map(|s| s.stage_id.clone()).collect()
-128:         } else {
-129:             
-130:             vec![
-131:                 "idea".to_string(),
-132:                 "prd".to_string(),
-133:                 "design".to_string(),
-134:                 "plan".to_string(),
-135:                 "coding".to_string(),
-136:                 "check".to_string(),
-137:                 "delivery".to_string(),
-138:             ]
-139:         }
-140:     }
-141: 
-142:     pub fn fail(&mut self) {
-143:         self.status = IterationStatus::Failed;
-144:         
-145:         
-146:     }
-147: 
-148:     pub fn set_stage(&mut self, stage: impl Into<String>) {
-149:         self.current_stage = Some(stage.into());
-150:     }
-151: 
-152:     pub fn complete_stage(&mut self, stage: impl Into<String>, artifact_path: Option<String>) {
-153:         let stage_name = stage.into();
-154:         self.completed_stages.push(stage_name.clone());
-155: 
-156:         
-157:         let path = artifact_path.unwrap_or_default();
-158:         match stage_name.as_str() {
-159:             "idea" => self.artifacts.idea = Some(path),
-160:             "prd" => self.artifacts.prd = Some(path),
-161:             "design" => self.artifacts.design = Some(path),
-162:             "plan" => self.artifacts.plan = Some(path),
-163:             "coding" => self.artifacts.coding = Some(path), 
-164:             "delivery" => self.artifacts.delivery = Some(path),
-165:             _ => {}
-166:         }
-167:     }
-168: 
-169:     
-170:     
-171:     pub fn determine_start_stage(&self) -> String {
-172:         let stage_mapping = self.get_stage_mapping_from_flow();
-173:         
-174:         let mode_key = match self.inheritance {
-175:             InheritanceMode::None => "none",
-176:             InheritanceMode::Full => "full",
-177:             InheritanceMode::Partial => "partial",
-178:         };
-179:         
-180:         stage_mapping
-181:             .get(mode_key)
-182:             .cloned()
-183:             .unwrap_or_else(|| "idea".to_string())
-184:     }
-185:     
-186:     
-187:     fn get_stage_mapping_from_flow(&self) -> std::collections::HashMap<String, String> {
-188:         use crate::config_definition::registry::global_registry;
-189:         
-190:         if let Some(flow) = global_registry().get_default_flow() {
-191:             flow.config.inheritance.stage_mapping
-192:         } else {
-193:             
-194:             let mut mapping = std::collections::HashMap::new();
-195:             mapping.insert("none".to_string(), "idea".to_string());
-196:             mapping.insert("partial".to_string(), "idea".to_string());
-197:             mapping.insert("full".to_string(), "idea".to_string());
-198:             mapping
-199:         }
-200:     }
-201: 
-202:     pub fn to_summary(&self) -> super::IterationSummary {
-203:         super::IterationSummary {
-204:             id: self.id.clone(),
-205:             number: self.number,
-206:             title: self.title.clone(),
-207:             status: self.status,
-208:             completed_stages: self.completed_stages.clone(),
-209:             created_at: self.started_at,
-210:         }
-211:     }
-212: }
-213: ⋮----
-214: InheritanceMode
-215: ⋮----
-216: {
-217:     None,     
-218:     Full,     
-219:     Partial,  
-220: }
-221: ⋮----
-222: InheritanceMode
-223: ⋮----
-224: {
-225:     fn default() -> Self {
-226:         InheritanceMode::Full
-227:     }
-228: }
-229: ⋮----
-230: Artifacts
-231: ⋮----
-232: {
-233:     pub idea: Option<String>,
-234:     pub prd: Option<String>,
-235:     pub design: Option<String>,
-236:     pub plan: Option<String>,
-237:     pub coding: Option<String>,  
-238:     pub delivery: Option<String>,
-239: }
-240: ⋮----
-241: Artifacts
-242: ⋮----
-243: {
-244:     pub fn get(&self, stage: &str) -> Option<&String> {
-245:         match stage {
-246:             "idea" => self.idea.as_ref(),
-247:             "prd" => self.prd.as_ref(),
-248:             "design" => self.design.as_ref(),
-249:             "plan" => self.plan.as_ref(),
-250:             "coding" => self.coding.as_ref(),
-251:             "delivery" => self.delivery.as_ref(),
-252:             _ => None,
-253:         }
-254:     }
-255: 
-256:     pub fn set(&mut self, stage: &str, path: String) {
-257:         match stage {
-258:             "idea" => self.idea = Some(path),
-259:             "prd" => self.prd = Some(path),
-260:             "design" => self.design = Some(path),
-261:             "plan" => self.plan = Some(path),
-262:             "coding" => self.coding = Some(path),
-263:             "delivery" => self.delivery = Some(path),
-264:             _ => {}
-265:         }
-266:     }
-267: }
-268: ⋮----
-269: create_test_project
-270: ⋮----
-271: ()
-272: ⋮----
-273: test_create_genesis_iteration
-274: ⋮----
-275: ()
-276: ⋮----
-277: test_create_evolution_iteration
-278: ⋮----
-279: ()
-280: ⋮----
-281: test_iteration_status_transitions
-282: ⋮----
-283: ()
-284: ⋮----
-285: test_iteration_fail
-286: ⋮----
-287: ()
-288: ⋮----
-289: test_set_and_complete_stage
-290: ⋮----
-291: ()
-292: ⋮----
-293: test_determine_start_stage_none_mode
-294: ⋮----
-295: ()
-296: ⋮----
-297: test_determine_start_stage_partial_mode
-298: ⋮----
-299: ()
-300: ⋮----
-301: test_determine_start_stage_full_mode
-302: ⋮----
-303: ()
-304: ⋮----
-305: test_artifacts_get_set
-306: ⋮----
-307: ()
-308: ⋮----
-309: test_to_summary
-310: ⋮----
-311: ()
-312: ⋮----
-313: test_inheritance_mode_default
-314: ⋮----
-315: ()
-316: ⋮----
-317: test_inheritance_mode_serde
-318: ⋮----
-319: ()
 ```
 
 ### crates/cowork-core/src/instructions/plan.rs (401 lines)
@@ -6915,443 +7105,6 @@ LICENSE
 322:         }))
 323:     }
 324: }
-```
-
-### crates/cowork-gui/src/hooks/useAppEvents.ts (432 lines)
-
-```
-1: function useAppEvents(userInput: string, setUserInput: (input: string) => void) {
-2: 	const { message } = AntApp.useApp();
-3: 	const listenersRegistered = useRef(false);
-4: 
-5: 	
-6: 	const {
-7: 		loadProject,
-8: 		loadIterations,
-9: 		setCurrentIteration,
-10: 		updateCurrentIterationStatus,
-11: 		setIsExecuting
-12: 	} = useProjectStore();
-13: 
-14: 	
-15: 	const {
-16: 		setMessages,
-17: 		clearMessages,
-18: 		setPMMessages,
-19: 		clearPMMessages,
-20: 		setProcessing,
-21: 		setCurrentAgent,
-22: 		setCurrentStage,
-23: 		setInputRequest,
-24: 		setPmProcessing,
-25: 		submitInput,
-26: 		loadPMWelcomeMessage
-27: 	} = useAgentStore();
-28: 
-29: 	
-30: 	const {
-31: 		commandPaletteVisible,
-32: 		setActiveView,
-33: 		setCommandPaletteVisible,
-34: 		setActiveArtifactTab,
-35: 		triggerArtifactsRefresh,
-36: 		triggerCodeRefresh,
-37: 		triggerMemoryRefresh,
-38: 		triggerKnowledgeRefresh
-39: 	} = useUIStore();
-40: 
-41: 	useEffect(() => {
-42: 		const setupListeners = async () => {
-43: 			if (listenersRegistered.current) return;
-44: 			listenersRegistered.current = true;
-45: 
-46: 			
-47: 			const listenerPromises = [
-48: 				
-49: 				listen('iteration_created', () => {
-50: 					loadProject();
-51: 					message.success('Iteration created');
-52: 				}),
-53: 
-54: 				listen('iteration_started', (event) => {
-55: 					const iterationId = event.payload as string;
-56: 					setProcessing(true);
-57: 					setIsExecuting(true);
-58: 					updateCurrentIterationStatus('Running');
-59: 					setActiveView('chat');
-60: 					message.info('Iteration started');
-61: 				}),
-62: 
-63: 				listen('iteration_continued', (event) => {
-64: 					const iterationId = event.payload as string;
-65: 					setProcessing(true);
-66: 					setIsExecuting(true);
-67: 					updateCurrentIterationStatus('Running');
-68: 					setActiveView('chat');
-69: 					message.info('Iteration continued');
-70: 				}),
-71: 
-72: 				listen('iteration_retrying', (event) => {
-73: 					const iterationId = event.payload as string;
-74: 					setProcessing(true);
-75: 					setIsExecuting(true);
-76: 					updateCurrentIterationStatus('Running');
-77: 					setActiveView('chat');
-78: 					message.info('Retrying iteration...');
-79: 				}),
-80: 
-81: 				listen('iteration_completed', (event) => {
-82: 					const iterationId = event.payload as string;
-83: 					setProcessing(false);
-84: 					setIsExecuting(false);
-85: 					setCurrentAgent(null);
-86: 					setCurrentStage(null);
-87: 					setInputRequest(null);
-88: 					updateCurrentIterationStatus('Completed');
-89: 					loadProject();
-90: 					triggerMemoryRefresh();
-91: 					triggerKnowledgeRefresh();
-92: 					clearPMMessages();
-93: 					setActiveView('chat');
-94: 					loadPMWelcomeMessage(iterationId);
-95: 					message.success('Iteration completed');
-96: 				}),
-97: 
-98: 				listen('iteration_failed', (event) => {
-99: 					const [, error] = event.payload as [string, string];
-100: 					setProcessing(false);
-101: 					setIsExecuting(false);
-102: 					setCurrentAgent(null);
-103: 					setCurrentStage(null);
-104: 					setInputRequest(null);
-105: 					updateCurrentIterationStatus('Failed');
-106: 					loadProject();
-107: 					message.error('Iteration failed: ' + error);
-108: 				}),
-109: 
-110: 				
-111: 				listen('agent_event', (event) => {
-112: 					const { content, agent_name, message_type, stage_name, level } = event.payload as {
-113: 						content?: string;
-114: 						agent_name?: string;
-115: 						message_type?: string;
-116: 						stage_name?: string;
-117: 						level?: string;
-118: 					};
-119: 
-120: 					if (agent_name) setCurrentAgent(agent_name);
-121: 					if (stage_name) setCurrentStage(stage_name);
-122: 					if (!content) return;
-123: 
-124: 					setMessages((prev) => {
-125: 						const lastMsg = prev[prev.length - 1];
-126: 						const isThinking = message_type === 'thinking';
-127: 
-128: 						if (isThinking) {
-129: 							if (
-130: 								lastMsg?.type === 'thinking' &&
-131: 								(lastMsg as ThinkingMessage).isStreaming &&
-132: 								(lastMsg as ThinkingMessage).agentName === agent_name
-133: 							) {
-134: 								return [
-135: 									...prev.slice(0, -1),
-136: 									{
-137: 										...lastMsg,
-138: 										content: (lastMsg as ThinkingMessage).content + content
-139: 									} as ChatMessage
-140: 								];
-141: 							}
-142: 							return [
-143: 								...prev,
-144: 								{
-145: 									type: 'thinking',
-146: 									content,
-147: 									agentName: agent_name || 'AI Agent',
-148: 									stageName: stage_name,
-149: 									isStreaming: true,
-150: 									isExpanded: false,
-151: 									timestamp: new Date().toISOString()
-152: 								} as ThinkingMessage
-153: 							] as ChatMessage[];
-154: 						} else {
-155: 							if (
-156: 								lastMsg?.type === 'agent' &&
-157: 								(lastMsg as { isStreaming?: boolean }).isStreaming &&
-158: 								(lastMsg as { agentName?: string }).agentName === agent_name
-159: 							) {
-160: 								return [
-161: 									...prev.slice(0, -1),
-162: 									{
-163: 										...lastMsg,
-164: 										content: (lastMsg as { content: string }).content + content
-165: 									} as ChatMessage
-166: 								];
-167: 							}
-168: 							return [
-169: 								...prev,
-170: 								{
-171: 									type: 'agent',
-172: 									content,
-173: 									agentName: agent_name || 'AI Agent',
-174: 									stageName: stage_name,
-175: 									level,
-176: 									isStreaming: true,
-177: 									timestamp: new Date().toISOString()
-178: 								} as ChatMessage
-179: 							];
-180: 						}
-181: 					});
-182: 				}),
-183: 
-184: 				
-185: 				listen('agent_streaming', (event) => {
-186: 					const { content, agent_name, is_thinking, is_first, is_last } = event.payload as {
-187: 						content?: string;
-188: 						agent_name?: string;
-189: 						is_thinking?: boolean;
-190: 						is_first?: boolean;
-191: 						is_last?: boolean;
-192: 					};
-193: 
-194: 					
-195: 					if (agent_name === 'PM Agent') {
-196: 						if (is_last && !content) {
-197: 							setPMMessages((prev) => {
-198: 								const lastMsg = prev[prev.length - 1];
-199: 								if (lastMsg?.type === 'pm_agent') {
-200: 									return [...prev.slice(0, -1), { ...lastMsg } as PMAgentMessage];
-201: 								}
-202: 								return prev;
-203: 							});
-204: 							setPmProcessing(false);
-205: 							return;
-206: 						}
-207: 
-208: 						if (!content) return;
-209: 
-210: 						setPMMessages((prev) => {
-211: 							const lastMsg = prev[prev.length - 1];
-212: 							if (
-213: 								is_first ||
-214: 								!lastMsg ||
-215: 								lastMsg.type !== 'pm_agent' ||
-216: 								!(lastMsg as PMAgentMessage & { isStreaming?: boolean }).isStreaming
-217: 							) {
-218: 								return [
-219: 									...prev,
-220: 									{
-221: 										type: 'pm_agent' as const,
-222: 										content,
-223: 										isStreaming: !is_last,
-224: 										timestamp: new Date().toISOString()
-225: 									} as PMAgentMessage & { isStreaming?: boolean }
-226: 								];
-227: 							}
-228: 							return [
-229: 								...prev.slice(0, -1),
-230: 								{
-231: 									...lastMsg,
-232: 									content: (lastMsg as PMAgentMessage).content + content,
-233: 									isStreaming: !is_last
-234: 								} as PMAgentMessage & { isStreaming?: boolean }
-235: 							];
-236: 						});
-237: 						return;
-238: 					}
-239: 
-240: 					
-241: 					if (!content) return;
-242: 					const msgType = is_thinking ? 'thinking' : 'agent';
-243: 
-244: 					setMessages((prev) => {
-245: 						const lastMsg = prev[prev.length - 1];
-246: 						if (
-247: 							lastMsg?.type === msgType &&
-248: 							(lastMsg as { isStreaming?: boolean }).isStreaming &&
-249: 							(lastMsg as { agentName?: string }).agentName === agent_name
-250: 						) {
-251: 							return [
-252: 								...prev.slice(0, -1),
-253: 								{
-254: 									...lastMsg,
-255: 									content: (lastMsg as { content: string }).content + content,
-256: 									isStreaming: !is_last
-257: 								} as ChatMessage
-258: 							];
-259: 						}
-260: 						return [
-261: 							...prev,
-262: 							{
-263: 								type: msgType,
-264: 								content,
-265: 								agentName: agent_name || 'AI Agent',
-266: 								isStreaming: !is_last,
-267: 								isExpanded: false,
-268: 								timestamp: new Date().toISOString()
-269: 							} as ChatMessage
-270: 						];
-271: 					});
-272: 				}),
-273: 
-274: 				
-275: 				listen('tool_call', (event) => {
-276: 					const { tool_name, arguments: args, agent_name } = event.payload as {
-277: 						tool_name: string;
-278: 						arguments: Record<string, unknown>;
-279: 						agent_name?: string;
-280: 					};
-281: 					setMessages((prev) => [
-282: 						...prev,
-283: 						{
-284: 							type: 'tool_call',
-285: 							toolName: tool_name,
-286: 							arguments: args,
-287: 							agentName: agent_name || 'AI Agent',
-288: 							timestamp: new Date().toISOString()
-289: 						} as ChatMessage
-290: 					]);
-291: 				}),
-292: 
-293: 				listen('tool_result', (event) => {
-294: 					const { tool_name, result, success, agent_name } = event.payload as {
-295: 						tool_name: string;
-296: 						result: string;
-297: 						success: boolean;
-298: 						agent_name?: string;
-299: 					};
-300: 					setMessages((prev) => [
-301: 						...prev,
-302: 						{
-303: 							type: 'tool_result',
-304: 							toolName: tool_name,
-305: 							result,
-306: 							success,
-307: 							agentName: agent_name || 'AI Agent',
-308: 							timestamp: new Date().toISOString()
-309: 						} as ChatMessage
-310: 					]);
-311: 				}),
-312: 
-313: 				
-314: 				listen('pm_actions', (event) => {
-315: 					const { actions } = event.payload as { actions: PMAction[] };
-316: 					setPMMessages((prev) => {
-317: 						const lastMsg = prev[prev.length - 1];
-318: 						if (lastMsg?.type === 'pm_agent') {
-319: 							return [
-320: 								...prev.slice(0, -1),
-321: 								{
-322: 									...lastMsg,
-323: 									actions: [...((lastMsg as PMAgentMessage).actions || []), ...actions]
-324: 								} as PMAgentMessage
-325: 							];
-326: 						}
-327: 						return prev;
-328: 					});
-329: 				}),
-330: 
-331: 				
-332: 				listen('input_request', async (event) => {
-333: 					const [requestId, prompt, options] = event.payload as [string, string, InputOption[]];
-334: 					updateCurrentIterationStatus('Paused');
-335: 
-336: 					const artifactMatch = prompt.match(/\[ARTIFACT_TYPE:(\w+)\]$/);
-337: 					if (artifactMatch) {
-338: 						const artifactType = artifactMatch[1];
-339: 						const cleanPrompt = prompt.replace(/\[ARTIFACT_TYPE:\w+\]$/, '').trim();
-340: 
-341: 						await loadIterations();
-342: 						const latestIterations = useProjectStore.getState().iterations;
-343: 						if (latestIterations && latestIterations.length > 0) {
-344: 							const latestIteration = latestIterations[latestIterations.length - 1];
-345: 							const fullIteration = await API.iteration.get(latestIteration.id);
-346: 							setCurrentIteration(fullIteration);
-347: 						}
-348: 
-349: 						setInputRequest({
-350: 							requestId,
-351: 							prompt: cleanPrompt,
-352: 							options,
-353: 							isArtifactConfirmation: true,
-354: 							artifactType
-355: 						});
-356: 					} else {
-357: 						setInputRequest({ requestId, prompt, options });
-358: 					}
-359: 					setUserInput('');
-360: 				}),
-361: 
-362: 				
-363: 				listen('project_loaded', async () => {
-364: 					setProcessing(false);
-365: 					setCurrentAgent(null);
-366: 					setInputRequest(null);
-367: 					clearMessages();
-368: 					setCurrentIteration(null);
-369: 					await loadProject();
-370: 					setActiveView('iterations');
-371: 					message.success('Project loaded');
-372: 				}),
-373: 
-374: 				listen('project_initialized', async () => {
-375: 					setProcessing(false);
-376: 					setCurrentAgent(null);
-377: 					setInputRequest(null);
-378: 					clearMessages();
-379: 					setCurrentIteration(null);
-380: 					await loadProject();
-381: 					setActiveView('iterations');
-382: 					message.success('Project initialized');
-383: 				}),
-384: 
-385: 				
-386: 				listen('knowledge_regeneration_completed', () => {
-387: 					triggerKnowledgeRefresh();
-388: 					message.success('Knowledge updated');
-389: 				}),
-390: 
-391: 				listen<[string, string]>('knowledge_regeneration_failed', (event) => {
-392: 					const [iterationId, error] = event.payload;
-393: 					console.error('[App] Knowledge regeneration failed:', iterationId, error);
-394: 					message.error('Knowledge generation failed: ' + error);
-395: 				}),
-396: 			];
-397: 
-398: 			
-399: 			await Promise.all(listenerPromises);
-400: 
-401: 			
-402: 			
-403: 			try {
-404: 				const hasOpenProject = await API.workspace.hasOpen();
-405: 				if (hasOpenProject) {
-406: 					console.log('[App] Detected open project on startup, loading project...');
-407: 					await loadProject();
-408: 					setActiveView('iterations');
-409: 				}
-410: 			} catch (error) {
-411: 				console.error('[App] Failed to check for open project:', error);
-412: 			}
-413: 		};
-414: 
-415: 		setupListeners();
-416: 
-417: 		
-418: 		const handleKeyDown = (e: KeyboardEvent) => {
-419: 			if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-420: 				e.preventDefault();
-421: 				setCommandPaletteVisible(!commandPaletteVisible);
-422: 			}
-423: 		};
-424: 
-425: 		window.addEventListener('keydown', handleKeyDown);
-426: 		return () => window.removeEventListener('keydown', handleKeyDown);
-427: 	}, []);
-428: 
-429: 	return {
-430: 		
-431: 	};
-432: }
 ```
 
 ### crates/cowork-gui/src/types/config.ts (291 lines)
@@ -10077,6 +9830,330 @@ LICENSE
 651: test_registry_operations
 652: ⋮----
 653: ()
+```
+
+### crates/cowork-core/src/domain/iteration.rs (319 lines)
+
+```
+1: Iteration
+2: ⋮----
+3: {
+4:     pub id: String,
+5:     pub number: u32,
+6:     pub title: String,
+7:     pub description: String,
+8: 
+9:     
+10:     pub base_iteration_id: Option<String>,
+11:     pub inheritance: InheritanceMode,
+12: 
+13:     
+14:     pub status: IterationStatus,
+15:     pub started_at: DateTime<Utc>,
+16:     pub completed_at: Option<DateTime<Utc>>,
+17:     pub current_stage: Option<String>,
+18:     pub completed_stages: Vec<String>,
+19: 
+20:     
+21:     pub artifacts: Artifacts,
+22: }
+23: ⋮----
+24: Iteration
+25: ⋮----
+26: {
+27:     pub fn create_genesis(project: &Project, title: String, description: String) -> Self {
+28:         let now = Utc::now();
+29:         Self {
+30:             id: format!("iter-{}-{}", project.next_iteration_number(), now.timestamp()),
+31:             number: project.next_iteration_number(),
+32:             title,
+33:             description,
+34:             base_iteration_id: None,
+35:             inheritance: InheritanceMode::None,
+36:             status: IterationStatus::Draft,
+37:             started_at: now,
+38:             completed_at: None,
+39:             current_stage: None,
+40:             completed_stages: Vec::new(),
+41:             artifacts: Artifacts::default(),
+42:         }
+43:     }
+44: 
+45:     pub fn create_evolution(
+46:         project: &Project,
+47:         title: String,
+48:         description: String,
+49:         base_iteration_id: String,
+50:         inheritance: InheritanceMode,
+51:     ) -> Self {
+52:         let now = Utc::now();
+53:         Self {
+54:             id: format!("iter-{}-{}", project.next_iteration_number(), now.timestamp()),
+55:             number: project.next_iteration_number(),
+56:             title,
+57:             description,
+58:             base_iteration_id: Some(base_iteration_id),
+59:             inheritance,
+60:             status: IterationStatus::Draft,
+61:             started_at: now,
+62:             completed_at: None,
+63:             current_stage: None,
+64:             completed_stages: Vec::new(),
+65:             artifacts: Artifacts::default(),
+66:         }
+67:     }
+68: 
+69:     pub fn start(&mut self) {
+70:         self.status = IterationStatus::Running;
+71:         self.started_at = Utc::now();
+72:     }
+73: 
+74:     pub fn pause(&mut self) {
+75:         self.status = IterationStatus::Paused;
+76:     }
+77: 
+78:     pub fn resume(&mut self) {
+79:         self.status = IterationStatus::Running;
+80:     }
+81: 
+82:     pub fn complete(&mut self) {
+83:         self.status = IterationStatus::Completed;
+84:         self.completed_at = Some(Utc::now());
+85:         self.current_stage = None;
+86:         
+87:         
+88:         
+89:         
+90:         self.finalize_completed_stages();
+91:     }
+92:     
+93:     
+94:     
+95:     fn finalize_completed_stages(&mut self) {
+96:         
+97:         let flow_stages = self.get_flow_stages();
+98:         
+99:         
+100:         let artifact_stages = [
+101:             ("idea", &self.artifacts.idea),
+102:             ("prd", &self.artifacts.prd),
+103:             ("design", &self.artifacts.design),
+104:             ("plan", &self.artifacts.plan),
+105:             ("coding", &self.artifacts.coding),
+106:             ("delivery", &self.artifacts.delivery),
+107:         ];
+108:         
+109:         for (stage_name, artifact) in artifact_stages {
+110:             if artifact.is_some() && !self.completed_stages.contains(&stage_name.to_string()) {
+111:                 self.completed_stages.push(stage_name.to_string());
+112:             }
+113:         }
+114:         
+115:         
+116:         
+117:         if self.completed_stages.is_empty() && !flow_stages.is_empty() {
+118:             self.completed_stages = flow_stages;
+119:         }
+120:     }
+121:     
+122:     
+123:     fn get_flow_stages(&self) -> Vec<String> {
+124:         use crate::config_definition::registry::global_registry;
+125:         
+126:         if let Some(flow) = global_registry().get_default_flow() {
+127:             flow.stages.iter().map(|s| s.stage_id.clone()).collect()
+128:         } else {
+129:             
+130:             vec![
+131:                 "idea".to_string(),
+132:                 "prd".to_string(),
+133:                 "design".to_string(),
+134:                 "plan".to_string(),
+135:                 "coding".to_string(),
+136:                 "check".to_string(),
+137:                 "delivery".to_string(),
+138:             ]
+139:         }
+140:     }
+141: 
+142:     pub fn fail(&mut self) {
+143:         self.status = IterationStatus::Failed;
+144:         
+145:         
+146:     }
+147: 
+148:     pub fn set_stage(&mut self, stage: impl Into<String>) {
+149:         self.current_stage = Some(stage.into());
+150:     }
+151: 
+152:     pub fn complete_stage(&mut self, stage: impl Into<String>, artifact_path: Option<String>) {
+153:         let stage_name = stage.into();
+154:         self.completed_stages.push(stage_name.clone());
+155: 
+156:         
+157:         let path = artifact_path.unwrap_or_default();
+158:         match stage_name.as_str() {
+159:             "idea" => self.artifacts.idea = Some(path),
+160:             "prd" => self.artifacts.prd = Some(path),
+161:             "design" => self.artifacts.design = Some(path),
+162:             "plan" => self.artifacts.plan = Some(path),
+163:             "coding" => self.artifacts.coding = Some(path), 
+164:             "delivery" => self.artifacts.delivery = Some(path),
+165:             _ => {}
+166:         }
+167:     }
+168: 
+169:     
+170:     
+171:     pub fn determine_start_stage(&self) -> String {
+172:         let stage_mapping = self.get_stage_mapping_from_flow();
+173:         
+174:         let mode_key = match self.inheritance {
+175:             InheritanceMode::None => "none",
+176:             InheritanceMode::Full => "full",
+177:             InheritanceMode::Partial => "partial",
+178:         };
+179:         
+180:         stage_mapping
+181:             .get(mode_key)
+182:             .cloned()
+183:             .unwrap_or_else(|| "idea".to_string())
+184:     }
+185:     
+186:     
+187:     fn get_stage_mapping_from_flow(&self) -> std::collections::HashMap<String, String> {
+188:         use crate::config_definition::registry::global_registry;
+189:         
+190:         if let Some(flow) = global_registry().get_default_flow() {
+191:             flow.config.inheritance.stage_mapping
+192:         } else {
+193:             
+194:             let mut mapping = std::collections::HashMap::new();
+195:             mapping.insert("none".to_string(), "idea".to_string());
+196:             mapping.insert("partial".to_string(), "idea".to_string());
+197:             mapping.insert("full".to_string(), "idea".to_string());
+198:             mapping
+199:         }
+200:     }
+201: 
+202:     pub fn to_summary(&self) -> super::IterationSummary {
+203:         super::IterationSummary {
+204:             id: self.id.clone(),
+205:             number: self.number,
+206:             title: self.title.clone(),
+207:             status: self.status,
+208:             completed_stages: self.completed_stages.clone(),
+209:             created_at: self.started_at,
+210:         }
+211:     }
+212: }
+213: ⋮----
+214: InheritanceMode
+215: ⋮----
+216: {
+217:     None,     
+218:     Full,     
+219:     Partial,  
+220: }
+221: ⋮----
+222: InheritanceMode
+223: ⋮----
+224: {
+225:     fn default() -> Self {
+226:         InheritanceMode::Full
+227:     }
+228: }
+229: ⋮----
+230: Artifacts
+231: ⋮----
+232: {
+233:     pub idea: Option<String>,
+234:     pub prd: Option<String>,
+235:     pub design: Option<String>,
+236:     pub plan: Option<String>,
+237:     pub coding: Option<String>,  
+238:     pub delivery: Option<String>,
+239: }
+240: ⋮----
+241: Artifacts
+242: ⋮----
+243: {
+244:     pub fn get(&self, stage: &str) -> Option<&String> {
+245:         match stage {
+246:             "idea" => self.idea.as_ref(),
+247:             "prd" => self.prd.as_ref(),
+248:             "design" => self.design.as_ref(),
+249:             "plan" => self.plan.as_ref(),
+250:             "coding" => self.coding.as_ref(),
+251:             "delivery" => self.delivery.as_ref(),
+252:             _ => None,
+253:         }
+254:     }
+255: 
+256:     pub fn set(&mut self, stage: &str, path: String) {
+257:         match stage {
+258:             "idea" => self.idea = Some(path),
+259:             "prd" => self.prd = Some(path),
+260:             "design" => self.design = Some(path),
+261:             "plan" => self.plan = Some(path),
+262:             "coding" => self.coding = Some(path),
+263:             "delivery" => self.delivery = Some(path),
+264:             _ => {}
+265:         }
+266:     }
+267: }
+268: ⋮----
+269: create_test_project
+270: ⋮----
+271: ()
+272: ⋮----
+273: test_create_genesis_iteration
+274: ⋮----
+275: ()
+276: ⋮----
+277: test_create_evolution_iteration
+278: ⋮----
+279: ()
+280: ⋮----
+281: test_iteration_status_transitions
+282: ⋮----
+283: ()
+284: ⋮----
+285: test_iteration_fail
+286: ⋮----
+287: ()
+288: ⋮----
+289: test_set_and_complete_stage
+290: ⋮----
+291: ()
+292: ⋮----
+293: test_determine_start_stage_none_mode
+294: ⋮----
+295: ()
+296: ⋮----
+297: test_determine_start_stage_partial_mode
+298: ⋮----
+299: ()
+300: ⋮----
+301: test_determine_start_stage_full_mode
+302: ⋮----
+303: ()
+304: ⋮----
+305: test_artifacts_get_set
+306: ⋮----
+307: ()
+308: ⋮----
+309: test_to_summary
+310: ⋮----
+311: ()
+312: ⋮----
+313: test_inheritance_mode_default
+314: ⋮----
+315: ()
+316: ⋮----
+317: test_inheritance_mode_serde
+318: ⋮----
+319: ()
 ```
 
 ### crates/cowork-core/src/instructions/coding.rs (359 lines)
@@ -13885,436 +13962,6 @@ LICENSE
 167:     )
 ```
 
-### crates/cowork-gui/src/App.tsx (413 lines)
-
-```
-1: import React, { useEffect, useRef, useState, useMemo, useCallback, Suspense, lazy } from 'react';
-2: import { Layout, Menu, Button, Empty, App as AntApp, Tag, Spin } from 'antd';
-3: import {
-4: 	FolderOutlined,
-5: 	FileTextOutlined,
-6: 	CodeOutlined,
-7: 	EyeOutlined,
-8: 	PlayCircleOutlined,
-9: 	ReloadOutlined,
-10: 	MessageOutlined,
-11: 	AppstoreOutlined,
-12: 	DatabaseOutlined,
-13: 	BranchesOutlined,
-14: 	CheckCircleOutlined,
-15: 	RocketOutlined,
-16: 	BookOutlined,
-17: 	SettingOutlined,
-18: 	ControlOutlined
-19: } from '@ant-design/icons';
-20: 
-21: import { useProjectStore, useAgentStore, useUIStore } from './stores';
-22: import { LoadingScreen, StatusBadge } from './components/common';
-23: import { useAppEvents, usePMAgent, useIterationActions, useChatInput } from './hooks';
-24: 
-25: import type { ChatMode, PMAction, PMAgentMessage, ChatMessage } from './stores';
-26: 
-27: 
-28: import ProjectsPanel from './components/ProjectsPanel';
-29: 
-30: 
-31: const ArtifactsViewer = lazy(() => import('./components/ArtifactsViewer'));
-32: const CodeEditor = lazy(() => import('./components/CodeEditor'));
-33: const RunnerPanel = lazy(() => import('./components/RunnerPanel'));
-34: const MemoryPanel = lazy(() => import('./components/MemoryPanel'));
-35: const KnowledgePanel = lazy(() => import('./components/KnowledgePanel'));
-36: const CommandPalette = lazy(() => import('./components/CommandPalette'));
-37: const IterationsPanel = lazy(() => import('./components/IterationsPanel'));
-38: const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
-39: 
-40: const ChatPanel = lazy(() => import('./components/chat').then(m => ({ default: m.ChatPanel })));
-41: 
-42: const AgentsSetupPanel = lazy(() => import('./components/config').then(m => ({ default: m.AgentsSetupPanel })));
-43: 
-44: const { Sider, Content, Header, Footer } = Layout;
-45: 
-46: function App() {
-47: 	
-48: 	const [userInput, setUserInput] = useState('');
-49: 	const messagesContainerRef = useRef<HTMLDivElement>(null);
-50: 	const pmMessagesContainerRef = useRef<HTMLDivElement>(null);
-51: 
-52: 	
-53: 	const project = useProjectStore(state => state.project);
-54: 	const iterations = useProjectStore(state => state.iterations);
-55: 	const currentIteration = useProjectStore(state => state.currentIteration);
-56: 	const loading = useProjectStore(state => state.loading);
-57: 	const loadProject = useProjectStore(state => state.loadProject);
-58: 	const setCurrentIteration = useProjectStore(state => state.setCurrentIteration);
-59: 	const updateCurrentIterationStatus = useProjectStore(state => state.updateCurrentIterationStatus);
-60: 
-61: 	
-62: 	const messages = useAgentStore(state => state.messages);
-63: 	const pmMessages = useAgentStore(state => state.pmMessages);
-64: 	const isProcessing = useAgentStore(state => state.isProcessing);
-65: 	const currentAgent = useAgentStore(state => state.currentAgent);
-66: 	const currentStage = useAgentStore(state => state.currentStage);
-67: 	const inputRequest = useAgentStore(state => state.inputRequest);
-68: 	const pmProcessing = useAgentStore(state => state.pmProcessing);
-69: 	const setInputRequest = useAgentStore(state => state.setInputRequest);
-70: 	const loadPMWelcomeMessage = useAgentStore(state => state.loadPMWelcomeMessage);
-71: 
-72: 	
-73: 	const activeView = useUIStore(state => state.activeView);
-74: 	const commandPaletteVisible = useUIStore(state => state.commandPaletteVisible);
-75: 	const activeArtifactTab = useUIStore(state => state.activeArtifactTab);
-76: 	const artifactsRefreshTrigger = useUIStore(state => state.artifactsRefreshTrigger);
-77: 	const codeRefreshTrigger = useUIStore(state => state.codeRefreshTrigger);
-78: 	const memoryRefreshTrigger = useUIStore(state => state.memoryRefreshTrigger);
-79: 	const knowledgeRefreshTrigger = useUIStore(state => state.knowledgeRefreshTrigger);
-80: 	const setActiveView = useUIStore(state => state.setActiveView);
-81: 	const setCommandPaletteVisible = useUIStore(state => state.setCommandPaletteVisible);
-82: 	const setActiveArtifactTab = useUIStore(state => state.setActiveArtifactTab);
-83: 
-84: 	
-85: 	useAppEvents(userInput, setUserInput);
-86: 	const { handlePMSendMessage, handlePMAction } = usePMAgent();
-87: 	const { handleSelectIteration, handleExecuteIteration, handleOpenProjectFolder, handleOpenIterationFolder, handleCommandSelect } = useIterationActions();
-88: 	const {
-89: 		inputRequest: chatInputRequest,
-90: 		handleSendUserMessage,
-91: 		handleSelectOption,
-92: 		handleSubmitFeedback,
-93: 		handleToggleThinking,
-94: 		handleCancelFeedback
-95: 	} = useChatInput();
-96: 
-97: 	
-98: 	const chatMode = useMemo<ChatMode>(() => {
-99: 		if (!currentIteration) return 'disabled';
-100: 		if (currentIteration.status === 'Completed') return 'pm_agent';
-101: 		if (isProcessing || currentIteration.status === 'Running') return 'pipeline';
-102: 		return 'pipeline';
-103: 	}, [currentIteration, isProcessing]);
-104: 
-105: 	
-106: 	useEffect(() => {
-107: 		if (chatMode === 'pm_agent' && currentIteration) {
-108: 			const pmMessages = useAgentStore.getState().pmMessages;
-109: 			if (pmMessages.length === 0) {
-110: 				loadPMWelcomeMessage(currentIteration.id);
-111: 			}
-112: 		}
-113: 	}, [chatMode, currentIteration?.id, loadPMWelcomeMessage]);
-114: 
-115: 	
-116: 	useEffect(() => {
-117: 		if (messagesContainerRef.current) {
-118: 			messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-119: 		}
-120: 	}, [messages]);
-121: 
-122: 	useEffect(() => {
-123: 		if (pmMessagesContainerRef.current && pmMessages.length > 0) {
-124: 			pmMessagesContainerRef.current.scrollTop = pmMessagesContainerRef.current.scrollHeight;
-125: 		}
-126: 	}, [pmMessages]);
-127: 
-128: 	
-129: 	const handleSend = useCallback(() => {
-130: 		if (chatMode === 'pm_agent') {
-131: 			handlePMSendMessage(userInput, setUserInput);
-132: 		} else {
-133: 			handleSendUserMessage(userInput, setUserInput);
-134: 		}
-135: 	}, [chatMode, userInput, handlePMSendMessage, handleSendUserMessage]);
-136: 
-137: 	const handleSelectOptionWrapper = useCallback((option: Parameters<typeof handleSelectOption>[0]) => {
-138: 		handleSelectOption(option, userInput, setUserInput);
-139: 	}, [handleSelectOption, userInput]);
-140: 
-141: 	const handleSubmitFeedbackWrapper = useCallback(() => {
-142: 		handleSubmitFeedback(userInput, setUserInput, updateCurrentIterationStatus);
-143: 	}, [handleSubmitFeedback, userInput, updateCurrentIterationStatus]);
-144: 
-145: 	const handlePMActionWrapper = useCallback((action: PMAction) => {
-146: 		handlePMAction(action, pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]);
-147: 	}, [handlePMAction, pmMessages]);
-148: 
-149: 	
-150: 	const loadingFallback = (
-151: 		<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-152: 			<Spin size="large" tip="Loading..." />
-153: 		</div>
-154: 	);
-155: 
-156: 	
-157: 	const renderContent = () => (
-158: 		<div style={{ height: '100%' }}>
-159: 			<div style={{ height: '100%', display: activeView === 'iterations' ? 'block' : 'none' }}>
-160: 				<Suspense fallback={loadingFallback}>
-161: 					<IterationsPanel
-162: 						key="iterations"
-163: 						onSelectIteration={handleSelectIteration}
-164: 						selectedIterationId={currentIteration?.id}
-165: 					/>
-166: 				</Suspense>
-167: 			</div>
-168: 
-169: 			<div style={{ height: '100%', display: activeView === 'projects' ? 'block' : 'none' }}>
-170: 				<ProjectsPanel key="projects" />
-171: 			</div>
-172: 
-173: 			<div style={{ height: '100%', display: activeView === 'artifacts' ? 'block' : 'none' }}>
-174: 				{currentIteration ? (
-175: 					<Suspense fallback={loadingFallback}>
-176: 						<ArtifactsViewer
-177: 							key={`artifacts-${currentIteration.id}`}
-178: 							iterationId={currentIteration.id}
-179: 							activeTab={activeArtifactTab}
-180: 							onTabChange={setActiveArtifactTab}
-181: 							refreshTrigger={artifactsRefreshTrigger}
-182: 						/>
-183: 					</Suspense>
-184: 				) : (
-185: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-186: 				)}
-187: 			</div>
-188: 
-189: 			<div style={{ height: '100%', display: activeView === 'code' ? 'block' : 'none' }}>
-190: 				{currentIteration ? (
-191: 					<Suspense fallback={loadingFallback}>
-192: 						<CodeEditor
-193: 							key={`code-${currentIteration.id}`}
-194: 							iterationId={currentIteration.id}
-195: 							refreshTrigger={codeRefreshTrigger}
-196: 						/>
-197: 					</Suspense>
-198: 				) : (
-199: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-200: 				)}
-201: 			</div>
-202: 
-203: 			<div style={{ height: '100%', display: activeView === 'run' ? 'block' : 'none' }}>
-204: 				{currentIteration ? (
-205: 					<Suspense fallback={loadingFallback}>
-206: 						<RunnerPanel key={`run-${currentIteration.id}`} iterationId={currentIteration.id} />
-207: 					</Suspense>
-208: 				) : (
-209: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-210: 				)}
-211: 			</div>
-212: 
-213: 			<div style={{ height: '100%', display: activeView === 'execution-memory' ? 'block' : 'none' }}>
-214: 				<Suspense fallback={loadingFallback}>
-215: 					<MemoryPanel
-216: 						key={`memory-${memoryRefreshTrigger}`}
-217: 						currentSession={currentIteration?.id}
-218: 						refreshTrigger={memoryRefreshTrigger}
-219: 					/>
-220: 				</Suspense>
-221: 			</div>
-222: 
-223: 			<div style={{ height: '100%', display: activeView === 'project-knowledge' ? 'block' : 'none' }}>
-224: 				<Suspense fallback={loadingFallback}>
-225: 					<KnowledgePanel
-226: 						key={`knowledge-${knowledgeRefreshTrigger}`}
-227: 						currentSession={project?.id}
-228: 						currentIterationId={currentIteration?.id}
-229: 						refreshTrigger={knowledgeRefreshTrigger}
-230: 					/>
-231: 				</Suspense>
-232: 			</div>
-233: 
-234: 			<div style={{ height: '100%', display: activeView === 'settings' ? 'block' : 'none', overflow: 'auto' }}>
-235: 				<Suspense fallback={loadingFallback}>
-236: 					<SettingsPanel />
-237: 				</Suspense>
-238: 			</div>
-239: 
-240: 			<div style={{ height: '100%', display: activeView === 'config' ? 'block' : 'none', overflow: 'auto' }}>
-241: 				<Suspense fallback={loadingFallback}>
-242: 					<AgentsSetupPanel />
-243: 				</Suspense>
-244: 			</div>
-245: 
-246: 			<div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
-247: 				{currentIteration ? (
-248: 					<Suspense fallback={loadingFallback}>
-249: 						<ChatPanel
-250: 							messages={messages}
-251: 							pmMessages={pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]}
-252: 							mode={chatMode}
-253: 							isProcessing={isProcessing}
-254: 							pmProcessing={pmProcessing}
-255: 							currentAgent={currentAgent}
-256: 							iterationTitle={currentIteration.title}
-257: 							iterationDescription={currentIteration.description}
-258: 							currentStage={currentStage}
-259: 							inputRequest={inputRequest}
-260: 							userInput={userInput}
-261: 							messagesContainerRef={messagesContainerRef as React.RefObject<HTMLDivElement>}
-262: 							pmMessagesContainerRef={pmMessagesContainerRef as React.RefObject<HTMLDivElement>}
-263: 							onUserInputChange={setUserInput}
-264: 							onSend={handleSend}
-265: 							onSelectOption={handleSelectOptionWrapper}
-266: 							onSubmitFeedback={handleSubmitFeedbackWrapper}
-267: 							onCancelFeedback={handleCancelFeedback}
-268: 							onToggleThinking={handleToggleThinking}
-269: 							onActionClick={handlePMActionWrapper}
-270: 						/>
-271: 					</Suspense>
-272: 				) : (
-273: 					<Empty description="Select an iteration to view chat" style={{ marginTop: '40px' }} />
-274: 				)}
-275: 			</div>
-276: 		</div>
-277: 	);
-278: 
-279: 	if (loading) {
-280: 		return <LoadingScreen />;
-281: 	}
-282: 
-283: 	return (
-284: 		<Layout style={{ minHeight: '100vh' }}>
-285: 			<Header
-286: 				style={{
-287: 					background: '#fff',
-288: 					borderBottom: '1px solid #e8e8e8',
-289: 					padding: '0 24px',
-290: 					display: 'flex',
-291: 					alignItems: 'center',
-292: 					justifyContent: 'space-between'
-293: 				}}
-294: 			>
-295: 				<div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-296: 					<h1 style={{ margin: 0, fontSize: '18px' }}>
-297: 						<RocketOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
-298: 						Cowork Forge
-299: 					</h1>
-300: 					{project && (
-301: 						<Tag color="blue" style={{ cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
-302: 							{project.name}
-303: 						</Tag>
-304: 					)}
-305: 				</div>
-306: 
-307: 				<div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-308: 					{currentIteration && (
-309: 						<>
-310: 							<StatusBadge status={currentIteration.status} />
-311: 							{(currentIteration.status === 'Draft' || currentIteration.status === 'Paused') && (
-312: 								<Button
-313: 									type="primary"
-314: 									icon={
-315: 										currentIteration.status === 'Draft' ? (
-316: 											<PlayCircleOutlined />
-317: 										) : (
-318: 											<ReloadOutlined />
-319: 										)
-320: 									}
-321: 									onClick={handleExecuteIteration}
-322: 									loading={isProcessing}
-323: 								>
-324: 									{currentIteration.status === 'Draft' ? 'Start Iteration' : 'Continue'}
-325: 								</Button>
-326: 							)}
-327: 						</>
-328: 					)}
-329: 				</div>
-330: 			</Header>
-331: 
-332: 			<Layout style={{ height: 'calc(100vh - 64px - 48px)' }}>
-333: 				<Sider width={200} style={{ background: '#fff', borderRight: '1px solid #e8e8e8' }}>
-334: 					<Menu
-335: 						mode="inline"
-336: 						selectedKeys={[activeView]}
-337: 						onClick={({ key }) => setActiveView(key as typeof activeView)}
-338: 						style={{ height: '100%', borderRight: 0 }}
-339: 						items={[
-340: 							{ key: 'projects', icon: <AppstoreOutlined />, label: 'Projects' },
-341: 							{ key: 'iterations', icon: <BranchesOutlined />, label: 'Iterations' },
-342: 							{ key: 'chat', icon: <MessageOutlined />, label: 'Collaborate' },
-343: 							{ key: 'artifacts', icon: <FileTextOutlined />, label: 'Artifacts' },
-344: 							{ key: 'code', icon: <CodeOutlined />, label: 'Code' },
-345: 							{ key: 'run', icon: <PlayCircleOutlined />, label: 'Run' },
-346: 							{ key: 'execution-memory', icon: <DatabaseOutlined />, label: 'Memory' },
-347: 							{ key: 'project-knowledge', icon: <BookOutlined />, label: 'Knowledge' },
-348: 							{ type: 'divider' },
-349: 							{ key: 'config', icon: <ControlOutlined />, label: 'Agents Setup' },
-350: 							{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' }
-351: 						]}
-352: 					/>
-353: 				</Sider>
-354: 
-355: 				<Content style={{ overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
-356: 					{renderContent()}
-357: 				</Content>
-358: 			</Layout>
-359: 
-360: 			<Footer
-361: 				style={{
-362: 					background: '#fff',
-363: 					borderTop: '1px solid #e8e8e8',
-364: 					padding: '12px 24px',
-365: 					display: 'flex',
-366: 					justifyContent: 'space-between',
-367: 					alignItems: 'center'
-368: 				}}
-369: 			>
-370: 				<div style={{ fontSize: '12px', color: '#888' }}>
-371: 					{project ? (
-372: 						<>
-373: 							<span style={{ marginRight: '16px', cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
-374: 								Project: <strong>{project.name}</strong>
-375: 							</span>
-376: 							<span
-377: 								style={{ cursor: currentIteration ? 'pointer' : 'default' }}
-378: 								onClick={() => currentIteration && handleOpenIterationFolder(currentIteration.id)}
-379: 								title={currentIteration ? `Click to open iteration folder: ${currentIteration.id}` : undefined}
-380: 							>
-381: 								Iterations: <strong>{iterations.length}</strong>
-382: 								{currentIteration && <span style={{ marginLeft: '4px', color: '#1890ff' }}>(#{currentIteration.number})</span>}
-383: 							</span>
-384: 						</>
-385: 					) : (
-386: 						'No project loaded'
-387: 					)}
-388: 				</div>
-389: 				<div style={{ fontSize: '12px', color: '#888' }}>
-390: 					{isProcessing ? (
-391: 						<span style={{ color: '#1890ff' }}>
-392: 							<Spin size="small" style={{ marginRight: '8px' }} />
-393: 							{currentAgent ? `${currentAgent} is working...` : 'Processing...'}
-394: 						</span>
-395: 					) : (
-396: 						<span style={{ color: '#52c41a' }}>
-397: 							<CheckCircleOutlined style={{ marginRight: '4px' }} />
-398: 							Ready
-399: 						</span>
-400: 					)}
-401: 				</div>
-402: 			</Footer>
-403: 
-404: 			<CommandPalette
-405: 				visible={commandPaletteVisible}
-406: 				onClose={() => setCommandPaletteVisible(false)}
-407: 				onCommandSelect={handleCommandSelect}
-408: 			/>
-409: 		</Layout>
-410: 	);
-411: }
-412: 
-413: export default App;
-```
-
-### crates/cowork-gui/src/components/IterationsPanel.tsx (7 lines)
-
-```
-1: IterationsPanelProps
-2: ⋮----
-3: {
-4:   onSelectIteration?: (iterationId: string) => void;
-5:   selectedIterationId?: string | null;
-6:   onExecuteStatusChange?: (iterationId: string, status: string) => void;
-7: }
-```
-
 ### crates/cowork-gui/src/components/common/MarkdownMessage.tsx (5 lines)
 
 ```
@@ -14565,103 +14212,6 @@ LICENSE
 235: };
 236: 
 237: export default SkillManager;
-```
-
-### crates/cowork-gui/src/hooks/useIterationActions.ts (92 lines)
-
-```
-1: function useIterationActions() {
-2: 	const { message } = AntApp.useApp();
-3: 
-4: 	
-5: 	const { currentIteration, setCurrentIteration, setIsExecuting } = useProjectStore();
-6: 
-7: 	
-8: 	const { setProcessing } = useAgentStore();
-9: 
-10: 	
-11: 	const { activeView, setActiveView } = useUIStore();
-12: 
-13: 	
-14: 	const handleSelectIteration = useCallback(
-15: 		async (iterationId: string) => {
-16: 			try {
-17: 				const { currentIteration, isExecuting } = useProjectStore.getState();
-18: 				const fullIteration = await API.iteration.get(iterationId);
-19: 				
-20: 				if (isExecuting && currentIteration?.id === iterationId) {
-21: 					setCurrentIteration({ ...fullIteration, status: currentIteration.status });
-22: 				} else {
-23: 					setCurrentIteration(fullIteration);
-24: 				}
-25: 				setActiveView('chat');
-26: 			} catch (error) {
-27: 				console.error('Failed to load iteration:', error);
-28: 				message.error('Failed to load iteration: ' + error);
-29: 			}
-30: 		},
-31: 		[setCurrentIteration, setActiveView, message]
-32: 	);
-33: 
-34: 	
-35: 	const handleExecuteIteration = useCallback(async () => {
-36: 		if (!currentIteration) return;
-37: 		try {
-38: 			setProcessing(true);
-39: 			await API.iteration.execute(currentIteration.id);
-40: 			message.info('Iteration execution started');
-41: 		} catch (error) {
-42: 			message.error('Failed to execute iteration: ' + error);
-43: 			setProcessing(false);
-44: 		}
-45: 	}, [currentIteration, setProcessing, message]);
-46: 
-47: 	
-48: 	const handleOpenProjectFolder = useCallback(async () => {
-49: 		try {
-50: 			await API.util.openInFileManager('.');
-51: 		} catch (error) {
-52: 			message.error('Failed to open project folder');
-53: 		}
-54: 	}, [message]);
-55: 
-56: 	
-57: 	const handleOpenIterationFolder = useCallback(async (iterationId: string) => {
-58: 		try {
-59: 			await API.util.openInFileManager(iterationId);
-60: 		} catch (error) {
-61: 			message.error('Failed to open iteration folder: ' + error);
-62: 		}
-63: 	}, [message]);
-64: 
-65: 	
-66: 	const handleCommandSelect = useCallback(
-67: 		(commandId: string) => {
-68: 			const viewMap: Record<string, string> = {
-69: 				'view-iterations': 'iterations',
-70: 				'view-chat': 'chat',
-71: 				'view-artifacts': 'artifacts',
-72: 				'view-code': 'code',
-73: 				'view-run': 'run',
-74: 				'view-memory': 'execution-memory',
-75: 				'view-projects': 'projects',
-76: 				'view-settings': 'settings'
-77: 			};
-78: 			if (viewMap[commandId]) {
-79: 				setActiveView(viewMap[commandId] as typeof activeView);
-80: 			}
-81: 		},
-82: 		[setActiveView]
-83: 	);
-84: 
-85: 	return {
-86: 		handleSelectIteration,
-87: 		handleExecuteIteration,
-88: 		handleOpenProjectFolder,
-89: 		handleOpenIterationFolder,
-90: 		handleCommandSelect
-91: 	};
-92: }
 ```
 
 ### crates/cowork-gui/src/stores/configStore.ts (49 lines)
@@ -21559,6 +21109,424 @@ LICENSE
 38: }
 ```
 
+### crates/cowork-gui/src/App.tsx (413 lines)
+
+```
+1: import React, { useEffect, useRef, useState, useMemo, useCallback, Suspense, lazy } from 'react';
+2: import { Layout, Menu, Button, Empty, App as AntApp, Tag, Spin } from 'antd';
+3: import {
+4: 	FolderOutlined,
+5: 	FileTextOutlined,
+6: 	CodeOutlined,
+7: 	EyeOutlined,
+8: 	PlayCircleOutlined,
+9: 	ReloadOutlined,
+10: 	MessageOutlined,
+11: 	AppstoreOutlined,
+12: 	DatabaseOutlined,
+13: 	BranchesOutlined,
+14: 	CheckCircleOutlined,
+15: 	RocketOutlined,
+16: 	BookOutlined,
+17: 	SettingOutlined,
+18: 	ControlOutlined
+19: } from '@ant-design/icons';
+20: 
+21: import { useProjectStore, useAgentStore, useUIStore } from './stores';
+22: import { LoadingScreen, StatusBadge } from './components/common';
+23: import { useAppEvents, usePMAgent, useIterationActions, useChatInput } from './hooks';
+24: 
+25: import type { ChatMode, PMAction, PMAgentMessage, ChatMessage } from './stores';
+26: 
+27: 
+28: import ProjectsPanel from './components/ProjectsPanel';
+29: 
+30: 
+31: const ArtifactsViewer = lazy(() => import('./components/ArtifactsViewer'));
+32: const CodeEditor = lazy(() => import('./components/CodeEditor'));
+33: const RunnerPanel = lazy(() => import('./components/RunnerPanel'));
+34: const MemoryPanel = lazy(() => import('./components/MemoryPanel'));
+35: const KnowledgePanel = lazy(() => import('./components/KnowledgePanel'));
+36: const CommandPalette = lazy(() => import('./components/CommandPalette'));
+37: const IterationsPanel = lazy(() => import('./components/IterationsPanel'));
+38: const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
+39: 
+40: const ChatPanel = lazy(() => import('./components/chat').then(m => ({ default: m.ChatPanel })));
+41: 
+42: const AgentsSetupPanel = lazy(() => import('./components/config').then(m => ({ default: m.AgentsSetupPanel })));
+43: 
+44: const { Sider, Content, Header, Footer } = Layout;
+45: 
+46: function App() {
+47: 	
+48: 	const [userInput, setUserInput] = useState('');
+49: 	const messagesContainerRef = useRef<HTMLDivElement>(null);
+50: 	const pmMessagesContainerRef = useRef<HTMLDivElement>(null);
+51: 
+52: 	
+53: 	const project = useProjectStore(state => state.project);
+54: 	const iterations = useProjectStore(state => state.iterations);
+55: 	const currentIteration = useProjectStore(state => state.currentIteration);
+56: 	const loading = useProjectStore(state => state.loading);
+57: 	const loadProject = useProjectStore(state => state.loadProject);
+58: 	const setCurrentIteration = useProjectStore(state => state.setCurrentIteration);
+59: 	const updateCurrentIterationStatus = useProjectStore(state => state.updateCurrentIterationStatus);
+60: 
+61: 	
+62: 	const messages = useAgentStore(state => state.messages);
+63: 	const pmMessages = useAgentStore(state => state.pmMessages);
+64: 	const isProcessing = useAgentStore(state => state.isProcessing);
+65: 	const currentAgent = useAgentStore(state => state.currentAgent);
+66: 	const currentStage = useAgentStore(state => state.currentStage);
+67: 	const inputRequest = useAgentStore(state => state.inputRequest);
+68: 	const pmProcessing = useAgentStore(state => state.pmProcessing);
+69: 	const setInputRequest = useAgentStore(state => state.setInputRequest);
+70: 	const loadPMWelcomeMessage = useAgentStore(state => state.loadPMWelcomeMessage);
+71: 
+72: 	
+73: 	const activeView = useUIStore(state => state.activeView);
+74: 	const commandPaletteVisible = useUIStore(state => state.commandPaletteVisible);
+75: 	const activeArtifactTab = useUIStore(state => state.activeArtifactTab);
+76: 	const artifactsRefreshTrigger = useUIStore(state => state.artifactsRefreshTrigger);
+77: 	const codeRefreshTrigger = useUIStore(state => state.codeRefreshTrigger);
+78: 	const memoryRefreshTrigger = useUIStore(state => state.memoryRefreshTrigger);
+79: 	const knowledgeRefreshTrigger = useUIStore(state => state.knowledgeRefreshTrigger);
+80: 	const setActiveView = useUIStore(state => state.setActiveView);
+81: 	const setCommandPaletteVisible = useUIStore(state => state.setCommandPaletteVisible);
+82: 	const setActiveArtifactTab = useUIStore(state => state.setActiveArtifactTab);
+83: 
+84: 	
+85: 	useAppEvents(userInput, setUserInput);
+86: 	const { handlePMSendMessage, handlePMAction } = usePMAgent();
+87: 	const { handleSelectIteration, handleExecuteIteration, handleOpenProjectFolder, handleOpenIterationFolder, handleCommandSelect } = useIterationActions();
+88: 	const {
+89: 		inputRequest: chatInputRequest,
+90: 		handleSendUserMessage,
+91: 		handleSelectOption,
+92: 		handleSubmitFeedback,
+93: 		handleToggleThinking,
+94: 		handleCancelFeedback
+95: 	} = useChatInput();
+96: 
+97: 	
+98: 	const chatMode = useMemo<ChatMode>(() => {
+99: 		if (!currentIteration) return 'disabled';
+100: 		if (currentIteration.status === 'Completed') return 'pm_agent';
+101: 		if (isProcessing || currentIteration.status === 'Running') return 'pipeline';
+102: 		return 'pipeline';
+103: 	}, [currentIteration, isProcessing]);
+104: 
+105: 	
+106: 	useEffect(() => {
+107: 		if (chatMode === 'pm_agent' && currentIteration) {
+108: 			const pmMessages = useAgentStore.getState().pmMessages;
+109: 			if (pmMessages.length === 0) {
+110: 				loadPMWelcomeMessage(currentIteration.id);
+111: 			}
+112: 		}
+113: 	}, [chatMode, currentIteration?.id, loadPMWelcomeMessage]);
+114: 
+115: 	
+116: 	useEffect(() => {
+117: 		if (messagesContainerRef.current) {
+118: 			messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+119: 		}
+120: 	}, [messages]);
+121: 
+122: 	useEffect(() => {
+123: 		if (pmMessagesContainerRef.current && pmMessages.length > 0) {
+124: 			pmMessagesContainerRef.current.scrollTop = pmMessagesContainerRef.current.scrollHeight;
+125: 		}
+126: 	}, [pmMessages]);
+127: 
+128: 	
+129: 	const handleSend = useCallback(() => {
+130: 		if (chatMode === 'pm_agent') {
+131: 			handlePMSendMessage(userInput, setUserInput);
+132: 		} else {
+133: 			handleSendUserMessage(userInput, setUserInput);
+134: 		}
+135: 	}, [chatMode, userInput, handlePMSendMessage, handleSendUserMessage]);
+136: 
+137: 	const handleSelectOptionWrapper = useCallback((option: Parameters<typeof handleSelectOption>[0]) => {
+138: 		handleSelectOption(option, userInput, setUserInput);
+139: 	}, [handleSelectOption, userInput]);
+140: 
+141: 	const handleSubmitFeedbackWrapper = useCallback(() => {
+142: 		handleSubmitFeedback(userInput, setUserInput, updateCurrentIterationStatus);
+143: 	}, [handleSubmitFeedback, userInput, updateCurrentIterationStatus]);
+144: 
+145: 	const handlePMActionWrapper = useCallback((action: PMAction) => {
+146: 		handlePMAction(action, pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]);
+147: 	}, [handlePMAction, pmMessages]);
+148: 
+149: 	
+150: 	const loadingFallback = (
+151: 		<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+152: 			<Spin size="large" tip="Loading..." />
+153: 		</div>
+154: 	);
+155: 
+156: 	
+157: 	const renderContent = () => (
+158: 		<div style={{ height: '100%' }}>
+159: 			<div style={{ height: '100%', display: activeView === 'iterations' ? 'block' : 'none' }}>
+160: 				<Suspense fallback={loadingFallback}>
+161: 					<IterationsPanel
+162: 						key="iterations"
+163: 						onSelectIteration={handleSelectIteration}
+164: 						selectedIterationId={currentIteration?.id}
+165: 					/>
+166: 				</Suspense>
+167: 			</div>
+168: 
+169: 			<div style={{ height: '100%', display: activeView === 'projects' ? 'block' : 'none' }}>
+170: 				<ProjectsPanel key="projects" />
+171: 			</div>
+172: 
+173: 			<div style={{ height: '100%', display: activeView === 'artifacts' ? 'block' : 'none' }}>
+174: 				{currentIteration ? (
+175: 					<Suspense fallback={loadingFallback}>
+176: 						<ArtifactsViewer
+177: 							key={`artifacts-${currentIteration.id}`}
+178: 							iterationId={currentIteration.id}
+179: 							activeTab={activeArtifactTab}
+180: 							onTabChange={setActiveArtifactTab}
+181: 							refreshTrigger={artifactsRefreshTrigger}
+182: 						/>
+183: 					</Suspense>
+184: 				) : (
+185: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
+186: 				)}
+187: 			</div>
+188: 
+189: 			<div style={{ height: '100%', display: activeView === 'code' ? 'block' : 'none' }}>
+190: 				{currentIteration ? (
+191: 					<Suspense fallback={loadingFallback}>
+192: 						<CodeEditor
+193: 							key={`code-${currentIteration.id}`}
+194: 							iterationId={currentIteration.id}
+195: 							refreshTrigger={codeRefreshTrigger}
+196: 						/>
+197: 					</Suspense>
+198: 				) : (
+199: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
+200: 				)}
+201: 			</div>
+202: 
+203: 			<div style={{ height: '100%', display: activeView === 'run' ? 'block' : 'none' }}>
+204: 				{currentIteration ? (
+205: 					<Suspense fallback={loadingFallback}>
+206: 						<RunnerPanel key={`run-${currentIteration.id}`} iterationId={currentIteration.id} />
+207: 					</Suspense>
+208: 				) : (
+209: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
+210: 				)}
+211: 			</div>
+212: 
+213: 			<div style={{ height: '100%', display: activeView === 'execution-memory' ? 'block' : 'none' }}>
+214: 				<Suspense fallback={loadingFallback}>
+215: 					<MemoryPanel
+216: 						key={`memory-${memoryRefreshTrigger}`}
+217: 						currentSession={currentIteration?.id}
+218: 						refreshTrigger={memoryRefreshTrigger}
+219: 					/>
+220: 				</Suspense>
+221: 			</div>
+222: 
+223: 			<div style={{ height: '100%', display: activeView === 'project-knowledge' ? 'block' : 'none' }}>
+224: 				<Suspense fallback={loadingFallback}>
+225: 					<KnowledgePanel
+226: 						key={`knowledge-${knowledgeRefreshTrigger}`}
+227: 						currentSession={project?.id}
+228: 						currentIterationId={currentIteration?.id}
+229: 						refreshTrigger={knowledgeRefreshTrigger}
+230: 					/>
+231: 				</Suspense>
+232: 			</div>
+233: 
+234: 			<div style={{ height: '100%', display: activeView === 'settings' ? 'block' : 'none', overflow: 'auto' }}>
+235: 				<Suspense fallback={loadingFallback}>
+236: 					<SettingsPanel />
+237: 				</Suspense>
+238: 			</div>
+239: 
+240: 			<div style={{ height: '100%', display: activeView === 'config' ? 'block' : 'none', overflow: 'auto' }}>
+241: 				<Suspense fallback={loadingFallback}>
+242: 					<AgentsSetupPanel />
+243: 				</Suspense>
+244: 			</div>
+245: 
+246: 			<div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
+247: 				{currentIteration ? (
+248: 					<Suspense fallback={loadingFallback}>
+249: 						<ChatPanel
+250: 							messages={messages}
+251: 							pmMessages={pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]}
+252: 							mode={chatMode}
+253: 							isProcessing={isProcessing}
+254: 							pmProcessing={pmProcessing}
+255: 							currentAgent={currentAgent}
+256: 							iterationTitle={currentIteration.title}
+257: 							iterationDescription={currentIteration.description}
+258: 							currentStage={currentStage}
+259: 							inputRequest={inputRequest}
+260: 							userInput={userInput}
+261: 							messagesContainerRef={messagesContainerRef as React.RefObject<HTMLDivElement>}
+262: 							pmMessagesContainerRef={pmMessagesContainerRef as React.RefObject<HTMLDivElement>}
+263: 							onUserInputChange={setUserInput}
+264: 							onSend={handleSend}
+265: 							onSelectOption={handleSelectOptionWrapper}
+266: 							onSubmitFeedback={handleSubmitFeedbackWrapper}
+267: 							onCancelFeedback={handleCancelFeedback}
+268: 							onToggleThinking={handleToggleThinking}
+269: 							onActionClick={handlePMActionWrapper}
+270: 						/>
+271: 					</Suspense>
+272: 				) : (
+273: 					<Empty description="Select an iteration to view chat" style={{ marginTop: '40px' }} />
+274: 				)}
+275: 			</div>
+276: 		</div>
+277: 	);
+278: 
+279: 	if (loading) {
+280: 		return <LoadingScreen />;
+281: 	}
+282: 
+283: 	return (
+284: 		<Layout style={{ minHeight: '100vh' }}>
+285: 			<Header
+286: 				style={{
+287: 					background: '#fff',
+288: 					borderBottom: '1px solid #e8e8e8',
+289: 					padding: '0 24px',
+290: 					display: 'flex',
+291: 					alignItems: 'center',
+292: 					justifyContent: 'space-between'
+293: 				}}
+294: 			>
+295: 				<div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+296: 					<h1 style={{ margin: 0, fontSize: '18px' }}>
+297: 						<RocketOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
+298: 						Cowork Forge
+299: 					</h1>
+300: 					{project && (
+301: 						<Tag color="blue" style={{ cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
+302: 							{project.name}
+303: 						</Tag>
+304: 					)}
+305: 				</div>
+306: 
+307: 				<div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+308: 					{currentIteration && (
+309: 						<>
+310: 							<StatusBadge status={currentIteration.status} />
+311: 							{(currentIteration.status === 'Draft' || currentIteration.status === 'Paused') && (
+312: 								<Button
+313: 									type="primary"
+314: 									icon={
+315: 										currentIteration.status === 'Draft' ? (
+316: 											<PlayCircleOutlined />
+317: 										) : (
+318: 											<ReloadOutlined />
+319: 										)
+320: 									}
+321: 									onClick={handleExecuteIteration}
+322: 									loading={isProcessing}
+323: 								>
+324: 									{currentIteration.status === 'Draft' ? 'Start Iteration' : 'Continue'}
+325: 								</Button>
+326: 							)}
+327: 						</>
+328: 					)}
+329: 				</div>
+330: 			</Header>
+331: 
+332: 			<Layout style={{ height: 'calc(100vh - 64px - 48px)' }}>
+333: 				<Sider width={200} style={{ background: '#fff', borderRight: '1px solid #e8e8e8' }}>
+334: 					<Menu
+335: 						mode="inline"
+336: 						selectedKeys={[activeView]}
+337: 						onClick={({ key }) => setActiveView(key as typeof activeView)}
+338: 						style={{ height: '100%', borderRight: 0 }}
+339: 						items={[
+340: 							{ key: 'projects', icon: <AppstoreOutlined />, label: 'Projects' },
+341: 							{ key: 'iterations', icon: <BranchesOutlined />, label: 'Iterations' },
+342: 							{ key: 'chat', icon: <MessageOutlined />, label: 'Collaborate' },
+343: 							{ key: 'artifacts', icon: <FileTextOutlined />, label: 'Artifacts' },
+344: 							{ key: 'code', icon: <CodeOutlined />, label: 'Code' },
+345: 							{ key: 'run', icon: <PlayCircleOutlined />, label: 'Run' },
+346: 							{ key: 'execution-memory', icon: <DatabaseOutlined />, label: 'Memory' },
+347: 							{ key: 'project-knowledge', icon: <BookOutlined />, label: 'Knowledge' },
+348: 							{ type: 'divider' },
+349: 							{ key: 'config', icon: <ControlOutlined />, label: 'Agents Setup' },
+350: 							{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' }
+351: 						]}
+352: 					/>
+353: 				</Sider>
+354: 
+355: 				<Content style={{ overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
+356: 					{renderContent()}
+357: 				</Content>
+358: 			</Layout>
+359: 
+360: 			<Footer
+361: 				style={{
+362: 					background: '#fff',
+363: 					borderTop: '1px solid #e8e8e8',
+364: 					padding: '12px 24px',
+365: 					display: 'flex',
+366: 					justifyContent: 'space-between',
+367: 					alignItems: 'center'
+368: 				}}
+369: 			>
+370: 				<div style={{ fontSize: '12px', color: '#888' }}>
+371: 					{project ? (
+372: 						<>
+373: 							<span style={{ marginRight: '16px', cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
+374: 								Project: <strong>{project.name}</strong>
+375: 							</span>
+376: 							<span
+377: 								style={{ cursor: currentIteration ? 'pointer' : 'default' }}
+378: 								onClick={() => currentIteration && handleOpenIterationFolder(currentIteration.id)}
+379: 								title={currentIteration ? `Click to open iteration folder: ${currentIteration.id}` : undefined}
+380: 							>
+381: 								Iterations: <strong>{iterations.length}</strong>
+382: 								{currentIteration && <span style={{ marginLeft: '4px', color: '#1890ff' }}>(#{currentIteration.number})</span>}
+383: 							</span>
+384: 						</>
+385: 					) : (
+386: 						'No project loaded'
+387: 					)}
+388: 				</div>
+389: 				<div style={{ fontSize: '12px', color: '#888' }}>
+390: 					{isProcessing ? (
+391: 						<span style={{ color: '#1890ff' }}>
+392: 							<Spin size="small" style={{ marginRight: '8px' }} />
+393: 							{currentAgent ? `${currentAgent} is working...` : 'Processing...'}
+394: 						</span>
+395: 					) : (
+396: 						<span style={{ color: '#52c41a' }}>
+397: 							<CheckCircleOutlined style={{ marginRight: '4px' }} />
+398: 							Ready
+399: 						</span>
+400: 					)}
+401: 				</div>
+402: 			</Footer>
+403: 
+404: 			<CommandPalette
+405: 				visible={commandPaletteVisible}
+406: 				onClose={() => setCommandPaletteVisible(false)}
+407: 				onCommandSelect={handleCommandSelect}
+408: 			/>
+409: 		</Layout>
+410: 	);
+411: }
+412: 
+413: export default App;
+```
+
 ### crates/cowork-gui/src/assets.d.ts (24 lines)
 
 ```
@@ -21625,6 +21593,18 @@ LICENSE
 32:   onTabChange?: (key: string) => void;
 33:   refreshTrigger?: number;
 34: }
+```
+
+### crates/cowork-gui/src/components/IterationsPanel.tsx (7 lines)
+
+```
+1: IterationsPanelProps
+2: ⋮----
+3: {
+4:   onSelectIteration?: (iterationId: string) => void;
+5:   selectedIterationId?: string | null;
+6:   onExecuteStatusChange?: (iterationId: string, status: string) => void;
+7: }
 ```
 
 ### crates/cowork-gui/src/components/MemoryPanel.tsx (48 lines)
@@ -22798,6 +22778,103 @@ LICENSE
 1: export { default as CreateProjectModal } from './CreateProjectModal';
 2: export { default as EditProjectModal } from './EditProjectModal';
 3: export { default as ImportProjectModal } from './ImportProjectModal';
+```
+
+### crates/cowork-gui/src/hooks/useIterationActions.ts (92 lines)
+
+```
+1: function useIterationActions() {
+2: 	const { message } = AntApp.useApp();
+3: 
+4: 	
+5: 	const { currentIteration, setCurrentIteration, setIsExecuting } = useProjectStore();
+6: 
+7: 	
+8: 	const { setProcessing } = useAgentStore();
+9: 
+10: 	
+11: 	const { activeView, setActiveView } = useUIStore();
+12: 
+13: 	
+14: 	const handleSelectIteration = useCallback(
+15: 		async (iterationId: string) => {
+16: 			try {
+17: 				const { currentIteration, isExecuting } = useProjectStore.getState();
+18: 				const fullIteration = await API.iteration.get(iterationId);
+19: 				
+20: 				if (isExecuting && currentIteration?.id === iterationId) {
+21: 					setCurrentIteration({ ...fullIteration, status: currentIteration.status });
+22: 				} else {
+23: 					setCurrentIteration(fullIteration);
+24: 				}
+25: 				setActiveView('chat');
+26: 			} catch (error) {
+27: 				console.error('Failed to load iteration:', error);
+28: 				message.error('Failed to load iteration: ' + error);
+29: 			}
+30: 		},
+31: 		[setCurrentIteration, setActiveView, message]
+32: 	);
+33: 
+34: 	
+35: 	const handleExecuteIteration = useCallback(async () => {
+36: 		if (!currentIteration) return;
+37: 		try {
+38: 			setProcessing(true);
+39: 			await API.iteration.execute(currentIteration.id);
+40: 			message.info('Iteration execution started');
+41: 		} catch (error) {
+42: 			message.error('Failed to execute iteration: ' + error);
+43: 			setProcessing(false);
+44: 		}
+45: 	}, [currentIteration, setProcessing, message]);
+46: 
+47: 	
+48: 	const handleOpenProjectFolder = useCallback(async () => {
+49: 		try {
+50: 			await API.util.openInFileManager('.');
+51: 		} catch (error) {
+52: 			message.error('Failed to open project folder');
+53: 		}
+54: 	}, [message]);
+55: 
+56: 	
+57: 	const handleOpenIterationFolder = useCallback(async (iterationId: string) => {
+58: 		try {
+59: 			await API.util.openInFileManager(iterationId);
+60: 		} catch (error) {
+61: 			message.error('Failed to open iteration folder: ' + error);
+62: 		}
+63: 	}, [message]);
+64: 
+65: 	
+66: 	const handleCommandSelect = useCallback(
+67: 		(commandId: string) => {
+68: 			const viewMap: Record<string, string> = {
+69: 				'view-iterations': 'iterations',
+70: 				'view-chat': 'chat',
+71: 				'view-artifacts': 'artifacts',
+72: 				'view-code': 'code',
+73: 				'view-run': 'run',
+74: 				'view-memory': 'execution-memory',
+75: 				'view-projects': 'projects',
+76: 				'view-settings': 'settings'
+77: 			};
+78: 			if (viewMap[commandId]) {
+79: 				setActiveView(viewMap[commandId] as typeof activeView);
+80: 			}
+81: 		},
+82: 		[setActiveView]
+83: 	);
+84: 
+85: 	return {
+86: 		handleSelectIteration,
+87: 		handleExecuteIteration,
+88: 		handleOpenProjectFolder,
+89: 		handleOpenIterationFolder,
+90: 		handleCommandSelect
+91: 	};
+92: }
 ```
 
 ### crates/cowork-gui/src/stores/projectStore.ts (58 lines)

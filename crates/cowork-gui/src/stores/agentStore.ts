@@ -76,22 +76,26 @@ interface AgentState {
   inputRequest: InputRequest | null;
   chatMode: ChatMode;
   pmProcessing: boolean;
-  
+
   addMessage: (message: ChatMessage) => void;
   setMessages: (messages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
+  /** 流式高效 patch：直接修改末尾消息的 content，避免 O(n) 数组拷贝 */
+  appendLastMessageContent: (chunk: string, opts?: { isLast?: boolean; agentName?: string; msgType?: string }) => void;
   clearMessages: () => void;
-  
+
   addPMMessage: (message: UserMessage | PMAgentMessage) => void;
   setPMMessages: (messages: (UserMessage | PMAgentMessage)[] | ((prev: (UserMessage | PMAgentMessage)[]) => (UserMessage | PMAgentMessage)[])) => void;
+  /** 流式高效 patch：直接修改末尾 PM 消息的 content */
+  appendLastPMMessageContent: (chunk: string, opts?: { isLast?: boolean }) => void;
   clearPMMessages: () => void;
-  
+
   setProcessing: (isProcessing: boolean) => void;
   setCurrentAgent: (agent: string | null) => void;
   setCurrentStage: (stage: string | null) => void;
   setInputRequest: (request: InputRequest | null) => void;
   setChatMode: (mode: ChatMode) => void;
   setPmProcessing: (processing: boolean) => void;
-  
+
   submitInput: (response: string, responseType: string) => Promise<void>;
   sendPMMessage: (iterationId: string, message: string) => Promise<void>;
   loadPMWelcomeMessage: (iterationId: string) => Promise<void>;
@@ -106,11 +110,11 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   inputRequest: null,
   chatMode: 'disabled',
   pmProcessing: false,
-  
+
   addMessage: (message) => {
     set((state) => ({ messages: [...state.messages, message] }));
   },
-  
+
   setMessages: (messagesOrUpdater) => {
     if (typeof messagesOrUpdater === 'function') {
       set((state) => ({ messages: messagesOrUpdater(state.messages) }));
@@ -118,15 +122,67 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       set({ messages: messagesOrUpdater });
     }
   },
-  
+
+  /**
+   * 流式高效 patch：直接修改末尾消息的 content。
+   * 比函数式 setState + slice+spread 更快：
+   * - 复用同一数组外壳（仅替换末尾元素）
+   * - 末尾消息也只新建一个对象，content 字符串拼接
+   * 配合 useAppEvents 的 raf 节流使用，每帧只触发一次渲染。
+   */
+  appendLastMessageContent: (chunk, opts = {}) => {
+    const { isLast, agentName, msgType } = opts;
+    set((state) => {
+      const prev = state.messages;
+      if (prev.length === 0) {
+        // 没有上一条，新建一条
+        return {
+          messages: [{
+            type: msgType || 'agent',
+            content: chunk,
+            agentName: agentName || 'AI Agent',
+            isStreaming: !isLast,
+            isExpanded: false,
+            timestamp: new Date().toISOString(),
+          } as ChatMessage],
+        };
+      }
+      const last = prev[prev.length - 1];
+      const lastType = (last as { type?: string }).type;
+      const lastAgent = (last as { agentName?: string }).agentName;
+      // 末尾不是同类型同 agent 的流式消息，需要 push 新条目
+      const sameKind = lastType === (msgType || 'agent') && lastAgent === (agentName || 'AI Agent') && (last as { isStreaming?: boolean }).isStreaming;
+      if (!sameKind) {
+        return {
+          messages: [...prev, {
+            type: msgType || 'agent',
+            content: chunk,
+            agentName: agentName || 'AI Agent',
+            isStreaming: !isLast,
+            isExpanded: false,
+            timestamp: new Date().toISOString(),
+          } as ChatMessage],
+        };
+      }
+      // 同条流式：替换末尾元素（数组外壳仍新建以触发 React 重新渲染，但避免 O(n) slice）
+      const next = prev.slice();
+      next[next.length - 1] = {
+        ...last,
+        content: (last as { content: string }).content + chunk,
+        isStreaming: !isLast,
+      } as ChatMessage;
+      return { messages: next };
+    });
+  },
+
   clearMessages: () => {
     set({ messages: [] });
   },
-  
+
   addPMMessage: (message) => {
     set((state) => ({ pmMessages: [...state.pmMessages, message] }));
   },
-  
+
   setPMMessages: (messagesOrUpdater) => {
     if (typeof messagesOrUpdater === 'function') {
       set((state) => ({ pmMessages: messagesOrUpdater(state.pmMessages) }));
@@ -134,75 +190,102 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       set({ pmMessages: messagesOrUpdater });
     }
   },
-  
+
+  appendLastPMMessageContent: (chunk, opts = {}) => {
+    const { isLast } = opts;
+    set((state) => {
+      const prev = state.pmMessages;
+      if (prev.length === 0) {
+        return {
+          pmMessages: [{
+            type: 'pm_agent' as const,
+            content: chunk,
+            isStreaming: !isLast,
+            timestamp: new Date().toISOString(),
+          } as PMAgentMessage & { isStreaming?: boolean }],
+        };
+      }
+      const last = prev[prev.length - 1] as PMAgentMessage & { isStreaming?: boolean };
+      if (last.type !== 'pm_agent' || !last.isStreaming) {
+        return {
+          pmMessages: [...prev, {
+            type: 'pm_agent' as const,
+            content: chunk,
+            isStreaming: !isLast,
+            timestamp: new Date().toISOString(),
+          } as PMAgentMessage & { isStreaming?: boolean }],
+        };
+      }
+      const next = prev.slice();
+      next[next.length - 1] = {
+        ...last,
+        content: last.content + chunk,
+        isStreaming: !isLast,
+      } as PMAgentMessage & { isStreaming?: boolean };
+      return { pmMessages: next };
+    });
+  },
+
   clearPMMessages: () => {
     set({ pmMessages: [] });
   },
-  
+
   setProcessing: (isProcessing) => {
     set({ isProcessing });
   },
-  
+
   setCurrentAgent: (agent) => {
     set({ currentAgent: agent });
   },
-  
+
   setCurrentStage: (stage) => {
     set({ currentStage: stage });
   },
-  
+
   setInputRequest: (request) => {
     set({ inputRequest: request });
   },
-  
+
   setChatMode: (mode) => {
     set({ chatMode: mode });
   },
-  
+
   setPmProcessing: (processing) => {
     set({ pmProcessing: processing });
   },
-  
+
   submitInput: async (response, responseType) => {
     const { inputRequest } = get();
     if (!inputRequest) return;
-    
+
     await API.input.submit(inputRequest.requestId, response, responseType);
     set({ inputRequest: null });
   },
-  
+
   sendPMMessage: async (iterationId, message) => {
     const { pmMessages } = get();
-    
-    console.log('[PM] Sending message:', { iterationId, message, pmMessagesLength: pmMessages.length });
-    
+
     const userMsg: UserMessage = {
       type: 'user',
       content: message,
       timestamp: new Date().toISOString(),
     };
-    
+
     // Add user message and set processing state
     set({ pmProcessing: true, pmMessages: [...pmMessages, userMsg] });
-    
+
     try {
-      console.log('[PM] Calling API...');
       // Call API - the response will be streamed via agent_streaming events
-      // We don't need to wait for the full response or add the message here
       const response = await API.pm.sendMessage(
-        iterationId, 
-        message, 
+        iterationId,
+        message,
         [...pmMessages, userMsg]
       ) as { agent_message?: string; actions?: PMAction[] };
-      
-      console.log('[PM] API response:', response);
-      
+
       // If there are actions from the response, find the last pm_agent message and add actions to it
-      // Note: The streaming message is added by the event listener, not here
       if (response.actions && response.actions.length > 0) {
         set((state) => {
           const msgs = [...state.pmMessages];
-          // Find the last pm_agent message (not the user message)
           let lastPmAgentIdx = -1;
           for (let i = msgs.length - 1; i >= 0; i--) {
             if (msgs[i].type === 'pm_agent') {
@@ -210,10 +293,9 @@ export const useAgentStore = create<AgentState>((set, get) => ({
               break;
             }
           }
-          
+
           if (lastPmAgentIdx >= 0) {
             const lastMsg = msgs[lastPmAgentIdx] as PMAgentMessage;
-            // Only add actions if not already present
             if (!lastMsg.actions || lastMsg.actions.length === 0) {
               msgs[lastPmAgentIdx] = { ...lastMsg, actions: response.actions };
             }
@@ -224,16 +306,15 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         set({ pmProcessing: false });
       }
     } catch (error) {
-      console.error('PM Agent error:', error);
       set({ pmProcessing: false });
-      // Optionally add error message
+      throw error;
     }
   },
-  
+
   loadPMWelcomeMessage: async (iterationId: string) => {
     try {
       const response = await API.pm.getWelcome(iterationId);
-      
+
       if (response) {
         const agentMsg: PMAgentMessage = {
           type: 'pm_agent',
@@ -241,11 +322,11 @@ export const useAgentStore = create<AgentState>((set, get) => ({
           actions: response.actions,
           timestamp: new Date().toISOString(),
         };
-        
+
         set({ pmMessages: [agentMsg] });
       }
     } catch (error) {
-      console.error('Failed to load welcome message:', error);
+      // 静默失败，不打扰用户
     }
   },
 }));
