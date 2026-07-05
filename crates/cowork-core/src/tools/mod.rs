@@ -70,7 +70,7 @@ pub fn notify_tool_call(tool_name: &str, args: &Value) {
     } else {
         args.to_string()
     };
-    println!("🔧 [{}] Tool call: {} {}", agent_name, tool_name, args_str);
+    tracing::debug!("🔧 [{}] Tool call: {} {}", agent_name, tool_name, args_str);
 
     if let Ok(guard) = TOOL_NOTIFIER.read() {
         if let Some(ref callback) = *guard {
@@ -97,9 +97,9 @@ pub fn notify_tool_result(tool_name: &str, result: &Result<Value, AdkError>) {
             } else {
                 v.to_string()
             };
-            println!("✓ [{}] Tool result: {} -> {}", agent_name, tool_name, preview);
+            tracing::debug!("✓ [{}] Tool result: {} -> {}", agent_name, tool_name, preview);
         }
-        Err(e) => println!("✗ [{}] Tool result: {} - error: {}", agent_name, tool_name, e),
+        Err(e) => tracing::warn!("✗ [{}] Tool result: {} - error: {}", agent_name, tool_name, e),
     }
 
     if let Ok(guard) = TOOL_NOTIFIER.read() {
@@ -116,7 +116,6 @@ pub fn notify_tool_result(tool_name: &str, result: &Result<Value, AdkError>) {
 
 // Core tools
 pub mod file_tools;
-pub mod hitl_tools;
 pub mod hitl_content_tools;
 pub mod test_lint_tools;
 

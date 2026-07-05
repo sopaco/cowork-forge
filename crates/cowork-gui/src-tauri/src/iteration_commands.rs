@@ -10,6 +10,7 @@ use cowork_core::pipeline::IterationExecutor;
 use tauri::{Emitter, Manager, State, Window};
 use std::sync::Arc;
 use serde::{Serialize, Deserialize};
+use tracing;
 
 // ============================================================================
 // Types
@@ -248,14 +249,14 @@ pub async fn gui_continue_iteration(
     let iteration_id_clone = iteration_id.clone();
 
     tokio::spawn(async move {
-        println!("[GUI] Starting continue_iteration for iteration: {}", iteration_id_clone);
+        tracing::info!("[GUI] Starting continue_iteration for iteration: {}", iteration_id_clone);
         match executor.continue_iteration(&mut project, &iteration_id_clone, Some(model)).await {
             Ok(_) => {
-                println!("[GUI] continue_iteration completed successfully");
+                tracing::info!("[GUI] continue_iteration completed successfully");
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);
             }
             Err(e) => {
-                println!("[GUI] continue_iteration failed: {}", e);
+                tracing::error!("[GUI] continue_iteration failed: {}", e);
                 let _ = window_clone.emit("iteration_failed", (iteration_id_clone, e.to_string()));
             }
         }
@@ -297,14 +298,14 @@ pub async fn gui_retry_iteration(
     let iteration_id_clone = iteration_id.clone();
 
     tokio::spawn(async move {
-        println!("[GUI] Starting retry_iteration for iteration: {}", iteration_id_clone);
+        tracing::info!("[GUI] Starting retry_iteration for iteration: {}", iteration_id_clone);
         match executor.retry_iteration(&mut project, &iteration_id_clone, Some(model)).await {
             Ok(_) => {
-                println!("[GUI] retry_iteration completed successfully");
+                tracing::info!("[GUI] retry_iteration completed successfully");
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);
             }
             Err(e) => {
-                println!("[GUI] retry_iteration failed: {}", e);
+                tracing::error!("[GUI] retry_iteration failed: {}", e);
                 let _ = window_clone.emit("iteration_failed", (iteration_id_clone, e.to_string()));
             }
         }
@@ -422,14 +423,14 @@ pub async fn gui_regenerate_knowledge(
     let iteration_id_clone = iteration_id.clone();
 
     tokio::spawn(async move {
-        println!("[GUI] Starting knowledge regeneration for iteration: {}", iteration_id_clone);
+        tracing::info!("[GUI] Starting knowledge regeneration for iteration: {}", iteration_id_clone);
         match executor.regenerate_iteration_knowledge(&iteration_id_clone, model).await {
             Ok(_) => {
-                println!("[GUI] Knowledge regeneration completed successfully");
+                tracing::info!("[GUI] Knowledge regeneration completed successfully");
                 let _ = window_clone.emit("knowledge_regeneration_completed", iteration_id_clone);
             }
             Err(e) => {
-                println!("[GUI] Knowledge regeneration failed: {}", e);
+                tracing::error!("[GUI] Knowledge regeneration failed: {}", e);
                 let _ = window_clone.emit("knowledge_regeneration_failed", (iteration_id_clone, e.to_string()));
             }
         }

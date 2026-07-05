@@ -1461,6 +1461,145 @@ LICENSE
 262: <!-- terrain:end tools -->
 ````
 
+### crates/cowork-core/src/agents/mod.rs (134 lines)
+
+```
+1: create_idea_agent
+2: ⋮----
+3: (model: Arc<dyn Llm>)
+4: ⋮----
+5: create_idea_agent_with_id
+6: ⋮----
+7: (model: Arc<dyn Llm>, iteration_id: String)
+8: ⋮----
+9: create_prd_loop
+10: ⋮----
+11: (model: Arc<dyn Llm>)
+12: ⋮----
+13: create_prd_loop_with_id
+14: ⋮----
+15: (model: Arc<dyn Llm>, iteration_id: String)
+16: ⋮----
+17: create_design_loop
+18: ⋮----
+19: (model: Arc<dyn Llm>)
+20: ⋮----
+21: create_design_loop_with_id
+22: ⋮----
+23: (model: Arc<dyn Llm>, iteration_id: String)
+24: ⋮----
+25: create_plan_loop
+26: ⋮----
+27: (model: Arc<dyn Llm>)
+28: ⋮----
+29: create_plan_loop_with_id
+30: ⋮----
+31: (model: Arc<dyn Llm>, iteration_id: String)
+32: ⋮----
+33: create_coding_loop
+34: ⋮----
+35: (model: Arc<dyn Llm>)
+36: ⋮----
+37: create_coding_loop_with_id
+38: ⋮----
+39: (model: Arc<dyn Llm>, iteration_id: String)
+40: ⋮----
+41: create_check_agent
+42: ⋮----
+43: (model: Arc<dyn Llm>)
+44: ⋮----
+45: create_check_agent_with_id
+46: ⋮----
+47: (model: Arc<dyn Llm>, iteration_id: String)
+48: ⋮----
+49: create_delivery_agent
+50: ⋮----
+51: (model: Arc<dyn Llm>)
+52: ⋮----
+53: create_delivery_agent_with_id
+54: ⋮----
+55: (model: Arc<dyn Llm>, iteration_id: String)
+56: ⋮----
+57: create_summary_agent
+58: ⋮----
+59: (model: Arc<dyn Llm>, iteration_id: String, iteration_number: u32)
+60: ⋮----
+61: create_knowledge_generation_agent
+62: ⋮----
+63: (
+64:     model: Arc<dyn Llm>,
+65:     iteration_id: String,
+66:     iteration_number: u32,
+67:     base_iteration_id: Option<String>
+68: )
+69: ⋮----
+70: create_project_manager_agent
+71: ⋮----
+72: (model: Arc<dyn Llm>, iteration_id: String)
+73: ⋮----
+74: load_artifacts_summary_for_pm
+75: ⋮----
+76: (iteration_store: &IterationStore, iteration_id: &str)
+77: ⋮----
+78: PMAgentResult
+79: ⋮----
+80: {
+81:     
+82:     pub message: String,
+83:     
+84:     pub actions: Vec<PMAgentAction>,
+85:     
+86:     pub parts: Vec<adk_core::Part>,
+87: }
+88: ⋮----
+89: PMAgentAction
+90: ⋮----
+91: {
+92:     
+93:     #[serde(rename = "pm_goto_stage")]
+94:     GotoStage {
+95:         target_stage: String,
+96:         reason: String,
+97:     },
+98:     
+99:     #[serde(rename = "pm_create_iteration")]
+100:     CreateIteration {
+101:         iteration_id: String,
+102:         title: String,
+103:         description: String,
+104:         inheritance: String,
+105:     },
+106: }
+107: ⋮----
+108: PMAgentStreamCallback
+109: ⋮----
+110: {
+111:     
+112:     async fn on_text_chunk(&self, text: &str, is_first: bool, is_last: bool);
+113:     
+114:     async fn on_tool_call(&self, tool_name: &str, args: &serde_json::Value);
+115: }
+116: ⋮----
+117: execute_pm_agent_message_streaming
+118: ⋮----
+119: (
+120:     model: Arc<dyn Llm>,
+121:     iteration_id: String,
+122:     message: String,
+123:     history: Vec<serde_json::Value>,
+124:     stream_callback: Option<Arc<dyn PMAgentStreamCallback>>,
+125: )
+126: ⋮----
+127: execute_pm_agent_message
+128: ⋮----
+129: (
+130:     model: Arc<dyn Llm>,
+131:     iteration_id: String,
+132:     message: String,
+133:     history: Vec<serde_json::Value>,
+134: )
+```
+
 ### crates/cowork-core/src/lib.rs (109 lines)
 
 ```
@@ -1633,143 +1772,688 @@ LICENSE
 53: agent-client-protocol = "0.9"
 ```
 
-### crates/cowork-core/src/agents/mod.rs (134 lines)
+### crates/cowork-core/src/pipeline/executor/mod.rs (643 lines)
 
 ```
-1: create_idea_agent
+1: IterationExecutor
 2: ⋮----
-3: (model: Arc<dyn Llm>)
-4: ⋮----
-5: create_idea_agent_with_id
-6: ⋮----
-7: (model: Arc<dyn Llm>, iteration_id: String)
+3: {
+4:     project_store: ProjectStore,
+5:     iteration_store: IterationStore,
+6:     interaction: Arc<dyn InteractiveBackend>,
+7: }
 8: ⋮----
-9: create_prd_loop
+9: IterationExecutor
 10: ⋮----
-11: (model: Arc<dyn Llm>)
+11: {
+12:     pub fn new(interaction: Arc<dyn InteractiveBackend>) -> Self {
+13:         Self {
+14:             project_store: ProjectStore::new(),
+15:             iteration_store: IterationStore::new(),
+16:             interaction,
+17:         }
+18:     }
+19: 
+20:     
+21:     pub fn create_genesis_iteration(
+22:         &self,
+23:         project: &mut Project,
+24:         title: impl Into<String>,
+25:         description: impl Into<String>,
+26:     ) -> anyhow::Result<crate::domain::Iteration> {
+27:         let iteration = crate::domain::Iteration::create_genesis(project, title.into(), description.into());
+28: 
+29:         self.iteration_store.save(&iteration)?;
+30:         self.project_store
+31:             .add_iteration(project, iteration.to_summary())?;
+32: 
+33:         Ok(iteration)
+34:     }
+35: 
+36:     
+37:     
+38:     
+39:     
+40:     
+41:     
+42:     pub fn create_evolution_iteration(
+43:         &self,
+44:         project: &mut Project,
+45:         title: impl Into<String>,
+46:         description: impl Into<String>,
+47:         base_iteration_id: impl Into<String>,
+48:         inheritance: crate::domain::InheritanceMode,
+49:     ) -> anyhow::Result<crate::domain::Iteration> {
+50:         let iteration = crate::domain::Iteration::create_evolution(
+51:             project,
+52:             title.into(),
+53:             description.into(),
+54:             base_iteration_id.into(),
+55:             inheritance,
+56:         );
+57: 
+58:         self.iteration_store.save(&iteration)?;
+59:         self.project_store
+60:             .add_iteration(project, iteration.to_summary())?;
+61: 
+62:         Ok(iteration)
+63:     }
+64: 
+65:     
+66:     pub async fn execute(
+67:         &self,
+68:         project: &mut Project,
+69:         iteration_id: &str,
+70:         resume_stage: Option<String>,
+71:         model: Option<Arc<dyn adk_core::Llm>>,
+72:     ) -> anyhow::Result<()> {
+73:         let mut iteration = self.iteration_store.load(iteration_id)?;
+74: 
+75:         let model = match model {
+76:             Some(m) => m,
+77:             None => {
+78:                 let llm_config = load_config()?;
+79:                 create_llm_client(&llm_config.llm)?
+80:             }
+81:         };
+82:         set_execution_llm(model.clone());
+83: 
+84:         let result = self.execute_inner(project, &mut iteration, resume_stage, model).await;
+85:         
+86:         clear_execution_llm();
+87:         result
+88:     }
+89: 
+90:     async fn execute_inner(
+91:         &self,
+92:         project: &mut Project,
+93:         iteration: &mut crate::domain::Iteration,
+94:         resume_stage: Option<String>,
+95:         _model: Arc<dyn adk_core::Llm>,
+96:     ) -> anyhow::Result<()> {
+97: 
+98:         
+99:         let workspace = workspace::prepare_workspace(
+100:             &self.iteration_store,
+101:             &self.interaction,
+102:             &iteration,
+103:         ).await?;
+104: 
+105:         
+106:         let start_stage = if let Some(stage) = resume_stage {
+107:             stage
+108:         } else if let Some(ref current) = iteration.current_stage {
+109:             current.clone()
+110:         } else {
+111:             iteration.determine_start_stage()
+112:         };
+113: 
+114:         let stages = get_stages_from_flow(&start_stage);
+115:         let flow_config = get_flow_config();
+116: 
+117:         println!(
+118:             "[Executor] Using Flow config: stop_on_failure={}, memory_scope={:?}",
+119:             flow_config.stop_on_failure, flow_config.memory_scope
+120:         );
+121: 
+122:         
+123:         iteration.start();
+124:         self.iteration_store.save(&iteration)?;
+125:         self.project_store
+126:             .set_current_iteration(project, iteration.id.clone())?;
+127: 
+128:         
+129:         let memory_store = crate::persistence::MemoryStore::new();
+130:         if let Err(e) = memory_store.ensure_iteration_memory(&iteration.id) {
+131:             println!("[Executor] Warning: Failed to create iteration memory: {}", e);
+132:         }
+133: 
+134:         println!(
+135:             "[Executor] Iteration '{}' started, will execute {} stages starting from '{}'",
+136:             iteration.title,
+137:             stages.len(),
+138:             start_stage
+139:         );
+140: 
+141:         self.interaction
+142:             .show_message_with_context(
+143:                 crate::interaction::MessageLevel::Info,
+144:                 format!(
+145:                     "Starting iteration '{}' from stage '{}'",
+146:                     iteration.title, start_stage
+147:                 ),
+148:                 MessageContext::new("Pipeline Controller"),
+149:             )
+150:             .await;
+151: 
+152:         
+153:         if iteration.base_iteration_id.is_some() {
+154:             if let Err(e) = knowledge::inject_project_knowledge(&self.iteration_store, &iteration).await {
+155:                 println!("[Executor] Warning: Failed to inject project knowledge: {}", e);
+156:             }
+157:         }
+158: 
+159:         println!("[Executor] Starting stage execution loop...");
+160:         self.execute_stages_from(project, iteration, stages, workspace, flow_config, 0).await
+161:     }
+162: 
+163:     
+164:     
+165:     
+166:     
+167:     
+168:     async fn execute_stages_from(
+169:         &self,
+170:         project: &mut Project,
+171:         iteration: &mut crate::domain::Iteration,
+172:         stages: Vec<Box<dyn crate::pipeline::Stage>>,
+173:         workspace: std::path::PathBuf,
+174:         flow_config: crate::config_definition::flow_definition::FlowConfig,
+175:         goto_depth: u32,
+176:     ) -> anyhow::Result<()> {
+177:         const MAX_STAGE_RETRIES: u32 = 3;
+178:         const RETRY_DELAY_MS: u64 = 5000;
+179:         const MAX_FEEDBACK_LOOPS: u32 = 5;
+180:         const MAX_GOTO_DEPTH: u32 = 10;
+181:         
+182:         let total_stages = stages.len();
+183:         let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
+184:         
+185:         crate::persistence::set_iteration_id(iteration.id.clone());
+186: 
+187:         for (stage_idx, stage) in stages.into_iter().enumerate() {
+188:             let stage_name = stage.name().to_string();
+189:             let stage_num = stage_idx + 1;
+190: 
+191:             iteration.set_stage(&stage_name);
+192:             self.iteration_store.save(&iteration)?;
+193: 
+194:             println!("[Executor] Stage updated: {} (iteration: {})", stage_name, iteration.id);
+195: 
+196:             self.interaction
+197:                 .show_message_with_context(
+198:                     crate::interaction::MessageLevel::Info,
+199:                     format!(
+200:                         "🚀 [{}/{}] Starting stage: {}",
+201:                         stage_num,
+202:                         total_stages,
+203:                         stage.description()
+204:                     ),
+205:                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+206:                 )
+207:                 .await;
+208: 
+209:             let mut last_error = None;
+210:             let mut success = false;
+211: 
+212:             for attempt in 0..MAX_STAGE_RETRIES {
+213:                 if attempt > 0 {
+214:                     println!(
+215:                         "[Executor] Retrying stage '{}' (attempt {}/{})",
+216:                         stage_name, attempt + 1, MAX_STAGE_RETRIES
+217:                     );
+218:                     self.interaction
+219:                         .show_message_with_context(
+220:                             crate::interaction::MessageLevel::Warning,
+221:                             format!(
+222:                                 "Retrying stage '{}' (attempt {}/{})",
+223:                                 stage_name, attempt + 1, MAX_STAGE_RETRIES
+224:                             ),
+225:                             MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+226:                         )
+227:                         .await;
+228:                     tokio::time::sleep(tokio::time::Duration::from_millis(RETRY_DELAY_MS)).await;
+229:                 }
+230: 
+231:                 
+232:                 let mut current_feedback: Option<String> = None;
+233:                 let mut feedback_loop_count: u32 = 0;
+234: 
+235:                 if let Ok(feedback_history) = crate::persistence::load_feedback_history() {
+236:                     if let Some(fb) = feedback_history
+237:                         .feedbacks
+238:                         .iter()
+239:                         .filter(|f| f.stage == stage_name)
+240:                         .max_by_key(|f| f.timestamp)
+241:                     {
+242:                         tracing::info!("[Executor] Found stored feedback for stage '{}': {}",
+243:                             stage_name, fb.details.chars().take(100).collect::<String>());
+244:                         current_feedback = Some(fb.details.clone());
+245:                         
+246:                         
+247:                         if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
+248:                             tracing::warn!("Failed to clear consumed feedback for stage '{}': {}", stage_name, e);
+249:                         }
+250:                     }
+251:                 }
+252: 
+253:                 loop {
+254:                     let result = if let Some(ref feedback) = current_feedback {
+255:                         stage
+256:                             .execute_with_feedback(&ctx, self.interaction.clone(), feedback)
+257:                             .await
+258:                     } else {
+259:                         stage.execute(&ctx, self.interaction.clone()).await
+260:                     };
+261: 
+262:                     match result {
+263:                         StageResult::GotoStage(target_stage, reason) => {
+264:                             self.interaction
+265:                                 .show_message_with_context(
+266:                                     crate::interaction::MessageLevel::Warning,
+267:                                     format!(
+268:                                         "🔄 Stage jump requested: {} → {}\nReason: {}",
+269:                                         stage_name, target_stage, reason
+270:                                     ),
+271:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+272:                                 )
+273:                                 .await;
+274: 
+275:                             
+276:                             
+277:                             
+278: 
+279:                             if goto_depth >= MAX_GOTO_DEPTH {
+280:                                 anyhow::bail!(
+281:                                     "Maximum goto stage depth ({}) reached. Stage '{}' keeps requesting jumps to '{}'. Last reason: {}",
+282:                                     MAX_GOTO_DEPTH, stage_name, target_stage, reason
+283:                                 );
+284:                             }
+285: 
+286:                             iteration.set_stage(&target_stage);
+287:                             self.iteration_store.save(&iteration)?;
+288: 
+289:                             let new_stages = get_stages_from_flow(&target_stage);
+290: 
+291:                             self.interaction
+292:                                 .show_message_with_context(
+293:                                     crate::interaction::MessageLevel::Info,
+294:                                     format!(
+295:                                         "Restarting pipeline from '{}' stage with {} stages to execute (goto depth {}/{})",
+296:                                         target_stage,
+297:                                         new_stages.len(),
+298:                                         goto_depth + 1,
+299:                                         MAX_GOTO_DEPTH
+300:                                     ),
+301:                                     MessageContext::new("Pipeline Controller"),
+302:                                 )
+303:                                 .await;
+304: 
+305:                             return Box::pin(self.execute_stages_from(
+306:                                 project,
+307:                                 iteration,
+308:                                 new_stages,
+309:                                 workspace.clone(),
+310:                                 flow_config.clone(),
+311:                                 goto_depth + 1,
+312:                             )).await;
+313:                         }
+314:                         StageResult::Success(artifact_path) => {
+315:                             let artifact_exists = if let Some(ref path) = artifact_path {
+316:                                 std::path::Path::new(path).exists()
+317:                             } else {
+318:                                 workspace::check_artifact_exists(&stage_name, &workspace).await
+319:                             };
+320: 
+321:                             if !artifact_exists {
+322:                                 last_error = Some(format!("Artifacts not generated for stage '{}'", stage_name));
+323: 
+324:                                 self.interaction
+325:                                     .show_message_with_context(
+326:                                         crate::interaction::MessageLevel::Error,
+327:                                         format!("❌ Stage '{}' completed but artifacts not found. Will retry...", stage_name),
+328:                                         MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+329:                                     )
+330:                                     .await;
+331:                                 beak;
+332:                             }
+333: 
+334:                             if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
+335:                                 tracing::warn!("Failed to clear feedback for stage '{}': {}", stage_name, e);
+336:                             }
+337: 
+338:                             iteration.complete_stage(&stage_name, artifact_path.clone());
+339:                             self.iteration_store.save(&iteration)?;
+340: 
+341:                             let progress_msg = if feedback_loop_count > 0 {
+342:                                 format!(
+343:                                     "✅ [{}/{}] Stage '{}' completed (revision {})",
+344:                                     stage_num, total_stages, stage_name, feedback_loop_count
+345:                                 )
+346:                             } else if attempt > 0 {
+347:                                 format!(
+348:                                     "✅ [{}/{}] Stage '{}' completed (after {} retries)",
+349:                                     stage_num, total_stages, stage_name, attempt
+350:                                 )
+351:                             } else {
+352:                                 format!("✅ [{}/{}] Stage '{}' completed", stage_num, total_stages, stage_name)
+353:                             };
+354: 
+355:                             self.interaction
+356:                                 .show_message_with_context(
+357:                                     crate::interaction::MessageLevel::Success,
+358:                                     progress_msg,
+359:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+360:                                 )
+361:                                 .await;
+362: 
+363:                             if is_critical_stage(&stage_name) {
+364:                                 iteration.pause();
+365:                                 self.iteration_store.save(&iteration)?;
+366: 
+367:                                 let artifact_type = match stage_name.as_str() {
+368:                                     "idea" => "idea",
+369:                                     "prd" => "requirements",
+370:                                     "design" => "design",
+371:                                     "plan" => "plan",
+372:                                     "coding" => "code",
+373:                                     _ => "artifacts",
+374:                                 };
+375: 
+376:                                 let action = self.interaction
+377:                                     .request_confirmation_with_feedback(
+378:                                         &format!(
+379:                                             "Stage '{}' completed. Please review the generated {} document.{}",
+380:                                             stage_name,
+381:                                             stage_name.to_uppercase(),
+382:                                             if feedback_loop_count > 0 {
+383:                                                 format!(" (Revision {})", feedback_loop_count)
+384:                                             } else {
+385:                                                 String::new()
+386:                                             }
+387:                                         ), 
+388:                                         artifact_type
+389:                                     )
+390:                                     .await;
+391: 
+392:                                 match action {
+393:                                     ConfirmationAction::Continue => {
+394:                                         iteration.resume();
+395:                                         self.iteration_store.save(&iteration)?;
+396:                                         success = true;
+397:                                         beak;
+398:                                     }
+399:                                     ConfirmationAction::ViewArtifact => {
+400:                                         current_feedback = None;
+401:                                         continue;
+402:                                     }
+403:                                     ConfirmationAction::ProvideFeedback(feedback) => {
+404:                                         if feedback_loop_count >= MAX_FEEDBACK_LOOPS {
+405:                                             self.interaction
+406:                                                 .show_message_with_context(
+407:                                                     crate::interaction::MessageLevel::Warning,
+408:                                                     format!("Maximum revision attempts ({}) reached. Proceeding...", MAX_FEEDBACK_LOOPS),
+409:                                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+410:                                                 )
+411:                                                 .await;
+412:                                             iteration.resume();
+413:                                             self.iteration_store.save(&iteration)?;
+414:                                             success = true;
+415:                                             beak;
+416:                                         }
+417: 
+418:                                         feedback_loop_count += 1;
+419:                                         current_feedback = Some(feedback);
+420:                                         self.interaction
+421:                                             .show_message_with_context(
+422:                                                 crate::interaction::MessageLevel::Info,
+423:                                                 format!("Revising stage '{}' based on feedback...", stage_name),
+424:                                                 MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+425:                                             )
+426:                                             .await;
+427:                                         continue;
+428:                                     }
+429:                                     ConfirmationAction::Cancel => {
+430:                                         iteration.pause();
+431:                                         self.iteration_store.save(&iteration)?;
+432:                                         return Err(anyhow::anyhow!("User cancelled at stage '{}'", stage_name));
+433:                                     }
+434:                                 }
+435:                             } else {
+436:                                 success = true;
+437:                                 beak;
+438:                             }
+439:                         }
+440:                         StageResult::Failed(e) => {
+441:                             last_error = Some(e.clone());
+442:                             tracing::error!("[Executor] Stage '{}' failed: {}", stage_name, e);
+443:                             self.interaction
+444:                                 .show_message_with_context(
+445:                                     crate::interaction::MessageLevel::Error,
+446:                                     format!("❌ Stage '{}' failed: {}", stage_name, e),
+447:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+448:                                 )
+449:                                 .await;
+450:                             beak;
+451:                         }
+452:                         StageResult::Paused => {
+453:                             iteration.pause();
+454:                             self.iteration_store.save(&iteration)?;
+455:                             self.interaction
+456:                                 .show_message_with_context(
+457:                                     crate::interaction::MessageLevel::Info,
+458:                                     format!("⏸️ Stage '{}' paused by user", stage_name),
+459:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+460:                                 )
+461:                                 .await;
+462:                             return Ok(());
+463:                         }
+464:                         StageResult::NeedsRevision(e) => {
+465:                             last_error = Some(e.clone());
+466:                             self.interaction
+467:                                 .show_message_with_context(
+468:                                     crate::interaction::MessageLevel::Warning,
+469:                                     format!("🔄 Stage '{}' needs revision: {}", stage_name, e),
+470:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+471:                                 )
+472:                                 .await;
+473:                             beak;
+474:                         }
+475:                     }
+476:                 }
+477: 
+478:                 if success {
+479:                     beak;
+480:                 }
+481:             }
+482: 
+483:             if !success {
+484:                 if flow_config.stop_on_failure {
+485:                     iteration.fail();
+486:                     self.iteration_store.save(&iteration)?;
+487: 
+488:                     return Err(anyhow::anyhow!(
+489:                         "Stage '{}' failed after {} retries: {}",
+490:                         stage_name,
+491:                         MAX_STAGE_RETRIES,
+492:                         last_error.unwrap_or_else(|| "Unknown error".to_string())
+493:                     ));
+494:                 } else {
+495:                     self.interaction
+496:                         .show_message_with_context(
+497:                             crate::interaction::MessageLevel::Warning,
+498:                             format!("Skipping failed stage '{}' and continuing...", stage_name),
+499:                             MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+500:                         )
+501:                         .await;
+502:                 }
+503:             }
+504:         }
+505: 
+506:         
+507:         iteration.complete();
+508:         self.iteration_store.save(&iteration)?;
+509: 
+510:         
+511:         if let Err(e) = crate::persistence::MemoryStore::new().promote_insights_to_decisions(&iteration.id) {
+512:             println!("[Executor] Warning: Failed to promote insights: {}", e);
+513:         }
+514: 
+515:         project.current_iteration_id = Some(iteration.id.clone());
+516:         self.project_store.save(project)?;
+517: 
+518:         self.interaction
+519:             .show_message_with_context(
+520:                 crate::interaction::MessageLevel::Success,
+521:                 format!("Iteration '{}' completed successfully!", iteration.title),
+522:                 MessageContext::new("Pipeline Controller"),
+523:             )
+524:             .await;
+525: 
+526:         Ok(())
+527:     }
+528: 
+529:     
+530:     pub async fn continue_iteration(
+531:         &self,
+532:         project: &mut Project,
+533:         iteration_id: &str,
+534:         model: Option<Arc<dyn adk_core::Llm>>,
+535:     ) -> anyhow::Result<()> {
+536:         let mut iteration = self.iteration_store.load(iteration_id)?;
+537: 
+538:         println!(
+539:             "[Executor] Continuing iteration '{}' (status: {:?}, current_stage: {:?})",
+540:             iteration_id, iteration.status, iteration.current_stage
+541:         );
+542: 
+543:         if iteration.status != IterationStatus::Paused {
+544:             return Err(anyhow::anyhow!("Iteration is not paused"));
+545:         }
+546: 
+547:         let resume_stage = iteration.current_stage.clone();
+548:         println!("[Executor] Resuming from stage: {:?}", resume_stage);
+549: 
+550:         iteration.resume();
+551:         self.iteration_store.save(&iteration)?;
+552: 
+553:         self.interaction
+554:             .show_message_with_context(
+555:                 crate::interaction::MessageLevel::Info,
+556:                 format!(
+557:                     "Iteration '{}' resumed from stage: {}",
+558:                     iteration_id,
+559:                     resume_stage.as_ref().unwrap_or(&"unknown".to_string())
+560:                 ),
+561:                 MessageContext::new("Pipeline Controller")
+562:                     .with_stage(resume_stage.as_deref().unwrap_or("unknown")),
+563:             )
+564:             .await;
+565: 
+566:         self.execute(project, iteration_id, resume_stage, model).await
+567:     }
+568: 
+569:     
+570:     pub async fn retry_iteration(
+571:         &self,
+572:         project: &mut Project,
+573:         iteration_id: &str,
+574:         model: Option<Arc<dyn adk_core::Llm>>,
+575:     ) -> anyhow::Result<()> {
+576:         let mut iteration = self.iteration_store.load(iteration_id)?;
+577: 
+578:         println!(
+579:             "[Executor] Retrying failed iteration '{}' (status: {:?}, current_stage: {:?})",
+580:             iteration_id, iteration.status, iteration.current_stage
+581:         );
+582: 
+583:         if iteration.status != IterationStatus::Failed {
+584:             return Err(anyhow::anyhow!("Iteration is not failed"));
+585:         }
+586: 
+587:         let retry_stage = if let Some(ref current) = iteration.current_stage {
+588:             current.clone()
+589:         } else {
+590:             println!("[Executor] No current_stage found, defaulting to 'check' for retry");
+591:             "check".to_string()
+592:         };
+593: 
+594:         iteration.resume();
+595:         self.iteration_store.save(&iteration)?;
+596: 
+597:         self.interaction
+598:             .show_message_with_context(
+599:                 crate::interaction::MessageLevel::Info,
+600:                 format!("Retrying iteration '{}' from stage: {}", iteration_id, retry_stage),
+601:                 MessageContext::new("Pipeline Controller").with_stage(&retry_stage),
+602:             )
+603:             .await;
+604: 
+605:         self.execute(project, iteration_id, Some(retry_stage), model).await
+606:     }
+607: 
+608:     
+609:     
+610:     
+611: 
+612:     
+613:     pub async fn generate_document_summaries(
+614:         &self,
+615:         iteration: &crate::domain::Iteration,
+616:         model: Arc<dyn adk_core::Llm>,
+617:     ) -> anyhow::Result<()> {
+618:         knowledge::generate_document_summaries(&self.iteration_store, iteration, model).await
+619:     }
+620: 
+621:     
+622:     pub async fn generate_iteration_knowledge(
+623:         &self,
+624:         iteration: &crate::domain::Iteration,
+625:         model: Arc<dyn adk_core::Llm>,
+626:     ) -> anyhow::Result<()> {
+627:         knowledge::generate_iteration_knowledge(&self.iteration_store, iteration, model).await
+628:     }
+629: 
+630:     
+631:     pub async fn inject_project_knowledge(&self, iteration: &crate::domain::Iteration) -> anyhow::Result<()> {
+632:         knowledge::inject_project_knowledge(&self.iteration_store, iteration).await
+633:     }
+634: 
+635:     
+636:     pub async fn regenerate_iteration_knowledge(
+637:         &self,
+638:         iteration_id: &str,
+639:         model: Arc<dyn adk_core::Llm>,
+640:     ) -> anyhow::Result<()> {
+641:         knowledge::regenerate_iteration_knowledge(&self.iteration_store, iteration_id, model).await
+642:     }
+643: }
+```
+
+### crates/cowork-core/src/tools/mod.rs (31 lines)
+
+```
+1: set_current_agent_name
+2: ⋮----
+3: (name: &str)
+4: ⋮----
+5: get_current_agent_name
+6: ⋮----
+7: ()
+8: ⋮----
+9: get_required_string_param
+10: ⋮----
+11: (args: &'a Value, key: &str)
 12: ⋮----
-13: create_prd_loop_with_id
+13: get_optional_string_param
 14: ⋮----
-15: (model: Arc<dyn Llm>, iteration_id: String)
+15: (args: &Value, key: &str)
 16: ⋮----
-17: create_design_loop
+17: get_required_array_param
 18: ⋮----
-19: (model: Arc<dyn Llm>)
+19: (args: &'a Value, key: &str)
 20: ⋮----
-21: create_design_loop_with_id
+21: set_tool_notify_callback
 22: ⋮----
-23: (model: Arc<dyn Llm>, iteration_id: String)
+23: (callback: F)
 24: ⋮----
-25: create_plan_loop
+25: notify_tool_call
 26: ⋮----
-27: (model: Arc<dyn Llm>)
+27: (tool_name: &str, args: &Value)
 28: ⋮----
-29: create_plan_loop_with_id
+29: notify_tool_result
 30: ⋮----
-31: (model: Arc<dyn Llm>, iteration_id: String)
-32: ⋮----
-33: create_coding_loop
-34: ⋮----
-35: (model: Arc<dyn Llm>)
-36: ⋮----
-37: create_coding_loop_with_id
-38: ⋮----
-39: (model: Arc<dyn Llm>, iteration_id: String)
-40: ⋮----
-41: create_check_agent
-42: ⋮----
-43: (model: Arc<dyn Llm>)
-44: ⋮----
-45: create_check_agent_with_id
-46: ⋮----
-47: (model: Arc<dyn Llm>, iteration_id: String)
-48: ⋮----
-49: create_delivery_agent
-50: ⋮----
-51: (model: Arc<dyn Llm>)
-52: ⋮----
-53: create_delivery_agent_with_id
-54: ⋮----
-55: (model: Arc<dyn Llm>, iteration_id: String)
-56: ⋮----
-57: create_summary_agent
-58: ⋮----
-59: (model: Arc<dyn Llm>, iteration_id: String, iteration_number: u32)
-60: ⋮----
-61: create_knowledge_generation_agent
-62: ⋮----
-63: (
-64:     model: Arc<dyn Llm>,
-65:     iteration_id: String,
-66:     iteration_number: u32,
-67:     base_iteration_id: Option<String>
-68: )
-69: ⋮----
-70: create_project_manager_agent
-71: ⋮----
-72: (model: Arc<dyn Llm>, iteration_id: String)
-73: ⋮----
-74: load_artifacts_summary_for_pm
-75: ⋮----
-76: (iteration_store: &IterationStore, iteration_id: &str)
-77: ⋮----
-78: PMAgentResult
-79: ⋮----
-80: {
-81:     
-82:     pub message: String,
-83:     
-84:     pub actions: Vec<PMAgentAction>,
-85:     
-86:     pub parts: Vec<adk_core::Part>,
-87: }
-88: ⋮----
-89: PMAgentAction
-90: ⋮----
-91: {
-92:     
-93:     #[serde(rename = "pm_goto_stage")]
-94:     GotoStage {
-95:         target_stage: String,
-96:         reason: String,
-97:     },
-98:     
-99:     #[serde(rename = "pm_create_iteration")]
-100:     CreateIteration {
-101:         iteration_id: String,
-102:         title: String,
-103:         description: String,
-104:         inheritance: String,
-105:     },
-106: }
-107: ⋮----
-108: PMAgentStreamCallback
-109: ⋮----
-110: {
-111:     
-112:     async fn on_text_chunk(&self, text: &str, is_first: bool, is_last: bool);
-113:     
-114:     async fn on_tool_call(&self, tool_name: &str, args: &serde_json::Value);
-115: }
-116: ⋮----
-117: execute_pm_agent_message_streaming
-118: ⋮----
-119: (
-120:     model: Arc<dyn Llm>,
-121:     iteration_id: String,
-122:     message: String,
-123:     history: Vec<serde_json::Value>,
-124:     stream_callback: Option<Arc<dyn PMAgentStreamCallback>>,
-125: )
-126: ⋮----
-127: execute_pm_agent_message
-128: ⋮----
-129: (
-130:     model: Arc<dyn Llm>,
-131:     iteration_id: String,
-132:     message: String,
-133:     history: Vec<serde_json::Value>,
-134: )
+31: (tool_name: &str, result: &Result<Value, AdkError>)
 ```
 
 ### crates/cowork-gui/src/components/chat/InputArea.tsx (14 lines)
@@ -2543,688 +3227,351 @@ LICENSE
 93: "##;
 ````
 
-### crates/cowork-core/src/pipeline/executor/mod.rs (643 lines)
+### crates/cowork-core/src/tools/control_tools.rs (247 lines)
 
 ```
-1: IterationExecutor
+1: ProvideFeedbackTool
 2: ⋮----
 3: {
-4:     project_store: ProjectStore,
-5:     iteration_store: IterationStore,
-6:     interaction: Arc<dyn InteractiveBackend>,
-7: }
-8: ⋮----
-9: IterationExecutor
-10: ⋮----
-11: {
-12:     pub fn new(interaction: Arc<dyn InteractiveBackend>) -> Self {
-13:         Self {
-14:             project_store: ProjectStore::new(),
-15:             iteration_store: IterationStore::new(),
-16:             interaction,
-17:         }
-18:     }
-19: 
-20:     
-21:     pub fn create_genesis_iteration(
-22:         &self,
-23:         project: &mut Project,
-24:         title: impl Into<String>,
-25:         description: impl Into<String>,
-26:     ) -> anyhow::Result<crate::domain::Iteration> {
-27:         let iteration = crate::domain::Iteration::create_genesis(project, title.into(), description.into());
-28: 
-29:         self.iteration_store.save(&iteration)?;
-30:         self.project_store
-31:             .add_iteration(project, iteration.to_summary())?;
-32: 
-33:         Ok(iteration)
-34:     }
-35: 
-36:     
-37:     
-38:     
-39:     
-40:     
-41:     
-42:     pub fn create_evolution_iteration(
-43:         &self,
-44:         project: &mut Project,
-45:         title: impl Into<String>,
-46:         description: impl Into<String>,
-47:         base_iteration_id: impl Into<String>,
-48:         inheritance: crate::domain::InheritanceMode,
-49:     ) -> anyhow::Result<crate::domain::Iteration> {
-50:         let iteration = crate::domain::Iteration::create_evolution(
-51:             project,
-52:             title.into(),
-53:             description.into(),
-54:             base_iteration_id.into(),
-55:             inheritance,
-56:         );
+4:     fn name(&self) -> &str {
+5:         "provide_feedback"
+6:     }
+7: 
+8:     fn description(&self) -> &str {
+9:         "Provide structured feedback to the Actor agent. \
+10:          This feedback will be visible to the Actor in the next iteration."
+11:     }
+12: 
+13:     fn parameters_schema(&self) -> Option<Value> {
+14:         Some(json!({
+15:             "type": "object",
+16:             "properties": {
+17:                 "stage": {
+18:                     "type": "string",
+19:                     "description": "The stage providing this feedback (e.g., 'idea', 'prd', 'design', 'plan', 'coding', 'check', 'delivery')",
+20:                     "enum": ["idea", "prd", "design", "plan", "coding", "check", "delivery"]
+21:                 },
+22:                 "feedback_type": {
+23:                     "type": "string",
+24:                     "enum": [
+25:                         "build_error",
+26:                         "quality_issue",
+27:                         "missing_requirement",
+28:                         "missing_artifact",
+29:                         "architecture_issue",
+30:                         "task_scope_issue",
+31:                         "suggestion"
+32:                     ],
+33:                 },
+34:                 "severity": {
+35:                     "type": "string",
+36:                     "enum": ["critical", "major", "minor"],
+37:                 },
+38:                 "details": {"type": "string"},
+39:                 "suggested_fix": {"type": "string"}
+40:             },
+41:             "required": ["stage", "feedback_type", "severity", "details"]
+42:         }))
+43:     }
+44: 
+45:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+46:         let stage = get_required_string_param(&args, "stage")?;
+47: 
+48:         let feedback_type = match get_required_string_param(&args, "feedback_type")? {
+49:             "build_error" => FeedbackType::BuildError,
+50:             "quality_issue" => FeedbackType::QualityIssue,
+51:             "missing_requirement" => FeedbackType::MissingRequirement,
+52:             "missing_artifact" => FeedbackType::MissingArtifact,
+53:             "architecture_issue" => FeedbackType::ArchitectureIssue,
+54:             "task_scope_issue" => FeedbackType::TaskScopeIssue,
+55:             _ => FeedbackType::Suggestion,
+56:         };
 57: 
-58:         self.iteration_store.save(&iteration)?;
-59:         self.project_store
-60:             .add_iteration(project, iteration.to_summary())?;
-61: 
-62:         Ok(iteration)
-63:     }
-64: 
-65:     
-66:     pub async fn execute(
-67:         &self,
-68:         project: &mut Project,
-69:         iteration_id: &str,
-70:         resume_stage: Option<String>,
-71:         model: Option<Arc<dyn adk_core::Llm>>,
-72:     ) -> anyhow::Result<()> {
-73:         let mut iteration = self.iteration_store.load(iteration_id)?;
-74: 
-75:         let model = match model {
-76:             Some(m) => m,
-77:             None => {
-78:                 let llm_config = load_config()?;
-79:                 create_llm_client(&llm_config.llm)?
-80:             }
-81:         };
-82:         set_execution_llm(model.clone());
-83: 
-84:         let result = self.execute_inner(project, &mut iteration, resume_stage, model).await;
-85:         
-86:         clear_execution_llm();
-87:         result
-88:     }
-89: 
-90:     async fn execute_inner(
-91:         &self,
-92:         project: &mut Project,
-93:         iteration: &mut crate::domain::Iteration,
-94:         resume_stage: Option<String>,
-95:         _model: Arc<dyn adk_core::Llm>,
-96:     ) -> anyhow::Result<()> {
+58:         let severity = match get_required_string_param(&args, "severity")? {
+59:             "critical" => Severity::Critical,
+60:             "major" => Severity::Major,
+61:             _ => Severity::Minor,
+62:         };
+63: 
+64:         let feedback = Feedback {
+65:             stage: stage.to_string(),
+66:             feedback_type,
+67:             severity,
+68:             details: get_required_string_param(&args, "details")?.to_string(),
+69:             suggested_fix: args
+70:                 .get("suggested_fix")
+71:                 .and_then(|v| v.as_str())
+72:                 .map(String::from),
+73:             timestamp: chrono::Utc::now(),
+74:         };
+75: 
+76:         append_feedback(&feedback).map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
+77: 
+78:         tracing::debug!("[ProvideFeedbackTool] Feedback recorded for stage '{}': {}", stage, feedback.details.chars().take(100).collect::<String>());
+79: 
+80:         Ok(json!({
+81:             "status": "feedback_recorded",
+82:             "message": "Feedback will be available to Actor in next iteration"
+83:         }))
+84:     }
+85: }
+86: ⋮----
+87: AskUserTool
+88: ⋮----
+89: {
+90:     fn name(&self) -> &str {
+91:         "ask_user"
+92:     }
+93: 
+94:     fn description(&self) -> &str {
+95:         "Ask the user for confirmation or text input."
+96:     }
 97: 
-98:         
-99:         let workspace = workspace::prepare_workspace(
-100:             &self.iteration_store,
-101:             &self.interaction,
-102:             &iteration,
-103:         ).await?;
-104: 
-105:         
-106:         let start_stage = if let Some(stage) = resume_stage {
-107:             stage
-108:         } else if let Some(ref current) = iteration.current_stage {
-109:             current.clone()
-110:         } else {
-111:             iteration.determine_start_stage()
-112:         };
-113: 
-114:         let stages = get_stages_from_flow(&start_stage);
-115:         let flow_config = get_flow_config();
-116: 
-117:         println!(
-118:             "[Executor] Using Flow config: stop_on_failure={}, memory_scope={:?}",
-119:             flow_config.stop_on_failure, flow_config.memory_scope
-120:         );
-121: 
-122:         
-123:         iteration.start();
-124:         self.iteration_store.save(&iteration)?;
-125:         self.project_store
-126:             .set_current_iteration(project, iteration.id.clone())?;
-127: 
-128:         
-129:         let memory_store = crate::persistence::MemoryStore::new();
-130:         if let Err(e) = memory_store.ensure_iteration_memory(&iteration.id) {
-131:             println!("[Executor] Warning: Failed to create iteration memory: {}", e);
-132:         }
-133: 
-134:         println!(
-135:             "[Executor] Iteration '{}' started, will execute {} stages starting from '{}'",
-136:             iteration.title,
-137:             stages.len(),
-138:             start_stage
-139:         );
-140: 
-141:         self.interaction
-142:             .show_message_with_context(
-143:                 crate::interaction::MessageLevel::Info,
-144:                 format!(
-145:                     "Starting iteration '{}' from stage '{}'",
-146:                     iteration.title, start_stage
-147:                 ),
-148:                 MessageContext::new("Pipeline Controller"),
-149:             )
-150:             .await;
-151: 
-152:         
-153:         if iteration.base_iteration_id.is_some() {
-154:             if let Err(e) = knowledge::inject_project_knowledge(&self.iteration_store, &iteration).await {
-155:                 println!("[Executor] Warning: Failed to inject project knowledge: {}", e);
-156:             }
-157:         }
-158: 
-159:         println!("[Executor] Starting stage execution loop...");
-160:         self.execute_stages_from(project, iteration, stages, workspace, flow_config, 0).await
-161:     }
-162: 
-163:     
-164:     
-165:     
-166:     
-167:     
-168:     async fn execute_stages_from(
-169:         &self,
-170:         project: &mut Project,
-171:         iteration: &mut crate::domain::Iteration,
-172:         stages: Vec<Box<dyn crate::pipeline::Stage>>,
-173:         workspace: std::path::PathBuf,
-174:         flow_config: crate::config_definition::flow_definition::FlowConfig,
-175:         goto_depth: u32,
-176:     ) -> anyhow::Result<()> {
-177:         const MAX_STAGE_RETRIES: u32 = 3;
-178:         const RETRY_DELAY_MS: u64 = 5000;
-179:         const MAX_FEEDBACK_LOOPS: u32 = 5;
-180:         const MAX_GOTO_DEPTH: u32 = 10;
-181:         
-182:         let total_stages = stages.len();
-183:         let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
-184:         
-185:         crate::persistence::set_iteration_id(iteration.id.clone());
-186: 
-187:         for (stage_idx, stage) in stages.into_iter().enumerate() {
-188:             let stage_name = stage.name().to_string();
-189:             let stage_num = stage_idx + 1;
-190: 
-191:             iteration.set_stage(&stage_name);
-192:             self.iteration_store.save(&iteration)?;
-193: 
-194:             println!("[Executor] Stage updated: {} (iteration: {})", stage_name, iteration.id);
-195: 
-196:             self.interaction
-197:                 .show_message_with_context(
-198:                     crate::interaction::MessageLevel::Info,
-199:                     format!(
-200:                         "🚀 [{}/{}] Starting stage: {}",
-201:                         stage_num,
-202:                         total_stages,
-203:                         stage.description()
-204:                     ),
-205:                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-206:                 )
-207:                 .await;
+98:     fn parameters_schema(&self) -> Option<Value> {
+99:         Some(json!({
+100:             "type": "object",
+101:             "properties": {
+102:                 "question": {
+103:                     "type": "string",
+104:                     "description": "The question to ask the user"
+105:                 },
+106:                 "question_type": {
+107:                     "type": "string",
+108:                     "enum": ["yes_no", "text_input"],
+109:                     "description": "Type of question"
+110:                 }
+111:             },
+112:             "required": ["question", "question_type"]
+113:         }))
+114:     }
+115: 
+116:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+117:         let question = get_required_string_param(&args, "question")?;
+118:         let question_type = get_required_string_param(&args, "question_type")?;
+119: 
+120:         let interaction = get_interaction_backend()
+121:             .ok_or_else(|| adk_core::AdkError::tool("InteractiveBackend not set - cannot ask user".to_string()))?;
+122: 
+123:         match question_type {
+124:             "yes_no" => {
+125:                 let options = vec![
+126:                     InputOption {
+127:                         id: "yes".to_string(),
+128:                         label: "Yes".to_string(),
+129:                         description: Some("Confirm and proceed".to_string()),
+130:                     },
+131:                     InputOption {
+132:                         id: "no".to_string(),
+133:                         label: "No".to_string(),
+134:                         description: Some("Deny or cancel".to_string()),
+135:                     },
+136:                 ];
+137: 
+138:                 let response = interaction.request_input(
+139:                     question,
+140:                     options,
+141:                     None,
+142:                 ).await.map_err(|e| adk_core::AdkError::tool(format!("Input error: {}", e)))?;
+143: 
+144:                 let answer = match response {
+145:                     InputResponse::Selection(id) => id == "yes",
+146:                     InputResponse::Text(text) => {
+147:                         let trimmed = text.trim().to_lowercase();
+148:                         trimmed == "yes" || trimmed == "y" || trimmed == "true" || trimmed == "1"
+149:                     }
+150:                     InputResponse::Cancel => false,
+151:                 };
+152: 
+153:                 Ok(json!({
+154:                     "answer": answer,
+155:                     "answer_type": "boolean"
+156:                 }))
+157:             }
+158:             "text_input" => {
+159:                 let response = interaction.request_input(
+160:                     question,
+161:                     vec![],
+162:                     None,
+163:                 ).await.map_err(|e| adk_core::AdkError::tool(format!("Input error: {}", e)))?;
+164: 
+165:                 let answer = match response {
+166:                     InputResponse::Text(text) => text,
+167:                     InputResponse::Selection(_) => String::new(),
+168:                     InputResponse::Cancel => String::new(),
+169:                 };
+170: 
+171:                 Ok(json!({
+172:                     "answer": answer,
+173:                     "answer_type": "text"
+174:                 }))
+175:             }
+176:             _ => Ok(json!({"error": "Invalid question type. Use 'yes_no' or 'text_input'."})),
+177:         }
+178:     }
+179: }
+180: ⋮----
+181: RequestHumanReviewTool
+182: ⋮----
+183: {
+184:     fn name(&self) -> &str {
+185:         "request_human_review"
+186:     }
+187: 
+188:     fn description(&self) -> &str {
+189:         "Request human intervention when the Actor-Critic feedback loop cannot resolve an issue. \
+190:          This signals that the agent needs human judgment to proceed, and terminates the current loop."
+191:     }
+192: 
+193:     fn parameters_schema(&self) -> Option<Value> {
+194:         Some(json!({
+195:             "type": "object",
+196:             "properties": {
+197:                 "reason": {
+198:                     "type": "string",
+199:                     "description": "Why human review is needed (describe the stuck issue)"
+200:                 }
+201:             },
+202:             "required": ["reason"]
+203:         }))
+204:     }
+205: 
+206:     async fn execute(&self, ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+207:         let reason = get_required_string_param(&args, "reason")?;
 208: 
-209:             let mut last_error = None;
-210:             let mut success = false;
-211: 
-212:             for attempt in 0..MAX_STAGE_RETRIES {
-213:                 if attempt > 0 {
-214:                     println!(
-215:                         "[Executor] Retrying stage '{}' (attempt {}/{})",
-216:                         stage_name, attempt + 1, MAX_STAGE_RETRIES
-217:                     );
-218:                     self.interaction
-219:                         .show_message_with_context(
-220:                             crate::interaction::MessageLevel::Warning,
-221:                             format!(
-222:                                 "Retrying stage '{}' (attempt {}/{})",
-223:                                 stage_name, attempt + 1, MAX_STAGE_RETRIES
-224:                             ),
-225:                             MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-226:                         )
-227:                         .await;
-228:                     tokio::time::sleep(tokio::time::Duration::from_millis(RETRY_DELAY_MS)).await;
-229:                 }
-230: 
-231:                 
-232:                 let mut current_feedback: Option<String> = None;
-233:                 let mut feedback_loop_count: u32 = 0;
-234: 
-235:                 if let Ok(feedback_history) = crate::persistence::load_feedback_history() {
-236:                     if let Some(fb) = feedback_history
-237:                         .feedbacks
-238:                         .iter()
-239:                         .filter(|f| f.stage == stage_name)
-240:                         .max_by_key(|f| f.timestamp)
-241:                     {
-242:                         tracing::info!("[Executor] Found stored feedback for stage '{}': {}",
-243:                             stage_name, fb.details.chars().take(100).collect::<String>());
-244:                         current_feedback = Some(fb.details.clone());
-245:                         
-246:                         
-247:                         if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
-248:                             eprintln!("[Warning] Failed to clear consumed feedback for stage '{}': {}", stage_name, e);
-249:                         }
-250:                     }
-251:                 }
-252: 
-253:                 loop {
-254:                     let result = if let Some(ref feedback) = current_feedback {
-255:                         stage
-256:                             .execute_with_feedback(&ctx, self.interaction.clone(), feedback)
-257:                             .await
-258:                     } else {
-259:                         stage.execute(&ctx, self.interaction.clone()).await
-260:                     };
-261: 
-262:                     match result {
-263:                         StageResult::GotoStage(target_stage, reason) => {
-264:                             self.interaction
-265:                                 .show_message_with_context(
-266:                                     crate::interaction::MessageLevel::Warning,
-267:                                     format!(
-268:                                         "🔄 Stage jump requested: {} → {}\nReason: {}",
-269:                                         stage_name, target_stage, reason
-270:                                     ),
-271:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-272:                                 )
-273:                                 .await;
-274: 
-275:                             
-276:                             
-277:                             
-278: 
-279:                             if goto_depth >= MAX_GOTO_DEPTH {
-280:                                 anyhow::bail!(
-281:                                     "Maximum goto stage depth ({}) reached. Stage '{}' keeps requesting jumps to '{}'. Last reason: {}",
-282:                                     MAX_GOTO_DEPTH, stage_name, target_stage, reason
-283:                                 );
-284:                             }
-285: 
-286:                             iteration.set_stage(&target_stage);
-287:                             self.iteration_store.save(&iteration)?;
-288: 
-289:                             let new_stages = get_stages_from_flow(&target_stage);
-290: 
-291:                             self.interaction
-292:                                 .show_message_with_context(
-293:                                     crate::interaction::MessageLevel::Info,
-294:                                     format!(
-295:                                         "Restarting pipeline from '{}' stage with {} stages to execute (goto depth {}/{})",
-296:                                         target_stage,
-297:                                         new_stages.len(),
-298:                                         goto_depth + 1,
-299:                                         MAX_GOTO_DEPTH
-300:                                     ),
-301:                                     MessageContext::new("Pipeline Controller"),
-302:                                 )
-303:                                 .await;
-304: 
-305:                             return Box::pin(self.execute_stages_from(
-306:                                 project,
-307:                                 iteration,
-308:                                 new_stages,
-309:                                 workspace.clone(),
-310:                                 flow_config.clone(),
-311:                                 goto_depth + 1,
-312:                             )).await;
-313:                         }
-314:                         StageResult::Success(artifact_path) => {
-315:                             let artifact_exists = if let Some(ref path) = artifact_path {
-316:                                 std::path::Path::new(path).exists()
-317:                             } else {
-318:                                 workspace::check_artifact_exists(&stage_name, &workspace).await
-319:                             };
-320: 
-321:                             if !artifact_exists {
-322:                                 last_error = Some(format!("Artifacts not generated for stage '{}'", stage_name));
-323: 
-324:                                 self.interaction
-325:                                     .show_message_with_context(
-326:                                         crate::interaction::MessageLevel::Error,
-327:                                         format!("❌ Stage '{}' completed but artifacts not found. Will retry...", stage_name),
-328:                                         MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-329:                                     )
-330:                                     .await;
-331:                                 beak;
-332:                             }
-333: 
-334:                             if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
-335:                                 eprintln!("[Warning] Failed to clear feedback for stage '{}': {}", stage_name, e);
-336:                             }
-337: 
-338:                             iteration.complete_stage(&stage_name, artifact_path.clone());
-339:                             self.iteration_store.save(&iteration)?;
-340: 
-341:                             let progress_msg = if feedback_loop_count > 0 {
-342:                                 format!(
-343:                                     "✅ [{}/{}] Stage '{}' completed (revision {})",
-344:                                     stage_num, total_stages, stage_name, feedback_loop_count
-345:                                 )
-346:                             } else if attempt > 0 {
-347:                                 format!(
-348:                                     "✅ [{}/{}] Stage '{}' completed (after {} retries)",
-349:                                     stage_num, total_stages, stage_name, attempt
-350:                                 )
-351:                             } else {
-352:                                 format!("✅ [{}/{}] Stage '{}' completed", stage_num, total_stages, stage_name)
-353:                             };
-354: 
-355:                             self.interaction
-356:                                 .show_message_with_context(
-357:                                     crate::interaction::MessageLevel::Success,
-358:                                     progress_msg,
-359:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-360:                                 )
-361:                                 .await;
-362: 
-363:                             if is_critical_stage(&stage_name) {
-364:                                 iteration.pause();
-365:                                 self.iteration_store.save(&iteration)?;
-366: 
-367:                                 let artifact_type = match stage_name.as_str() {
-368:                                     "idea" => "idea",
-369:                                     "prd" => "requirements",
-370:                                     "design" => "design",
-371:                                     "plan" => "plan",
-372:                                     "coding" => "code",
-373:                                     _ => "artifacts",
-374:                                 };
-375: 
-376:                                 let action = self.interaction
-377:                                     .request_confirmation_with_feedback(
-378:                                         &format!(
-379:                                             "Stage '{}' completed. Please review the generated {} document.{}",
-380:                                             stage_name,
-381:                                             stage_name.to_uppercase(),
-382:                                             if feedback_loop_count > 0 {
-383:                                                 format!(" (Revision {})", feedback_loop_count)
-384:                                             } else {
-385:                                                 String::new()
-386:                                             }
-387:                                         ), 
-388:                                         artifact_type
-389:                                     )
-390:                                     .await;
-391: 
-392:                                 match action {
-393:                                     ConfirmationAction::Continue => {
-394:                                         iteration.resume();
-395:                                         self.iteration_store.save(&iteration)?;
-396:                                         success = true;
-397:                                         beak;
-398:                                     }
-399:                                     ConfirmationAction::ViewArtifact => {
-400:                                         current_feedback = None;
-401:                                         continue;
-402:                                     }
-403:                                     ConfirmationAction::ProvideFeedback(feedback) => {
-404:                                         if feedback_loop_count >= MAX_FEEDBACK_LOOPS {
-405:                                             self.interaction
-406:                                                 .show_message_with_context(
-407:                                                     crate::interaction::MessageLevel::Warning,
-408:                                                     format!("Maximum revision attempts ({}) reached. Proceeding...", MAX_FEEDBACK_LOOPS),
-409:                                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-410:                                                 )
-411:                                                 .await;
-412:                                             iteration.resume();
-413:                                             self.iteration_store.save(&iteration)?;
-414:                                             success = true;
-415:                                             beak;
-416:                                         }
-417: 
-418:                                         feedback_loop_count += 1;
-419:                                         current_feedback = Some(feedback);
-420:                                         self.interaction
-421:                                             .show_message_with_context(
-422:                                                 crate::interaction::MessageLevel::Info,
-423:                                                 format!("Revising stage '{}' based on feedback...", stage_name),
-424:                                                 MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-425:                                             )
-426:                                             .await;
-427:                                         continue;
-428:                                     }
-429:                                     ConfirmationAction::Cancel => {
-430:                                         iteration.pause();
-431:                                         self.iteration_store.save(&iteration)?;
-432:                                         return Err(anyhow::anyhow!("User cancelled at stage '{}'", stage_name));
-433:                                     }
-434:                                 }
-435:                             } else {
-436:                                 success = true;
-437:                                 beak;
-438:                             }
-439:                         }
-440:                         StageResult::Failed(e) => {
-441:                             last_error = Some(e.clone());
-442:                             eprintln!("[Executor] Stage '{}' failed: {}", stage_name, e);
-443:                             self.interaction
-444:                                 .show_message_with_context(
-445:                                     crate::interaction::MessageLevel::Error,
-446:                                     format!("❌ Stage '{}' failed: {}", stage_name, e),
-447:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-448:                                 )
-449:                                 .await;
-450:                             beak;
-451:                         }
-452:                         StageResult::Paused => {
-453:                             iteration.pause();
-454:                             self.iteration_store.save(&iteration)?;
-455:                             self.interaction
-456:                                 .show_message_with_context(
-457:                                     crate::interaction::MessageLevel::Info,
-458:                                     format!("⏸️ Stage '{}' paused by user", stage_name),
-459:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-460:                                 )
-461:                                 .await;
-462:                             return Ok(());
-463:                         }
-464:                         StageResult::NeedsRevision(e) => {
-465:                             last_error = Some(e.clone());
-466:                             self.interaction
-467:                                 .show_message_with_context(
-468:                                     crate::interaction::MessageLevel::Warning,
-469:                                     format!("🔄 Stage '{}' needs revision: {}", stage_name, e),
-470:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-471:                                 )
-472:                                 .await;
-473:                             beak;
-474:                         }
-475:                     }
-476:                 }
-477: 
-478:                 if success {
-479:                     beak;
-480:                 }
-481:             }
-482: 
-483:             if !success {
-484:                 if flow_config.stop_on_failure {
-485:                     iteration.fail();
-486:                     self.iteration_store.save(&iteration)?;
-487: 
-488:                     return Err(anyhow::anyhow!(
-489:                         "Stage '{}' failed after {} retries: {}",
-490:                         stage_name,
-491:                         MAX_STAGE_RETRIES,
-492:                         last_error.unwrap_or_else(|| "Unknown error".to_string())
-493:                     ));
-494:                 } else {
-495:                     self.interaction
-496:                         .show_message_with_context(
-497:                             crate::interaction::MessageLevel::Warning,
-498:                             format!("Skipping failed stage '{}' and continuing...", stage_name),
-499:                             MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-500:                         )
-501:                         .await;
-502:                 }
-503:             }
-504:         }
-505: 
-506:         
-507:         iteration.complete();
-508:         self.iteration_store.save(&iteration)?;
-509: 
-510:         
-511:         if let Err(e) = crate::persistence::MemoryStore::new().promote_insights_to_decisions(&iteration.id) {
-512:             println!("[Executor] Warning: Failed to promote insights: {}", e);
-513:         }
-514: 
-515:         project.current_iteration_id = Some(iteration.id.clone());
-516:         self.project_store.save(project)?;
-517: 
-518:         self.interaction
-519:             .show_message_with_context(
-520:                 crate::interaction::MessageLevel::Success,
-521:                 format!("Iteration '{}' completed successfully!", iteration.title),
-522:                 MessageContext::new("Pipeline Controller"),
-523:             )
-524:             .await;
-525: 
-526:         Ok(())
-527:     }
-528: 
-529:     
-530:     pub async fn continue_iteration(
-531:         &self,
-532:         project: &mut Project,
-533:         iteration_id: &str,
-534:         model: Option<Arc<dyn adk_core::Llm>>,
-535:     ) -> anyhow::Result<()> {
-536:         let mut iteration = self.iteration_store.load(iteration_id)?;
-537: 
-538:         println!(
-539:             "[Executor] Continuing iteration '{}' (status: {:?}, current_stage: {:?})",
-540:             iteration_id, iteration.status, iteration.current_stage
-541:         );
-542: 
-543:         if iteration.status != IterationStatus::Paused {
-544:             return Err(anyhow::anyhow!("Iteration is not paused"));
-545:         }
-546: 
-547:         let resume_stage = iteration.current_stage.clone();
-548:         println!("[Executor] Resuming from stage: {:?}", resume_stage);
-549: 
-550:         iteration.resume();
-551:         self.iteration_store.save(&iteration)?;
-552: 
-553:         self.interaction
-554:             .show_message_with_context(
-555:                 crate::interaction::MessageLevel::Info,
-556:                 format!(
-557:                     "Iteration '{}' resumed from stage: {}",
-558:                     iteration_id,
-559:                     resume_stage.as_ref().unwrap_or(&"unknown".to_string())
-560:                 ),
-561:                 MessageContext::new("Pipeline Controller")
-562:                     .with_stage(resume_stage.as_deref().unwrap_or("unknown")),
-563:             )
-564:             .await;
-565: 
-566:         self.execute(project, iteration_id, resume_stage, model).await
-567:     }
-568: 
-569:     
-570:     pub async fn retry_iteration(
-571:         &self,
-572:         project: &mut Project,
-573:         iteration_id: &str,
-574:         model: Option<Arc<dyn adk_core::Llm>>,
-575:     ) -> anyhow::Result<()> {
-576:         let mut iteration = self.iteration_store.load(iteration_id)?;
-577: 
-578:         println!(
-579:             "[Executor] Retrying failed iteration '{}' (status: {:?}, current_stage: {:?})",
-580:             iteration_id, iteration.status, iteration.current_stage
-581:         );
-582: 
-583:         if iteration.status != IterationStatus::Failed {
-584:             return Err(anyhow::anyhow!("Iteration is not failed"));
-585:         }
-586: 
-587:         let retry_stage = if let Some(ref current) = iteration.current_stage {
-588:             current.clone()
-589:         } else {
-590:             println!("[Executor] No current_stage found, defaulting to 'check' for retry");
-591:             "check".to_string()
-592:         };
-593: 
-594:         iteration.resume();
-595:         self.iteration_store.save(&iteration)?;
-596: 
-597:         self.interaction
-598:             .show_message_with_context(
-599:                 crate::interaction::MessageLevel::Info,
-600:                 format!("Retrying iteration '{}' from stage: {}", iteration_id, retry_stage),
-601:                 MessageContext::new("Pipeline Controller").with_stage(&retry_stage),
-602:             )
-603:             .await;
-604: 
-605:         self.execute(project, iteration_id, Some(retry_stage), model).await
-606:     }
-607: 
-608:     
-609:     
-610:     
-611: 
-612:     
-613:     pub async fn generate_document_summaries(
-614:         &self,
-615:         iteration: &crate::domain::Iteration,
-616:         model: Arc<dyn adk_core::Llm>,
-617:     ) -> anyhow::Result<()> {
-618:         knowledge::generate_document_summaries(&self.iteration_store, iteration, model).await
-619:     }
-620: 
-621:     
-622:     pub async fn generate_iteration_knowledge(
-623:         &self,
-624:         iteration: &crate::domain::Iteration,
-625:         model: Arc<dyn adk_core::Llm>,
-626:     ) -> anyhow::Result<()> {
-627:         knowledge::generate_iteration_knowledge(&self.iteration_store, iteration, model).await
-628:     }
-629: 
-630:     
-631:     pub async fn inject_project_knowledge(&self, iteration: &crate::domain::Iteration) -> anyhow::Result<()> {
-632:         knowledge::inject_project_knowledge(&self.iteration_store, iteration).await
-633:     }
-634: 
-635:     
-636:     pub async fn regenerate_iteration_knowledge(
-637:         &self,
-638:         iteration_id: &str,
-639:         model: Arc<dyn adk_core::Llm>,
-640:     ) -> anyhow::Result<()> {
-641:         knowledge::regenerate_iteration_knowledge(&self.iteration_store, iteration_id, model).await
-642:     }
-643: }
+209:         tracing::warn!("[RequestHumanReviewTool] Human review requested: {}", reason);
+210: 
+211:         if let Some(interaction) = get_interaction_backend() {
+212:             interaction.show_message(
+213:                 MessageLevel::Warning,
+214:                 format!("⚠️ Human review requested\nReason: {}", reason),
+215:             ).await;
+216: 
+217:             let options = vec![
+218:                 InputOption {
+219:                     id: "continue".to_string(),
+220:                     label: "Continue (agent will proceed)".to_string(),
+221:                     description: Some("Allow the agent to continue to the next stage".to_string()),
+222:                 },
+223:                 InputOption {
+224:                     id: "restart".to_string(),
+225:                     label: "Restart stage".to_string(),
+226:                     description: Some("Send the agent back to try again".to_string()),
+227:                 },
+228:             ];
+229: 
+230:             let _ = interaction.request_input(
+231:                 &format!("Human review needed: {}\n\nPlease choose how to proceed:", reason),
+232:                 options,
+233:                 None,
+234:             ).await;
+235:         }
+236: 
+237:         let mut actions = EventActions::default();
+238:         actions.escalate = true;
+239:         ctx.set_actions(actions);
+240: 
+241:         Ok(json!({
+242:             "status": "human_review_requested",
+243:             "reason": reason,
+244:             "message": "Human review has been requested. The loop will terminate."
+245:         }))
+246:     }
+247: }
 ```
 
-### crates/cowork-core/src/tools/mod.rs (31 lines)
+### crates/cowork-core/src/tools/goto_stage_tool.rs (90 lines)
 
 ```
-1: set_current_agent_name
+1: GotoStageTool
 2: ⋮----
-3: (name: &str)
-4: ⋮----
-5: get_current_agent_name
-6: ⋮----
-7: ()
-8: ⋮----
-9: get_required_string_param
-10: ⋮----
-11: (args: &'a Value, key: &str)
-12: ⋮----
-13: get_optional_string_param
-14: ⋮----
-15: (args: &Value, key: &str)
-16: ⋮----
-17: get_required_array_param
-18: ⋮----
-19: (args: &'a Value, key: &str)
-20: ⋮----
-21: set_tool_notify_callback
-22: ⋮----
-23: (callback: F)
-24: ⋮----
-25: notify_tool_call
-26: ⋮----
-27: (tool_name: &str, args: &Value)
-28: ⋮----
-29: notify_tool_result
-30: ⋮----
-31: (tool_name: &str, result: &Result<Value, AdkError>)
+3: {
+4:     fn name(&self) -> &str {
+5:         "goto_stage"
+6:     }
+7: 
+8:     fn description(&self) -> &str {
+9:         "Restart pipeline from a specific stage. Use this when critical issues \
+10:          require going back to an earlier phase. Valid stages: prd, design, plan, coding."
+11:     }
+12: 
+13:     fn parameters_schema(&self) -> Option<Value> {
+14:         Some(json!({
+15:             "type": "object",
+16:             "properties": {
+17:                 "stage": {
+18:                     "type": "string",
+19:                     "enum": ["prd", "design", "plan", "coding"],
+20:                     "description": "Which stage to restart from"
+21:                 },
+22:                 "reason": {
+23:                     "type": "string",
+24:                     "description": "Why the restart is needed"
+25:                 }
+26:             },
+27:             "required": ["stage", "reason"]
+28:         }))
+29:     }
+30: 
+31:     async fn execute(&self, ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+32:         let stage_str = get_required_string_param(&args, "stage")?;
+33:         let reason = get_required_string_param(&args, "reason")?;
+34: 
+35:         let stage = match stage_str {
+36:             "prd" => Stage::Prd,
+37:             "design" => Stage::Design,
+38:             "plan" => Stage::Plan,
+39:             "coding" => Stage::Coding,
+40:             _ => {
+41:                 return Ok(json!({
+42:                     "status": "error",
+43:                     "message": format!("Invalid stage: {}", stage_str)
+44:                 }));
+45:             }
+46:         };
+47: 
+48:         let feedback = Feedback {
+49:             stage: stage_str.to_string(),
+50:             feedback_type: FeedbackType::QualityIssue,
+51:             severity: Severity::Critical,
+52:             details: reason.to_string(),
+53:             suggested_fix: Some(format!("Restart from {} stage to address the issue", stage_str)),
+54:             timestamp: chrono::Utc::now(),
+55:         };
+56: 
+57:         if let Err(e) = crate::persistence::append_feedback(&feedback) {
+58:             tracing::warn!("[GotoStageTool] Failed to save feedback: {}", e);
+59:         }
+60: 
+61:         let mut meta = load_session_meta()
+62:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?
+63:             .unwrap_or_else(|| SessionMeta {
+64:                 session_id: uuid::Uuid::new_v4().to_string(),
+65:                 created_at: chrono::Utc::now(),
+66:                 current_stage: Some(Stage::Check),
+67:                 restart_reason: None,
+68:             });
+69: 
+70:         meta.current_stage = Some(stage);
+71:         meta.restart_reason = Some(reason.to_string());
+72: 
+73:         save_session_meta(&meta)
+74:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
+75: 
+76:         set_goto_stage_signal(stage_str.to_string(), reason.to_string());
+77: 
+78:         let mut actions = EventActions::default();
+79:         actions.escalate = true;
+80:         actions.state_delta.insert("goto_stage".to_string(), json!(stage_str));
+81:         actions.state_delta.insert("goto_reason".to_string(), json!(reason));
+82:         ctx.set_actions(actions);
+83: 
+84:         Ok(json!({
+85:             "status": "goto_stage",
+86:             "stage": stage_str,
+87:             "reason": reason
+88:         }))
+89:     }
+90: }
 ```
 
 ### crates/cowork-gui/src/components/chat/ChatPanel.tsx (24 lines)
@@ -3309,6 +3656,188 @@ LICENSE
 48: adk-skill = { workspace = true }
 49: adk-tool = { workspace = true, features = ["http-transport"] }
 50: which = "8.0.0"
+```
+
+### crates/cowork-core/src/config_definition/agent_definition.rs (177 lines)
+
+```
+1: AgentType
+2: ⋮----
+3: {
+4:     
+5:     #[default]
+6:     Simple,
+7:     
+8:     Loop {
+9:         
+10:         max_iterations: Option<u32>,
+11:     },
+12: }
+13: ⋮----
+14: ModelConfig
+15: ⋮----
+16: {
+17:     
+18:     pub model_id: Option<String>,
+19:     
+20:     pub temperature: Option<f32>,
+21:     
+22:     pub max_tokens: Option<u32>,
+23:     
+24:     pub top_p: Option<f32>,
+25: }
+26: ⋮----
+27: ModelConfig
+28: ⋮----
+29: {
+30:     fn default() -> Self {
+31:         Self {
+32:             model_id: None,
+33:             temperature: Some(0.7),
+34:             max_tokens: None,
+35:             top_p: None,
+36:         }
+37:     }
+38: }
+39: ⋮----
+40: ToolReference
+41: ⋮----
+42: {
+43:     
+44:     pub tool_id: String,
+45:     
+46:     pub config: Option<HashMap<String, serde_json::Value>>,
+47: }
+48: ⋮----
+49: AgentDefinition
+50: ⋮----
+51: {
+52:     
+53:     pub id: String,
+54:     
+55:     pub name: String,
+56:     
+57:     pub description: Option<String>,
+58:     
+59:     pub version: Option<String>,
+60: 
+61:     
+62:     #[serde(default)]
+63:     pub agent_type: AgentType,
+64: 
+65:     
+66:     
+67:     
+68:     
+69:     
+70:     pub instruction: String,
+71: 
+72:     
+73:     #[serde(default)]
+74:     pub tools: Vec<ToolReference>,
+75: 
+76:     
+77:     #[serde(default)]
+78:     pub model: ModelConfig,
+79: 
+80:     
+81:     #[serde(default)]
+82:     pub include_contents: IncludeContentsMode,
+83: 
+84:     
+85:     #[serde(default)]
+86:     pub tags: Vec<String>,
+87: 
+88:     
+89:     #[serde(default)]
+90:     pub metadata: HashMap<String, serde_json::Value>,
+91: }
+92: ⋮----
+93: IncludeContentsMode
+94: ⋮----
+95: {
+96:     
+97:     #[default]
+98:     None,
+99:     
+100:     Default,
+101:     
+102:     All,
+103:     
+104:     Selected(Vec<String>),
+105: }
+106: ⋮----
+107: ActorCriticDefinition
+108: ⋮----
+109: {
+110:     
+111:     pub actor: AgentDefinition,
+112:     
+113:     pub critic: AgentDefinition,
+114:     
+115:     pub max_iterations: Option<u32>,
+116: }
+117: ⋮----
+118: AgentDefinition
+119: ⋮----
+120: {
+121:     
+122:     pub fn new(id: impl Into<String>, name: impl Into<String>, instruction: impl Into<String>) -> Self {
+123:         Self {
+124:             id: id.into(),
+125:             name: name.into(),
+126:             description: None,
+127:             version: None,
+128:             agent_type: AgentType::Simple,
+129:             instruction: instruction.into(),
+130:             tools: Vec::new(),
+131:             model: ModelConfig::default(),
+132:             include_contents: IncludeContentsMode::None,
+133:             tags: Vec::new(),
+134:             metadata: HashMap::new(),
+135:         }
+136:     }
+137: 
+138:     
+139:     pub fn with_tool(mut self, tool_id: impl Into<String>) -> Self {
+140:         self.tools.push(ToolReference {
+141:             tool_id: tool_id.into(),
+142:             config: None,
+143:         });
+144:         self
+145:     }
+146: 
+147:     
+148:     pub fn with_tool_config(mut self, tool_id: impl Into<String>, config: HashMap<String, serde_json::Value>) -> Self {
+149:         self.tools.push(ToolReference {
+150:             tool_id: tool_id.into(),
+151:             config: Some(config),
+152:         });
+153:         self
+154:     }
+155: 
+156:     
+157:     pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
+158:         self.tags.push(tag.into());
+159:         self
+160:     }
+161: 
+162:     
+163:     pub fn as_loop(mut self, max_iterations: Option<u32>) -> Self {
+164:         self.agent_type = AgentType::Loop { max_iterations };
+165:         self
+166:     }
+167: 
+168:     
+169:     pub fn with_model(mut self, model: ModelConfig) -> Self {
+170:         self.model = model;
+171:         self
+172:     }
+173: }
+174: ⋮----
+175: test_agent_definition_serialization
+176: ⋮----
+177: ()
 ```
 
 ### crates/cowork-core/src/config_definition/mod.rs (17 lines)
@@ -4906,156 +5435,6 @@ LICENSE
 304: }
 ```
 
-### crates/cowork-core/src/tools/control_tools.rs (145 lines)
-
-```
-1: ProvideFeedbackTool
-2: ⋮----
-3: {
-4:     fn name(&self) -> &str {
-5:         "provide_feedback"
-6:     }
-7: 
-8:     fn description(&self) -> &str {
-9:         "Provide structured feedback to the Actor agent. \
-10:          This feedback will be visible to the Actor in the next iteration."
-11:     }
-12: 
-13:     fn parameters_schema(&self) -> Option<Value> {
-14:         Some(json!({
-15:             "type": "object",
-16:             "properties": {
-17:                 "stage": {
-18:                     "type": "string",
-19:                     "description": "The stage providing this feedback (e.g., 'idea', 'prd', 'design', 'plan', 'coding', 'check', 'delivery')",
-20:                     "enum": ["idea", "prd", "design", "plan", "coding", "check", "delivery"]
-21:                 },
-22:                 "feedback_type": {
-23:                     "type": "string",
-24:                     "enum": [
-25:                         "build_error",
-26:                         "quality_issue",
-27:                         "missing_requirement",
-28:                         "missing_artifact",
-29:                         "architecture_issue",
-30:                         "task_scope_issue",
-31:                         "suggestion"
-32:                     ],
-33:                 },
-34:                 "severity": {
-35:                     "type": "string",
-36:                     "enum": ["critical", "major", "minor"],
-37:                 },
-38:                 "details": {"type": "string"},
-39:                 "suggested_fix": {"type": "string"}
-40:             },
-41:             "required": ["stage", "feedback_type", "severity", "details"]
-42:         }))
-43:     }
-44: 
-45:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-46:         let stage = get_required_string_param(&args, "stage")?;
-47: 
-48:         let feedback_type = match get_required_string_param(&args, "feedback_type")? {
-49:             "build_error" => FeedbackType::BuildError,
-50:             "quality_issue" => FeedbackType::QualityIssue,
-51:             "missing_requirement" => FeedbackType::MissingRequirement,
-52:             "missing_artifact" => FeedbackType::MissingArtifact,
-53:             "architecture_issue" => FeedbackType::ArchitectureIssue,
-54:             "task_scope_issue" => FeedbackType::TaskScopeIssue,
-55:             _ => FeedbackType::Suggestion,
-56:         };
-57: 
-58:         let severity = match get_required_string_param(&args, "severity")? {
-59:             "critical" => Severity::Critical,
-60:             "major" => Severity::Major,
-61:             _ => Severity::Minor,
-62:         };
-63: 
-64:         let feedback = Feedback {
-65:             stage: stage.to_string(),  
-66:             feedback_type,
-67:             severity,
-68:             details: get_required_string_param(&args, "details")?.to_string(),
-69:             suggested_fix: args
-70:                 .get("suggested_fix")
-71:                 .and_then(|v| v.as_str())
-72:                 .map(String::from),
-73:             timestamp: chrono::Utc::now(),
-74:         };
-75: 
-76:         append_feedback(&feedback).map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
-77: 
-78:         Ok(json!({
-79:             "status": "feedback_recorded",
-80:             "message": "Feedback will be available to Actor in next iteration"
-81:         }))
-82:     }
-83: }
-84: ⋮----
-85: AskUserTool
-86: ⋮----
-87: {
-88:     fn name(&self) -> &str {
-89:         "ask_user"
-90:     }
-91: 
-92:     fn description(&self) -> &str {
-93:         "Ask the user for confirmation or input via CLI interface."
-94:     }
-95: 
-96:     fn parameters_schema(&self) -> Option<Value> {
-97:         Some(json!({
-98:             "type": "object",
-99:             "properties": {
-100:                 "question": {
-101:                     "type": "string",
-102:                     "description": "The question to ask the user"
-103:                 },
-104:                 "question_type": {
-105:                     "type": "string",
-106:                     "enum": ["yes_no", "text_input"],
-107:                     "description": "Type of question"
-108:                 }
-109:             },
-110:             "required": ["question", "question_type"]
-111:         }))
-112:     }
-113: 
-114:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-115:         let question = get_required_string_param(&args, "question")?;
-116:         let question_type = get_required_string_param(&args, "question_type")?;
-117: 
-118:         match question_type {
-119:             "yes_no" => {
-120:                 let answer = Confirm::new()
-121:                     .with_prompt(question)
-122:                     .default(false)
-123:                     .interact()
-124:                     .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
-125: 
-126:                 Ok(json!({
-127:                     "answer": answer,
-128:                     "answer_type": "boolean"
-129:                 }))
-130:             }
-131:             "text_input" => {
-132:                 let answer: String = Input::new()
-133:                     .with_prompt(question)
-134:                     .interact_text()
-135:                     .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
-136: 
-137:                 Ok(json!({
-138:                     "answer": answer,
-139:                     "answer_type": "text"
-140:                 }))
-141:             }
-142:             _ => Ok(json!({"error": "Invalid question type"})),
-143:         }
-144:     }
-145: }
-```
-
 ### crates/cowork-core/src/tools/file_tools.rs (733 lines)
 
 ```
@@ -5794,99 +6173,333 @@ LICENSE
 733: (content: &str, max_chars: usize)
 ```
 
-### crates/cowork-core/src/tools/goto_stage_tool.rs (90 lines)
+### crates/cowork-core/src/tools/pm_tools.rs (324 lines)
 
 ```
-1: GotoStageTool
+1: PMGotoStageTool
 2: ⋮----
 3: {
-4:     fn name(&self) -> &str {
-5:         "goto_stage"
-6:     }
-7: 
-8:     fn description(&self) -> &str {
-9:         "Restart pipeline from a specific stage. Use this when critical issues \
-10:          require going back to an earlier phase. Valid stages: prd, design, plan, coding."
-11:     }
-12: 
-13:     fn parameters_schema(&self) -> Option<Value> {
-14:         Some(json!({
-15:             "type": "object",
-16:             "properties": {
-17:                 "stage": {
-18:                     "type": "string",
-19:                     "enum": ["prd", "design", "plan", "coding"],
-20:                     "description": "Which stage to restart from"
-21:                 },
-22:                 "reason": {
-23:                     "type": "string",
-24:                     "description": "Why the restart is needed"
-25:                 }
-26:             },
-27:             "required": ["stage", "reason"]
-28:         }))
-29:     }
-30: 
-31:     async fn execute(&self, ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-32:         let stage_str = get_required_string_param(&args, "stage")?;
-33:         let reason = get_required_string_param(&args, "reason")?;
-34: 
-35:         let stage = match stage_str {
-36:             "prd" => Stage::Prd,
-37:             "design" => Stage::Design,
-38:             "plan" => Stage::Plan,
-39:             "coding" => Stage::Coding,
-40:             _ => {
-41:                 return Ok(json!({
-42:                     "status": "error",
-43:                     "message": format!("Invalid stage: {}", stage_str)
-44:                 }));
-45:             }
-46:         };
-47: 
-48:         let feedback = Feedback {
-49:             stage: stage_str.to_string(),
-50:             feedback_type: FeedbackType::QualityIssue,
-51:             severity: Severity::Critical,
-52:             details: reason.to_string(),
-53:             suggested_fix: Some(format!("Restart from {} stage to address the issue", stage_str)),
-54:             timestamp: chrono::Utc::now(),
-55:         };
-56: 
-57:         if let Err(e) = crate::persistence::append_feedback(&feedback) {
-58:             eprintln!("[GotoStageTool] Warning: Failed to save feedback: {}", e);
-59:         }
-60: 
-61:         let mut meta = load_session_meta()
-62:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?
-63:             .unwrap_or_else(|| SessionMeta {
-64:                 session_id: uuid::Uuid::new_v4().to_string(),
-65:                 created_at: chrono::Utc::now(),
-66:                 current_stage: Some(Stage::Check),
-67:                 restart_reason: None,
-68:             });
-69: 
-70:         meta.current_stage = Some(stage);
-71:         meta.restart_reason = Some(reason.to_string());
-72: 
-73:         save_session_meta(&meta)
-74:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
-75: 
-76:         set_goto_stage_signal(stage_str.to_string(), reason.to_string());
-77: 
-78:         let mut actions = EventActions::default();
-79:         actions.escalate = true;
-80:         actions.state_delta.insert("goto_stage".to_string(), json!(stage_str));
-81:         actions.state_delta.insert("goto_reason".to_string(), json!(reason));
-82:         ctx.set_actions(actions);
-83: 
-84:         Ok(json!({
-85:             "status": "goto_stage",
-86:             "stage": stage_str,
-87:             "reason": reason
-88:         }))
-89:     }
-90: }
+4:     current_iteration_id: String,
+5: }
+6: ⋮----
+7: PMGotoStageTool
+8: ⋮----
+9: {
+10:     pub fn new(current_iteration_id: String) -> Self {
+11:         Self { current_iteration_id }
+12:     }
+13: }
+14: ⋮----
+15: PMGotoStageTool
+16: ⋮----
+17: {
+18:     fn name(&self) -> &str {
+19:         "pm_goto_stage"
+20:     }
+21: 
+22:     fn description(&self) -> &str {
+23:         "Restart the pipeline from a specific stage. Use this when the user wants to fix bugs, \
+24:          modify requirements, or make changes to the project after delivery. \
+25:          Valid stages: idea, prd, design, plan, coding."
+26:     }
+27: 
+28:     fn parameters_schema(&self) -> Option<Value> {
+29:         Some(json!({
+30:             "type": "object",
+31:             "properties": {
+32:                 "stage": {
+33:                     "type": "string",
+34:                     "enum": ["idea", "prd", "design", "plan", "coding"],
+35:                     "description": "Which stage to restart from"
+36:                 },
+37:                 "reason": {
+38:                     "type": "string",
+39:                     "description": "Why the restart is needed (user's request summary)"
+40:                 }
+41:             },
+42:             "required": ["stage", "reason"]
+43:         }))
+44:     }
+45: 
+46:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+47:         let stage_str = get_required_string_param(&args, "stage")?;
+48:         let reason = get_required_string_param(&args, "reason")?;
+49: 
+50:         
+51:         let stage = match stage_str {
+52:             "idea" => Stage::Idea,
+53:             "prd" => Stage::Prd,
+54:             "design" => Stage::Design,
+55:             "plan" => Stage::Plan,
+56:             "coding" => Stage::Coding,
+57:             _ => {
+58:                 return Ok(json!({
+59:                     "status": "error",
+60:                     "message": format!("Invalid stage: {}. Valid stages are: idea, prd, design, plan, coding", stage_str)
+61:                 }));
+62:             }
+63:         };
+64: 
+65:         
+66:         crate::persistence::set_iteration_id(self.current_iteration_id.clone());
+67: 
+68:         
+69:         
+70:         let feedback = Feedback {
+71:             stage: stage_str.to_string(),  
+72:             feedback_type: FeedbackType::QualityIssue,
+73:             severity: Severity::Major,
+74:             details: reason.to_string(),
+75:             suggested_fix: Some(format!("Restart from {} stage via PM Agent", stage_str)),
+76:             timestamp: chrono::Utc::now(),
+77:         };
+78: 
+79:         if let Err(e) = append_feedback(&feedback) {
+80:             tracing::warn!("[PMGotoStageTool] Failed to save feedback: {}", e);
+81:         }
+82: 
+83:         
+84:         let mut meta = load_session_meta()
+85:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?
+86:             .unwrap_or_else(|| SessionMeta {
+87:                 session_id: uuid::Uuid::new_v4().to_string(),
+88:                 created_at: chrono::Utc::now(),
+89:                 current_stage: Some(Stage::Delivery),
+90:                 restart_reason: None,
+91:             });
+92: 
+93:         
+94:         meta.current_stage = Some(stage);
+95:         meta.restart_reason = Some(reason.to_string());
+96: 
+97:         
+98:         save_session_meta(&meta)
+99:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
+100: 
+101:         Ok(json!({
+102:             "status": "success",
+103:             "message": format!("Pipeline will restart from {} stage. Reason: {}", stage_str, reason),
+104:             "target_stage": stage_str
+105:         }))
+106:     }
+107: }
+108: ⋮----
+109: PMCreateIterationTool
+110: ⋮----
+111: {
+112:     current_iteration_id: String,
+113: }
+114: ⋮----
+115: PMCreateIterationTool
+116: ⋮----
+117: {
+118:     pub fn new(current_iteration_id: String) -> Self {
+119:         Self { current_iteration_id }
+120:     }
+121: }
+122: ⋮----
+123: PMCreateIterationTool
+124: ⋮----
+125: {
+126:     fn name(&self) -> &str {
+127:         "pm_create_iteration"
+128:     }
+129: 
+130:     fn description(&self) -> &str {
+131:         "Create a new iteration for implementing new features or major changes. \
+132:          Use this when the user wants to add new functionality that is separate from the current project."
+133:     }
+134: 
+135:     fn parameters_schema(&self) -> Option<Value> {
+136:         Some(json!({
+137:             "type": "object",
+138:             "properties": {
+139:                 "title": {
+140:                     "type": "string",
+141:                     "description": "Title for the new iteration (concise summary of the new feature)"
+142:                 },
+143:                 "description": {
+144:                     "type": "string",
+145:                     "description": "Detailed description of what the user wants to implement"
+146:                 },
+147:                 "inheritance": {
+148:                     "type": "string",
+149:                     "enum": ["none", "full", "partial"],
+150:                     "description": "Inheritance mode: none=fresh start, full=copy all artifacts and code, partial=copy code only (default)"
+151:                 }
+152:             },
+153:             "required": ["title", "description"]
+154:         }))
+155:     }
+156: 
+157:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+158:         let title = get_required_string_param(&args, "title")?;
+159:         let description = get_required_string_param(&args, "description")?;
+160:         let inheritance = get_optional_string_param(&args, "inheritance")
+161:             .unwrap_or_else(|| "partial".to_string());
+162: 
+163:         
+164:         let project_store = ProjectStore::new();
+165:         let mut project = project_store.load()
+166:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?
+167:             .ok_or_else(|| adk_core::AdkError::tool("Project not initialized".to_string()))?;
+168: 
+169:         
+170:         let inheritance_mode = match inheritance.as_str() {
+171:             "none" => crate::domain::InheritanceMode::None,
+172:             "full" => crate::domain::InheritanceMode::Full,
+173:             _ => crate::domain::InheritanceMode::Partial,
+174:         };
+175: 
+176:         
+177:         let new_iteration = Iteration::create_evolution(
+178:             &project,
+179:             title.to_string(),
+180:             description.to_string(),
+181:             self.current_iteration_id.clone(),
+182:             inheritance_mode,
+183:         );
+184: 
+185:         let new_iteration_id = new_iteration.id.clone();
+186: 
+187:         
+188:         let iteration_store = IterationStore::new();
+189:         iteration_store.save(&new_iteration)
+190:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
+191: 
+192:         
+193:         project_store.add_iteration(&mut project, new_iteration.to_summary())
+194:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
+195: 
+196:         Ok(json!({
+197:             "status": "success",
+198:             "message": format!("Created new iteration: {}", title),
+199:             "iteration_id": new_iteration_id,
+200:             "title": title,
+201:             "inheritance": inheritance
+202:         }))
+203:     }
+204: }
+205: ⋮----
+206: PMRespondTool
+207: ⋮----
+208: {
+209:     fn name(&self) -> &str {
+210:         "pm_respond"
+211:     }
+212: 
+213:     fn description(&self) -> &str {
+214:         "Respond to the user without taking any action. Use this when answering questions, \
+215:          asking for clarification, or providing information."
+216:     }
+217: 
+218:     fn parameters_schema(&self) -> Option<Value> {
+219:         Some(json!({
+220:             "type": "object",
+221:             "properties": {
+222:                 "response": {
+223:                     "type": "string",
+224:                     "description": "The response message to the user"
+225:                 },
+226:                 "ask_clarification": {
+227:                     "type": "boolean",
+228:                     "description": "Whether this response is asking for clarification (optional)"
+229:                 }
+230:             },
+231:             "required": ["response"]
+232:         }))
+233:     }
+234: 
+235:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+236:         let response = get_required_string_param(&args, "response")?;
+237:         let ask_clarification = args.get("ask_clarification")
+238:             .and_then(|v| v.as_bool())
+239:             .unwrap_or(false);
+240: 
+241:         Ok(json!({
+242:             "status": "success",
+243:             "message": response,
+244:             "ask_clarification": ask_clarification
+245:         }))
+246:     }
+247: }
+248: ⋮----
+249: PMSaveDecisionTool
+250: ⋮----
+251: {
+252:     iteration_id: String,
+253: }
+254: ⋮----
+255: PMSaveDecisionTool
+256: ⋮----
+257: {
+258:     pub fn new(iteration_id: String) -> Self {
+259:         Self { iteration_id }
+260:     }
+261: }
+262: ⋮----
+263: PMSaveDecisionTool
+264: ⋮----
+265: {
+266:     fn name(&self) -> &str {
+267:         "pm_save_decision"
+268:     }
+269: 
+270:     fn description(&self) -> &str {
+271:         "Save an important decision or preference to project memory. Use this when the user \
+272:          makes a significant decision that should be remembered for future iterations."
+273:     }
+274: 
+275:     fn parameters_schema(&self) -> Option<Value> {
+276:         Some(json!({
+277:             "type": "object",
+278:             "properties": {
+279:                 "title": {
+280:                     "type": "string",
+281:                     "description": "Title of the decision"
+282:                 },
+283:                 "context": {
+284:                     "type": "string",
+285:                     "description": "Background context of the decision"
+286:                 },
+287:                 "decision": {
+288:                     "type": "string",
+289:                     "description": "The actual decision made"
+290:                 },
+291:                 "impact": {
+292:                     "type": "string",
+293:                     "description": "Impact analysis of this decision (optional)"
+294:                 }
+295:             },
+296:             "required": ["title", "context", "decision"]
+297:         }))
+298:     }
+299: 
+300:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+301:         let title = get_required_string_param(&args, "title")?;
+302:         let context = get_required_string_param(&args, "context")?;
+303:         let decision = get_required_string_param(&args, "decision")?;
+304:         let impact = get_optional_string_param(&args, "impact").unwrap_or_default();
+305: 
+306:         
+307:         let memory_store = crate::persistence::MemoryStore::new();
+308:         
+309:         let memory_decision = Decision::new(
+310:             title,
+311:             context,
+312:             format!("{}\n\nImpact: {}", decision, impact),
+313:             &self.iteration_id,
+314:         );
+315: 
+316:         memory_store.add_decision(memory_decision)
+317:             .map_err(|e: anyhow::Error| adk_core::AdkError::tool(e.to_string()))?;
+318: 
+319:         Ok(json!({
+320:             "status": "success",
+321:             "message": format!("Decision saved: {}", title)
+322:         }))
+323:     }
+324: }
 ```
 
 ### crates/cowork-gui/src/hooks/useAppEvents.ts (432 lines)
@@ -8284,186 +8897,6 @@ LICENSE
 210: }
 ```
 
-### crates/cowork-core/src/config_definition/agent_definition.rs (175 lines)
-
-```
-1: AgentType
-2: ⋮----
-3: {
-4:     
-5:     #[default]
-6:     Simple,
-7:     
-8:     Loop {
-9:         
-10:         max_iterations: Option<u32>,
-11:     },
-12: }
-13: ⋮----
-14: ModelConfig
-15: ⋮----
-16: {
-17:     
-18:     pub model_id: Option<String>,
-19:     
-20:     pub temperature: Option<f32>,
-21:     
-22:     pub max_tokens: Option<u32>,
-23:     
-24:     pub top_p: Option<f32>,
-25: }
-26: ⋮----
-27: ModelConfig
-28: ⋮----
-29: {
-30:     fn default() -> Self {
-31:         Self {
-32:             model_id: None,
-33:             temperature: Some(0.7),
-34:             max_tokens: None,
-35:             top_p: None,
-36:         }
-37:     }
-38: }
-39: ⋮----
-40: ToolReference
-41: ⋮----
-42: {
-43:     
-44:     pub tool_id: String,
-45:     
-46:     pub config: Option<HashMap<String, serde_json::Value>>,
-47: }
-48: ⋮----
-49: AgentDefinition
-50: ⋮----
-51: {
-52:     
-53:     pub id: String,
-54:     
-55:     pub name: String,
-56:     
-57:     pub description: Option<String>,
-58:     
-59:     pub version: Option<String>,
-60: 
-61:     
-62:     #[serde(default)]
-63:     pub agent_type: AgentType,
-64: 
-65:     
-66:     
-67:     
-68:     
-69:     
-70:     pub instruction: String,
-71: 
-72:     
-73:     #[serde(default)]
-74:     pub tools: Vec<ToolReference>,
-75: 
-76:     
-77:     #[serde(default)]
-78:     pub model: ModelConfig,
-79: 
-80:     
-81:     #[serde(default)]
-82:     pub include_contents: IncludeContentsMode,
-83: 
-84:     
-85:     #[serde(default)]
-86:     pub tags: Vec<String>,
-87: 
-88:     
-89:     #[serde(default)]
-90:     pub metadata: HashMap<String, serde_json::Value>,
-91: }
-92: ⋮----
-93: IncludeContentsMode
-94: ⋮----
-95: {
-96:     
-97:     #[default]
-98:     None,
-99:     
-100:     All,
-101:     
-102:     Selected(Vec<String>),
-103: }
-104: ⋮----
-105: ActorCriticDefinition
-106: ⋮----
-107: {
-108:     
-109:     pub actor: AgentDefinition,
-110:     
-111:     pub critic: AgentDefinition,
-112:     
-113:     pub max_iterations: Option<u32>,
-114: }
-115: ⋮----
-116: AgentDefinition
-117: ⋮----
-118: {
-119:     
-120:     pub fn new(id: impl Into<String>, name: impl Into<String>, instruction: impl Into<String>) -> Self {
-121:         Self {
-122:             id: id.into(),
-123:             name: name.into(),
-124:             description: None,
-125:             version: None,
-126:             agent_type: AgentType::Simple,
-127:             instruction: instruction.into(),
-128:             tools: Vec::new(),
-129:             model: ModelConfig::default(),
-130:             include_contents: IncludeContentsMode::None,
-131:             tags: Vec::new(),
-132:             metadata: HashMap::new(),
-133:         }
-134:     }
-135: 
-136:     
-137:     pub fn with_tool(mut self, tool_id: impl Into<String>) -> Self {
-138:         self.tools.push(ToolReference {
-139:             tool_id: tool_id.into(),
-140:             config: None,
-141:         });
-142:         self
-143:     }
-144: 
-145:     
-146:     pub fn with_tool_config(mut self, tool_id: impl Into<String>, config: HashMap<String, serde_json::Value>) -> Self {
-147:         self.tools.push(ToolReference {
-148:             tool_id: tool_id.into(),
-149:             config: Some(config),
-150:         });
-151:         self
-152:     }
-153: 
-154:     
-155:     pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
-156:         self.tags.push(tag.into());
-157:         self
-158:     }
-159: 
-160:     
-161:     pub fn as_loop(mut self, max_iterations: Option<u32>) -> Self {
-162:         self.agent_type = AgentType::Loop { max_iterations };
-163:         self
-164:     }
-165: 
-166:     
-167:     pub fn with_model(mut self, model: ModelConfig) -> Self {
-168:         self.model = model;
-169:         self
-170:     }
-171: }
-172: ⋮----
-173: test_agent_definition_serialization
-174: ⋮----
-175: ()
-```
-
 ### crates/cowork-core/src/config_definition/builtin.rs (19 lines)
 
 ```
@@ -8542,6 +8975,437 @@ LICENSE
 49:   "include_contents": "none",
 50:   "tags": ["built-in", "quality", "validation"]
 51: }
+```
+
+### crates/cowork-core/src/config_definition/default_configs/agents/built-in/coding_actor.json (69 lines)
+
+```
+1: {
+2:   "id": "coding_actor",
+3:   "name": "Coding Actor",
+4:   "description": "Implements the code based on the implementation plan",
+5:   "version": "1.0.0",
+6:   "agent_type": "simple",
+7:   "instruction": "builtin://coding_actor",
+8:   "tools": [
+9:     {
+10:       "tool_id": "load_feedback_history"
+11:     },
+12:     {
+13:       "tool_id": "get_implementation_plan"
+14:     },
+15:     {
+16:       "tool_id": "get_requirements"
+17:     },
+18:     {
+19:       "tool_id": "load_design_doc"
+20:     },
+21:     {
+22:       "tool_id": "load_plan_doc"
+23:     },
+24:     {
+25:       "tool_id": "create_task"
+26:     },
+27:     {
+28:       "tool_id": "update_task_status"
+29:     },
+30:     {
+31:       "tool_id": "update_feature_status"
+32:     },
+33:     {
+34:       "tool_id": "read_file"
+35:     },
+36:     {
+37:       "tool_id": "write_file"
+38:     },
+39:     {
+40:       "tool_id": "list_files"
+41:     },
+42:     {
+43:       "tool_id": "run_command"
+44:     },
+45:     {
+46:       "tool_id": "read_file_truncated"
+47:     },
+48:     {
+49:       "tool_id": "goto_stage"
+50:     },
+51:     {
+52:       "tool_id": "query_memory"
+53:     },
+54:     {
+55:       "tool_id": "save_insight"
+56:     },
+57:     {
+58:       "tool_id": "save_issue"
+59:     },
+60:     {
+61:       "tool_id": "save_learning"
+62:     }
+63:   ],
+64:   "model": {
+65:     "temperature": 0.7
+66:   },
+67:   "include_contents": "default",
+68:   "tags": ["built-in", "coding", "actor"]
+69: }
+```
+
+### crates/cowork-core/src/config_definition/default_configs/agents/built-in/design_actor.json (57 lines)
+
+```
+1: {
+2:   "id": "design_actor",
+3:   "name": "Design Actor",
+4:   "description": "Generates system design specification based on requirements",
+5:   "version": "1.0.0",
+6:   "agent_type": "simple",
+7:   "instruction": "builtin://design_actor",
+8:   "tools": [
+9:     {
+10:       "tool_id": "load_feedback_history"
+11:     },
+12:     {
+13:       "tool_id": "get_requirements"
+14:     },
+15:     {
+16:       "tool_id": "get_design"
+17:     },
+18:     {
+19:       "tool_id": "load_prd_doc"
+20:     },
+21:     {
+22:       "tool_id": "review_with_feedback_content"
+23:     },
+24:     {
+25:       "tool_id": "create_design_component"
+26:     },
+27:     {
+28:       "tool_id": "save_design_doc"
+29:     },
+30:     {
+31:       "tool_id": "read_file"
+32:     },
+33:     {
+34:       "tool_id": "list_files"
+35:     },
+36:     {
+37:       "tool_id": "read_file_truncated"
+38:     },
+39:     {
+40:       "tool_id": "query_memory"
+41:     },
+42:     {
+43:       "tool_id": "save_insight"
+44:     },
+45:     {
+46:       "tool_id": "save_issue"
+47:     },
+48:     {
+49:       "tool_id": "save_learning"
+50:     }
+51:   ],
+52:   "model": {
+53:     "temperature": 0.7
+54:   },
+55:   "include_contents": "default",
+56:   "tags": ["built-in", "design", "actor"]
+57: }
+```
+
+### crates/cowork-core/src/config_definition/default_configs/agents/built-in/design_critic.json (51 lines)
+
+```
+1: {
+2:   "id": "design_critic",
+3:   "name": "Design Critic",
+4:   "description": "Reviews and validates the system design specification",
+5:   "version": "1.0.0",
+6:   "agent_type": "simple",
+7:   "instruction": "builtin://design_critic",
+8:   "tools": [
+9:     {
+10:       "tool_id": "get_requirements"
+11:     },
+12:     {
+13:       "tool_id": "get_design"
+14:     },
+15:     {
+16:       "tool_id": "load_design_doc"
+17:     },
+18:     {
+19:       "tool_id": "check_feature_coverage"
+20:     },
+21:     {
+22:       "tool_id": "provide_feedback"
+23:     },
+24:     {
+25:       "tool_id": "exit_loop"
+26:     },
+27:     {
+28:       "tool_id": "request_human_review"
+29:     },
+30:     {
+31:       "tool_id": "read_file"
+32:     },
+33:     {
+34:       "tool_id": "list_files"
+35:     },
+36:     {
+37:       "tool_id": "read_file_truncated"
+38:     },
+39:     {
+40:       "tool_id": "query_memory"
+41:     },
+42:     {
+43:       "tool_id": "save_issue"
+44:     }
+45:   ],
+46:   "model": {
+47:     "temperature": 0.3
+48:   },
+49:   "include_contents": "default",
+50:   "tags": ["built-in", "design", "critic"]
+51: }
+```
+
+### crates/cowork-core/src/config_definition/default_configs/agents/built-in/plan_actor.json (63 lines)
+
+```
+1: {
+2:   "id": "plan_actor",
+3:   "name": "Plan Actor",
+4:   "description": "Generates implementation plan with detailed tasks",
+5:   "version": "1.0.0",
+6:   "agent_type": "simple",
+7:   "instruction": "builtin://plan_actor",
+8:   "tools": [
+9:     {
+10:       "tool_id": "load_feedback_history"
+11:     },
+12:     {
+13:       "tool_id": "get_requirements"
+14:     },
+15:     {
+16:       "tool_id": "get_design"
+17:     },
+18:     {
+19:       "tool_id": "load_design_doc"
+20:     },
+21:     {
+22:       "tool_id": "review_with_feedback_content"
+23:     },
+24:     {
+25:       "tool_id": "create_task"
+26:     },
+27:     {
+28:       "tool_id": "add_component"
+29:     },
+30:     {
+31:       "tool_id": "get_implementation_plan"
+32:     },
+33:     {
+34:       "tool_id": "save_plan_doc"
+35:     },
+36:     {
+37:       "tool_id": "read_file"
+38:     },
+39:     {
+40:       "tool_id": "list_files"
+41:     },
+42:     {
+43:       "tool_id": "read_file_truncated"
+44:     },
+45:     {
+46:       "tool_id": "query_memory"
+47:     },
+48:     {
+49:       "tool_id": "save_insight"
+50:     },
+51:     {
+52:       "tool_id": "save_issue"
+53:     },
+54:     {
+55:       "tool_id": "save_learning"
+56:     }
+57:   ],
+58:   "model": {
+59:     "temperature": 0.7
+60:   },
+61:   "include_contents": "default",
+62:   "tags": ["built-in", "planning", "actor"]
+63: }
+```
+
+### crates/cowork-core/src/config_definition/default_configs/agents/built-in/plan_critic.json (48 lines)
+
+```
+1: {
+2:   "id": "plan_critic",
+3:   "name": "Plan Critic",
+4:   "description": "Reviews and validates the implementation plan",
+5:   "version": "1.0.0",
+6:   "agent_type": "simple",
+7:   "instruction": "builtin://plan_critic",
+8:   "tools": [
+9:     {
+10:       "tool_id": "get_implementation_plan"
+11:     },
+12:     {
+13:       "tool_id": "load_plan_doc"
+14:     },
+15:     {
+16:       "tool_id": "check_task_dependencies"
+17:     },
+18:     {
+19:       "tool_id": "provide_feedback"
+20:     },
+21:     {
+22:       "tool_id": "exit_loop"
+23:     },
+24:     {
+25:       "tool_id": "request_human_review"
+26:     },
+27:     {
+28:       "tool_id": "read_file"
+29:     },
+30:     {
+31:       "tool_id": "list_files"
+32:     },
+33:     {
+34:       "tool_id": "read_file_truncated"
+35:     },
+36:     {
+37:       "tool_id": "query_memory"
+38:     },
+39:     {
+40:       "tool_id": "save_issue"
+41:     }
+42:   ],
+43:   "model": {
+44:     "temperature": 0.3
+45:   },
+46:   "include_contents": "default",
+47:   "tags": ["built-in", "planning", "critic"]
+48: }
+```
+
+### crates/cowork-core/src/config_definition/default_configs/agents/built-in/prd_actor.json (60 lines)
+
+```
+1: {
+2:   "id": "prd_actor",
+3:   "name": "PRD Actor",
+4:   "description": "Generates Product Requirements Document based on the idea document",
+5:   "version": "1.0.0",
+6:   "agent_type": "simple",
+7:   "instruction": "builtin://prd_actor",
+8:   "tools": [
+9:     {
+10:       "tool_id": "load_feedback_history"
+11:     },
+12:     {
+13:       "tool_id": "load_idea"
+14:     },
+15:     {
+16:       "tool_id": "create_requirement"
+17:     },
+18:     {
+19:       "tool_id": "add_feature"
+20:     },
+21:     {
+22:       "tool_id": "update_requirement"
+23:     },
+24:     {
+25:       "tool_id": "update_feature"
+26:     },
+27:     {
+28:       "tool_id": "delete_requirement"
+29:     },
+30:     {
+31:       "tool_id": "get_requirements"
+32:     },
+33:     {
+34:       "tool_id": "review_with_feedback_content"
+35:     },
+36:     {
+37:       "tool_id": "save_prd_doc"
+38:     },
+39:     {
+40:       "tool_id": "read_file"
+41:     },
+42:     {
+43:       "tool_id": "list_files"
+44:     },
+45:     {
+46:       "tool_id": "read_file_truncated"
+47:     },
+48:     {
+49:       "tool_id": "query_memory"
+50:     },
+51:     {
+52:       "tool_id": "save_insight"
+53:     }
+54:   ],
+55:   "model": {
+56:     "temperature": 0.7
+57:   },
+58:   "include_contents": "default",
+59:   "tags": ["built-in", "requirements", "actor"]
+60: }
+```
+
+### crates/cowork-core/src/config_definition/default_configs/agents/built-in/prd_critic.json (48 lines)
+
+```
+1: {
+2:   "id": "prd_critic",
+3:   "name": "PRD Critic",
+4:   "description": "Reviews and validates the Product Requirements Document",
+5:   "version": "1.0.0",
+6:   "agent_type": "simple",
+7:   "instruction": "builtin://prd_critic",
+8:   "tools": [
+9:     {
+10:       "tool_id": "get_requirements"
+11:     },
+12:     {
+13:       "tool_id": "load_idea"
+14:     },
+15:     {
+16:       "tool_id": "load_prd_doc"
+17:     },
+18:     {
+19:       "tool_id": "provide_feedback"
+20:     },
+21:     {
+22:       "tool_id": "exit_loop"
+23:     },
+24:     {
+25:       "tool_id": "request_human_review"
+26:     },
+27:     {
+28:       "tool_id": "read_file"
+29:     },
+30:     {
+31:       "tool_id": "list_files"
+32:     },
+33:     {
+34:       "tool_id": "read_file_truncated"
+35:     },
+36:     {
+37:       "tool_id": "query_memory"
+38:     },
+39:     {
+40:       "tool_id": "save_issue"
+41:     }
+42:   ],
+43:   "model": {
+44:     "temperature": 0.3
+45:   },
+46:   "include_contents": "default",
+47:   "tags": ["built-in", "requirements", "critic"]
+48: }
 ```
 
 ### crates/cowork-core/src/config_definition/flow_definition.rs (269 lines)
@@ -10988,6 +11852,216 @@ LICENSE
 303: }
 ```
 
+### crates/cowork-core/src/tools/hitl_content_tools.rs (205 lines)
+
+```
+1: set_interaction_backend
+2: ⋮----
+3: (backend: Arc<dyn InteractiveBackend + Send + Sync>)
+4: ⋮----
+5: get_interaction_backend
+6: ⋮----
+7: ()
+8: ⋮----
+9: ReviewAndEditContentTool
+10: ⋮----
+11: {
+12:     fn name(&self) -> &str {
+13:         "review_and_edit_content"
+14:     }
+15: 
+16:     fn description(&self) -> &str {
+17:         "Let the user review content and choose: edit, pass, or provide feedback."
+18:     }
+19: 
+20:     fn parameters_schema(&self) -> Option<Value> {
+21:         Some(json!({
+22:             "type": "object",
+23:             "properties": {
+24:                 "title": {"type": "string", "description": "Title shown to user"},
+25:                 "content": {"type": "string", "description": "Content to review"}
+26:             },
+27:             "required": ["title", "content"]
+28:         }))
+29:     }
+30: 
+31:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+32:         let title = args["title"].as_str()
+33:             .ok_or_else(|| adk_core::AdkError::tool("Missing required parameter: title".to_string()))?;
+34:         let content = args["content"].as_str()
+35:             .ok_or_else(|| adk_core::AdkError::tool("Missing required parameter: content".to_string()))?;
+36: 
+37:         
+38:         let interaction = get_interaction_backend()
+39:             .ok_or_else(|| adk_core::AdkError::tool("InteractiveBackend not set".to_string()))?;
+40: 
+41:         
+42:         interaction.show_message(
+43:             MessageLevel::Info,
+44:             format!("\n📝 {}\n{}\n---\n{}",
+45:                 title,
+46:                 "─".repeat(40),
+47:                 content.lines().take(15).collect::<Vec<_>>().join("\n")
+48:             )
+49:         ).await;
+50: 
+51:         
+52:         let options = vec![
+53:             InputOption {
+54:                 id: "pass".to_string(),
+55:                 label: "✓ Pass".to_string(),
+56:                 description: Some("Continue without changes".to_string()),
+57:             },
+58:         ];
+59: 
+60:         let response = interaction.request_input(
+61:             "Type 'edit' to open editor, 'pass' to continue, or provide feedback:",
+62:             options,
+63:             Some(content.to_string())
+64:         ).await.map_err(|e| adk_core::AdkError::tool(format!("Input error: {}", e)))?;
+65: 
+66:         match response {
+67:             InputResponse::Selection(id) => match id.as_str() {
+68:                 "pass" => Ok(json!({
+69:                     "action": "pass",
+70:                     "content": content,
+71:                     "message": "User passed"
+72:                 })),
+73:                 _ => Ok(json!({
+74:                     "action": "pass",
+75:                     "content": content,
+76:                     "message": "Unknown action"
+77:                 }))
+78:             },
+79:             InputResponse::Text(text) => {
+80:                 let text = text.trim();
+81:                 
+82:                 if text.contains('\n') || text.len() > 100 {
+83:                     
+84:                     Ok(json!({
+85:                         "action": "edit",
+86:                         "content": text,
+87:                         "message": "User provided edited content"
+88:                     }))
+89:                 } else {
+90:                     
+91:                     Ok(json!({
+92:                         "action": "feedback",
+93:                         "feedback": text,
+94:                         "content": content,
+95:                         "message": "User provided feedback"
+96:                     }))
+97:                 }
+98:             },
+99:             InputResponse::Cancel => Ok(json!({
+100:                 "action": "pass",
+101:                 "content": content,
+102:                 "message": "User cancelled"
+103:             })),
+104:         }
+105:     }
+106: }
+107: ⋮----
+108: ReviewWithFeedbackContentTool
+109: ⋮----
+110: {
+111:     fn name(&self) -> &str {
+112:         "review_with_feedback_content"
+113:     }
+114: 
+115:     fn description(&self) -> &str {
+116:         "Review content and allow user to: edit, pass, or provide feedback text."
+117:     }
+118: 
+119:     fn parameters_schema(&self) -> Option<Value> {
+120:         Some(json!({
+121:             "type": "object",
+122:             "properties": {
+123:                 "title": {"type": "string"},
+124:                 "content": {"type": "string"},
+125:                 "prompt": {"type": "string"}
+126:             },
+127:             "required": ["title", "content"]
+128:         }))
+129:     }
+130: 
+131:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+132:         let title = args["title"].as_str()
+133:             .ok_or_else(|| adk_core::AdkError::tool("Missing required parameter: title".to_string()))?;
+134:         let content = args["content"].as_str()
+135:             .ok_or_else(|| adk_core::AdkError::tool("Missing required parameter: content".to_string()))?;
+136:         let default_prompt = "Type 'edit' to open editor, 'pass' to continue, or provide feedback:";
+137:         let prompt = args.get("prompt").and_then(|v| v.as_str()).unwrap_or(default_prompt);
+138: 
+139:         
+140:         let interaction = get_interaction_backend()
+141:             .ok_or_else(|| adk_core::AdkError::tool("InteractiveBackend not set".to_string()))?;
+142: 
+143:         
+144:         interaction.show_message(
+145:             MessageLevel::Info,
+146:             format!("\n📝 {}\n{}\n---\n{}",
+147:                 title,
+148:                 "─".repeat(40),
+149:                 content.lines().take(15).collect::<Vec<_>>().join("\n")
+150:             )
+151:         ).await;
+152: 
+153:         
+154:         let options = vec![
+155:             InputOption {
+156:                 id: "pass".to_string(),
+157:                 label: "✓ Pass".to_string(),
+158:                 description: Some("Continue without changes".to_string()),
+159:             },
+160:         ];
+161: 
+162:         let response = interaction.request_input(prompt, options, Some(content.to_string()))
+163:             .await.map_err(|e| adk_core::AdkError::tool(format!("Input error: {}", e)))?;
+164: 
+165:         match response {
+166:             InputResponse::Selection(id) => match id.as_str() {
+167:                 "pass" => Ok(json!({
+168:                     "action": "pass",
+169:                     "content": content,
+170:                     "message": "User passed"
+171:                 })),
+172:                 _ => Ok(json!({
+173:                     "action": "pass",
+174:                     "content": content,
+175:                     "message": "Unknown action"
+176:                 }))
+177:             },
+178:             InputResponse::Text(text) => {
+179:                 let text = text.trim();
+180:                 
+181:                 if text.contains('\n') || text.len() > 100 {
+182:                     
+183:                     Ok(json!({
+184:                         "action": "edit",
+185:                         "content": text,
+186:                         "message": "User provided edited content"
+187:                     }))
+188:                 } else {
+189:                     
+190:                     Ok(json!({
+191:                         "action": "feedback",
+192:                         "feedback": text,
+193:                         "content": content,
+194:                         "message": "User provided feedback"
+195:                     }))
+196:                 }
+197:             },
+198:             InputResponse::Cancel => Ok(json!({
+199:                 "action": "pass",
+200:                 "content": content,
+201:                 "message": "User cancelled"
+202:             })),
+203:         }
+204:     }
+205: }
+```
+
 ### crates/cowork-core/src/tools/knowledge_tools.rs (321 lines)
 
 ```
@@ -11979,333 +13053,186 @@ LICENSE
 135: }
 ```
 
-### crates/cowork-core/src/tools/pm_tools.rs (324 lines)
+### crates/cowork-core/src/tools/test_lint_tools.rs (177 lines)
 
 ```
-1: PMGotoStageTool
+1: CheckTestsTool
 2: ⋮----
 3: {
-4:     current_iteration_id: String,
-5: }
-6: ⋮----
-7: PMGotoStageTool
-8: ⋮----
-9: {
-10:     pub fn new(current_iteration_id: String) -> Self {
-11:         Self { current_iteration_id }
-12:     }
-13: }
-14: ⋮----
-15: PMGotoStageTool
-16: ⋮----
-17: {
-18:     fn name(&self) -> &str {
-19:         "pm_goto_stage"
-20:     }
-21: 
-22:     fn description(&self) -> &str {
-23:         "Restart the pipeline from a specific stage. Use this when the user wants to fix bugs, \
-24:          modify requirements, or make changes to the project after delivery. \
-25:          Valid stages: idea, prd, design, plan, coding."
-26:     }
-27: 
-28:     fn parameters_schema(&self) -> Option<Value> {
-29:         Some(json!({
-30:             "type": "object",
-31:             "properties": {
-32:                 "stage": {
-33:                     "type": "string",
-34:                     "enum": ["idea", "prd", "design", "plan", "coding"],
-35:                     "description": "Which stage to restart from"
-36:                 },
-37:                 "reason": {
-38:                     "type": "string",
-39:                     "description": "Why the restart is needed (user's request summary)"
-40:                 }
-41:             },
-42:             "required": ["stage", "reason"]
-43:         }))
-44:     }
-45: 
-46:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-47:         let stage_str = get_required_string_param(&args, "stage")?;
-48:         let reason = get_required_string_param(&args, "reason")?;
-49: 
-50:         
-51:         let stage = match stage_str {
-52:             "idea" => Stage::Idea,
-53:             "prd" => Stage::Prd,
-54:             "design" => Stage::Design,
-55:             "plan" => Stage::Plan,
-56:             "coding" => Stage::Coding,
-57:             _ => {
-58:                 return Ok(json!({
-59:                     "status": "error",
-60:                     "message": format!("Invalid stage: {}. Valid stages are: idea, prd, design, plan, coding", stage_str)
-61:                 }));
-62:             }
-63:         };
+4:     fn name(&self) -> &str {
+5:         "check_tests"
+6:     }
+7: 
+8:     fn description(&self) -> &str {
+9:         "Run project tests and return results. Automatically detects project type \
+10:          (Rust, Node.js, Python, etc.) and runs appropriate test command."
+11:     }
+12: 
+13:     fn parameters_schema(&self) -> Option<Value> {
+14:         Some(json!({
+15:             "type": "object",
+16:             "properties": {
+17:                 "path": {
+18:                     "type": "string",
+19:                     "description": "Project directory path (default: current directory)"
+20:                 },
+21:                 "test_command": {
+22:                     "type": "string",
+23:                     "description": "Optional: Override auto-detected test command (e.g., 'cargo test', 'npm test')"
+24:                 }
+25:             }
+26:         }))
+27:     }
+28: 
+29:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+30:         let path = args.get("path")
+31:             .and_then(|v| v.as_str())
+32:             .unwrap_or(".");
+33: 
+34:         
+35:         let test_command = if let Some(cmd) = args.get("test_command").and_then(|v| v.as_str()) {
+36:             cmd.to_string()
+37:         } else {
+38:             detect_test_command(path)?
+39:         };
+40: 
+41:         
+42:         let output = if cfg!(target_os = "windows") {
+43:             tokio::process::Command::new("cmd")
+44:                 .args(["/C", &test_command])
+45:                 .current_dir(path)
+46:                 .output()
+47:                 .await
+48:         } else {
+49:             tokio::process::Command::new("sh")
+50:                 .arg("-c")
+51:                 .arg(&test_command)
+52:                 .current_dir(path)
+53:                 .output()
+54:                 .await
+55:         }
+56:         .map_err(|e| adk_core::AdkError::tool(format!("Failed to run tests: {}", e)))?;
+57: 
+58:         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+59:         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+60:         let success = output.status.success();
+61: 
+62:         
+63:         let (passed, failed, total) = parse_test_output(&stdout, &stderr);
 64: 
-65:         
-66:         crate::persistence::set_iteration_id(self.current_iteration_id.clone());
-67: 
-68:         
-69:         
-70:         let feedback = Feedback {
-71:             stage: stage_str.to_string(),  
-72:             feedback_type: FeedbackType::QualityIssue,
-73:             severity: Severity::Major,
-74:             details: reason.to_string(),
-75:             suggested_fix: Some(format!("Restart from {} stage via PM Agent", stage_str)),
-76:             timestamp: chrono::Utc::now(),
-77:         };
-78: 
-79:         if let Err(e) = append_feedback(&feedback) {
-80:             eprintln!("[PMGotoStageTool] Warning: Failed to save feedback: {}", e);
-81:         }
-82: 
-83:         
-84:         let mut meta = load_session_meta()
-85:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?
-86:             .unwrap_or_else(|| SessionMeta {
-87:                 session_id: uuid::Uuid::new_v4().to_string(),
-88:                 created_at: chrono::Utc::now(),
-89:                 current_stage: Some(Stage::Delivery),
-90:                 restart_reason: None,
-91:             });
-92: 
-93:         
-94:         meta.current_stage = Some(stage);
-95:         meta.restart_reason = Some(reason.to_string());
-96: 
-97:         
-98:         save_session_meta(&meta)
-99:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
-100: 
-101:         Ok(json!({
-102:             "status": "success",
-103:             "message": format!("Pipeline will restart from {} stage. Reason: {}", stage_str, reason),
-104:             "target_stage": stage_str
-105:         }))
-106:     }
-107: }
-108: ⋮----
-109: PMCreateIterationTool
-110: ⋮----
-111: {
-112:     current_iteration_id: String,
-113: }
-114: ⋮----
-115: PMCreateIterationTool
-116: ⋮----
-117: {
-118:     pub fn new(current_iteration_id: String) -> Self {
-119:         Self { current_iteration_id }
-120:     }
-121: }
-122: ⋮----
-123: PMCreateIterationTool
-124: ⋮----
-125: {
-126:     fn name(&self) -> &str {
-127:         "pm_create_iteration"
-128:     }
-129: 
-130:     fn description(&self) -> &str {
-131:         "Create a new iteration for implementing new features or major changes. \
-132:          Use this when the user wants to add new functionality that is separate from the current project."
-133:     }
-134: 
-135:     fn parameters_schema(&self) -> Option<Value> {
-136:         Some(json!({
-137:             "type": "object",
-138:             "properties": {
-139:                 "title": {
-140:                     "type": "string",
-141:                     "description": "Title for the new iteration (concise summary of the new feature)"
-142:                 },
-143:                 "description": {
-144:                     "type": "string",
-145:                     "description": "Detailed description of what the user wants to implement"
-146:                 },
-147:                 "inheritance": {
-148:                     "type": "string",
-149:                     "enum": ["none", "full", "partial"],
-150:                     "description": "Inheritance mode: none=fresh start, full=copy all artifacts and code, partial=copy code only (default)"
-151:                 }
-152:             },
-153:             "required": ["title", "description"]
-154:         }))
-155:     }
-156: 
-157:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-158:         let title = get_required_string_param(&args, "title")?;
-159:         let description = get_required_string_param(&args, "description")?;
-160:         let inheritance = get_optional_string_param(&args, "inheritance")
-161:             .unwrap_or_else(|| "partial".to_string());
-162: 
-163:         
-164:         let project_store = ProjectStore::new();
-165:         let mut project = project_store.load()
-166:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?
-167:             .ok_or_else(|| adk_core::AdkError::tool("Project not initialized".to_string()))?;
-168: 
-169:         
-170:         let inheritance_mode = match inheritance.as_str() {
-171:             "none" => crate::domain::InheritanceMode::None,
-172:             "full" => crate::domain::InheritanceMode::Full,
-173:             _ => crate::domain::InheritanceMode::Partial,
-174:         };
-175: 
-176:         
-177:         let new_iteration = Iteration::create_evolution(
-178:             &project,
-179:             title.to_string(),
-180:             description.to_string(),
-181:             self.current_iteration_id.clone(),
-182:             inheritance_mode,
-183:         );
-184: 
-185:         let new_iteration_id = new_iteration.id.clone();
-186: 
-187:         
-188:         let iteration_store = IterationStore::new();
-189:         iteration_store.save(&new_iteration)
-190:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
-191: 
-192:         
-193:         project_store.add_iteration(&mut project, new_iteration.to_summary())
-194:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
-195: 
-196:         Ok(json!({
-197:             "status": "success",
-198:             "message": format!("Created new iteration: {}", title),
-199:             "iteration_id": new_iteration_id,
-200:             "title": title,
-201:             "inheritance": inheritance
-202:         }))
-203:     }
-204: }
-205: ⋮----
-206: PMRespondTool
-207: ⋮----
-208: {
-209:     fn name(&self) -> &str {
-210:         "pm_respond"
-211:     }
-212: 
-213:     fn description(&self) -> &str {
-214:         "Respond to the user without taking any action. Use this when answering questions, \
-215:          asking for clarification, or providing information."
-216:     }
-217: 
-218:     fn parameters_schema(&self) -> Option<Value> {
-219:         Some(json!({
-220:             "type": "object",
-221:             "properties": {
-222:                 "response": {
-223:                     "type": "string",
-224:                     "description": "The response message to the user"
-225:                 },
-226:                 "ask_clarification": {
-227:                     "type": "boolean",
-228:                     "description": "Whether this response is asking for clarification (optional)"
-229:                 }
-230:             },
-231:             "required": ["response"]
-232:         }))
-233:     }
-234: 
-235:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-236:         let response = get_required_string_param(&args, "response")?;
-237:         let ask_clarification = args.get("ask_clarification")
-238:             .and_then(|v| v.as_bool())
-239:             .unwrap_or(false);
-240: 
-241:         Ok(json!({
-242:             "status": "success",
-243:             "message": response,
-244:             "ask_clarification": ask_clarification
-245:         }))
-246:     }
-247: }
-248: ⋮----
-249: PMSaveDecisionTool
-250: ⋮----
-251: {
-252:     iteration_id: String,
-253: }
-254: ⋮----
-255: PMSaveDecisionTool
-256: ⋮----
-257: {
-258:     pub fn new(iteration_id: String) -> Self {
-259:         Self { iteration_id }
-260:     }
-261: }
-262: ⋮----
-263: PMSaveDecisionTool
-264: ⋮----
-265: {
-266:     fn name(&self) -> &str {
-267:         "pm_save_decision"
-268:     }
-269: 
-270:     fn description(&self) -> &str {
-271:         "Save an important decision or preference to project memory. Use this when the user \
-272:          makes a significant decision that should be remembered for future iterations."
-273:     }
-274: 
-275:     fn parameters_schema(&self) -> Option<Value> {
-276:         Some(json!({
-277:             "type": "object",
-278:             "properties": {
-279:                 "title": {
-280:                     "type": "string",
-281:                     "description": "Title of the decision"
-282:                 },
-283:                 "context": {
-284:                     "type": "string",
-285:                     "description": "Background context of the decision"
-286:                 },
-287:                 "decision": {
-288:                     "type": "string",
-289:                     "description": "The actual decision made"
-290:                 },
-291:                 "impact": {
-292:                     "type": "string",
-293:                     "description": "Impact analysis of this decision (optional)"
-294:                 }
-295:             },
-296:             "required": ["title", "context", "decision"]
-297:         }))
-298:     }
-299: 
-300:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-301:         let title = get_required_string_param(&args, "title")?;
-302:         let context = get_required_string_param(&args, "context")?;
-303:         let decision = get_required_string_param(&args, "decision")?;
-304:         let impact = get_optional_string_param(&args, "impact").unwrap_or_default();
-305: 
-306:         
-307:         let memory_store = crate::persistence::MemoryStore::new();
-308:         
-309:         let memory_decision = Decision::new(
-310:             title,
-311:             context,
-312:             format!("{}\n\nImpact: {}", decision, impact),
-313:             &self.iteration_id,
-314:         );
-315: 
-316:         memory_store.add_decision(memory_decision)
-317:             .map_err(|e: anyhow::Error| adk_core::AdkError::tool(e.to_string()))?;
-318: 
-319:         Ok(json!({
-320:             "status": "success",
-321:             "message": format!("Decision saved: {}", title)
-322:         }))
-323:     }
-324: }
+65:         Ok(json!({
+66:             "status": if success { "passed" } else { "failed" },
+67:             "command": test_command,
+68:             "exit_code": output.status.code(),
+69:             "tests_passed": passed,
+70:             "tests_failed": failed,
+71:             "tests_total": total,
+72:             "stdout": stdout,
+73:             "stderr": stderr
+74:         }))
+75:     }
+76: }
+77: ⋮----
+78: CheckLintTool
+79: ⋮----
+80: {
+81:     fn name(&self) -> &str {
+82:         "check_lint"
+83:     }
+84: 
+85:     fn description(&self) -> &str {
+86:         "Run linter/code quality checks and return results. Automatically detects \
+87:          project type and runs appropriate linter (clippy for Rust, eslint for Node.js, etc.)."
+88:     }
+89: 
+90:     fn parameters_schema(&self) -> Option<Value> {
+91:         Some(json!({
+92:             "type": "object",
+93:             "properties": {
+94:                 "path": {
+95:                     "type": "string",
+96:                     "description": "Project directory path (default: current directory)"
+97:                 },
+98:                 "lint_command": {
+99:                     "type": "string",
+100:                     "description": "Optional: Override auto-detected lint command (e.g., 'cargo clippy', 'npm run lint')"
+101:                 },
+102:                 "fix": {
+103:                     "type": "boolean",
+104:                     "description": "Whether to auto-fix issues if supported (default: false)"
+105:                 }
+106:             }
+107:         }))
+108:     }
+109: 
+110:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+111:         let path = args.get("path")
+112:             .and_then(|v| v.as_str())
+113:             .unwrap_or(".");
+114: 
+115:         let fix = args.get("fix")
+116:             .and_then(|v| v.as_bool())
+117:             .unwrap_or(false);
+118: 
+119:         
+120:         let lint_command = if let Some(cmd) = args.get("lint_command").and_then(|v| v.as_str()) {
+121:             cmd.to_string()
+122:         } else {
+123:             detect_lint_command(path, fix)?
+124:         };
+125: 
+126:         
+127:         let output = if cfg!(target_os = "windows") {
+128:             tokio::process::Command::new("cmd")
+129:                 .args(["/C", &lint_command])
+130:                 .current_dir(path)
+131:                 .output()
+132:                 .await
+133:         } else {
+134:             tokio::process::Command::new("sh")
+135:                 .arg("-c")
+136:                 .arg(&lint_command)
+137:                 .current_dir(path)
+138:                 .output()
+139:                 .await
+140:         }
+141:         .map_err(|e| adk_core::AdkError::tool(format!("Failed to run linter: {}", e)))?;
+142: 
+143:         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+144:         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+145:         let success = output.status.success();
+146: 
+147:         
+148:         let (warnings, errors) = parse_lint_output(&stdout, &stderr);
+149: 
+150:         Ok(json!({
+151:             "status": if success { "clean" } else { "issues_found" },
+152:             "command": lint_command,
+153:             "exit_code": output.status.code(),
+154:             "warnings": warnings,
+155:             "errors": errors,
+156:             "total_issues": warnings + errors,
+157:             "stdout": stdout,
+158:             "stderr": stderr
+159:         }))
+160:     }
+161: }
+162: ⋮----
+163: detect_test_command
+164: ⋮----
+165: (path: &str)
+166: ⋮----
+167: detect_lint_command
+168: ⋮----
+169: (path: &str, fix: bool)
+170: ⋮----
+171: parse_test_output
+172: ⋮----
+173: (stdout: &str, _stderr: &str)
+174: ⋮----
+175: parse_lint_output
+176: ⋮----
+177: (stdout: &str, stderr: &str)
 ```
 
 ### crates/cowork-core/src/tools/validation_tools.rs (167 lines)
@@ -12478,49 +13405,6 @@ LICENSE
 165:         visited: &mut HashSet<String>,
 166:         rec_stack: &mut HashSet<String>,
 167:     )
-```
-
-### crates/cowork-gui/package.json (38 lines)
-
-```
-1: {
-2:   "name": "cowork-gui",
-3:   "private": true,
-4:   "type": "module",
-5:   "version": "2.5.2",
-6:   "scripts": {
-7:     "dev": "vite --port 15173",
-8:     "build": "tsc && vite build",
-9:     "tauri": "tauri",
-10:     "tauri:dev": "tauri dev --port 15173",
-11:     "tauri:build": "tauri build",
-12:     "typecheck": "tsc --noEmit"
-13:   },
-14:   "dependencies": {
-15:     "@monaco-editor/react": "^4.6.0",
-16:     "@tauri-apps/api": "^2.11.1",
-17:     "@tauri-apps/plugin-dialog": "^2.7.1",
-18:     "antd": "^5.12.0",
-19:     "react": "^18.3.1",
-20:     "react-dom": "^18.3.1",
-21:     "react-json-view": "^1.21.3",
-22:     "react-markdown": "^9.0.1",
-23:     "react-window": "^2.2.6",
-24:     "rehype-highlight": "^7.0.2",
-25:     "rehype-raw": "^7.0.0",
-26:     "remark-gfm": "^4.0.1",
-27:     "zustand": "^4.5.0"
-28:   },
-29:   "devDependencies": {
-30:     "@tauri-apps/cli": "^2.11.4",
-31:     "@types/node": "^20.0.0",
-32:     "@types/react": "^18.3.0",
-33:     "@types/react-dom": "^18.3.0",
-34:     "@vitejs/plugin-react": "^4.3.0",
-35:     "typescript": "^5.3.0",
-36:     "vite": "^5.0.0"
-37:   }
-38: }
 ```
 
 ### crates/cowork-gui/src/App.tsx (413 lines)
@@ -14401,51 +15285,6 @@ LICENSE
 29:     "icon": ["icons/icon-rgba.png", "icons/icon.icns", "icons/icon.ico"]
 30:   }
 31: }
-```
-
-### crates/cowork-gui/vite.config.js (40 lines)
-
-```
-1: import { defineConfig } from "vite";
-2: import react from "@vitejs/plugin-react";
-3: import path from "path";
-4: 
-5: export default defineConfig({
-6:   plugins: [react()],
-7:   resolve: {
-8:     alias: {
-9:       "@": path.resolve(__dirname, "src"),
-10:     },
-11:   },
-12:   server: {
-13:     port: 15173,
-14:   },
-15:   build: {
-16:     rollupOptions: {
-17:       output: {
-18:         manualChunks: {
-19:           
-20:           "vendor-react": ["react", "react-dom"],
-21:           
-22:           "vendor-antd": ["antd", "@ant-design/icons"],
-23:           
-24:           "vendor-monaco": ["@monaco-editor/react", "monaco-editor"],
-25:           
-26:           "vendor-markdown": [
-27:             "react-markdown",
-28:             "remark-gfm",
-29:             "rehype-highlight",
-30:             "rehype-raw",
-31:           ],
-32:           
-33:           "vendor-zustand": ["zustand"],
-34:         },
-35:       },
-36:     },
-37:     
-38:     chunkSizeWarningLimit: 1536,
-39:   },
-40: });
 ```
 
 ### litho.docs/en/4.Deep-Exploration/CLI Domain.md (734 lines)
@@ -16402,72 +17241,60 @@ LICENSE
 18: )
 ```
 
-### crates/cowork-core/src/config_definition/default_configs/agents/built-in/coding_actor.json (63 lines)
+### crates/cowork-core/src/config_definition/default_configs/agents/built-in/coding_critic.json (51 lines)
 
 ```
 1: {
-2:   "id": "coding_actor",
-3:   "name": "Coding Actor",
-4:   "description": "Implements the code based on the implementation plan",
+2:   "id": "coding_critic",
+3:   "name": "Coding Critic",
+4:   "description": "Reviews and validates the implemented code",
 5:   "version": "1.0.0",
 6:   "agent_type": "simple",
-7:   "instruction": "builtin://coding_actor",
+7:   "instruction": "builtin://coding_critic",
 8:   "tools": [
 9:     {
-10:       "tool_id": "load_feedback_history"
+10:       "tool_id": "get_implementation_plan"
 11:     },
 12:     {
-13:       "tool_id": "get_implementation_plan"
+13:       "tool_id": "load_plan_doc"
 14:     },
 15:     {
-16:       "tool_id": "get_requirements"
+16:       "tool_id": "read_file"
 17:     },
 18:     {
-19:       "tool_id": "load_design_doc"
+19:       "tool_id": "list_files"
 20:     },
 21:     {
-22:       "tool_id": "update_task_status"
+22:       "tool_id": "run_command"
 23:     },
 24:     {
-25:       "tool_id": "update_feature_status"
+25:       "tool_id": "check_tests"
 26:     },
 27:     {
-28:       "tool_id": "read_file"
+28:       "tool_id": "check_lint"
 29:     },
 30:     {
-31:       "tool_id": "write_file"
+31:       "tool_id": "provide_feedback"
 32:     },
 33:     {
-34:       "tool_id": "list_files"
+34:       "tool_id": "exit_loop"
 35:     },
 36:     {
-37:       "tool_id": "run_command"
+37:       "tool_id": "request_human_review"
 38:     },
 39:     {
-40:       "tool_id": "read_file_truncated"
+40:       "tool_id": "query_memory"
 41:     },
 42:     {
-43:       "tool_id": "goto_stage"
-44:     },
-45:     {
-46:       "tool_id": "query_memory"
-47:     },
-48:     {
-49:       "tool_id": "save_insight"
-50:     },
-51:     {
-52:       "tool_id": "save_issue"
-53:     },
-54:     {
-55:       "tool_id": "save_learning"
-56:     }
-57:   ],
-58:   "model": {
-59:     "temperature": 0.7
-60:   },
-61:   "include_contents": "none",
-62:   "tags": ["built-in", "coding", "actor"]
-63: }
+43:       "tool_id": "save_issue"
+44:     }
+45:   ],
+46:   "model": {
+47:     "temperature": 0.3
+48:   },
+49:   "include_contents": "default",
+50:   "tags": ["built-in", "coding", "critic"]
+51: }
 ```
 
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/delivery_agent.json (36 lines)
@@ -16511,115 +17338,6 @@ LICENSE
 36: }
 ```
 
-### crates/cowork-core/src/config_definition/default_configs/agents/built-in/design_actor.json (54 lines)
-
-```
-1: {
-2:   "id": "design_actor",
-3:   "name": "Design Actor",
-4:   "description": "Generates system design specification based on requirements",
-5:   "version": "1.0.0",
-6:   "agent_type": "simple",
-7:   "instruction": "builtin://design_actor",
-8:   "tools": [
-9:     {
-10:       "tool_id": "load_feedback_history"
-11:     },
-12:     {
-13:       "tool_id": "get_requirements"
-14:     },
-15:     {
-16:       "tool_id": "get_design"
-17:     },
-18:     {
-19:       "tool_id": "load_prd_doc"
-20:     },
-21:     {
-22:       "tool_id": "create_design_component"
-23:     },
-24:     {
-25:       "tool_id": "save_design_doc"
-26:     },
-27:     {
-28:       "tool_id": "read_file"
-29:     },
-30:     {
-31:       "tool_id": "list_files"
-32:     },
-33:     {
-34:       "tool_id": "read_file_truncated"
-35:     },
-36:     {
-37:       "tool_id": "query_memory"
-38:     },
-39:     {
-40:       "tool_id": "save_insight"
-41:     },
-42:     {
-43:       "tool_id": "save_issue"
-44:     },
-45:     {
-46:       "tool_id": "save_learning"
-47:     }
-48:   ],
-49:   "model": {
-50:     "temperature": 0.7
-51:   },
-52:   "include_contents": "none",
-53:   "tags": ["built-in", "design", "actor"]
-54: }
-```
-
-### crates/cowork-core/src/config_definition/default_configs/agents/built-in/design_critic.json (45 lines)
-
-```
-1: {
-2:   "id": "design_critic",
-3:   "name": "Design Critic",
-4:   "description": "Reviews and validates the system design specification",
-5:   "version": "1.0.0",
-6:   "agent_type": "simple",
-7:   "instruction": "builtin://design_critic",
-8:   "tools": [
-9:     {
-10:       "tool_id": "get_requirements"
-11:     },
-12:     {
-13:       "tool_id": "get_design"
-14:     },
-15:     {
-16:       "tool_id": "load_design_doc"
-17:     },
-18:     {
-19:       "tool_id": "check_feature_coverage"
-20:     },
-21:     {
-22:       "tool_id": "provide_feedback"
-23:     },
-24:     {
-25:       "tool_id": "read_file"
-26:     },
-27:     {
-28:       "tool_id": "list_files"
-29:     },
-30:     {
-31:       "tool_id": "read_file_truncated"
-32:     },
-33:     {
-34:       "tool_id": "query_memory"
-35:     },
-36:     {
-37:       "tool_id": "save_issue"
-38:     }
-39:   ],
-40:   "model": {
-41:     "temperature": 0.3
-42:   },
-43:   "include_contents": "none",
-44:   "tags": ["built-in", "design", "critic"]
-45: }
-```
-
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/idea_agent.json (30 lines)
 
 ```
@@ -16653,118 +17371,6 @@ LICENSE
 28:   "include_contents": "none",
 29:   "tags": ["built-in", "ideation"]
 30: }
-```
-
-### crates/cowork-core/src/config_definition/default_configs/agents/built-in/plan_actor.json (60 lines)
-
-```
-1: {
-2:   "id": "plan_actor",
-3:   "name": "Plan Actor",
-4:   "description": "Generates implementation plan with detailed tasks",
-5:   "version": "1.0.0",
-6:   "agent_type": "simple",
-7:   "instruction": "builtin://plan_actor",
-8:   "tools": [
-9:     {
-10:       "tool_id": "load_feedback_history"
-11:     },
-12:     {
-13:       "tool_id": "get_requirements"
-14:     },
-15:     {
-16:       "tool_id": "get_design"
-17:     },
-18:     {
-19:       "tool_id": "load_design_doc"
-20:     },
-21:     {
-22:       "tool_id": "create_task"
-23:     },
-24:     {
-25:       "tool_id": "add_component"
-26:     },
-27:     {
-28:       "tool_id": "get_implementation_plan"
-29:     },
-30:     {
-31:       "tool_id": "save_plan_doc"
-32:     },
-33:     {
-34:       "tool_id": "read_file"
-35:     },
-36:     {
-37:       "tool_id": "list_files"
-38:     },
-39:     {
-40:       "tool_id": "read_file_truncated"
-41:     },
-42:     {
-43:       "tool_id": "query_memory"
-44:     },
-45:     {
-46:       "tool_id": "save_insight"
-47:     },
-48:     {
-49:       "tool_id": "save_issue"
-50:     },
-51:     {
-52:       "tool_id": "save_learning"
-53:     }
-54:   ],
-55:   "model": {
-56:     "temperature": 0.7
-57:   },
-58:   "include_contents": "none",
-59:   "tags": ["built-in", "planning", "actor"]
-60: }
-```
-
-### crates/cowork-core/src/config_definition/default_configs/agents/built-in/plan_critic.json (42 lines)
-
-```
-1: {
-2:   "id": "plan_critic",
-3:   "name": "Plan Critic",
-4:   "description": "Reviews and validates the implementation plan",
-5:   "version": "1.0.0",
-6:   "agent_type": "simple",
-7:   "instruction": "builtin://plan_critic",
-8:   "tools": [
-9:     {
-10:       "tool_id": "get_implementation_plan"
-11:     },
-12:     {
-13:       "tool_id": "load_plan_doc"
-14:     },
-15:     {
-16:       "tool_id": "check_task_dependencies"
-17:     },
-18:     {
-19:       "tool_id": "provide_feedback"
-20:     },
-21:     {
-22:       "tool_id": "read_file"
-23:     },
-24:     {
-25:       "tool_id": "list_files"
-26:     },
-27:     {
-28:       "tool_id": "read_file_truncated"
-29:     },
-30:     {
-31:       "tool_id": "query_memory"
-32:     },
-33:     {
-34:       "tool_id": "save_issue"
-35:     }
-36:   ],
-37:   "model": {
-38:     "temperature": 0.3
-39:   },
-40:   "include_contents": "none",
-41:   "tags": ["built-in", "planning", "critic"]
-42: }
 ```
 
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/pm_agent.json (39 lines)
@@ -16808,112 +17414,6 @@ LICENSE
 36:   },
 37:   "include_contents": "none",
 38:   "tags": ["built-in", "management", "pm"]
-39: }
-```
-
-### crates/cowork-core/src/config_definition/default_configs/agents/built-in/prd_actor.json (57 lines)
-
-```
-1: {
-2:   "id": "prd_actor",
-3:   "name": "PRD Actor",
-4:   "description": "Generates Product Requirements Document based on the idea document",
-5:   "version": "1.0.0",
-6:   "agent_type": "simple",
-7:   "instruction": "builtin://prd_actor",
-8:   "tools": [
-9:     {
-10:       "tool_id": "load_feedback_history"
-11:     },
-12:     {
-13:       "tool_id": "load_idea"
-14:     },
-15:     {
-16:       "tool_id": "create_requirement"
-17:     },
-18:     {
-19:       "tool_id": "add_feature"
-20:     },
-21:     {
-22:       "tool_id": "update_requirement"
-23:     },
-24:     {
-25:       "tool_id": "update_feature"
-26:     },
-27:     {
-28:       "tool_id": "delete_requirement"
-29:     },
-30:     {
-31:       "tool_id": "get_requirements"
-32:     },
-33:     {
-34:       "tool_id": "save_prd_doc"
-35:     },
-36:     {
-37:       "tool_id": "read_file"
-38:     },
-39:     {
-40:       "tool_id": "list_files"
-41:     },
-42:     {
-43:       "tool_id": "read_file_truncated"
-44:     },
-45:     {
-46:       "tool_id": "query_memory"
-47:     },
-48:     {
-49:       "tool_id": "save_insight"
-50:     }
-51:   ],
-52:   "model": {
-53:     "temperature": 0.7
-54:   },
-55:   "include_contents": "none",
-56:   "tags": ["built-in", "requirements", "actor"]
-57: }
-```
-
-### crates/cowork-core/src/config_definition/default_configs/agents/built-in/prd_critic.json (39 lines)
-
-```
-1: {
-2:   "id": "prd_critic",
-3:   "name": "PRD Critic",
-4:   "description": "Reviews and validates the Product Requirements Document",
-5:   "version": "1.0.0",
-6:   "agent_type": "simple",
-7:   "instruction": "builtin://prd_critic",
-8:   "tools": [
-9:     {
-10:       "tool_id": "get_requirements"
-11:     },
-12:     {
-13:       "tool_id": "load_idea"
-14:     },
-15:     {
-16:       "tool_id": "provide_feedback"
-17:     },
-18:     {
-19:       "tool_id": "read_file"
-20:     },
-21:     {
-22:       "tool_id": "list_files"
-23:     },
-24:     {
-25:       "tool_id": "read_file_truncated"
-26:     },
-27:     {
-28:       "tool_id": "query_memory"
-29:     },
-30:     {
-31:       "tool_id": "save_issue"
-32:     }
-33:   ],
-34:   "model": {
-35:     "temperature": 0.3
-36:   },
-37:   "include_contents": "none",
-38:   "tags": ["built-in", "requirements", "critic"]
 39: }
 ```
 
@@ -20433,216 +20933,6 @@ LICENSE
 20: };
 ```
 
-### crates/cowork-core/src/tools/hitl_content_tools.rs (205 lines)
-
-```
-1: set_interaction_backend
-2: ⋮----
-3: (backend: Arc<dyn InteractiveBackend + Send + Sync>)
-4: ⋮----
-5: get_interaction_backend
-6: ⋮----
-7: ()
-8: ⋮----
-9: ReviewAndEditContentTool
-10: ⋮----
-11: {
-12:     fn name(&self) -> &str {
-13:         "review_and_edit_content"
-14:     }
-15: 
-16:     fn description(&self) -> &str {
-17:         "Let the user review content and choose: edit, pass, or provide feedback."
-18:     }
-19: 
-20:     fn parameters_schema(&self) -> Option<Value> {
-21:         Some(json!({
-22:             "type": "object",
-23:             "properties": {
-24:                 "title": {"type": "string", "description": "Title shown to user"},
-25:                 "content": {"type": "string", "description": "Content to review"}
-26:             },
-27:             "required": ["title", "content"]
-28:         }))
-29:     }
-30: 
-31:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-32:         let title = args["title"].as_str()
-33:             .ok_or_else(|| adk_core::AdkError::tool("Missing required parameter: title".to_string()))?;
-34:         let content = args["content"].as_str()
-35:             .ok_or_else(|| adk_core::AdkError::tool("Missing required parameter: content".to_string()))?;
-36: 
-37:         
-38:         let interaction = get_interaction_backend()
-39:             .ok_or_else(|| adk_core::AdkError::tool("InteractiveBackend not set".to_string()))?;
-40: 
-41:         
-42:         interaction.show_message(
-43:             MessageLevel::Info,
-44:             format!("\n📝 {}\n{}\n---\n{}",
-45:                 title,
-46:                 "─".repeat(40),
-47:                 content.lines().take(15).collect::<Vec<_>>().join("\n")
-48:             )
-49:         ).await;
-50: 
-51:         
-52:         let options = vec![
-53:             InputOption {
-54:                 id: "pass".to_string(),
-55:                 label: "✓ Pass".to_string(),
-56:                 description: Some("Continue without changes".to_string()),
-57:             },
-58:         ];
-59: 
-60:         let response = interaction.request_input(
-61:             "Type 'edit' to open editor, 'pass' to continue, or provide feedback:",
-62:             options,
-63:             Some(content.to_string())
-64:         ).await.map_err(|e| adk_core::AdkError::tool(format!("Input error: {}", e)))?;
-65: 
-66:         match response {
-67:             InputResponse::Selection(id) => match id.as_str() {
-68:                 "pass" => Ok(json!({
-69:                     "action": "pass",
-70:                     "content": content,
-71:                     "message": "User passed"
-72:                 })),
-73:                 _ => Ok(json!({
-74:                     "action": "pass",
-75:                     "content": content,
-76:                     "message": "Unknown action"
-77:                 }))
-78:             },
-79:             InputResponse::Text(text) => {
-80:                 let text = text.trim();
-81:                 
-82:                 if text.contains('\n') || text.len() > 100 {
-83:                     
-84:                     Ok(json!({
-85:                         "action": "edit",
-86:                         "content": text,
-87:                         "message": "User provided edited content"
-88:                     }))
-89:                 } else {
-90:                     
-91:                     Ok(json!({
-92:                         "action": "feedback",
-93:                         "feedback": text,
-94:                         "content": content,
-95:                         "message": "User provided feedback"
-96:                     }))
-97:                 }
-98:             },
-99:             InputResponse::Cancel => Ok(json!({
-100:                 "action": "pass",
-101:                 "content": content,
-102:                 "message": "User cancelled"
-103:             })),
-104:         }
-105:     }
-106: }
-107: ⋮----
-108: ReviewWithFeedbackContentTool
-109: ⋮----
-110: {
-111:     fn name(&self) -> &str {
-112:         "review_with_feedback_content"
-113:     }
-114: 
-115:     fn description(&self) -> &str {
-116:         "Review content and allow user to: edit, pass, or provide feedback text."
-117:     }
-118: 
-119:     fn parameters_schema(&self) -> Option<Value> {
-120:         Some(json!({
-121:             "type": "object",
-122:             "properties": {
-123:                 "title": {"type": "string"},
-124:                 "content": {"type": "string"},
-125:                 "prompt": {"type": "string"}
-126:             },
-127:             "required": ["title", "content"]
-128:         }))
-129:     }
-130: 
-131:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-132:         let title = args["title"].as_str()
-133:             .ok_or_else(|| adk_core::AdkError::tool("Missing required parameter: title".to_string()))?;
-134:         let content = args["content"].as_str()
-135:             .ok_or_else(|| adk_core::AdkError::tool("Missing required parameter: content".to_string()))?;
-136:         let default_prompt = "Type 'edit' to open editor, 'pass' to continue, or provide feedback:";
-137:         let prompt = args.get("prompt").and_then(|v| v.as_str()).unwrap_or(default_prompt);
-138: 
-139:         
-140:         let interaction = get_interaction_backend()
-141:             .ok_or_else(|| adk_core::AdkError::tool("InteractiveBackend not set".to_string()))?;
-142: 
-143:         
-144:         interaction.show_message(
-145:             MessageLevel::Info,
-146:             format!("\n📝 {}\n{}\n---\n{}",
-147:                 title,
-148:                 "─".repeat(40),
-149:                 content.lines().take(15).collect::<Vec<_>>().join("\n")
-150:             )
-151:         ).await;
-152: 
-153:         
-154:         let options = vec![
-155:             InputOption {
-156:                 id: "pass".to_string(),
-157:                 label: "✓ Pass".to_string(),
-158:                 description: Some("Continue without changes".to_string()),
-159:             },
-160:         ];
-161: 
-162:         let response = interaction.request_input(prompt, options, Some(content.to_string()))
-163:             .await.map_err(|e| adk_core::AdkError::tool(format!("Input error: {}", e)))?;
-164: 
-165:         match response {
-166:             InputResponse::Selection(id) => match id.as_str() {
-167:                 "pass" => Ok(json!({
-168:                     "action": "pass",
-169:                     "content": content,
-170:                     "message": "User passed"
-171:                 })),
-172:                 _ => Ok(json!({
-173:                     "action": "pass",
-174:                     "content": content,
-175:                     "message": "Unknown action"
-176:                 }))
-177:             },
-178:             InputResponse::Text(text) => {
-179:                 let text = text.trim();
-180:                 
-181:                 if text.contains('\n') || text.len() > 100 {
-182:                     
-183:                     Ok(json!({
-184:                         "action": "edit",
-185:                         "content": text,
-186:                         "message": "User provided edited content"
-187:                     }))
-188:                 } else {
-189:                     
-190:                     Ok(json!({
-191:                         "action": "feedback",
-192:                         "feedback": text,
-193:                         "content": content,
-194:                         "message": "User provided feedback"
-195:                     }))
-196:                 }
-197:             },
-198:             InputResponse::Cancel => Ok(json!({
-199:                 "action": "pass",
-200:                 "content": content,
-201:                 "message": "User cancelled"
-202:             })),
-203:         }
-204:     }
-205: }
-```
-
 ### crates/cowork-core/src/tools/hitl_tools.rs (217 lines)
 
 ```
@@ -21359,264 +21649,47 @@ LICENSE
 489: }
 ```
 
-### crates/cowork-core/src/tools/test_lint_tools.rs (255 lines)
+### crates/cowork-gui/package.json (38 lines)
 
 ```
-1: CheckTestsTool
-2: ⋮----
-3: {
-4:     fn name(&self) -> &str {
-5:         "check_tests"
-6:     }
-7: 
-8:     fn description(&self) -> &str {
-9:         "Run project tests and return results. Automatically detects project type \
-10:          (Rust, Node.js, Python, etc.) and runs appropriate test command."
-11:     }
-12: 
-13:     fn parameters_schema(&self) -> Option<Value> {
-14:         Some(json!({
-15:             "type": "object",
-16:             "properties": {
-17:                 "path": {
-18:                     "type": "string",
-19:                     "description": "Project directory path (default: current directory)"
-20:                 },
-21:                 "test_command": {
-22:                     "type": "string",
-23:                     "description": "Optional: Override auto-detected test command (e.g., 'cargo test', 'npm test')"
-24:                 }
-25:             }
-26:         }))
-27:     }
-28: 
-29:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-30:         let path = args.get("path")
-31:             .and_then(|v| v.as_str())
-32:             .unwrap_or(".");
-33: 
-34:         
-35:         let test_command = if let Some(cmd) = args.get("test_command").and_then(|v| v.as_str()) {
-36:             cmd.to_string()
-37:         } else {
-38:             detect_test_command(path)?
-39:         };
-40: 
-41:         
-42:         let output = tokio::process::Command::new("sh")
-43:             .arg("-c")
-44:             .arg(&test_command)
-45:             .current_dir(path)
-46:             .output()
-47:             .await
-48:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to run tests: {}", e)))?;
-49: 
-50:         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-51:         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-52:         let success = output.status.success();
-53: 
-54:         
-55:         let (passed, failed, total) = parse_test_output(&stdout, &stderr);
-56: 
-57:         Ok(json!({
-58:             "status": if success { "passed" } else { "failed" },
-59:             "command": test_command,
-60:             "exit_code": output.status.code(),
-61:             "tests_passed": passed,
-62:             "tests_failed": failed,
-63:             "tests_total": total,
-64:             "stdout": stdout,
-65:             "stderr": stderr
-66:         }))
-67:     }
-68: }
-69: ⋮----
-70: CheckLintTool
-71: ⋮----
-72: {
-73:     fn name(&self) -> &str {
-74:         "check_lint"
-75:     }
-76: 
-77:     fn description(&self) -> &str {
-78:         "Run linter/code quality checks and return results. Automatically detects \
-79:          project type and runs appropriate linter (clippy for Rust, eslint for Node.js, etc.)."
-80:     }
-81: 
-82:     fn parameters_schema(&self) -> Option<Value> {
-83:         Some(json!({
-84:             "type": "object",
-85:             "properties": {
-86:                 "path": {
-87:                     "type": "string",
-88:                     "description": "Project directory path (default: current directory)"
-89:                 },
-90:                 "lint_command": {
-91:                     "type": "string",
-92:                     "description": "Optional: Override auto-detected lint command (e.g., 'cargo clippy', 'npm run lint')"
-93:                 },
-94:                 "fix": {
-95:                     "type": "boolean",
-96:                     "description": "Whether to auto-fix issues if supported (default: false)"
-97:                 }
-98:             }
-99:         }))
-100:     }
-101: 
-102:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-103:         let path = args.get("path")
-104:             .and_then(|v| v.as_str())
-105:             .unwrap_or(".");
-106: 
-107:         let fix = args.get("fix")
-108:             .and_then(|v| v.as_bool())
-109:             .unwrap_or(false);
-110: 
-111:         
-112:         let lint_command = if let Some(cmd) = args.get("lint_command").and_then(|v| v.as_str()) {
-113:             cmd.to_string()
-114:         } else {
-115:             detect_lint_command(path, fix)?
-116:         };
-117: 
-118:         
-119:         let output = tokio::process::Command::new("sh")
-120:             .arg("-c")
-121:             .arg(&lint_command)
-122:             .current_dir(path)
-123:             .output()
-124:             .await
-125:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to run linter: {}", e)))?;
-126: 
-127:         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-128:         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-129:         let success = output.status.success();
-130: 
-131:         
-132:         let (warnings, errors) = parse_lint_output(&stdout, &stderr);
-133: 
-134:         Ok(json!({
-135:             "status": if success { "clean" } else { "issues_found" },
-136:             "command": lint_command,
-137:             "exit_code": output.status.code(),
-138:             "warnings": warnings,
-139:             "errors": errors,
-140:             "total_issues": warnings + errors,
-141:             "stdout": stdout,
-142:             "stderr": stderr
-143:         }))
-144:     }
-145: }
-146: ⋮----
-147: detect_test_command
-148: ⋮----
-149: (path: &str)
-150: ⋮----
-151: detect_lint_command
-152: ⋮----
-153: (path: &str, fix: bool)
-154: ⋮----
-155: parse_test_output
-156: ⋮----
-157: (stdout: &str, _stderr: &str)
-158: ⋮----
-159: parse_lint_output
-160: ⋮----
-161: (stdout: &str, stderr: &str)
-162: ⋮----
-163: ExecuteShellCommandTool
-164: ⋮----
-165: {
-166:     fn name(&self) -> &str {
-167:         "execute_shell_command"
-168:     }
-169: 
-170:     fn description(&self) -> &str {
-171:         "Execute a shell command and return the result. Use this to run \
-172:          installation, build, or test commands extracted from README.md. \
-173:          Supports both Windows (PowerShell) and Unix (bash) commands."
-174:     }
-175: 
-176:     fn parameters_schema(&self) -> Option<Value> {
-177:         Some(json!({
-178:             "type": "object",
-179:             "properties": {
-180:                 "command": {
-181:                     "type": "string",
-182:                     "description": "The shell command to execute"
-183:                 },
-184:                 "description": {
-185:                     "type": "string",
-186:                     "description": "Description of what this command does (e.g., 'Install dependencies')"
-187:                 },
-188:                 "timeout": {
-189:                     "type": "integer",
-190:                     "description": "Timeout in seconds (default: 120)"
-191:                 }
-192:             },
-193:             "required": ["command", "description"]
-194:         }))
-195:     }
-196: 
-197:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-198:         let command = get_required_string_param(&args, "command")?;
-199:         let description = get_optional_string_param(&args, "description").unwrap_or_default();
-200:         let timeout = args.get("timeout")
-201:             .and_then(|v| v.as_u64())
-202:             .unwrap_or(120);
-203: 
-204:         
-205:         let (shell, shell_arg) = if cfg!(target_os = "windows") {
-206:             ("powershell.exe", vec!["-NoProfile", "-Command", command])
-207:         } else {
-208:             ("sh", vec!["-c", command])
-209:         };
-210: 
-211:         
-212:         let result = tokio::time::timeout(
-213:             std::time::Duration::from_secs(timeout),
-214:             tokio::process::Command::new(shell)
-215:                 .args(&shell_arg)
-216:                 .output()
-217:         ).await;
-218: 
-219:         match result {
-220:             Ok(Ok(output)) => {
-221:                 let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-222:                 let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-223:                 let success = output.status.success();
-224: 
-225:                 Ok(json!({
-226:                     "status": if success { "success" } else { "failed" },
-227:                     "description": description,
-228:                     "command": command,
-229:                     "exit_code": output.status.code(),
-230:                     "stdout": stdout,
-231:                     "stderr": stderr,
-232:                     "timeout": false
-233:                 }))
-234:             }
-235:             Ok(Err(e)) => {
-236:                 Ok(json!({
-237:                     "status": "error",
-238:                     "description": description,
-239:                     "command": command,
-240:                     "error": e.to_string(),
-241:                     "timeout": false
-242:                 }))
-243:             }
-244:             Err(_) => {
-245:                 Ok(json!({
-246:                     "status": "timeout",
-247:                     "description": description,
-248:                     "command": command,
-249:                     "error": format!("Command timed out after {} seconds", timeout),
-250:                     "timeout": true
-251:                 }))
-252:             }
-253:         }
-254:     }
-255: }
+1: {
+2:   "name": "cowork-gui",
+3:   "private": true,
+4:   "type": "module",
+5:   "version": "2.5.2",
+6:   "scripts": {
+7:     "dev": "vite --port 15173",
+8:     "build": "tsc && vite build",
+9:     "tauri": "tauri",
+10:     "tauri:dev": "tauri dev --port 15173",
+11:     "tauri:build": "tauri build",
+12:     "typecheck": "tsc --noEmit"
+13:   },
+14:   "dependencies": {
+15:     "@monaco-editor/react": "^4.6.0",
+16:     "@tauri-apps/api": "^2.11.1",
+17:     "@tauri-apps/plugin-dialog": "^2.7.1",
+18:     "antd": "^5.12.0",
+19:     "react": "^18.3.1",
+20:     "react-dom": "^18.3.1",
+21:     "react-json-view": "^1.21.3",
+22:     "react-markdown": "^9.0.1",
+23:     "react-window": "^2.2.6",
+24:     "rehype-highlight": "^7.0.2",
+25:     "rehype-raw": "^7.0.0",
+26:     "remark-gfm": "^4.0.1",
+27:     "zustand": "^4.5.0"
+28:   },
+29:   "devDependencies": {
+30:     "@tauri-apps/cli": "^2.11.4",
+31:     "@types/node": "^20.0.0",
+32:     "@types/react": "^18.3.0",
+33:     "@types/react-dom": "^18.3.0",
+34:     "@vitejs/plugin-react": "^4.3.0",
+35:     "typescript": "^5.3.0",
+36:     "vite": "^5.0.0"
+37:   }
+38: }
 ```
 
 ### crates/cowork-gui/src/assets.d.ts (24 lines)
@@ -23835,6 +23908,51 @@ LICENSE
 123: iteration_to_info
 124: ⋮----
 125: (iteration: &Iteration)
+```
+
+### crates/cowork-gui/vite.config.js (40 lines)
+
+```
+1: import { defineConfig } from "vite";
+2: import react from "@vitejs/plugin-react";
+3: import path from "path";
+4: 
+5: export default defineConfig({
+6:   plugins: [react()],
+7:   resolve: {
+8:     alias: {
+9:       "@": path.resolve(__dirname, "src"),
+10:     },
+11:   },
+12:   server: {
+13:     port: 15173,
+14:   },
+15:   build: {
+16:     rollupOptions: {
+17:       output: {
+18:         manualChunks: {
+19:           
+20:           "vendor-react": ["react", "react-dom"],
+21:           
+22:           "vendor-antd": ["antd", "@ant-design/icons"],
+23:           
+24:           "vendor-monaco": ["@monaco-editor/react", "monaco-editor"],
+25:           
+26:           "vendor-markdown": [
+27:             "react-markdown",
+28:             "remark-gfm",
+29:             "rehype-highlight",
+30:             "rehype-raw",
+31:           ],
+32:           
+33:           "vendor-zustand": ["zustand"],
+34:         },
+35:       },
+36:     },
+37:     
+38:     chunkSizeWarningLimit: 1536,
+39:   },
+40: });
 ```
 
 ### litho.docs/en/4.Deep-Exploration/Domain Logic.md (491 lines)
@@ -26638,53 +26756,6 @@ LICENSE
 9: get_language_instruction
 10: ⋮----
 11: ()
-```
-
-### crates/cowork-core/src/config_definition/default_configs/agents/built-in/coding_critic.json (42 lines)
-
-```
-1: {
-2:   "id": "coding_critic",
-3:   "name": "Coding Critic",
-4:   "description": "Reviews and validates the implemented code",
-5:   "version": "1.0.0",
-6:   "agent_type": "simple",
-7:   "instruction": "builtin://coding_critic",
-8:   "tools": [
-9:     {
-10:       "tool_id": "get_implementation_plan"
-11:     },
-12:     {
-13:       "tool_id": "read_file"
-14:     },
-15:     {
-16:       "tool_id": "list_files"
-17:     },
-18:     {
-19:       "tool_id": "run_command"
-20:     },
-21:     {
-22:       "tool_id": "check_tests"
-23:     },
-24:     {
-25:       "tool_id": "check_lint"
-26:     },
-27:     {
-28:       "tool_id": "provide_feedback"
-29:     },
-30:     {
-31:       "tool_id": "query_memory"
-32:     },
-33:     {
-34:       "tool_id": "save_issue"
-35:     }
-36:   ],
-37:   "model": {
-38:     "temperature": 0.3
-39:   },
-40:   "include_contents": "none",
-41:   "tags": ["built-in", "coding", "critic"]
-42: }
 ```
 
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/knowledge_gen_agent.json (30 lines)

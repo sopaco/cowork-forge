@@ -8,435 +8,121 @@ _Source: `.terrain/knowledge/00-glossary.md`_
 
 
 
-## Private knowledge (.terrain\knowledge\10-internal-framework.md)
+## Private knowledge (.terrain\knowledge\adk-rust.md)
 
-_Source: `.terrain/knowledge/10-internal-framework.md` (truncated)_
+_Source: `.terrain/knowledge/adk-rust.md` (truncated)_
 
-# Cowork Forge - Internal Framework
+# adk-rust 框架速查
 
-## Core Framework Components
+> Agent Development Kit for Rust — LLM Agent 编排框架 (github.com/zavora-ai/adk-rust)
 
-### Pipeline Executor
-- **Location**: `crates/cowork-core/src/pipeline/executor/`
-- **Purpose**: Orchestrates 7-stage development pipeline
-- **Key Files**:
-  - `mod.rs` - Pipeline execution entry point
-  - `stage_executor.rs` - Stage execution logic
-  - `knowledge.rs` - Knowledge management during execution
+## 核心类型
 
-### Agent System
-- **Location**: `crates/cowork-core/src/agents/`
-- **Purpose**: Agent wrappers and orchestration
-- **Key Components**:
-  - `iterative_assistant.rs` - Actor-critic pattern implementation
-  - `external_coding_agent.rs` - External agent integration
-  - `legacy_project_analyzer.rs` - Legacy project analysis
+| 类型 | 用途 |
+|------|------|
+| `Agent` (trait) | 可执行 agent 单元，`run(ctx) -> Result<RunResult>` |
+| `LlmAgentBuilder` | 构建 LLM 驱动的 agent（system prompt + tools + model） |
+| `LoopAgent` | 循环编排器，按顺序执行 agents 数组，支持多轮迭代 |
+| `Tool` (trait) | 工具 trait：`name/description/parameters_schema/execute(ctx, args)` |
+| `ToolContext` (Arc<dyn>) | 工具执行上下文（LLM 调用、session 操作、action 设置） |
+| `EventActions` | 工具返回后的控制指令：`escalate` / `exit_loop` / `goto_stage` |
+| `IncludeContents` | 子 agent 可见会话历史模式 |
+| `Session` | 对话会话，存储 messages/state，agent 间共享 |
+| `ExitLoopTool` | 内置工具：调用后设置 `actions.exit_loop = true` |
 
-### Tool System
-- **Location**: `crates/cowork-core/src/tools/`
-- **Purpose**: 40+ ADK tools for development tasks
-- **Key Categories**:
-  - `file_tools.rs` - Workspace file operations
-  - `data_tools.rs` - Project data manipulation
-  - `hitl_tools.rs` - Human-in-the-loop tools
-  - `pm_tools.rs` - Project management tools
+## IncludeContents 模式
 
-### Configuration System
-- **Location**: `crates/cowork-core/src/config_definition/`
-- **Purpose**: Data-driven configuration for agents and stages
-- **Key Components**:
-  - `registry.rs` - Configuration registry
-  - `agent_definition.rs` - Agent configuration schema
-  - `stage_definition.rs` - Stage configuration schema
-  - `flow_definition.rs` - Flow configuration schema
-
-## Development Patterns
-
-### Hexagonal Architecture
-- Domain logic has zero external dependencies
-- Infrastructure adapters implement domain ports
-- Clear separation between business logic and I/O
-
-### Actor-Critic Pattern
-- **Actor**: Generates initial output
-- **Critic**: Reviews and suggests improvements
-- **Iteration**: Continues until quality threshold met
-- **Used In**: PRD, Design, Plan, Coding stages
-
-### Strategy Pattern
-- Stage implementations are pluggable
-- Each stage defines its own behavior
-- Common interface via trait implementations
-
-### Template Method Pattern
-- Pipeline execution flow is fixed
-- Stage sequence with hooks for customization
-- Consistent lifecycle across all stages
-
-## Integration Points
-
-### InteractiveBackend Trait
-- **Location**: `crates/cowork-core/src/interaction/mod.rs`
-- **Purpose**: Abstract CLI/GUI interaction
-- **Implementations**:
-  - CLI backend (dialoguer-based)
-  - GUI backend (Tauri-based)
-
-### ACP Protocol
-- **Location**: `crates/cowork-core/src/acp/`
-- **Purpose**: Agent Client Protocol for external agents
-- **Components**:
-  - `client.rs` - ACP client implementation
-  - `mod.rs` - Protocol definitions
-
-### Skill System
-- **Location**: `crates/cowork-core/src/skills/`
-- **Purpose**: agentskills.io standard skill system
-- **Features**: Skill loading, execution, and management
-
-## Persistence Layer
-
-### Storage Format
-- JSON-based storage for all domain entities
-- File-based persistence in workspace
-- No external database dependencies
-
-### Key Entities
-- **Project**: Top-level container
-- **Iteration**: Versioned snapshots
-- **Memory**: Persistent knowledge
-- **Artifact**: Generated outputs
-
-## Error Handling
-
-### Pattern
-- Always use `anyhow::Result`
-- No `unwrap()` in production code
-- Proper error propagation with `?` operator
-- Context added with `.context()` method
-
-### Error Categories
-- **Domain Errors**: Business logic violations
-- **Infrastructure Errors**: I/O and external system failures
-- **Configura
-
-…
-
-## Private knowledge (.terrain\knowledge\20-api-usage.md)
-
-_Source: `.terrain/knowledge/20-api-usage.md` (truncated)_
-
-# Cowork Forge - API Usage
-
-## CLI Commands
-
-### Core Commands
-```bash
-# Initialize new project
-cargo run --package cowork-cli -- init <project-name>
-
-# List all projects
-cargo run --package cowork-cli -- list
-
-# Show project status
-cargo run --package cowork-cli -- status <project-id>
-
-# Continue development iteration
-cargo run --package cowork-cli -- continue <project-id>
-
-# Delete project
-cargo run --package cowork-cli -- delete <project-id>
-```
-
-### Knowledge Management
-```bash
-# Generate project knowledge
-cargo run --package cowork-cli -- knowledge <project-id>
-
-# Import external project
-cargo run --package cowork-cli -- import <path>
-```
-
-### Configuration
-```bash
-# Show configuration
-cargo run --package cowork-cli -- config show
-
-# Update configuration
-cargo run --package cowork-cli -- config set <key> <value>
-```
-
-## GUI Interface
-
-### Development Mode
-```bash
-cd crates/cowork-gui
-cargo tauri dev
-```
-
-### Build for Production
-```bash
-cd crates/cowork-gui
-cargo tauri build
-```
-
-### Tauri Commands
-- Project management commands
-- Configuration commands
-- Pipeline execution commands
-- Real-time streaming events
-
-## Agent System API
-
-### Agent Types
 ```rust
-// PM Agent - Requirements
-pm_agent::generate_prd(idea: &str) -> Result<PrdDocument>
-
-// Architect Agent - Design
-architect_agent::create_design(prd: &PrdDocument) -> Result<DesignDocument>
-
-// Engineer Agent - Code
-engineer_agent::implement_code(design: &DesignDocument) -> Result<CodeArtifact>
-
-// Check Agent - Validation
-check_agent::validate(artifact: &CodeArtifact) -> Result<ValidationReport>
-
-// Delivery Agent - Deployment
-delivery_agent::package(artifact: &CodeArtifact) -> Result<PackageArtifact>
+IncludeContents::None     // 子 agent 看不到父/前序 agent 的历史（默认）
+IncludeContents::Default  // 共享会话历史（actor-critic 循环必须用此模式！）
 ```
 
-### Pipeline Execution
+**易错**：Actor-Critic 循环中 Critic 能看到 Actor 输出的前提是 `include_contents(IncludeContents::Default)`。设为 `None` 时 Critic 无法审查 Actor 的产出。
+
+## LoopAgent 工作流 (Actor-Critic)
+
+```
+LoopAgent::new("name", vec![actor_agent, critic_agent])
+          .with_max_iterations(N)
+```
+
+执行流程：
+1. **Actor** 先运行（产出 artifact/内容），消息写入共享 Session
+2. **Critic** 接着运行（读取 Session 中 Actor 的输出 + 历史），审查后：
+   - 通过 → Critic 调用 `exit_loop` 工具，循环终止
+   - 不通过 → Critic 调用 `provide_feedback` 写入反馈，继续下一轮
+3. Actor 读取 feedback 后修改产出，Critic 再审，直到 exit_loop 或 max_iterations
+
+**关键**：LoopAgent 中所有 agents **共享同一个 Session**。Actor 和 Critic 通过 Session 消息传递上下文，不是通过函数参数。
+
+## EventActions 使用
+
 ```rust
-// Execute full pipeline
-pipeline::execute(project: &mut Project) -> Result<Iteration>
-
-// Execute single stage
-pipeline::execute_stage(
-    project: &mut Project,
-    stage_id: &str
-) -> Result<StageResult>
+// 在 Tool::execute 中设置 action
+let mut actions = EventActions::default();
+actions.escalate = true;   // HITL: 暂停执行，等待用户输入
+ctx.set_actions(actions);  // 必须调用 set_actions 才生效！
 ```
 
-## Tool System API
+| 字段 | 作用 |
+|------|------|
+| `escalate` | 升级到人工，暂停当前 agent 等待用户交互（HITL 工具用） |
+| `exit_loop` | 退出 LoopAgent 循环（ExitLoopTool 自动设置，无需手动） |
 
-### File Tools
+**易错**：创建 `EventActions` 后**必须调用 `ctx.set_actions(actions)`**，仅创建 struct 不设置不会生效。
+
+## Tool trait 实现
+
 ```rust
-// Read file within workspace
-file_tools::read_file(path: &Path) -> Result<String>
-
-// Write file within workspace
-file_tools::write_file(path: &Path, content: &str) -> Result<()>
-
-// List directory contents
-file_tools::list_directory(path: &Path) -> Result<Vec<PathBuf>>
-```
-
-### Data Tools
-```rust
-// Load project data
-data_tools::load_project(project_id: &str) -> Result<Project>
-
-// Save project data
-data_tools::save_project(project: &Project) -> Result<()>
-
-// Update iteration
-data_tools::update_iteration(
-    project_id: &str,
-    iteration: &Iteration
-) -> Result<()>
-```
-
-### HITL Tools
-```rust
-// Request human input
-hitl_tools::request_input(prompt: &str) -> Result<String>
-
-// Request approval
-hitl_tools::request_approval(
-    proposal: &str
-) -> Result<bool>
-
-// Show progress
-hitl_tools::show_progress(
-    stage: &str,
-    progress: f32
-) -> Result<()>
-```
-
-## Configuration API
-
-### Config Structure
-```toml
-# config.toml
-[llm]
-provider = "openai"
-api_key = "your-api-key"
-model = "gpt-5"
-
-[pipeline]
-max_iterations = 10
-quality_threshold = 0.8
-
-[workspace]
-root_dir = "."
-```
-
-### Runtime Configuration
-```rust
-// Load configuration
-config::load_config() -> Result<Config>
-
-// Get specific setting
-config::get_setting(key: &str) -> Result<Value>
-
-// Update setting
-config::update_setting(key: &str, value: Value) -> Result<()>
-```
-
-#
-
-…
-
-## Private knowledge (.terrain\knowledge\30-scaffolding.md)
-
-_Source: `.terrain/knowledge/30-scaffolding.md` (truncated)_
-
-# Cowork Forge - Scaffolding Guide
-
-## Project Structure
-
-### New Project Layout
-```
-my-project/
-├── .terrain/                    # Terrain knowledge assets
-├── .ai-context/                 # AI context files
-├── crates/                      # Rust crates
-│   ├── core/                    # Core domain logic
-│   ├── api/                     # API layer
-│   └── cli/                     # CLI interface
-├── docs/                        # Documentation
-├── tests/                       # Integration tests
-├── Cargo.toml                   # Rust workspace
-└── README.md                    # Project documentation
-```
-
-### Cowork Forge Specific
-```
-cowork-forge/
-├── .terrain/                    # Terrain knowledge assets
-│   ├── agent/                   # Agent context and metadata
-│   ├── knowledge/               # Domain knowledge files
-│   └── .meta/                   # Freshness and sync metadata
-├── .ai-context/                 # AI context files
-├── crates/                      # Rust workspace
-│   ├── cowork-core/             # Core domain logic
-│   ├── cowork-cli/              # CLI adapter
-│   └── cowork-gui/              # GUI application
-├── docs/                        # Documentation
-└── README.md                    # Project documentation
-```
-
-## Crate Templates
-
-### Core Crate
-```toml
-# Cargo.toml
-[package]
-name = "cowork-core"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-anyhow = "1.0"
-async-trait = "0.1"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tokio = { version = "1.0", features = ["full"] }
-uuid = { version = "1.0", features = ["v4"] }
-chrono = { version = "0.4", features = ["serde"] }
-```
-
-### CLI Crate
-```toml
-# Cargo.toml
-[package]
-name = "cowork-cli"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-cowork-core = { path = "../cowork-core" }
-clap = { version = "4.0", features = ["derive"] }
-dialoguer = "0.10"
-console = "0.15"
-anyhow = "1.0"
-tokio = { version = "1.0", features = ["full"] }
-```
-
-### GUI Crate
-```toml
-# Cargo.toml
-[package]
-name = "cowork-gui"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-cowork-core = { path = "../cowork-core" }
-tauri = { version = "1.0", features = ["shell-open"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-anyhow = "1.0"
-tokio = { version = "1.0", features = ["full"] }
-```
-
-## Domain Entity Templates
-
-### Aggregate Root
-```rust
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use chrono::{DateTime, Utc};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Project {
-    pub id: Uuid,
-    pub name: String,
-    pub description: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub iterations: Vec<Iteration>,
-    pub memory: Memory,
-}
-
-impl Project {
-    pub fn new(name: String, description: String) -> Self {
-        Self {
-            id: Uuid::new_v4(),
-            name,
-            description,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            iterations: Vec::new(),
-            memory: Memory::new(),
-        }
+#[async_trait]
+impl Tool for MyTool {
+    fn name(&self) -> &str { "my_tool" }
+    fn description(&self) -> &str { "做什么用" }
+    fn parameters_schema(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": { "param": {"type": "string"} },
+            "required": ["param"]
+        }))
+    }
+    async fn execute(&self, ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        let param = args.get("param").and_then(|v| v.as_str())
+            .ok_or_else(|| adk_core::AdkError::tool("param required"))?;
+        Ok(json!({"result": "ok"}))
     }
 }
 ```
 
-### Value Object
+**要点**：
+- 参数校验失败返回 `Err(adk_core::AdkError::tool(...))`
+- 成功返回 `Ok(json!(...))`
+- 不要 panic/unwrap，用 `?` 传播错误
+- 工具注册到 agent 后才能被 LLM 调用
+
+## LlmAgentBuilder 构建
+
 ```rust
-use serde::{Deserialize, Serialize};
+LlmAgentBuilder::new("agent_id", llm)  // llm: Arc<dyn Llm>
+    .system_prompt("你是...")
+    .with_tool(Arc::new(MyTool))       // 可多次调用添加工具
+    .include_contents(IncludeContents::Default)  // 共享历史
+    .temperature(0.3)
+    .build()
+```
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct StageId(String);
+**易错**：
+- 忘记添加工具 → LLM 无法调用该工具
+- `include_contents` 默认是 `None`，actor-critic 场景必须显式设为 `Default`
+- system_prompt 中必须**列出可用工具名和用途**，否则 LLM 不知道何时调用
 
-impl StageId {
-    pub fn new(id: &str) -> anyhow::Result<Self> {
-        if id.is_empty() {
-            anyhow::bail!("Stage ID cannot be empty");
+## 常见陷阱 (Pitfalls)
 
+1. **Actor-Critic 看不到彼此输出**：检查 `include_contents` 是否为 `Default`
+2. **exit_loop 不生效**：Critic 的工具列表中必须注册 `ExitLoopTool`（`"exit_loop"`）
+3. **EventActions 不生效**：必须调用 `ctx.set_actions(actions)`，不是仅创建 struct
+4. **工具永远不被调用**：检查 ① 是否注册到 agent ② prompt 中是否提及该工具
+5. **Critic 无法读取 Actor 产物**：必须通过 Session 中的消息历史（`include_contents=Default`）或通过专门的 load 工具（如 `load_prd_doc`）从磁盘读取
+6. **HITL 工具绕过 Intera
 
 …
 

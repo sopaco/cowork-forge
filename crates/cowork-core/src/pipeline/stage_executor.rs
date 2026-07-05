@@ -1092,6 +1092,12 @@ impl adk_core::ReadonlyContext for SimpleInvocationContext {
 /// `.cowork-v2/iterations/{session_id}/session_history.jsonl` so that retries,
 /// actor-critic loops, and feedback revisions can see prior turns instead of
 /// starting from scratch.
+///
+/// Truncation: to prevent unbounded context growth across many retries /
+/// feedback revisions, `conversation_history()` applies a sliding window of
+/// `MAX_HISTORY_MESSAGES` messages (keeping the most recent ones, plus the
+/// initial user prompt for context). Persistence is untouched; truncation is
+/// only applied to the view returned to the LLM.
 struct SimpleSession {
     session_id: String,
     app_name: String,
@@ -1100,6 +1106,15 @@ struct SimpleSession {
     messages: std::sync::Mutex<Vec<Content>>,
     history_path: std::path::PathBuf,
 }
+
+/// Maximum number of messages returned by `conversation_history()`.
+///
+/// This is a sliding-window cap: when the in-memory history exceeds this many
+/// messages, only the most recent `MAX_HISTORY_MESSAGES` are returned to the
+/// LLM (the very first user prompt is also preserved so the agent never loses
+/// the original task context). The full history continues to be persisted to
+/// disk for debugging/audit.
+const MAX_HISTORY_MESSAGES: usize = 60;
 
 impl SimpleSession {
     fn new(session_id: &str, initial_message: Content) -> Self {
@@ -1130,10 +1145,15 @@ impl SimpleSession {
             }
         }
 
-        // Add the current prompt to the in-memory history, but do NOT write it
-        // to the persistent file. The prompt is reconstructed for every agent
-        // invocation; persisting it here would duplicate it on every run.
-        messages.push(initial_message.clone());
+        // Persist the current prompt so subsequent agent invocations (within
+        // the same stage run, or across retries / actor-critic iterations that
+        // reuse this session) can see the original user turn. Without this,
+        // a fresh agent run would only see prior assistant responses and lose
+        // the user's original instruction.
+        if let Err(e) = Self::append_message_to_file(&history_path, &initial_message) {
+            tracing::warn!("Failed to persist initial prompt to session history: {}", e);
+        }
+        messages.push(initial_message);
 
         Self {
             session_id: session_id.to_string(),
@@ -1158,6 +1178,28 @@ impl SimpleSession {
         writeln!(file, "{}", line)?;
         Ok(())
     }
+
+    /// Apply a sliding-window truncation so the LLM context stays bounded.
+    ///
+    /// Returns the full message list when it is small enough; otherwise
+    /// returns the first message (the original user prompt, to preserve the
+    /// task framing) followed by the most recent `MAX_HISTORY_MESSAGES - 1`
+    /// messages.
+    fn truncate_for_view(messages: &[Content]) -> Vec<Content> {
+        if messages.len() <= MAX_HISTORY_MESSAGES {
+            return messages.to_vec();
+        }
+        let mut view = Vec::with_capacity(MAX_HISTORY_MESSAGES);
+        // Always keep the very first user prompt for task context.
+        view.push(messages[0].clone());
+        let tail_start = messages.len().saturating_sub(MAX_HISTORY_MESSAGES - 1);
+        view.extend_from_slice(&messages[tail_start..]);
+        tracing::debug!(
+            "SimpleSession: truncated history from {} to {} messages (cap={})",
+            messages.len(), view.len(), MAX_HISTORY_MESSAGES
+        );
+        view
+    }
 }
 
 impl adk_core::Session for SimpleSession {
@@ -1178,7 +1220,10 @@ impl adk_core::Session for SimpleSession {
     }
 
     fn conversation_history(&self) -> Vec<Content> {
-        self.messages.lock().map(|m| m.clone()).unwrap_or_default()
+        self.messages
+            .lock()
+            .map(|m| Self::truncate_for_view(&m))
+            .unwrap_or_default()
     }
 
     fn append_to_history(&self, content: Content) {

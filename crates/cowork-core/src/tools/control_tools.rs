@@ -22,8 +22,13 @@ impl Tool for ProvideFeedbackTool {
     }
 
     fn description(&self) -> &str {
-        "Provide structured feedback to the Actor agent. \
-         This feedback will be visible to the Actor in the next iteration."
+        "Provide structured feedback to escalate an issue to the executor level. \
+         This records the feedback and signals the LoopAgent to exit immediately \
+         so the executor can retry the stage with the feedback. \
+         Use this ONLY for critical/major issues that need executor-level retry. \
+         For minor issues that the Actor can fix in the next loop iteration, \
+         just describe them in your response (the Actor sees conversation history). \
+         When satisfied, call `exit_loop` instead."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
@@ -58,7 +63,7 @@ impl Tool for ProvideFeedbackTool {
         }))
     }
 
-    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+    async fn execute(&self, ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let stage = get_required_string_param(&args, "stage")?;
 
         let feedback_type = match get_required_string_param(&args, "feedback_type")? {
@@ -91,11 +96,22 @@ impl Tool for ProvideFeedbackTool {
 
         append_feedback(&feedback).map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
-        tracing::debug!("[ProvideFeedbackTool] Feedback recorded for stage '{}': {}", stage, feedback.details.chars().take(100).collect::<String>());
+        tracing::info!(
+            "[ProvideFeedbackTool] Feedback recorded for stage '{}' (severity: {:?}): {}",
+            stage, severity, feedback.details.chars().take(100).collect::<String>()
+        );
+
+        // Signal the LoopAgent to exit immediately so the executor can retry
+        // the stage with the recorded feedback. Per adk-rust semantics, setting
+        // `escalate = true` in EventActions causes the LoopAgent to break out
+        // of its iteration loop. This is the same mechanism used by ExitLoopTool.
+        let mut actions = EventActions::default();
+        actions.escalate = true;
+        ctx.set_actions(actions);
 
         Ok(json!({
             "status": "feedback_recorded",
-            "message": "Feedback will be available to Actor in next iteration"
+            "message": "Feedback recorded. The loop will exit and the executor will retry the stage with this feedback."
         }))
     }
 }

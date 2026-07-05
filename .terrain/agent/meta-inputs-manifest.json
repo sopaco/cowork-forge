@@ -1,7 +1,7 @@
 {
-  "collected_at": "2026-07-04T23:38:17.801262600+00:00",
+  "collected_at": "2026-07-05T00:34:43.622012700+00:00",
   "meta_files": [],
-  "input_count": 4,
+  "input_count": 2,
   "sources": [
     {
       "label": "Private knowledge (.terrain\\knowledge\\00-glossary.md)",
@@ -10,20 +10,8 @@
       "truncated": false
     },
     {
-      "label": "Private knowledge (.terrain\\knowledge\\10-internal-framework.md)",
-      "source": ".terrain/knowledge/10-internal-framework.md",
-      "chars": 3503,
-      "truncated": true
-    },
-    {
-      "label": "Private knowledge (.terrain\\knowledge\\20-api-usage.md)",
-      "source": ".terrain/knowledge/20-api-usage.md",
-      "chars": 3503,
-      "truncated": true
-    },
-    {
-      "label": "Private knowledge (.terrain\\knowledge\\30-scaffolding.md)",
-      "source": ".terrain/knowledge/30-scaffolding.md",
+      "label": "Private knowledge (.terrain\\knowledge\\adk-rust.md)",
+      "source": ".terrain/knowledge/adk-rust.md",
       "chars": 3503,
       "truncated": true
     }

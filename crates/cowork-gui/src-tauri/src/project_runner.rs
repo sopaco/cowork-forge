@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 use tokio::process::Child;
 use tokio::sync::mpsc;
+use tracing;
 
 // Import PreviewInfo from gui_types
 use super::gui_types::PreviewInfo;
@@ -76,7 +77,7 @@ impl ProjectRunner {
     ) -> Result<u32, String> {
         // Stop existing process if any
         if let Ok(()) = self.stop(iteration_id.clone()).await {
-            println!(
+            tracing::info!(
                 "[Runner] Stopped existing process for iteration: {}",
                 iteration_id
             );
@@ -91,22 +92,22 @@ impl ProjectRunner {
 
         // Debug: Print PATH and check commands
         let path_env = std::env::var("PATH").unwrap_or_else(|_| "PATH not found".to_string());
-        println!("[Runner] PATH = {}", path_env);
-        
+        tracing::debug!("[Runner] PATH = {}", path_env);
+
         // Check if bun or sh exists
-        println!("[Runner] Checking commands...");
+        tracing::debug!("[Runner] Checking commands...");
         if command_exists("bun") {
-            println!("[Runner] bun found");
+            tracing::debug!("[Runner] bun found");
         } else {
-            println!("[Runner] bun NOT found");
+            tracing::debug!("[Runner] bun NOT found");
         }
         if command_exists("sh") {
-            println!("[Runner] sh found");
+            tracing::debug!("[Runner] sh found");
         } else {
-            println!("[Runner] sh NOT found");
+            tracing::debug!("[Runner] sh NOT found");
         }
 
-        println!("[Runner] Starting command: {} in {}", command, code_dir);
+        tracing::info!("[Runner] Starting command: {} in {}", command, code_dir);
 
         #[cfg(target_os = "windows")]
         let mut child = {
@@ -169,7 +170,7 @@ impl ProjectRunner {
         match child.try_wait() {
             Ok(Some(status)) => {
                 // Process already exited - command likely failed
-                println!("[Runner] Process exited immediately with status: {:?}", status);
+                tracing::warn!("[Runner] Process exited immediately with status: {:?}", status);
                 return Err(format!(
                     "Command failed immediately. Exit status: {}. Check if the command is correct.",
                     status
@@ -179,7 +180,7 @@ impl ProjectRunner {
                 // Process is still running - good
             }
             Err(e) => {
-                eprintln!("[Runner] Error checking process status: {}", e);
+                tracing::error!("[Runner] Error checking process status: {}", e);
             }
         }
 
@@ -206,14 +207,14 @@ impl ProjectRunner {
                                     "content": line.clone()
                                 }),
                             ) {
-                                eprintln!("[Runner] Failed to emit project_log event: {}", e);
+                                tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
                             }
                         }
 
                         line.clear();
                     }
                     Err(e) => {
-                        eprintln!("[Runner] Error reading stdout: {}", e);
+                        tracing::error!("[Runner] Error reading stdout: {}", e);
 
                         // Emit error event (use expected event name)
                         if let Some(ref handle) = app_handle_stdout {
@@ -226,7 +227,7 @@ impl ProjectRunner {
                                     "content": format!("Error reading output: {}\n", e)
                                 }),
                             ) {
-                                eprintln!("[Runner] Failed to emit project_log event: {}", e);
+                                tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
                             }
                         }
                         break;
@@ -258,14 +259,14 @@ impl ProjectRunner {
                                     "content": line.clone()
                                 }),
                             ) {
-                                eprintln!("[Runner] Failed to emit project_log event: {}", e);
+                                tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
                             }
                         }
 
                         line.clear();
                     }
                     Err(e) => {
-                        eprintln!("[Runner] Error reading stderr: {}", e);
+                        tracing::error!("[Runner] Error reading stderr: {}", e);
 
                         // Emit error event
                         if let Some(ref handle) = app_handle_stderr {
@@ -276,7 +277,7 @@ impl ProjectRunner {
                                     "error": e.to_string()
                                 }),
                             ) {
-                                eprintln!(
+                                tracing::warn!(
                                     "[Runner] Failed to emit process_error event: {}",
                                     emit_err
                                 );
@@ -331,13 +332,13 @@ impl ProjectRunner {
                         match proc.child.try_wait() {
                             Ok(Some(status)) => {
                                 // Process has exited, remove it
-                                println!("[Runner] Process {} exited with status: {:?}", iteration_id_exit, status);
+                                tracing::info!("[Runner] Process {} exited with status: {:?}", iteration_id_exit, status);
                                 procs.remove(&iteration_id_exit);
                                 true
                             }
                             Ok(None) => false, // Still running
                             Err(e) => {
-                                eprintln!("[Runner] Error checking process status: {}", e);
+                                tracing::error!("[Runner] Error checking process status: {}", e);
                                 false
                             }
                         }
@@ -365,7 +366,7 @@ impl ProjectRunner {
             }
         });
 
-        println!("[Runner] Process started with PID: {}", pid);
+        tracing::info!("[Runner] Process started with PID: {}", pid);
         Ok(pid)
     }
 
@@ -377,7 +378,7 @@ impl ProjectRunner {
         };
 
         if let Some(mut process) = process {
-            println!("[Runner] Stopping process for iteration: {}", iteration_id);
+            tracing::info!("[Runner] Stopping process for iteration: {}", iteration_id);
 
             let _ = process.child.kill().await;
 
@@ -392,11 +393,11 @@ impl ProjectRunner {
                 );
             }
 
-            println!("[Runner] Process stopped");
+            tracing::info!("[Runner] Process stopped");
             Ok(())
         } else {
             // Process already stopped or not found - this is fine, just return success
-            println!(
+            tracing::debug!(
                 "[Runner] No running process found for iteration: {} (may already be stopped)",
                 iteration_id
             );

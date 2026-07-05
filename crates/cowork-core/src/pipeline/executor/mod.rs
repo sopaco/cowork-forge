@@ -129,7 +129,7 @@ impl IterationExecutor {
         let stages = get_stages_from_flow(&start_stage);
         let flow_config = get_flow_config();
 
-        println!(
+        tracing::info!(
             "[Executor] Using Flow config: stop_on_failure={}, memory_scope={:?}",
             flow_config.stop_on_failure, flow_config.memory_scope
         );
@@ -143,10 +143,10 @@ impl IterationExecutor {
         // Ensure iteration memory exists
         let memory_store = crate::persistence::MemoryStore::new();
         if let Err(e) = memory_store.ensure_iteration_memory(&iteration.id) {
-            println!("[Executor] Warning: Failed to create iteration memory: {}", e);
+            tracing::warn!("[Executor] Failed to create iteration memory: {}", e);
         }
 
-        println!(
+        tracing::info!(
             "[Executor] Iteration '{}' started, will execute {} stages starting from '{}'",
             iteration.title,
             stages.len(),
@@ -167,11 +167,11 @@ impl IterationExecutor {
         // Evolution iteration: Inject project knowledge
         if iteration.base_iteration_id.is_some() {
             if let Err(e) = knowledge::inject_project_knowledge(&self.iteration_store, &iteration).await {
-                println!("[Executor] Warning: Failed to inject project knowledge: {}", e);
+                tracing::warn!("[Executor] Failed to inject project knowledge: {}", e);
             }
         }
 
-        println!("[Executor] Starting stage execution loop...");
+        tracing::info!("[Executor] Starting stage execution loop...");
         self.execute_stages_from(project, iteration, stages, workspace, flow_config, 0).await
     }
 
@@ -206,7 +206,7 @@ impl IterationExecutor {
             iteration.set_stage(&stage_name);
             self.iteration_store.save(&iteration)?;
 
-            println!("[Executor] Stage updated: {} (iteration: {})", stage_name, iteration.id);
+            tracing::info!("[Executor] Stage updated: {} (iteration: {})", stage_name, iteration.id);
 
             self.interaction
                 .show_message_with_context(
@@ -226,7 +226,7 @@ impl IterationExecutor {
 
             for attempt in 0..MAX_STAGE_RETRIES {
                 if attempt > 0 {
-                    println!(
+                    tracing::info!(
                         "[Executor] Retrying stage '{}' (attempt {}/{})",
                         stage_name, attempt + 1, MAX_STAGE_RETRIES
                     );
@@ -524,7 +524,7 @@ impl IterationExecutor {
 
         // Promote iteration insights to project decisions
         if let Err(e) = crate::persistence::MemoryStore::new().promote_insights_to_decisions(&iteration.id) {
-            println!("[Executor] Warning: Failed to promote insights: {}", e);
+            tracing::warn!("[Executor] Failed to promote insights: {}", e);
         }
 
         project.current_iteration_id = Some(iteration.id.clone());
@@ -550,7 +550,7 @@ impl IterationExecutor {
     ) -> anyhow::Result<()> {
         let mut iteration = self.iteration_store.load(iteration_id)?;
 
-        println!(
+        tracing::info!(
             "[Executor] Continuing iteration '{}' (status: {:?}, current_stage: {:?})",
             iteration_id, iteration.status, iteration.current_stage
         );
@@ -560,7 +560,7 @@ impl IterationExecutor {
         }
 
         let resume_stage = iteration.current_stage.clone();
-        println!("[Executor] Resuming from stage: {:?}", resume_stage);
+        tracing::info!("[Executor] Resuming from stage: {:?}", resume_stage);
 
         iteration.resume();
         self.iteration_store.save(&iteration)?;
@@ -590,7 +590,7 @@ impl IterationExecutor {
     ) -> anyhow::Result<()> {
         let mut iteration = self.iteration_store.load(iteration_id)?;
 
-        println!(
+        tracing::info!(
             "[Executor] Retrying failed iteration '{}' (status: {:?}, current_stage: {:?})",
             iteration_id, iteration.status, iteration.current_stage
         );
@@ -602,7 +602,7 @@ impl IterationExecutor {
         let retry_stage = if let Some(ref current) = iteration.current_stage {
             current.clone()
         } else {
-            println!("[Executor] No current_stage found, defaulting to 'check' for retry");
+            tracing::warn!("[Executor] No current_stage found, defaulting to 'check' for retry");
             "check".to_string()
         };
 
