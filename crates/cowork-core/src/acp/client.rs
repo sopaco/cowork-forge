@@ -18,7 +18,7 @@ use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 use crate::llm::config::CodingAgentConfig;
 
 /// Timeout for a single ACP prompt turn.
-const PROMPT_TIMEOUT_SECONDS: u64 = 600;
+const PROMPT_TIMEOUT_SECONDS: u64 = 3000;
 
 /// Max stderr line length to forward as status.
 const MAX_STATUS_LINE_LEN: usize = 500;

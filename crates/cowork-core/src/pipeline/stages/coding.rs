@@ -52,7 +52,7 @@ impl CodingStage {
         // Note: Executor now auto-loads feedback from storage before calling execute_with_feedback
         let task_description = if let Some(fb) = feedback {
             // Use parameter feedback (from executor auto-load or stage review loop)
-            println!("[Coding] Using parameter feedback: {}", fb.chars().take(100).collect::<String>());
+            tracing::debug!("using parameter feedback: {}", fb.chars().take(100).collect::<String>());
             format!(
                 "## ⚠️ USER REPORTED ISSUE - REQUIRES FIX\n\n\
                 The user has reported the following problems with the project:\n\n\
@@ -76,11 +76,11 @@ impl CodingStage {
                 });
 
             if let Some(ref fb) = stored_feedback {
-                println!("[Coding] Found fallback feedback from storage: {}", fb.details.chars().take(100).collect::<String>());
+                tracing::debug!("found fallback feedback from storage: {}", fb.details.chars().take(100).collect::<String>());
                 format!("Fix issues based on feedback: {}", fb.details)
             } else {
                 // Load plan artifact to get tasks
-                println!("[Coding] No feedback found, loading plan...");
+                tracing::debug!("no feedback found, loading plan...");
                 let iteration_dir = workspace.parent().unwrap_or(&workspace);
                 let plan_artifact = iteration_dir.join("artifacts").join("plan.md");
                 
@@ -100,9 +100,8 @@ impl CodingStage {
         );
 
         // Create external agent with iteration context for evolution iterations
-        eprintln!("DEBUG: Creating ExternalCodingAgent for workspace: {}", workspace.display());
-        eprintln!("DEBUG: Iteration id={}, base_id={:?}, inheritance={:?}", 
-            ctx.iteration.id, ctx.iteration.base_iteration_id, ctx.iteration.inheritance);
+        tracing::debug!(workspace = %workspace.display(), "creating ExternalCodingAgent");
+        tracing::debug!(iteration_id = %ctx.iteration.id, base_id = ?ctx.iteration.base_iteration_id, inheritance = ?ctx.iteration.inheritance, "iteration context");
         let agent = match ExternalCodingAgent::new_with_iteration(&workspace, Some(ctx.iteration.clone())).await {
             Ok(agent) => agent,
             Err(e) => {

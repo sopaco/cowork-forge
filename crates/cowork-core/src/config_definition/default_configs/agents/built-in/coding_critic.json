@@ -46,6 +46,6 @@
   "model": {
     "temperature": 0.3
   },
-  "include_contents": "default",
+  "include_contents": "none",
   "tags": ["built-in", "coding", "critic"]
 }

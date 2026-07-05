@@ -320,23 +320,17 @@ fn create_simple_agent_from_config_with_stage(
     builder = add_mcp_toolsets_to_builder(builder);
 
     // Set content inclusion mode:
-    // - If config explicitly specifies a mode, use that.
-    // - Otherwise, ActorCritic sub-agents default to Default so Critic can see
-    //   Actor's tool calls/outputs within the same LoopAgent run.
+    // - Actor agents use Default to see Critic feedback across LoopAgent iterations
+    //   (they explicitly set "include_contents": "default" in JSON configs).
+    // - Critic agents use None to avoid paying for Actor's full conversation history;
+    //   Critics load artifacts via tools (load_prd_doc, get_plan, etc.) rather than
+    //   reading conversation history, which significantly reduces token usage.
     // - Simple agents default to None to keep context focused.
     let include_contents = match &definition.include_contents {
         IncludeContentsMode::None => IncludeContents::None,
         IncludeContentsMode::Default => IncludeContents::Default,
         IncludeContentsMode::All => IncludeContents::Default,
         IncludeContentsMode::Selected(_) => IncludeContents::Default,
-    };
-    let include_contents = if matches!(include_contents, IncludeContents::None) {
-        match stage_type {
-            Some(StageType::ActorCritic) => IncludeContents::Default,
-            _ => IncludeContents::None,
-        }
-    } else {
-        include_contents
     };
     builder = builder.include_contents(include_contents);
 

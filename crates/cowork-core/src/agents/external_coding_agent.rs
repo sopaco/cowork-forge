@@ -45,16 +45,15 @@ impl ExternalCodingAgent {
 
     /// Create a new External Coding Agent with iteration context
     pub async fn new_with_iteration(workspace: &PathBuf, iteration: Option<Iteration>) -> Result<Self> {
-        eprintln!("DEBUG: ExternalCodingAgent::new_with_iteration called with workspace: {}", workspace.display());
+        tracing::debug!(workspace = %workspace.display(), "creating ExternalCodingAgent");
         if let Some(ref iter) = iteration {
-            eprintln!("DEBUG: Iteration context: id={}, base_id={:?}, inheritance={:?}",
-                iter.id, iter.base_iteration_id, iter.inheritance);
+            tracing::debug!(iteration_id = %iter.id, base_id = ?iter.base_iteration_id, inheritance = ?iter.inheritance, "iteration context");
         }
 
         let config = load_config()
             .context("Failed to load config")?;
 
-        eprintln!("DEBUG: Config loaded, coding_agent.enabled: {}", config.coding_agent.enabled);
+        tracing::debug!(enabled = config.coding_agent.enabled, "external coding agent config loaded");
 
         if !config.coding_agent.enabled {
             anyhow::bail!("External coding agent is not enabled in config");
