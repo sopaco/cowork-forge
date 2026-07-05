@@ -1,7 +1,7 @@
 {
   "project": "cowork-forge",
   "repo_path": ".",
-  "synced_at": "2026-07-05T13:59:52.257541800+00:00",
+  "synced_at": "2026-07-05T15:00:39.802481400+00:00",
   "collectors": [
     "git",
     "repomix"

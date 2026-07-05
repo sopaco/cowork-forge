@@ -3,31 +3,31 @@
   "project": "cowork-forge",
   "repo_path": ".",
   "baseline": {
-    "git_head": "6dd7c497f2982ac9985ff1dadbe782e2e89404fe",
-    "git_head_at": "2026-07-05T14:03:40.596226900+00:00",
-    "dirty": true
+    "git_head": "1442829c5d046af94a8554bf128ec4801c9bc4a2",
+    "git_head_at": "2026-07-05T14:15:46.380754800+00:00",
+    "dirty": false
   },
   "assets": {
     "agent_pack": {
       "path": "agent/repomix.md",
-      "synced_at": "2026-07-05T13:59:52.254362200+00:00",
-      "baseline_git_head": "6dd7c497f2982ac9985ff1dadbe782e2e89404fe",
+      "synced_at": "2026-07-05T14:13:45.686291800+00:00",
+      "baseline_git_head": "1442829c5d046af94a8554bf128ec4801c9bc4a2",
       "stale": false,
-      "freshness_score": 95
+      "freshness_score": 100
     },
     "agent_context": {
       "path": "agent/context.md",
-      "synced_at": "2026-07-05T14:03:39.056649300+00:00",
-      "baseline_git_head": "6dd7c497f2982ac9985ff1dadbe782e2e89404fe",
+      "synced_at": "2026-07-05T14:15:45.349131500+00:00",
+      "baseline_git_head": "1442829c5d046af94a8554bf128ec4801c9bc4a2",
       "stale": true,
       "stale_reason": "asset_not_ready",
       "freshness_score": 0
     },
     "human_docs": {
       "path": "human/",
-      "synced_at": "2026-07-05T13:59:52.257541800+00:00",
+      "synced_at": "2026-07-05T14:13:45.688358300+00:00",
       "stale": false,
-      "freshness_score": 95
+      "freshness_score": 100
     }
   },
   "drift": {
@@ -40,14 +40,14 @@
     "overall_stale": true,
     "commits_since_baseline": 0,
     "changed_files_count": 0,
-    "current_git_head": "6dd7c49",
-    "working_tree_dirty": true,
+    "current_git_head": "1442829",
+    "working_tree_dirty": false,
     "is_git_repo": true,
-    "last_computed_at": "2026-07-05T14:03:40.596226900+00:00",
+    "last_computed_at": "2026-07-05T14:15:46.380754800+00:00",
     "stale_reason": "asset_not_ready",
-    "agent_pack_score": 95,
+    "agent_pack_score": 100,
     "agent_context_score": 0,
-    "human_docs_score": 95,
+    "human_docs_score": 100,
     "macro_preload_allowed": false,
     "drift_factors": [
       {
@@ -60,20 +60,13 @@
         "id": "baseline_match",
         "severity": "info",
         "title": "与 baseline 提交一致",
-        "detail": "源码索引与 Agent 上下文均基于提交 6dd7c497f2982ac9985ff1dadbe782e2e89404fe 生成，相对 HEAD 无文件漂移。"
-      },
-      {
-        "id": "dirty_tree",
-        "severity": "medium",
-        "title": "工作区有未提交修改",
-        "detail": "Git 工作区在源码路径上有未提交改动（已排除 `.terrain/` 等知识产出目录）。知识资产基于某次提交快照，与磁盘上的未提交源码改动不一致，扣 5 分。",
-        "points_lost": 5
+        "detail": "源码索引与 Agent 上下文均基于提交 1442829c5d046af94a8554bf128ec4801c9bc4a2 生成，相对 HEAD 无文件漂移。"
       },
       {
         "id": "overall_driver",
         "severity": "info",
         "title": "总分由 Agent 架构上下文决定",
-        "detail": "综合分取三层最低值：源码索引 95、Agent 上下文 0、人类文档 95。"
+        "detail": "综合分取三层最低值：源码索引 100、Agent 上下文 0、人类文档 100。"
       },
       {
         "id": "macro_blocked",
@@ -82,8 +75,8 @@
         "detail": "分数 < 50：问答不会预加载可能过期的架构概览，需通过源码索引验证。"
       }
     ],
-    "pack_baseline_short": "6dd7c49",
-    "context_baseline_short": "6dd7c49"
+    "pack_baseline_short": "1442829",
+    "context_baseline_short": "1442829"
   },
-  "last_computed_at": "2026-07-05T14:03:40.596226900+00:00"
+  "last_computed_at": "2026-07-05T14:15:46.380754800+00:00"
 }

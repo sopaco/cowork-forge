@@ -2974,6 +2974,35 @@ LICENSE
 358: }
 ```
 
+### crates/cowork-gui/src/components/chat/ChatPanel.tsx (24 lines)
+
+```
+1: ChatPanelProps
+2: ⋮----
+3: {
+4:   messages: ChatMessage[];
+5:   pmMessages: (ChatMessage & { type: 'user' | 'pm_agent' })[];
+6:   mode: 'pipeline' | 'pm_agent' | 'disabled';
+7:   isProcessing: boolean;
+8:   pmProcessing: boolean;
+9:   currentAgent: string | null;
+10:   iterationTitle: string;
+11:   iterationDescription?: string;
+12:   currentStage?: string | null;
+13:   inputRequest?: InputRequest | null;
+14:   userInput: string;
+15:   messagesContainerRef: React.RefObject<HTMLDivElement>;
+16:   pmMessagesContainerRef: React.RefObject<HTMLDivElement>;
+17:   onUserInputChange: (value: string) => void;
+18:   onSend: () => void;
+19:   onSelectOption: (option: InputOption) => void;
+20:   onSubmitFeedback: () => void;
+21:   onCancelFeedback: () => void;
+22:   onToggleThinking: (index: number) => void;
+23:   onActionClick?: (action: PMAction) => void;
+24: }
+```
+
 ### crates/cowork-gui/src/components/chat/InputArea.tsx (18 lines)
 
 ```
@@ -3844,33 +3873,96 @@ LICENSE
 263: }
 ```
 
-### crates/cowork-gui/src/components/chat/ChatPanel.tsx (24 lines)
+### crates/cowork-gui/src/components/ArtifactsViewer.tsx (34 lines)
 
 ```
-1: ChatPanelProps
+1: ArtifactsData
 2: ⋮----
 3: {
-4:   messages: ChatMessage[];
-5:   pmMessages: (ChatMessage & { type: 'user' | 'pm_agent' })[];
-6:   mode: 'pipeline' | 'pm_agent' | 'disabled';
-7:   isProcessing: boolean;
-8:   pmProcessing: boolean;
-9:   currentAgent: string | null;
-10:   iterationTitle: string;
-11:   iterationDescription?: string;
-12:   currentStage?: string | null;
-13:   inputRequest?: InputRequest | null;
-14:   userInput: string;
-15:   messagesContainerRef: React.RefObject<HTMLDivElement>;
-16:   pmMessagesContainerRef: React.RefObject<HTMLDivElement>;
-17:   onUserInputChange: (value: string) => void;
-18:   onSend: () => void;
-19:   onSelectOption: (option: InputOption) => void;
-20:   onSubmitFeedback: () => void;
-21:   onCancelFeedback: () => void;
-22:   onToggleThinking: (index: number) => void;
-23:   onActionClick?: (action: PMAction) => void;
-24: }
+4:   iteration_id?: string;
+5:   idea?: string;
+6:   requirements?: string;
+7:   design?: unknown;
+8:   design_raw?: string;
+9:   plan?: unknown;
+10:   plan_raw?: string;
+11:   code_files?: FileInfo[];
+12:   check_report?: string;
+13:   delivery_report?: string;
+14: }
+15: ⋮----
+16: FileInfo
+17: ⋮----
+18: {
+19:   path: string;
+20:   name: string;
+21:   size: number;
+22:   is_dir: boolean;
+23:   language?: string;
+24:   modified_at?: string;
+25: }
+26: ⋮----
+27: ArtifactsViewerProps
+28: ⋮----
+29: {
+30:   iterationId: string;
+31:   activeTab?: string;
+32:   onTabChange?: (key: string) => void;
+33:   refreshTrigger?: number;
+34: }
+```
+
+### crates/cowork-gui/src/components/MemoryPanel.tsx (48 lines)
+
+```
+1: Memory
+2: ⋮----
+3: {
+4:   id: string;
+5:   title: string;
+6:   summary: string;
+7:   category: string;
+8:   stage?: string;
+9:   created_at: string;
+10:   impact?: string;
+11:   tags?: string[];
+12:   file?: string;
+13:   _ts?: number;
+14: }
+15: ⋮----
+16: MemoryDetail
+17: ⋮----
+18: {
+19:   content: string;
+20: }
+21: ⋮----
+22: MemoryQueryResult
+23: ⋮----
+24: {
+25:   results: Memory[];
+26:   total: number;
+27: }
+28: ⋮----
+29: MemoryPanelProps
+30: ⋮----
+31: {
+32:   currentSession?: string;
+33:   refreshTrigger?: number;
+34: }
+35: ⋮----
+36: getCategoryColor
+37: ⋮----
+38: (memory.category)
+39: ⋮----
+40: getCategoryColor
+41: ⋮----
+42: (
+43:                               selectedMemory?.category || "",
+44:                             )
+45: ⋮----
+46: getImpactColor
+47: ⋮----
+48: (selectedMemory.impact)
 ```
 
 ### litho.docs/en/1.Overview.md (296 lines)
@@ -4174,64 +4266,6 @@ LICENSE
 296: **Next Steps**: Refer to Container and Component Level diagrams for detailed internal architecture documentation.
 ````
 
-### Cargo.toml (53 lines)
-
-```
-1: [workspace]
-2: resolver = "2"
-3: members = [
-4:     "crates/cowork-core",
-5:     "crates/cowork-cli",
-6:     "crates/cowork-gui/src-tauri",
-7: ]
-8: 
-9: [workspace.package]
-10: version = "2.5.2"
-11: edition = "2024"
-12: authors = ["Sopaco"]
-13: license = "MIT"
-14: repository = "https://github.com/sopaco/cowork-forge"
-15: 
-16: [workspace.dependencies]
-17: adk-rust = "1.0.0"
-18: adk-core = "1.0.0"
-19: adk-agent = "1.0.0"
-20: adk-model = { version = "1.0.0", features = ["openai"] }
-21: adk-tool = "1.0.0"
-22: adk-runner = "1.0.0"
-23: adk-session = "1.0.0"
-24: adk-skill = "1.0.0"
-25: 
-26: tokio = { version = "1", features = ["full"] }
-27: tokio-util = { version = "0.7", features = ["compat"] }
-28: anyhow = "1"
-29: thiserror = "2"
-30: serde = { version = "1", features = ["derive"] }
-31: serde_json = "1"
-32: 
-33: toml = "1.0"
-34: 
-35: clap = { version = "4", features = ["derive"] }
-36: dialoguer = "0.12"
-37: console = "0.16"
-38: 
-39: tracing = "0.1"
-40: tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-41: 
-42: chrono = { version = "0.4", features = ["serde"] }
-43: uuid = { version = "1", features = ["v4", "serde"] }
-44: 
-45: dirs = "6"
-46: walkdir = "2"
-47: ignore = "0.4"
-48: 
-49: futures = "0.3"
-50: 
-51: tempfile = "3"
-52: 
-53: agent-client-protocol = "0.9"
-```
-
 ### crates/cowork-core/src/instructions/check.rs (93 lines)
 
 ````
@@ -4425,98 +4459,6 @@ LICENSE
 90: }
 ```
 
-### crates/cowork-gui/src/components/ArtifactsViewer.tsx (34 lines)
-
-```
-1: ArtifactsData
-2: ⋮----
-3: {
-4:   iteration_id?: string;
-5:   idea?: string;
-6:   requirements?: string;
-7:   design?: unknown;
-8:   design_raw?: string;
-9:   plan?: unknown;
-10:   plan_raw?: string;
-11:   code_files?: FileInfo[];
-12:   check_report?: string;
-13:   delivery_report?: string;
-14: }
-15: ⋮----
-16: FileInfo
-17: ⋮----
-18: {
-19:   path: string;
-20:   name: string;
-21:   size: number;
-22:   is_dir: boolean;
-23:   language?: string;
-24:   modified_at?: string;
-25: }
-26: ⋮----
-27: ArtifactsViewerProps
-28: ⋮----
-29: {
-30:   iterationId: string;
-31:   activeTab?: string;
-32:   onTabChange?: (key: string) => void;
-33:   refreshTrigger?: number;
-34: }
-```
-
-### crates/cowork-gui/src/components/MemoryPanel.tsx (48 lines)
-
-```
-1: Memory
-2: ⋮----
-3: {
-4:   id: string;
-5:   title: string;
-6:   summary: string;
-7:   category: string;
-8:   stage?: string;
-9:   created_at: string;
-10:   impact?: string;
-11:   tags?: string[];
-12:   file?: string;
-13:   _ts?: number;
-14: }
-15: ⋮----
-16: MemoryDetail
-17: ⋮----
-18: {
-19:   content: string;
-20: }
-21: ⋮----
-22: MemoryQueryResult
-23: ⋮----
-24: {
-25:   results: Memory[];
-26:   total: number;
-27: }
-28: ⋮----
-29: MemoryPanelProps
-30: ⋮----
-31: {
-32:   currentSession?: string;
-33:   refreshTrigger?: number;
-34: }
-35: ⋮----
-36: getCategoryColor
-37: ⋮----
-38: (memory.category)
-39: ⋮----
-40: getCategoryColor
-41: ⋮----
-42: (
-43:                               selectedMemory?.category || "",
-44:                             )
-45: ⋮----
-46: getImpactColor
-47: ⋮----
-48: (selectedMemory.impact)
-```
-
 ### crates/cowork-gui/src/components/common/MarkdownMessage.tsx (7 lines)
 
 ```
@@ -4527,6 +4469,501 @@ LICENSE
 5:   
 6:   streaming?: boolean;
 7: }
+```
+
+### crates/cowork-gui/src/styles/chat.css (432 lines)
+
+```
+1: .chat-messages {
+2:   overflow-y: auto;
+3:   padding: 0;
+4:   flex: 1;
+5:   display: flex;
+6:   flex-direction: column;
+7: }
+8: 
+9: 
+10: .chat-msg-row {
+11:   padding: 16px 24px;
+12:   animation: msgFadeIn 0.25s ease-out;
+13: }
+14: 
+15: .chat-msg-row + .chat-msg-row {
+16:   border-top: 1px solid var(--border-light);
+17: }
+18: 
+19: @keyframes msgFadeIn {
+20:   from { opacity: 0; transform: translateY(6px); }
+21:   to { opacity: 1; transform: translateY(0); }
+22: }
+23: 
+24: 
+25: .chat-msg-agent {
+26:   background: var(--bg-base);
+27: }
+28: 
+29: .chat-msg-agent .chat-msg-header {
+30:   display: flex;
+31:   align-items: center;
+32:   gap: 8px;
+33:   margin-bottom: 8px;
+34: }
+35: 
+36: .chat-msg-agent .chat-agent-avatar {
+37:   width: 24px;
+38:   height: 24px;
+39:   border-radius: 3px;
+40:   object-fit: cover;
+41:   flex-shrink: 0;
+42: }
+43: 
+44: .chat-msg-agent .chat-agent-name {
+45:   font-size: 13px;
+46:   font-weight: 600;
+47:   color: var(--text-primary);
+48: }
+49: 
+50: .chat-msg-agent .chat-agent-stage {
+51:   font-size: 11px;
+52:   color: var(--text-tertiary);
+53:   background: var(--bg-elevated);
+54:   padding: 1px 8px;
+55:   border-radius: 2px;
+56: }
+57: 
+58: 
+59: .chat-msg-user {
+60:   background: var(--primary-lighter);
+61: }
+62: 
+63: .chat-msg-user .chat-msg-content {
+64:   display: flex;
+65:   justify-content: flex-end;
+66: }
+67: 
+68: .chat-msg-user .chat-user-bubble {
+69:   background: var(--primary);
+70:   color: #fff;
+71:   padding: 10px 16px;
+72:   border-radius: 6px 6px 2px 6px;
+73:   max-width: 75%;
+74:   word-break: break-word;
+75:   line-height: 1.6;
+76:   font-size: 14px;
+77:   box-shadow: 0 1px 4px rgba(37, 99, 235, 0.15);
+78: }
+79: 
+80: 
+81: .chat-msg-thinking {
+82:   background: var(--bg-container);
+83: }
+84: 
+85: .chat-msg-thinking .chat-thinking-toggle {
+86:   display: flex;
+87:   align-items: center;
+88:   gap: 8px;
+89:   cursor: pointer;
+90:   user-select: none;
+91:   font-size: 13px;
+92:   color: var(--text-tertiary);
+93:   padding: 4px 0;
+94:   transition: color 0.15s;
+95: }
+96: 
+97: .chat-msg-thinking .chat-thinking-toggle:hover {
+98:   color: var(--text-secondary);
+99: }
+100: 
+101: .chat-msg-thinking .chat-agent-avatar {
+102:   width: 24px;
+103:   height: 24px;
+104:   border-radius: 3px;
+105:   object-fit: cover;
+106:   flex-shrink: 0;
+107:   opacity: 0.7;
+108: }
+109: 
+110: .chat-msg-thinking .chat-thinking-label {
+111:   font-style: italic;
+112: }
+113: 
+114: .chat-msg-thinking .chat-thinking-chevron {
+115:   font-size: 10px;
+116:   transition: transform 0.2s;
+117:   margin-left: auto;
+118: }
+119: 
+120: .chat-msg-thinking.chat-thinking-expanded .chat-thinking-chevron {
+121:   transform: rotate(90deg);
+122: }
+123: 
+124: .chat-msg-thinking .chat-thinking-body {
+125:   margin-top: 8px;
+126:   padding: 10px 14px;
+127:   background: var(--bg-elevated);
+128:   border-radius: 4px;
+129:   border: 1px solid var(--border-light);
+130:   font-size: 13px;
+131:   line-height: 1.6;
+132:   color: var(--text-secondary);
+133:   font-style: italic;
+134:   white-space: pre-wrap;
+135:   word-break: break-word;
+136:   max-height: 200px;
+137:   overflow-y: auto;
+138: }
+139: 
+140: 
+141: .chat-msg-tool-call {
+142:   background: var(--bg-base);
+143:   padding: 12px 24px !important;
+144: }
+145: 
+146: .chat-msg-tool-call .chat-tool-bar {
+147:   display: flex;
+148:   align-items: center;
+149:   gap: 8px;
+150:   font-size: 13px;
+151: }
+152: 
+153: .chat-msg-tool-call .chat-tool-icon {
+154:   width: 20px;
+155:   height: 20px;
+156:   border-radius: 2px;
+157:   background: var(--warning-light);
+158:   display: flex;
+159:   align-items: center;
+160:   justify-content: center;
+161:   font-size: 11px;
+162:   flex-shrink: 0;
+163: }
+164: 
+165: .chat-msg-tool-call .chat-tool-name {
+166:   font-weight: 500;
+167:   color: var(--text-primary);
+168:   font-family: 'JetBrains Mono', 'Consolas', monospace;
+169:   font-size: 12px;
+170: }
+171: 
+172: .chat-msg-tool-call .chat-tool-args {
+173:   margin-top: 6px;
+174:   padding: 8px 12px;
+175:   background: var(--bg-elevated);
+176:   border-radius: 3px;
+177:   font-family: 'JetBrains Mono', 'Consolas', monospace;
+178:   font-size: 12px;
+179:   color: var(--text-secondary);
+180:   overflow-x: auto;
+181:   max-height: 80px;
+182:   overflow-y: auto;
+183:   line-height: 1.5;
+184: }
+185: 
+186: 
+187: .chat-msg-tool-result {
+188:   background: var(--bg-base);
+189:   padding: 8px 24px !important;
+190: }
+191: 
+192: .chat-msg-tool-result .chat-tool-result-bar {
+193:   display: flex;
+194:   align-items: center;
+195:   gap: 6px;
+196:   font-size: 12px;
+197:   color: var(--text-tertiary);
+198: }
+199: 
+200: .chat-msg-tool-result .chat-tool-result-icon {
+201:   font-size: 13px;
+202: }
+203: 
+204: .chat-msg-tool-result.chat-tool-success .chat-tool-result-icon {
+205:   color: var(--success);
+206: }
+207: 
+208: .chat-msg-tool-result.chat-tool-fail .chat-tool-result-icon {
+209:   color: var(--error);
+210: }
+211: 
+212: .chat-msg-tool-result .chat-tool-result-name {
+213:   font-family: 'JetBrains Mono', 'Consolas', monospace;
+214:   font-size: 11px;
+215:   color: var(--text-tertiary);
+216: }
+217: 
+218: 
+219: .chat-msg-pm-agent {
+220:   background: var(--bg-base);
+221: }
+222: 
+223: .chat-msg-pm-agent .chat-pm-header {
+224:   display: flex;
+225:   align-items: center;
+226:   gap: 8px;
+227:   margin-bottom: 8px;
+228: }
+229: 
+230: .chat-msg-pm-agent .chat-agent-avatar {
+231:   width: 24px;
+232:   height: 24px;
+233:   border-radius: 3px;
+234:   object-fit: cover;
+235:   flex-shrink: 0;
+236: }
+237: 
+238: .chat-msg-pm-agent .chat-pm-name {
+239:   font-size: 13px;
+240:   font-weight: 600;
+241:   color: var(--success);
+242: }
+243: 
+244: .chat-msg-pm-agent .chat-pm-actions {
+245:   display: flex;
+246:   flex-wrap: wrap;
+247:   gap: 8px;
+248:   margin-top: 12px;
+249: }
+250: 
+251: .chat-msg-pm-agent .chat-pm-action {
+252:   cursor: pointer;
+253:   padding: 5px 12px;
+254:   border-radius: 3px;
+255:   display: inline-flex;
+256:   align-items: center;
+257:   gap: 6px;
+258:   font-size: 12px;
+259:   font-weight: 500;
+260:   border: 1px solid var(--border-color);
+261:   background: var(--bg-container);
+262:   color: var(--text-secondary);
+263:   transition: all 0.15s ease;
+264: }
+265: 
+266: .chat-msg-pm-agent .chat-pm-action:hover {
+267:   border-color: var(--primary);
+268:   color: var(--primary);
+269:   background: var(--primary-lighter);
+270:   box-shadow: 0 1px 4px rgba(37, 99, 235, 0.1);
+271: }
+272: 
+273: 
+274: .chat-processing-bar {
+275:   padding: 12px 24px;
+276:   background: var(--primary-lighter);
+277:   border-bottom: 1px solid var(--primary-light);
+278:   display: flex;
+279:   align-items: center;
+280:   gap: 10px;
+281:   font-size: 13px;
+282:   color: var(--primary);
+283:   font-weight: 500;
+284: }
+285: 
+286: .chat-processing-bar .chat-processing-stage {
+287:   font-size: 11px;
+288:   color: var(--text-secondary);
+289:   font-weight: 400;
+290: }
+291: 
+292: 
+293: .chat-msg-error {
+294:   background: var(--error-light);
+295: }
+296: 
+297: .chat-msg-error .chat-error-content {
+298:   color: var(--error);
+299:   font-size: 13px;
+300:   line-height: 1.5;
+301: }
+302: 
+303: 
+304: .chat-header {
+305:   padding: 16px 24px;
+306:   border-bottom: 1px solid var(--border-color);
+307:   background: var(--bg-base);
+308: }
+309: 
+310: .chat-header-title {
+311:   font-size: 15px;
+312:   font-weight: 600;
+313:   color: var(--text-primary);
+314:   margin: 0;
+315: }
+316: 
+317: .chat-header-desc {
+318:   font-size: 12px;
+319:   color: var(--text-tertiary);
+320:   margin: 4px 0 0 0;
+321:   display: -webkit-box;
+322:   -webkit-line-clamp: 2;
+323:   -webkit-box-orient: vertical;
+324:   overflow: hidden;
+325:   text-overflow: ellipsis;
+326:   line-height: 1.4;
+327: }
+328: 
+329: 
+330: .chat-input-wrapper {
+331:   padding: 16px 24px;
+332:   background: var(--bg-base);
+333:   border-top: 1px solid var(--border-color);
+334: }
+335: 
+336: 
+337: .chat-input-request {
+338:   padding: 16px;
+339:   background: var(--primary-lighter);
+340:   border: 1px solid var(--primary-light);
+341:   border-radius: 5px;
+342:   margin-bottom: 16px;
+343: }
+344: 
+345: .chat-input-request-title {
+346:   font-size: 14px;
+347:   font-weight: 600;
+348:   color: var(--primary);
+349:   margin-bottom: 8px;
+350: }
+351: 
+352: .chat-input-request-prompt {
+353:   font-size: 13px;
+354:   color: var(--text-secondary);
+355:   margin-bottom: 12px;
+356:   line-height: 1.5;
+357: }
+358: 
+359: 
+360: .chat-empty-state {
+361:   display: flex;
+362:   flex-direction: column;
+363:   align-items: center;
+364:   justify-content: center;
+365:   height: 100%;
+366:   color: var(--text-tertiary);
+367:   text-align: center;
+368:   padding: 40px;
+369: }
+370: 
+371: .chat-empty-state h3 {
+372:   font-size: 16px;
+373:   color: var(--text-secondary);
+374:   margin: 16px 0 8px;
+375:   font-weight: 500;
+376: }
+377: 
+378: .chat-empty-state p {
+379:   font-size: 13px;
+380:   line-height: 1.6;
+381:   max-width: 400px;
+382: }
+383: 
+384: 
+385: .chat-pm-welcome {
+386:   display: flex;
+387:   flex-direction: column;
+388:   align-items: center;
+389:   justify-content: center;
+390:   padding: 48px 24px;
+391:   text-align: center;
+392: }
+393: 
+394: .chat-pm-welcome-icon {
+395:   font-size: 40px;
+396:   margin-bottom: 16px;
+397: }
+398: 
+399: .chat-pm-welcome h3 {
+400:   font-size: 18px;
+401:   color: var(--text-primary);
+402:   margin: 0 0 8px;
+403:   font-weight: 600;
+404: }
+405: 
+406: .chat-pm-welcome p {
+407:   font-size: 13px;
+408:   color: var(--text-secondary);
+409:   line-height: 1.6;
+410:   max-width: 400px;
+411:   margin: 0;
+412: }
+413: 
+414: .chat-pm-welcome ul {
+415:   list-style: none;
+416:   padding: 0;
+417:   margin: 16px 0 0;
+418:   text-align: left;
+419: }
+420: 
+421: .chat-pm-welcome li {
+422:   font-size: 13px;
+423:   color: var(--text-secondary);
+424:   padding: 4px 0;
+425: }
+426: 
+427: .chat-pm-welcome li::before {
+428:   content: '·';
+429:   margin-right: 8px;
+430:   color: var(--primary);
+431:   font-weight: bold;
+432: }
+```
+
+### Cargo.toml (53 lines)
+
+```
+1: [workspace]
+2: resolver = "2"
+3: members = [
+4:     "crates/cowork-core",
+5:     "crates/cowork-cli",
+6:     "crates/cowork-gui/src-tauri",
+7: ]
+8: 
+9: [workspace.package]
+10: version = "2.5.2"
+11: edition = "2024"
+12: authors = ["Sopaco"]
+13: license = "MIT"
+14: repository = "https://github.com/sopaco/cowork-forge"
+15: 
+16: [workspace.dependencies]
+17: adk-rust = "1.0.0"
+18: adk-core = "1.0.0"
+19: adk-agent = "1.0.0"
+20: adk-model = { version = "1.0.0", features = ["openai"] }
+21: adk-tool = "1.0.0"
+22: adk-runner = "1.0.0"
+23: adk-session = "1.0.0"
+24: adk-skill = "1.0.0"
+25: 
+26: tokio = { version = "1", features = ["full"] }
+27: tokio-util = { version = "0.7", features = ["compat"] }
+28: anyhow = "1"
+29: thiserror = "2"
+30: serde = { version = "1", features = ["derive"] }
+31: serde_json = "1"
+32: 
+33: toml = "1.0"
+34: 
+35: clap = { version = "4", features = ["derive"] }
+36: dialoguer = "0.12"
+37: console = "0.16"
+38: 
+39: tracing = "0.1"
+40: tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+41: 
+42: chrono = { version = "0.4", features = ["serde"] }
+43: uuid = { version = "1", features = ["v4", "serde"] }
+44: 
+45: dirs = "6"
+46: walkdir = "2"
+47: ignore = "0.4"
+48: 
+49: futures = "0.3"
+50: 
+51: tempfile = "3"
+52: 
+53: agent-client-protocol = "0.9"
 ```
 
 ### crates/cowork-core/src/agents/external_coding_agent.rs (209 lines)
@@ -7025,441 +7462,1357 @@ LICENSE
 43: }
 ```
 
-### crates/cowork-gui/src/styles/chat.css (432 lines)
+### crates/cowork-gui/src/components/KnowledgePanel.tsx (41 lines)
 
 ```
-1: .chat-messages {
-2:   overflow-y: auto;
-3:   padding: 0;
-4:   flex: 1;
-5:   display: flex;
-6:   flex-direction: column;
-7: }
-8: 
-9: 
-10: .chat-msg-row {
-11:   padding: 16px 24px;
-12:   animation: msgFadeIn 0.25s ease-out;
-13: }
-14: 
-15: .chat-msg-row + .chat-msg-row {
-16:   border-top: 1px solid var(--border-light);
-17: }
-18: 
-19: @keyframes msgFadeIn {
-20:   from { opacity: 0; transform: translateY(6px); }
-21:   to { opacity: 1; transform: translateY(0); }
-22: }
-23: 
-24: 
-25: .chat-msg-agent {
-26:   background: var(--bg-base);
-27: }
-28: 
-29: .chat-msg-agent .chat-msg-header {
-30:   display: flex;
-31:   align-items: center;
-32:   gap: 8px;
-33:   margin-bottom: 8px;
-34: }
-35: 
-36: .chat-msg-agent .chat-agent-avatar {
-37:   width: 24px;
-38:   height: 24px;
-39:   border-radius: 3px;
-40:   object-fit: cover;
-41:   flex-shrink: 0;
-42: }
-43: 
-44: .chat-msg-agent .chat-agent-name {
-45:   font-size: 13px;
-46:   font-weight: 600;
-47:   color: var(--text-primary);
-48: }
-49: 
-50: .chat-msg-agent .chat-agent-stage {
-51:   font-size: 11px;
-52:   color: var(--text-tertiary);
-53:   background: var(--bg-elevated);
-54:   padding: 1px 8px;
-55:   border-radius: 2px;
-56: }
-57: 
-58: 
-59: .chat-msg-user {
-60:   background: var(--primary-lighter);
-61: }
+1: Knowledge
+2: ⋮----
+3: {
+4:   iteration_id: string;
+5:   title: string;
+6:   idea_summary?: string;
+7:   design_summary?: string;
+8:   plan_summary?: string;
+9:   code_structure?: string;
+10:   created_at: string;
+11:   tech_stack?: string[];
+12:   key_decisions?: string[];
+13:   key_patterns?: string[];
+14:   known_issues?: string[];
+15: }
+16: ⋮----
+17: KnowledgeListResult
+18: ⋮----
+19: {
+20:   knowledge_list: Knowledge[];
+21: }
+22: ⋮----
+23: IterationInfo
+24: ⋮----
+25: {
+26:   id: string;
+27:   number: number;
+28:   title: string;
+29:   description: string;
+30:   status: string;
+31:   current_stage: string | null;
+32:   created_at: string;
+33: }
+34: ⋮----
+35: KnowledgePanelProps
+36: ⋮----
+37: {
+38:   currentSession?: string;
+39:   currentIterationId?: string | null;
+40:   refreshTrigger?: number;
+41: }
+```
+
+### crates/cowork-gui/src/components/config/AgentConfigForm.tsx (712 lines)
+
+```
+1: import React, { useState, useEffect } from 'react';
+2: import {
+3:   Card,
+4:   List,
+5:   Button,
+6:   Space,
+7:   Typography,
+8:   Tag,
+9:   Modal,
+10:   Form,
+11:   Input,
+12:   Select,
+13:   Switch,
+14:   Slider,
+15:   message,
+16:   Popconfirm,
+17:   Empty,
+18:   Drawer,
+19:   Descriptions,
+20:   Divider,
+21:   Tabs,
+22:   InputNumber,
+23:   Alert,
+24:   Tooltip,
+25: } from 'antd';
+26: import {
+27:   PlusOutlined,
+28:   EditOutlined,
+29:   DeleteOutlined,
+30:   ExportOutlined,
+31:   ImportOutlined,
+32:   RobotOutlined,
+33:   ToolOutlined,
+34:   CodeOutlined,
+35:   SettingOutlined,
+36:   InfoCircleOutlined,
+37:   FolderOpenOutlined,
+38: } from '@ant-design/icons';
+39: import { useConfigStore } from '../../stores/configStore';
+40: import type { AgentDefinition, ToolReference, AgentType, ModelConfig, BuiltinInstruction, InstructionType, ToolInfo } from '../../types/config';
+41: import { open } from '@tauri-apps/plugin-dialog';
+42: 
+43: const { Title, Text, Paragraph } = Typography;
+44: const { TextArea } = Input;
+45: 
+46: const AgentConfigForm: React.FC = () => {
+47:   const {
+48:     agents,
+49:     skills,
+50:     selectedAgent,
+51:     selectAgent,
+52:     saveAgent,
+53:     deleteAgent,
+54:     validateAgent,
+55:     exportConfig,
+56:     importConfig,
+57:     getBuiltinInstructions,
+58:     availableTools,
+59:     loadAvailableTools,
+60:     getToolsByCategory,
+61:   } = useConfigStore();
 62: 
-63: .chat-msg-user .chat-msg-content {
-64:   display: flex;
-65:   justify-content: flex-end;
-66: }
-67: 
-68: .chat-msg-user .chat-user-bubble {
-69:   background: var(--primary);
-70:   color: #fff;
-71:   padding: 10px 16px;
-72:   border-radius: 12px 12px 4px 12px;
-73:   max-width: 75%;
-74:   word-break: break-word;
-75:   line-height: 1.6;
-76:   font-size: 14px;
-77:   box-shadow: 0 1px 4px rgba(37, 99, 235, 0.15);
-78: }
-79: 
-80: 
-81: .chat-msg-thinking {
-82:   background: var(--bg-container);
+63:   const [editModalVisible, setEditModalVisible] = useState(false);
+64:   const [editingAgent, setEditingAgent] = useState<AgentDefinition | null>(null);
+65:   const [detailDrawerVisible, setDetailDrawerVisible] = useState(false);
+66:   const [importModalVisible, setImportModalVisible] = useState(false);
+67:   const [importJson, setImportJson] = useState('');
+68:   const [form] = Form.useForm();
+69:   
+70:   
+71:   const [builtinInstructions, setBuiltinInstructions] = useState<BuiltinInstruction[]>([]);
+72:   const [instructionType, setInstructionType] = useState<InstructionType>('builtin');
+73:   const [selectedBuiltinId, setSelectedBuiltinId] = useState<string>('');
+74:   const [instructionFilePath, setInstructionFilePath] = useState<string>('');
+75:   const [instructionInlineContent, setInstructionInlineContent] = useState<string>('');
+76:   
+77:   
+78:   useEffect(() => {
+79:     getBuiltinInstructions().then(setBuiltinInstructions);
+80:     loadAvailableTools();  
+81:   }, [getBuiltinInstructions, loadAvailableTools]);
+82: 
+83:   const handleCreate = () => {
+84:     setEditingAgent(null);
+85:     form.resetFields();
+86:     form.setFieldsValue({
+87:       id: `agent-${Date.now()}`,
+88:       name: '',
+89:       description: '',
+90:       agent_type: 'simple',
+91:       instruction: '',
+92:       tools: [],
+93:       skills: [],
+94:       model: {},
+95:       include_contents: 'none',
+96:       tags: [],
+97:     });
+98:     
+99:     setInstructionType('builtin');
+100:     setSelectedBuiltinId('');
+101:     setInstructionFilePath('');
+102:     setInstructionInlineContent('');
+103:     setEditModalVisible(true);
+104:   };
+105: 
+106:   
+107:   const parseInstruction = (instruction: string): { type: InstructionType; builtinId: string; filePath: string; content: string } => {
+108:     if (instruction.startsWith('builtin://')) {
+109:       return {
+110:         type: 'builtin',
+111:         builtinId: instruction.substring('builtin://'.length),
+112:         filePath: '',
+113:         content: '',
+114:       };
+115:     } else if (instruction.startsWith('file://')) {
+116:       return {
+117:         type: 'file',
+118:         builtinId: '',
+119:         filePath: instruction.substring('file://'.length),
+120:         content: '',
+121:       };
+122:     } else if (instruction.startsWith('inline://')) {
+123:       return {
+124:         type: 'inline',
+125:         builtinId: '',
+126:         filePath: '',
+127:         content: instruction.substring('inline://'.length),
+128:       };
+129:     } else {
+130:       
+131:       
+132:       const matchingBuiltin = builtinInstructions.find(bi => bi.id === instruction);
+133:       if (matchingBuiltin) {
+134:         return {
+135:           type: 'builtin',
+136:           builtinId: instruction,
+137:           filePath: '',
+138:           content: '',
+139:         };
+140:       }
+141:       
+142:       return {
+143:         type: 'inline',
+144:         builtinId: '',
+145:         filePath: '',
+146:         content: instruction,
+147:       };
+148:     }
+149:   };
+150: 
+151:   const handleEdit = (agent: AgentDefinition) => {
+152:     setEditingAgent(agent);
+153:     
+154:     const toolIds = agent.tools.map(t => t.tool_id);
+155:     form.setFieldsValue({
+156:       ...agent,
+157:       agent_type: typeof agent.agent_type === 'string' ? agent.agent_type : 'loop',
+158:       tools: toolIds,
+159:     });
+160:     
+161:     
+162:     const parsed = parseInstruction(agent.instruction);
+163:     setInstructionType(parsed.type);
+164:     setSelectedBuiltinId(parsed.builtinId);
+165:     setInstructionFilePath(parsed.filePath);
+166:     
+167:     
+168:     if (parsed.type === 'inline' && parsed.content) {
+169:       setInstructionInlineContent(parsed.content);
+170:     } else if (parsed.type === 'builtin' && parsed.builtinId) {
+171:       const builtin = builtinInstructions.find(bi => bi.id === parsed.builtinId);
+172:       setInstructionInlineContent(builtin?.content || '');
+173:     } else {
+174:       setInstructionInlineContent(parsed.content);
+175:     }
+176:     
+177:     setEditModalVisible(true);
+178:     selectAgent(agent.id);
+179:   };
+180: 
+181:   const handleView = (agent: AgentDefinition) => {
+182:     selectAgent(agent.id);
+183:     setDetailDrawerVisible(true);
+184:   };
+185: 
+186:   const handleDelete = async (id: string) => {
+187:     try {
+188:       await deleteAgent(id);
+189:       message.success('Agent deleted successfully');
+190:     } catch (error) {
+191:       message.error('Failed to delete agent');
+192:     }
+193:   };
+194: 
+195:   const handleSave = async () => {
+196:     try {
+197:       const values = await form.validateFields();
+198:       
+199:       
+200:       const tools: ToolReference[] = (values.tools || []).map((toolId: string) => ({
+201:         tool_id: toolId,
+202:       }));
+203:       
+204:       
+205:       let instruction = '';
+206:       switch (instructionType) {
+207:         case 'builtin':
+208:           instruction = `builtin:
+209:           beak;
+210:         case 'file':
+211:           instruction = `file:
+212:           beak;
+213:         case 'inline':
+214:           instruction = `inline:
+215:           beak;
+216:       }
+217:       
+218:       const agent: AgentDefinition = {
+219:         ...editingAgent,
+220:         ...values,
+221:         instruction,
+222:         tools,
+223:         metadata: {},
+224:       };
+225: 
+226:       const validation = await validateAgent(agent);
+227:       if (!validation.valid) {
+228:         const errors = validation.issues.map(i => i.message).join(', ');
+229:         message.error(`Validation failed: ${errors}`);
+230:         return;
+231:       }
+232: 
+233:       await saveAgent(agent);
+234:       message.success('Agent saved successfully');
+235:       setEditModalVisible(false);
+236:     } catch (error) {
+237:       message.error('Failed to save agent');
+238:     }
+239:   };
+240: 
+241:   const handleExport = async (id: string) => {
+242:     try {
+243:       const json = await exportConfig('agent', id);
+244:       navigator.clipboard.writeText(json);
+245:       message.success('Agent exported to clipboard');
+246:     } catch (error) {
+247:       message.error('Failed to export agent');
+248:     }
+249:   };
+250: 
+251:   const handleImport = async () => {
+252:     try {
+253:       await importConfig('agent', importJson);
+254:       message.success('Agent imported successfully');
+255:       setImportModalVisible(false);
+256:       setImportJson('');
+257:     } catch (error) {
+258:       message.error('Failed to import agent');
+259:     }
+260:   };
+261: 
+262:   const selectedAgentData = selectedAgent ? agents[selectedAgent] : null;
+263: 
+264:   const getAgentTypeTag = (type: AgentType) => {
+265:     if (typeof type === 'string') {
+266:       return <Tag color="blue">{type}</Tag>;
+267:     }
+268:     return <Tag color="purple">loop ({(type as { loop: { max_iterations?: number } }).loop?.max_iterations || 'unlimited'})</Tag>;
+269:   };
+270: 
+271:   
+272:   const handleSelectInstructionFile = async () => {
+273:     try {
+274:       const selected = await open({
+275:         multiple: false,
+276:         filters: [{ name: 'Markdown', extensions: ['md', 'txt'] }],
+277:       });
+278:       if (selected && typeof selected === 'string') {
+279:         setInstructionFilePath(selected);
+280:       }
+281:     } catch (error) {
+282:       console.error('Failed to select file:', error);
+283:     }
+284:   };
+285: 
+286:   
+287:   const handleBuiltinChange = (builtinId: string) => {
+288:     setSelectedBuiltinId(builtinId);
+289:     const builtin = builtinInstructions.find(bi => bi.id === builtinId);
+290:     if (builtin) {
+291:       setInstructionInlineContent(builtin.content);
+292:     }
+293:   };
+294: 
+295:   
+296:   const handleInstructionTypeChange = (type: InstructionType) => {
+297:     setInstructionType(type);
+298:     
+299:     if (type === 'inline' && selectedBuiltinId) {
+300:       const builtin = builtinInstructions.find(bi => bi.id === selectedBuiltinId);
+301:       if (builtin) {
+302:         setInstructionInlineContent(builtin.content);
+303:       }
+304:     }
+305:   };
+306: 
+307:   const availableSkills = Object.keys(skills);
+308: 
+309:   return (
+310:     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+311:       <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+312:         <Title level={5} style={{ margin: 0 }}>Agent Definitions</Title>
+313:         <Space>
+314:           <Button icon={<ImportOutlined />} onClick={() => setImportModalVisible(true)}>
+315:             Import
+316:           </Button>
+317:           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+318:             New Agent
+319:           </Button>
+320:         </Space>
+321:       </div>
+322: 
+323:       {Object.keys(agents).length === 0 ? (
+324:         <Empty description="No agents defined" style={{ marginTop: '40px' }} />
+325:       ) : (
+326:         <List
+327:           style={{ flex: 1, overflow: 'auto', padding: '0 16px' }}
+328:           dataSource={Object.values(agents).sort((a, b) => a.name.localeCompare(b.name))}
+329:           renderItem={(agent) => (
+330:             <List.Item
+331:               actions={[
+332:                 <Button
+333:                   key="view"
+334:                   type="link"
+335:                   size="small"
+336:                   icon={<RobotOutlined />}
+337:                   onClick={() => handleView(agent)}
+338:                 >
+339:                   View
+340:                 </Button>,
+341:                 <Button
+342:                   key="edit"
+343:                   type="link"
+344:                   size="small"
+345:                   icon={<EditOutlined />}
+346:                   onClick={() => handleEdit(agent)}
+347:                 >
+348:                   Edit
+349:                 </Button>,
+350:                 <Button
+351:                   key="export"
+352:                   type="link"
+353:                   size="small"
+354:                   icon={<ExportOutlined />}
+355:                   onClick={() => handleExport(agent.id)}
+356:                 >
+357:                   Export
+358:                 </Button>,
+359:                 <Popconfirm
+360:                   key="delete"
+361:                   title="Delete this agent?"
+362:                   onConfirm={() => handleDelete(agent.id)}
+363:                 >
+364:                   <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+365:                     Delete
+366:                   </Button>
+367:                 </Popconfirm>,
+368:               ]}
+369:             >
+370:               <List.Item.Meta
+371:                 title={
+372:                   <Space>
+373:                     {agent.name}
+374:                     {agent.version && <Tag>{agent.version}</Tag>}
+375:                     {getAgentTypeTag(agent.agent_type)}
+376:                   </Space>
+377:                 }
+378:                 description={
+379:                   <Space orientation="vertical" size="small">
+380:                     <Text type="secondary">{agent.description || 'No description'}</Text>
+381:                     <Space size={4}>
+382:                       {agent.tools.slice(0, 5).map((t, i) => (
+383:                         <Tag key={i} color="blue" style={{ fontSize: '11px' }}>{t.tool_id}</Tag>
+384:                       ))}
+385:                       {agent.tools.length > 5 && <Tag>+{agent.tools.length - 5}</Tag>}
+386:                     </Space>
+387:                   </Space>
+388:                 }
+389:               />
+390:             </List.Item>
+391:           )}
+392:         />
+393:       )}
+394: 
+395:       {}
+396:       <Modal
+397:         title={editingAgent ? 'Edit Agent' : 'Create Agent'}
+398:         open={editModalVisible}
+399:         onCancel={() => setEditModalVisible(false)}
+400:         onOk={handleSave}
+401:         width={800}
+402:         okText="Save"
+403:       >
+404:         <Form form={form} layout="vertical">
+405:           <Tabs
+406:             items={[
+407:               {
+408:                 key: 'basic',
+409:                 label: 'Basic',
+410:                 children: (
+411:                   <>
+412:                     <Form.Item name="id" label="ID" rules={[{ required: true }]}>
+413:                       <Input disabled={!!editingAgent} />
+414:                     </Form.Item>
+415:                     <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+416:                       <Input />
+417:                     </Form.Item>
+418:                     <Form.Item name="description" label="Description">
+419:                       <TextArea rows={2} />
+420:                     </Form.Item>
+421:                     <Form.Item name="version" label="Version">
+422:                       <Input placeholder="e.g., 1.0.0" />
+423:                     </Form.Item>
+424:                     <Form.Item name="agent_type" label="Agent Type">
+425:                       <Select>
+426:                         <Select.Option value="simple">Simple (Single Execution)</Select.Option>
+427:                         <Select.Option value="loop">Loop (Actor-Critic)</Select.Option>
+428:                       </Select>
+429:                     </Form.Item>
+430:                   </>
+431:                 ),
+432:               },
+433:               {
+434:                 key: 'instruction',
+435:                 label: 'Instruction',
+436:                 children: (
+437:                   <div style={{ maxWidth: 700 }}>
+438:                     <Form.Item label="Instruction Type">
+439:                       <Select 
+440:                         value={instructionType} 
+441:                         onChange={handleInstructionTypeChange}
+442:                         style={{ width: '100%' }}
+443:                       >
+444:                         <Select.Option value="builtin">
+445:                           <Space>
+446:                             <Tag color="blue">Built-in</Tag>
+447:                             <span>Use a predefined instruction template</span>
+448:                           </Space>
+449:                         </Select.Option>
+450:                         <Select.Option value="file">
+451:                           <Space>
+452:                             <Tag color="green">File</Tag>
+453:                             <span>Load instruction from a file</span>
+454:                           </Space>
+455:                         </Select.Option>
+456:                         <Select.Option value="inline">
+457:                           <Space>
+458:                             <Tag color="purple">Inline</Tag>
+459:                             <span>Write custom instruction content</span>
+460:                           </Space>
+461:                         </Select.Option>
+462:                       </Select>
+463:                     </Form.Item>
+464:                     
+465:                     {instructionType === 'builtin' && (
+466:                       <>
+467:                         <Form.Item 
+468:                           label="Built-in Instruction"
+469:                           required
+470:                           validateStatus={!selectedBuiltinId && 'error'}
+471:                           help={!selectedBuiltinId && 'Please select a built-in instruction'}
+472:                         >
+473:                           <Select
+474:                             value={selectedBuiltinId || undefined}
+475:                             onChange={handleBuiltinChange}
+476:                             placeholder="Select a built-in instruction..."
+477:                             showSearch
+478:                             optionFilterProp="label"
+479:                             style={{ width: '100%' }}
+480:                             listHeight={300}
+481:                           >
+482:                             {(builtinInstructions || []).map(bi => (
+483:                               <Select.Option 
+484:                                 key={bi.id} 
+485:                                 value={bi.id}
+486:                                 label={bi.name}
+487:                               >
+488:                                 <div style={{ padding: '4px 0' }}>
+489:                                   <Text strong>{bi.name}</Text>
+490:                                   <b />
+491:                                   <Text type="secondary" style={{ fontSize: 12 }}>
+492:                                     {bi.description}
+493:                                   </Text>
+494:                                 </div>
+495:                               </Select.Option>
+496:                             ))}
+497:                           </Select>
+498:                         </Form.Item>
+499:                         
+500:                         {selectedBuiltinId && (
+501:                           <div style={{ marginBottom: 16 }}>
+502:                             <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>
+503:                               Instruction Preview:
+504:                             </Text>
+505:                             <div
+506:                               style={{
+507:                                 background: '#fafafa',
+508:                                 border: '1px solid #d9d9d9',
+509:                                 borderRadius: 3,
+510:                                 padding: 12,
+511:                                 maxHeight: 200,
+512:                                 overflow: 'auto',
+513:                                 fontSize: 12,
+514:                                 whiteSpace: 'pre-wrap',
+515:                                 fontFamily: 'monospace',
+516:                               }}
+517:                             >
+518:                               {(builtinInstructions || []).find(bi => bi.id === selectedBuiltinId)?.content || ''}
+519:                             </div>
+520:                           </div>
+521:                         )}
+522:                       </>
+523:                     )}
+524:                     
+525:                     {instructionType === 'file' && (
+526:                       <>
+527:                         <Form.Item 
+528:                           label="Instruction File"
+529:                           required
+530:                           validateStatus={!instructionFilePath && 'error'}
+531:                           help={!instructionFilePath && 'Please select or enter a file path'}
+532:                         >
+533:                           <Space.Compact style={{ width: '100%' }}>
+534:                             <Input
+535:                               value={instructionFilePath}
+536:                               onChange={(e) => setInstructionFilePath(e.target.value)}
+537:                               placeholder="./prompts/my_instruction.md"
+538:                               style={{ flex: 1 }}
+539:                             />
+540:                             <Button 
+541:                               icon={<FolderOpenOutlined />} 
+542:                               onClick={handleSelectInstructionFile}
+543:                             >
+544:                               Browse
+545:                             </Button>
+546:                           </Space.Compact>
+547:                         </Form.Item>
+548:                         <Text type="secondary" style={{ fontSize: 12 }}>
+549:                           Select a markdown (.md) or text (.txt) file containing the instruction
+550:                         </Text>
+551:                       </>
+552:                     )}
+553:                     
+554:                     {instructionType === 'inline' && (
+555:                       <>
+556:                         <Form.Item 
+557:                           label="Instruction Content"
+558:                           required
+559:                           validateStatus={!instructionInlineContent?.trim() && 'error'}
+560:                           help={!instructionInlineContent?.trim() && 'Please enter instruction content'}
+561:                         >
+562:                           <TextArea
+563:                             rows={12}
+564:                             value={instructionInlineContent}
+565:                             onChange={(e) => setInstructionInlineContent(e.target.value)}
+566:                             placeholder="Enter your custom instruction here..."
+567:                             style={{ fontFamily: 'monospace' }}
+568:                           />
+569:                         </Form.Item>
+570:                         <Space>
+571:                           <Text type="secondary" style={{ fontSize: 12 }}>
+572:                             Tip: Select a built-in instruction first, then switch to Inline mode to customize it.
+573:                           </Text>
+574:                         </Space>
+575:                       </>
+576:                     )}
+577:                   </div>
+578:                 ),
+579:               },
+580:               {
+581:                 key: 'tools',
+582:                 label: 'Tools',
+583:                 children: (
+584:                   <>
+585:                     <Form.Item name="tools" label="Available Tools">
+586:                       <Select 
+587:                         mode="multiple" 
+588:                         placeholder="Select tools"
+589:                         optionFilterProp="label"
+590:                         showSearch
+591:                         listHeight={400}
+592:                       >
+593:                         {Object.entries(getToolsByCategory()).map(([category, tools]) => (
+594:                           <Select.OptGroup key={category} label={category}>
+595:                             {tools.map(tool => (
+596:                               <Select.Option 
+597:                                 key={tool.id} 
+598:                                 value={tool.id}
+599:                                 label={tool.name}
+600:                               >
+601:                                 <Tooltip title={tool.description}>
+602:                                   <span>{tool.name}</span>
+603:                                 </Tooltip>
+604:                               </Select.Option>
+605:                             ))}
+606:                           </Select.OptGroup>
+607:                         ))}
+608:                       </Select>
+609:                     </Form.Item>
+610:                     <Form.Item name="skills" label="Skills">
+611:                       <Select mode="multiple" placeholder="Select skills">
+612:                         {availableSkills.map(skill => (
+613:                           <Select.Option key={skill} value={skill}>{skill}</Select.Option>
+614:                         ))}
+615:                       </Select>
+616:                     </Form.Item>
+617:                   </>
+618:                 ),
+619:               },
+620:               {
+621:                 key: 'advanced',
+622:                 label: 'Advanced',
+623:                 children: (
+624:                   <>
+625:                     <Form.Item name="include_contents" label="Include Contents Mode">
+626:                       <Select>
+627:                         <Select.Option value="none">None</Select.Option>
+628:                         <Select.Option value="all">All</Select.Option>
+629:                         <Select.Option value="selected">Selected</Select.Option>
+630:                       </Select>
+631:                     </Form.Item>
+632:                     <Form.Item name="tags" label="Tags">
+633:                       <Select mode="tags" placeholder="Add tags" />
+634:                     </Form.Item>
+635:                   </>
+636:                 ),
+637:               },
+638:             ]}
+639:           />
+640:         </Form>
+641:       </Modal>
+642: 
+643:       {}
+644:       <Drawer
+645:         title={selectedAgentData?.name || 'Agent Details'}
+646:         placement="right"
+647:         width={500}
+648:         onClose={() => setDetailDrawerVisible(false)}
+649:         open={detailDrawerVisible}
+650:       >
+651:         {selectedAgentData && (
+652:           <Space orientation="vertical" style={{ width: '100%' }} size="large">
+653:             <Descriptions column={1} bordered size="small">
+654:               <Descriptions.Item label="ID">{selectedAgentData.id}</Descriptions.Item>
+655:               <Descriptions.Item label="Version">{selectedAgentData.version || '-'}</Descriptions.Item>
+656:               <Descriptions.Item label="Type">
+657:                 {getAgentTypeTag(selectedAgentData.agent_type)}
+658:               </Descriptions.Item>
+659:               <Descriptions.Item label="Description">
+660:                 {selectedAgentData.description || '-'}
+661:               </Descriptions.Item>
+662:             </Descriptions>
+663: 
+664:             <Title level={5}>Tools ({selectedAgentData.tools?.length || 0})</Title>
+665:             <Space wrap>
+666:               {selectedAgentData.tools?.map((tool, i) => (
+667:                 <Tag key={i} color="blue">{tool.tool_id}</Tag>
+668:               ))}
+669:             </Space>
+670: 
+671:             {(selectedAgentData.skills?.length || 0) > 0 && (
+672:               <>
+673:                 <Title level={5}>Skills ({selectedAgentData.skills?.length || 0})</Title>
+674:                 <Space wrap>
+675:                   {selectedAgentData.skills?.map((skill, i) => (
+676:                     <Tag key={i} color="purple">{skill}</Tag>
+677:                   ))}
+678:                 </Space>
+679:               </>
+680:             )}
+681: 
+682:             <Title level={5}>Instruction</Title>
+683:             <Paragraph
+684:               ellipsis={{ rows: 5, expandable: true, symbol: 'more' }}
+685:               style={{ background: '#f5f5f5', padding: 8, borderRadius: 2 }}
+686:             >
+687:               {selectedAgentData.instruction}
+688:             </Paragraph>
+689:           </Space>
+690:         )}
+691:       </Drawer>
+692: 
+693:       {}
+694:       <Modal
+695:         title="Import Agent"
+696:         open={importModalVisible}
+697:         onCancel={() => setImportModalVisible(false)}
+698:         onOk={handleImport}
+699:         okText="Import"
+700:       >
+701:         <TextArea
+702:           rows={10}
+703:           placeholder="Paste agent JSON here..."
+704:           value={importJson}
+705:           onChange={(e) => setImportJson(e.target.value)}
+706:         />
+707:       </Modal>
+708:     </div>
+709:   );
+710: };
+711: 
+712: export default AgentConfigForm;
+```
+
+### crates/cowork-gui/src/styles/components.css (368 lines)
+
+```
+1: .artifact-content {
+2:   padding: 24px;
+3:   background: var(--bg-container);
+4:   color: var(--text-primary);
+5:   flex: 1;
+6:   min-height: 0;
+7:   overflow: auto;
+8: }
+9: 
+10: .artifact-content h3 {
+11:   color: var(--text-primary);
+12:   margin-bottom: 16px;
+13:   font-size: 18px;
+14: }
+15: 
+16: 
+17: .markdown-content {
+18:   color: var(--text-primary);
+19:   font-size: 14px;
+20:   line-height: 1.8;
+21: }
+22: 
+23: 
+24: .markdown-content h1,
+25: .markdown-content h2,
+26: .markdown-content h3,
+27: .markdown-content h4,
+28: .markdown-content h5,
+29: .markdown-content h6 {
+30:   color: var(--text-primary);
+31:   margin-top: 28px;
+32:   margin-bottom: 12px;
+33:   font-weight: 600;
+34:   line-height: 1.35;
+35: }
+36: 
+37: .markdown-content h1 { font-size: 1.5em; }
+38: .markdown-content h2 {
+39:   font-size: 1.25em;
+40:   border-bottom: 1px solid var(--border-light);
+41:   padding-bottom: 8px;
+42: }
+43: .markdown-content h3 { font-size: 1.15em; }
+44: .markdown-content h4 { font-size: 1.05em; }
+45: 
+46: 
+47: .markdown-content > :first-child,
+48: .markdown-content > h1:first-child,
+49: .markdown-content > h2:first-child,
+50: .markdown-content > h3:first-child,
+51: .markdown-content > h4:first-child {
+52:   margin-top: 0;
+53: }
+54: 
+55: 
+56: .markdown-content p {
+57:   margin-bottom: 14px;
+58: }
+59: 
+60: .markdown-content p:last-child {
+61:   margin-bottom: 0;
+62: }
+63: 
+64: 
+65: .markdown-content strong {
+66:   color: var(--text-primary);
+67:   font-weight: 600;
+68: }
+69: 
+70: .markdown-content em {
+71:   color: var(--text-secondary);
+72: }
+73: 
+74: 
+75: .markdown-content code:not(pre code) {
+76:   background: var(--bg-elevated);
+77:   color: var(--primary);
+78:   padding: 2px 7px;
+79:   border-radius: 2px;
+80:   font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+81:   font-size: 0.88em;
+82:   border: 1px solid var(--border-light);
 83: }
 84: 
-85: .chat-msg-thinking .chat-thinking-toggle {
-86:   display: flex;
-87:   align-items: center;
-88:   gap: 8px;
-89:   cursor: pointer;
-90:   user-select: none;
-91:   font-size: 13px;
-92:   color: var(--text-tertiary);
-93:   padding: 4px 0;
-94:   transition: color 0.15s;
+85: 
+86: .markdown-content ul,
+87: .markdown-content ol {
+88:   margin: 16px 0;
+89:   padding-left: 26px;
+90: }
+91: 
+92: .markdown-content li {
+93:   margin-bottom: 8px;
+94:   line-height: 1.75;
 95: }
 96: 
-97: .chat-msg-thinking .chat-thinking-toggle:hover {
-98:   color: var(--text-secondary);
+97: .markdown-content li:last-child {
+98:   margin-bottom: 0;
 99: }
 100: 
-101: .chat-msg-thinking .chat-agent-avatar {
-102:   width: 24px;
-103:   height: 24px;
-104:   border-radius: 3px;
-105:   object-fit: cover;
-106:   flex-shrink: 0;
-107:   opacity: 0.7;
-108: }
-109: 
-110: .chat-msg-thinking .chat-thinking-label {
-111:   font-style: italic;
-112: }
-113: 
-114: .chat-msg-thinking .chat-thinking-chevron {
-115:   font-size: 10px;
-116:   transition: transform 0.2s;
-117:   margin-left: auto;
-118: }
-119: 
-120: .chat-msg-thinking.chat-thinking-expanded .chat-thinking-chevron {
-121:   transform: rotate(90deg);
-122: }
-123: 
-124: .chat-msg-thinking .chat-thinking-body {
-125:   margin-top: 8px;
-126:   padding: 10px 14px;
-127:   background: var(--bg-elevated);
-128:   border-radius: 4px;
-129:   border: 1px solid var(--border-light);
-130:   font-size: 13px;
-131:   line-height: 1.6;
-132:   color: var(--text-secondary);
-133:   font-style: italic;
-134:   white-space: pre-wrap;
-135:   word-break: break-word;
-136:   max-height: 200px;
-137:   overflow-y: auto;
+101: .markdown-content ul li::marker {
+102:   color: var(--primary);
+103:   font-weight: 500;
+104: }
+105: 
+106: .markdown-content ol li::marker {
+107:   color: var(--primary);
+108:   font-weight: 600;
+109: }
+110: 
+111: 
+112: .markdown-content li > ul,
+113: .markdown-content li > ol {
+114:   margin: 6px 0;
+115: }
+116: 
+117: 
+118: .markdown-content blockquote {
+119:   border-left: 3px solid var(--primary);
+120:   padding: 10px 18px;
+121:   margin: 16px 0;
+122:   background: var(--bg-elevated);
+123:   border-radius: 0 4px 4px 0;
+124:   color: var(--text-secondary);
+125:   line-height: 1.7;
+126: }
+127: 
+128: .markdown-content blockquote p {
+129:   margin: 0;
+130: }
+131: 
+132: 
+133: .markdown-content a {
+134:   color: var(--primary);
+135:   text-decoration: none;
+136:   border-bottom: 1px solid transparent;
+137:   transition: all 0.15s;
 138: }
 139: 
-140: 
-141: .chat-msg-tool-call {
-142:   background: var(--bg-base);
-143:   padding: 12px 24px !important;
-144: }
-145: 
-146: .chat-msg-tool-call .chat-tool-bar {
-147:   display: flex;
-148:   align-items: center;
-149:   gap: 8px;
-150:   font-size: 13px;
-151: }
-152: 
-153: .chat-msg-tool-call .chat-tool-icon {
-154:   width: 20px;
-155:   height: 20px;
-156:   border-radius: 2px;
-157:   background: var(--warning-light);
-158:   display: flex;
-159:   align-items: center;
-160:   justify-content: center;
-161:   font-size: 11px;
-162:   flex-shrink: 0;
+140: .markdown-content a:hover {
+141:   border-bottom-color: var(--primary);
+142: }
+143: 
+144: 
+145: .markdown-content table {
+146:   width: 100%;
+147:   border-collapse: collapse;
+148:   margin: 16px 0;
+149:   font-size: 13px;
+150:   border: 1px solid var(--border-color);
+151:   border-radius: 4px;
+152:   overflow: hidden;
+153: }
+154: 
+155: .markdown-content th {
+156:   background: var(--bg-elevated);
+157:   color: var(--text-primary);
+158:   font-weight: 600;
+159:   text-align: left;
+160:   padding: 10px 14px;
+161:   border-bottom: 1px solid var(--border-color);
+162:   font-size: 12px;
 163: }
 164: 
-165: .chat-msg-tool-call .chat-tool-name {
-166:   font-weight: 500;
-167:   color: var(--text-primary);
-168:   font-family: 'JetBrains Mono', 'Consolas', monospace;
-169:   font-size: 12px;
-170: }
-171: 
-172: .chat-msg-tool-call .chat-tool-args {
-173:   margin-top: 6px;
-174:   padding: 8px 12px;
-175:   background: var(--bg-elevated);
-176:   border-radius: 3px;
-177:   font-family: 'JetBrains Mono', 'Consolas', monospace;
-178:   font-size: 12px;
-179:   color: var(--text-secondary);
-180:   overflow-x: auto;
-181:   max-height: 80px;
-182:   overflow-y: auto;
-183:   line-height: 1.5;
-184: }
+165: .markdown-content td {
+166:   padding: 9px 14px;
+167:   border-bottom: 1px solid var(--border-light);
+168: }
+169: 
+170: .markdown-content tr:last-child td {
+171:   border-bottom: none;
+172: }
+173: 
+174: .markdown-content tr:hover td {
+175:   background: var(--bg-container);
+176: }
+177: 
+178: 
+179: .markdown-content hr {
+180:   border: none;
+181:   border-top: 1px solid var(--border-light);
+182:   margin: 24px 0;
+183: }
+184: 
 185: 
-186: 
-187: .chat-msg-tool-result {
-188:   background: var(--bg-base);
-189:   padding: 8px 24px !important;
+186: .markdown-content img {
+187:   max-width: 100%;
+188:   border-radius: 4px;
+189:   margin: 16px 0;
 190: }
 191: 
-192: .chat-msg-tool-result .chat-tool-result-bar {
-193:   display: flex;
-194:   align-items: center;
-195:   gap: 6px;
-196:   font-size: 12px;
-197:   color: var(--text-tertiary);
-198: }
-199: 
-200: .chat-msg-tool-result .chat-tool-result-icon {
-201:   font-size: 13px;
-202: }
-203: 
-204: .chat-msg-tool-result.chat-tool-success .chat-tool-result-icon {
-205:   color: var(--success);
-206: }
-207: 
-208: .chat-msg-tool-result.chat-tool-fail .chat-tool-result-icon {
-209:   color: var(--error);
-210: }
-211: 
-212: .chat-msg-tool-result .chat-tool-result-name {
-213:   font-family: 'JetBrains Mono', 'Consolas', monospace;
-214:   font-size: 11px;
-215:   color: var(--text-tertiary);
+192: 
+193: .markdown-content pre {
+194:   margin: 16px 0;
+195:   border-radius: 4px;
+196:   overflow: hidden;
+197:   border: 1px solid var(--border-color);
+198:   background: #1e293b;
+199:   padding: 14px 16px;
+200: }
+201: 
+202: .markdown-content pre code {
+203:   background: transparent !important;
+204:   border: none !important;
+205:   padding: 0 !important;
+206:   color: #e2e8f0 !important;
+207:   font-size: 13px;
+208:   line-height: 1.65;
+209: }
+210: 
+211: .artifacts-tabs {
+212:   height: 100%;
+213:   display: flex;
+214:   flex-direction: column;
+215:   min-height: 0;
 216: }
 217: 
-218: 
-219: .chat-msg-pm-agent {
-220:   background: var(--bg-base);
+218: .artifacts-tabs > .ant-tabs-nav {
+219:   margin-bottom: 0;
+220:   flex-shrink: 0;
 221: }
 222: 
-223: .chat-msg-pm-agent .chat-pm-header {
-224:   display: flex;
-225:   align-items: center;
-226:   gap: 8px;
-227:   margin-bottom: 8px;
-228: }
-229: 
-230: .chat-msg-pm-agent .chat-agent-avatar {
-231:   width: 24px;
-232:   height: 24px;
-233:   border-radius: 3px;
-234:   object-fit: cover;
-235:   flex-shrink: 0;
-236: }
-237: 
-238: .chat-msg-pm-agent .chat-pm-name {
-239:   font-size: 13px;
-240:   font-weight: 600;
-241:   color: var(--success);
-242: }
-243: 
-244: .chat-msg-pm-agent .chat-pm-actions {
-245:   display: flex;
-246:   flex-wrap: wrap;
-247:   gap: 8px;
-248:   margin-top: 12px;
-249: }
-250: 
-251: .chat-msg-pm-agent .chat-pm-action {
-252:   cursor: pointer;
-253:   padding: 5px 12px;
-254:   border-radius: 3px;
-255:   display: inline-flex;
-256:   align-items: center;
-257:   gap: 6px;
-258:   font-size: 12px;
-259:   font-weight: 500;
-260:   border: 1px solid var(--border-color);
-261:   background: var(--bg-container);
-262:   color: var(--text-secondary);
-263:   transition: all 0.15s ease;
+223: .artifacts-tabs .ant-tabs-content-holder {
+224:   flex: 1;
+225:   overflow: hidden;
+226:   display: flex;
+227:   flex-direction: column;
+228:   min-height: 0;
+229: }
+230: 
+231: .artifacts-tabs .ant-tabs-content {
+232:   height: 100%;
+233:   overflow: hidden;
+234: }
+235: 
+236: .artifacts-tabs .ant-tabs-tabpane {
+237:   height: 100%;
+238:   overflow: hidden;
+239: }
+240: 
+241: .artifacts-tabs .ant-tabs-tabpane > div {
+242:   height: 100%;
+243: }
+244: 
+245: 
+246: .code-editor-tabs {
+247:   height: 100%;
+248:   display: flex;
+249:   flex-direction: column;
+250: }
+251: 
+252: .code-editor-tabs .ant-tabs-content {
+253:   flex: 1;
+254:   overflow: hidden;
+255:   display: flex;
+256:   flex-direction: column;
+257: }
+258: 
+259: .code-editor-tabs .ant-tabs-content-holder {
+260:   flex: 1;
+261:   overflow: hidden;
+262:   display: flex;
+263:   flex-direction: column;
 264: }
 265: 
-266: .chat-msg-pm-agent .chat-pm-action:hover {
-267:   border-color: var(--primary);
-268:   color: var(--primary);
-269:   background: var(--primary-lighter);
-270:   box-shadow: 0 1px 4px rgba(37, 99, 235, 0.1);
-271: }
-272: 
-273: 
-274: .chat-processing-bar {
-275:   padding: 12px 24px;
-276:   background: var(--primary-lighter);
-277:   border-bottom: 1px solid var(--primary-light);
-278:   display: flex;
-279:   align-items: center;
-280:   gap: 10px;
-281:   font-size: 13px;
-282:   color: var(--primary);
-283:   font-weight: 500;
-284: }
-285: 
-286: .chat-processing-bar .chat-processing-stage {
-287:   font-size: 11px;
-288:   color: var(--text-secondary);
-289:   font-weight: 400;
-290: }
-291: 
-292: 
-293: .chat-msg-error {
-294:   background: var(--error-light);
-295: }
-296: 
-297: .chat-msg-error .chat-error-content {
-298:   color: var(--error);
-299:   font-size: 13px;
-300:   line-height: 1.5;
-301: }
-302: 
+266: .code-editor-tabs .ant-tabs-tabpane {
+267:   height: 100% !important;
+268:   overflow: hidden !important;
+269:   display: none !important;
+270: }
+271: 
+272: .code-editor-tabs .ant-tabs-tabpane-active {
+273:   display: flex !important;
+274:   flex-direction: column !important;
+275: }
+276: 
+277: .code-editor-tabs .ant-tabs-tabpane > div {
+278:   height: 100% !important;
+279:   display: flex !important;
+280:   flex-direction: column !important;
+281:   position: relative;
+282: }
+283: 
+284: .code-editor-tabs .ant-tabs-tabpane > div > div {
+285:   flex: 1;
+286:   overflow: hidden;
+287:   position: relative;
+288: }
+289: 
+290: .code-editor-tabs .monaco-editor {
+291:   height: 100% !important;
+292: }
+293: 
+294: 
+295: .react-json-view {
+296:   background: var(--bg-container) !important;
+297:   padding: 20px;
+298:   border-radius: 6px;
+299:   border: 1px solid var(--border-color);
+300:   font-size: 14px;
+301:   line-height: 1.8;
+302: }
 303: 
-304: .chat-header {
-305:   padding: 16px 24px;
-306:   border-bottom: 1px solid var(--border-color);
-307:   background: var(--bg-base);
-308: }
-309: 
-310: .chat-header-title {
-311:   font-size: 15px;
-312:   font-weight: 600;
-313:   color: var(--text-primary);
-314:   margin: 0;
-315: }
-316: 
-317: .chat-header-desc {
-318:   font-size: 12px;
-319:   color: var(--text-tertiary);
-320:   margin: 4px 0 0 0;
-321:   display: -webkit-box;
-322:   -webkit-line-clamp: 2;
-323:   -webkit-box-orient: vertical;
-324:   overflow: hidden;
-325:   text-overflow: ellipsis;
-326:   line-height: 1.4;
-327: }
-328: 
-329: 
-330: .chat-input-wrapper {
-331:   padding: 16px 24px;
-332:   background: var(--bg-base);
-333:   border-top: 1px solid var(--border-color);
+304: .react-json-view .string-key {
+305:   color: var(--primary) !important;
+306:   font-weight: 600;
+307: }
+308: 
+309: .react-json-view .object-key {
+310:   color: var(--primary) !important;
+311:   font-weight: 600;
+312: }
+313: 
+314: .react-json-view .string-value {
+315:   color: #059669 !important;
+316: }
+317: 
+318: .react-json-view .variable-value {
+319:   color: #059669 !important;
+320: }
+321: 
+322: .react-json-view .number-value {
+323:   color: #2563eb !important;
+324: }
+325: 
+326: .react-json-view .boolean-value {
+327:   color: #d97706 !important;
+328:   font-weight: 500;
+329: }
+330: 
+331: .react-json-view .null-value {
+332:   color: #dc2626 !important;
+333:   font-weight: 500;
 334: }
 335: 
-336: 
-337: .chat-input-request {
-338:   padding: 16px;
-339:   background: var(--primary-lighter);
-340:   border: 1px solid var(--primary-light);
-341:   border-radius: 10px;
-342:   margin-bottom: 16px;
+336: .react-json-view .array-key {
+337:   color: var(--primary) !important;
+338:   font-weight: 600;
+339: }
+340: 
+341: .react-json-view .string-literal {
+342:   color: #059669 !important;
 343: }
 344: 
-345: .chat-input-request-title {
-346:   font-size: 14px;
+345: .react-json-view .object-name {
+346:   color: var(--primary) !important;
 347:   font-weight: 600;
-348:   color: var(--primary);
-349:   margin-bottom: 8px;
-350: }
-351: 
-352: .chat-input-request-prompt {
-353:   font-size: 13px;
-354:   color: var(--text-secondary);
-355:   margin-bottom: 12px;
-356:   line-height: 1.5;
-357: }
-358: 
+348: }
+349: 
+350: .react-json-view .array-name {
+351:   color: var(--primary) !important;
+352:   font-weight: 600;
+353: }
+354: 
+355: .react-json-view .br-row,
+356: .react-json-view .bracket {
+357:   color: var(--text-tertiary) !important;
+358: }
 359: 
-360: .chat-empty-state {
-361:   display: flex;
-362:   flex-direction: column;
-363:   align-items: center;
-364:   justify-content: center;
-365:   height: 100%;
-366:   color: var(--text-tertiary);
-367:   text-align: center;
-368:   padding: 40px;
-369: }
-370: 
-371: .chat-empty-state h3 {
-372:   font-size: 16px;
-373:   color: var(--text-secondary);
-374:   margin: 16px 0 8px;
-375:   font-weight: 500;
-376: }
-377: 
-378: .chat-empty-state p {
-379:   font-size: 13px;
-380:   line-height: 1.6;
-381:   max-width: 400px;
-382: }
-383: 
-384: 
-385: .chat-pm-welcome {
-386:   display: flex;
-387:   flex-direction: column;
-388:   align-items: center;
-389:   justify-content: center;
-390:   padding: 48px 24px;
-391:   text-align: center;
-392: }
-393: 
-394: .chat-pm-welcome-icon {
-395:   font-size: 40px;
-396:   margin-bottom: 16px;
-397: }
-398: 
-399: .chat-pm-welcome h3 {
-400:   font-size: 18px;
-401:   color: var(--text-primary);
-402:   margin: 0 0 8px;
-403:   font-weight: 600;
-404: }
-405: 
-406: .chat-pm-welcome p {
-407:   font-size: 13px;
-408:   color: var(--text-secondary);
-409:   line-height: 1.6;
-410:   max-width: 400px;
-411:   margin: 0;
-412: }
-413: 
-414: .chat-pm-welcome ul {
-415:   list-style: none;
-416:   padding: 0;
-417:   margin: 16px 0 0;
-418:   text-align: left;
-419: }
-420: 
-421: .chat-pm-welcome li {
-422:   font-size: 13px;
-423:   color: var(--text-secondary);
-424:   padding: 4px 0;
-425: }
-426: 
-427: .chat-pm-welcome li::before {
-428:   content: '·';
-429:   margin-right: 8px;
-430:   color: var(--primary);
-431:   font-weight: bold;
-432: }
+360: .react-json-view .colon {
+361:   color: var(--text-tertiary) !important;
+362: }
+363: 
+364: .react-json-view .arrow-icon,
+365: .react-json-view .expanded-icon,
+366: .react-json-view .collapsed-icon {
+367:   fill: var(--primary) !important;
+368: }
+```
+
+### crates/cowork-gui/src/styles/markdown.css (212 lines)
+
+```
+1: .markdown-body {
+2:   color: var(--text-primary);
+3:   line-height: 1.7;
+4:   font-size: 14px;
+5: }
+6: 
+7: 
+8: .markdown-body p {
+9:   margin: 0 0 12px;
+10: }
+11: 
+12: .markdown-body p:last-child {
+13:   margin-bottom: 0;
+14: }
+15: 
+16: 
+17: .markdown-body h1,
+18: .markdown-body h2,
+19: .markdown-body h3,
+20: .markdown-body h4,
+21: .markdown-body h5,
+22: .markdown-body h6 {
+23:   color: var(--text-primary);
+24:   margin: 20px 0 8px;
+25:   font-weight: 600;
+26:   line-height: 1.3;
+27: }
+28: 
+29: .markdown-body h1 { font-size: 1.4em; }
+30: .markdown-body h2 { font-size: 1.2em; border-bottom: 1px solid var(--border-light); padding-bottom: 6px; }
+31: .markdown-body h3 { font-size: 1.1em; }
+32: .markdown-body h4 { font-size: 1em; }
+33: 
+34: 
+35: .markdown-body strong {
+36:   color: var(--text-primary);
+37:   font-weight: 600;
+38: }
+39: 
+40: .markdown-body em {
+41:   color: var(--text-secondary);
+42: }
+43: 
+44: 
+45: .markdown-body code {
+46:   background: var(--bg-elevated);
+47:   color: var(--primary);
+48:   padding: 2px 6px;
+49:   border-radius: 2px;
+50:   font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+51:   font-size: 0.88em;
+52:   border: 1px solid var(--border-light);
+53: }
+54: 
+55: 
+56: .markdown-code-block {
+57:   position: relative;
+58:   margin: 12px 0;
+59:   border-radius: 4px;
+60:   overflow: hidden;
+61:   border: 1px solid var(--border-color);
+62:   background: #1e293b;
+63: }
+64: 
+65: .markdown-code-header {
+66:   display: flex;
+67:   align-items: center;
+68:   justify-content: space-between;
+69:   padding: 6px 12px;
+70:   background: rgba(0, 0, 0, 0.2);
+71:   font-size: 11px;
+72:   color: #94a3b8;
+73:   font-family: 'JetBrains Mono', 'Consolas', monospace;
+74: }
+75: 
+76: .markdown-code-copy {
+77:   background: none;
+78:   border: 1px solid rgba(148, 163, 184, 0.3);
+79:   color: #94a3b8;
+80:   padding: 2px 8px;
+81:   border-radius: 2px;
+82:   cursor: pointer;
+83:   font-size: 11px;
+84:   font-family: inherit;
+85:   transition: all 0.15s;
+86: }
+87: 
+88: .markdown-code-copy:hover {
+89:   background: rgba(148, 163, 184, 0.15);
+90:   color: #e2e8f0;
+91:   border-color: rgba(148, 163, 184, 0.5);
+92: }
+93: 
+94: .markdown-code-block pre {
+95:   margin: 0;
+96:   padding: 14px 16px;
+97:   overflow-x: auto;
+98:   background: transparent !important;
+99:   border: none !important;
+100:   border-radius: 0 !important;
+101: }
+102: 
+103: .markdown-code-block code {
+104:   background: transparent !important;
+105:   border: none !important;
+106:   padding: 0 !important;
+107:   color: #e2e8f0 !important;
+108:   font-size: 13px;
+109:   line-height: 1.6;
+110: }
+111: 
+112: 
+113: .markdown-body ul,
+114: .markdown-body ol {
+115:   margin: 8px 0;
+116:   padding-left: 24px;
+117: }
+118: 
+119: .markdown-body li {
+120:   margin-bottom: 4px;
+121:   color: var(--text-primary);
+122: }
+123: 
+124: .markdown-body ul li::marker {
+125:   color: var(--primary);
+126: }
+127: 
+128: .markdown-body ol li::marker {
+129:   color: var(--primary);
+130:   font-weight: 600;
+131: }
+132: 
+133: 
+134: .markdown-body blockquote {
+135:   border-left: 3px solid var(--primary);
+136:   padding: 8px 16px;
+137:   margin: 12px 0;
+138:   background: var(--primary-lighter);
+139:   border-radius: 0 4px 4px 0;
+140:   color: var(--text-secondary);
+141: }
+142: 
+143: .markdown-body blockquote p {
+144:   margin: 0;
+145: }
+146: 
+147: 
+148: .markdown-body a {
+149:   color: var(--primary);
+150:   text-decoration: none;
+151:   border-bottom: 1px solid transparent;
+152:   transition: all 0.15s;
+153: }
+154: 
+155: .markdown-body a:hover {
+156:   border-bottom-color: var(--primary);
+157: }
+158: 
+159: 
+160: .markdown-body table {
+161:   width: 100%;
+162:   border-collapse: collapse;
+163:   margin: 12px 0;
+164:   font-size: 13px;
+165:   border: 1px solid var(--border-color);
+166:   border-radius: 4px;
+167:   overflow: hidden;
+168: }
+169: 
+170: .markdown-body th {
+171:   background: var(--bg-elevated);
+172:   color: var(--text-primary);
+173:   font-weight: 600;
+174:   text-align: left;
+175:   padding: 10px 14px;
+176:   border-bottom: 1px solid var(--border-color);
+177:   font-size: 12px;
+178: }
+179: 
+180: .markdown-body td {
+181:   padding: 8px 14px;
+182:   border-bottom: 1px solid var(--border-light);
+183: }
+184: 
+185: .markdown-body tr:last-child td {
+186:   border-bottom: none;
+187: }
+188: 
+189: .markdown-body tr:hover td {
+190:   background: var(--bg-container);
+191: }
+192: 
+193: 
+194: .markdown-body hr {
+195:   border: none;
+196:   border-top: 1px solid var(--border-light);
+197:   margin: 20px 0;
+198: }
+199: 
+200: 
+201: .markdown-body img {
+202:   max-width: 100%;
+203:   border-radius: 4px;
+204:   margin: 12px 0;
+205: }
+206: 
+207: 
+208: .hljs {
+209:   background: transparent !important;
+210:   color: #e2e8f0 !important;
+211:   padding: 0 !important;
+212: }
 ```
 
 ### crates/cowork-gui/src-tauri/Cargo.toml (50 lines)
@@ -14031,52 +15384,6 @@ LICENSE
 40: }
 ```
 
-### crates/cowork-gui/src/components/KnowledgePanel.tsx (41 lines)
-
-```
-1: Knowledge
-2: ⋮----
-3: {
-4:   iteration_id: string;
-5:   title: string;
-6:   idea_summary?: string;
-7:   design_summary?: string;
-8:   plan_summary?: string;
-9:   code_structure?: string;
-10:   created_at: string;
-11:   tech_stack?: string[];
-12:   key_decisions?: string[];
-13:   key_patterns?: string[];
-14:   known_issues?: string[];
-15: }
-16: ⋮----
-17: KnowledgeListResult
-18: ⋮----
-19: {
-20:   knowledge_list: Knowledge[];
-21: }
-22: ⋮----
-23: IterationInfo
-24: ⋮----
-25: {
-26:   id: string;
-27:   number: number;
-28:   title: string;
-29:   description: string;
-30:   status: string;
-31:   current_stage: string | null;
-32:   created_at: string;
-33: }
-34: ⋮----
-35: KnowledgePanelProps
-36: ⋮----
-37: {
-38:   currentSession?: string;
-39:   currentIterationId?: string | null;
-40:   refreshTrigger?: number;
-41: }
-```
-
 ### crates/cowork-gui/src/components/ProjectsPanel.tsx (348 lines)
 
 ```
@@ -14430,721 +15737,61 @@ LICENSE
 348: export default ProjectsPanel;
 ```
 
-### crates/cowork-gui/src/components/config/AgentConfigForm.tsx (712 lines)
+### crates/cowork-gui/src/components/RunnerPanel.tsx (36 lines)
 
 ```
-1: import React, { useState, useEffect } from 'react';
-2: import {
-3:   Card,
-4:   List,
-5:   Button,
-6:   Space,
-7:   Typography,
-8:   Tag,
-9:   Modal,
-10:   Form,
-11:   Input,
-12:   Select,
-13:   Switch,
-14:   Slider,
-15:   message,
-16:   Popconfirm,
-17:   Empty,
-18:   Drawer,
-19:   Descriptions,
-20:   Divider,
-21:   Tabs,
-22:   InputNumber,
-23:   Alert,
-24:   Tooltip,
-25: } from 'antd';
-26: import {
-27:   PlusOutlined,
-28:   EditOutlined,
-29:   DeleteOutlined,
-30:   ExportOutlined,
-31:   ImportOutlined,
-32:   RobotOutlined,
-33:   ToolOutlined,
-34:   CodeOutlined,
-35:   SettingOutlined,
-36:   InfoCircleOutlined,
-37:   FolderOpenOutlined,
-38: } from '@ant-design/icons';
-39: import { useConfigStore } from '../../stores/configStore';
-40: import type { AgentDefinition, ToolReference, AgentType, ModelConfig, BuiltinInstruction, InstructionType, ToolInfo } from '../../types/config';
-41: import { open } from '@tauri-apps/plugin-dialog';
-42: 
-43: const { Title, Text, Paragraph } = Typography;
-44: const { TextArea } = Input;
-45: 
-46: const AgentConfigForm: React.FC = () => {
-47:   const {
-48:     agents,
-49:     skills,
-50:     selectedAgent,
-51:     selectAgent,
-52:     saveAgent,
-53:     deleteAgent,
-54:     validateAgent,
-55:     exportConfig,
-56:     importConfig,
-57:     getBuiltinInstructions,
-58:     availableTools,
-59:     loadAvailableTools,
-60:     getToolsByCategory,
-61:   } = useConfigStore();
-62: 
-63:   const [editModalVisible, setEditModalVisible] = useState(false);
-64:   const [editingAgent, setEditingAgent] = useState<AgentDefinition | null>(null);
-65:   const [detailDrawerVisible, setDetailDrawerVisible] = useState(false);
-66:   const [importModalVisible, setImportModalVisible] = useState(false);
-67:   const [importJson, setImportJson] = useState('');
-68:   const [form] = Form.useForm();
-69:   
-70:   
-71:   const [builtinInstructions, setBuiltinInstructions] = useState<BuiltinInstruction[]>([]);
-72:   const [instructionType, setInstructionType] = useState<InstructionType>('builtin');
-73:   const [selectedBuiltinId, setSelectedBuiltinId] = useState<string>('');
-74:   const [instructionFilePath, setInstructionFilePath] = useState<string>('');
-75:   const [instructionInlineContent, setInstructionInlineContent] = useState<string>('');
-76:   
-77:   
-78:   useEffect(() => {
-79:     getBuiltinInstructions().then(setBuiltinInstructions);
-80:     loadAvailableTools();  
-81:   }, [getBuiltinInstructions, loadAvailableTools]);
-82: 
-83:   const handleCreate = () => {
-84:     setEditingAgent(null);
-85:     form.resetFields();
-86:     form.setFieldsValue({
-87:       id: `agent-${Date.now()}`,
-88:       name: '',
-89:       description: '',
-90:       agent_type: 'simple',
-91:       instruction: '',
-92:       tools: [],
-93:       skills: [],
-94:       model: {},
-95:       include_contents: 'none',
-96:       tags: [],
-97:     });
-98:     
-99:     setInstructionType('builtin');
-100:     setSelectedBuiltinId('');
-101:     setInstructionFilePath('');
-102:     setInstructionInlineContent('');
-103:     setEditModalVisible(true);
-104:   };
-105: 
-106:   
-107:   const parseInstruction = (instruction: string): { type: InstructionType; builtinId: string; filePath: string; content: string } => {
-108:     if (instruction.startsWith('builtin://')) {
-109:       return {
-110:         type: 'builtin',
-111:         builtinId: instruction.substring('builtin://'.length),
-112:         filePath: '',
-113:         content: '',
-114:       };
-115:     } else if (instruction.startsWith('file://')) {
-116:       return {
-117:         type: 'file',
-118:         builtinId: '',
-119:         filePath: instruction.substring('file://'.length),
-120:         content: '',
-121:       };
-122:     } else if (instruction.startsWith('inline://')) {
-123:       return {
-124:         type: 'inline',
-125:         builtinId: '',
-126:         filePath: '',
-127:         content: instruction.substring('inline://'.length),
-128:       };
-129:     } else {
-130:       
-131:       
-132:       const matchingBuiltin = builtinInstructions.find(bi => bi.id === instruction);
-133:       if (matchingBuiltin) {
-134:         return {
-135:           type: 'builtin',
-136:           builtinId: instruction,
-137:           filePath: '',
-138:           content: '',
-139:         };
-140:       }
-141:       
-142:       return {
-143:         type: 'inline',
-144:         builtinId: '',
-145:         filePath: '',
-146:         content: instruction,
-147:       };
-148:     }
-149:   };
-150: 
-151:   const handleEdit = (agent: AgentDefinition) => {
-152:     setEditingAgent(agent);
-153:     
-154:     const toolIds = agent.tools.map(t => t.tool_id);
-155:     form.setFieldsValue({
-156:       ...agent,
-157:       agent_type: typeof agent.agent_type === 'string' ? agent.agent_type : 'loop',
-158:       tools: toolIds,
-159:     });
-160:     
-161:     
-162:     const parsed = parseInstruction(agent.instruction);
-163:     setInstructionType(parsed.type);
-164:     setSelectedBuiltinId(parsed.builtinId);
-165:     setInstructionFilePath(parsed.filePath);
-166:     
-167:     
-168:     if (parsed.type === 'inline' && parsed.content) {
-169:       setInstructionInlineContent(parsed.content);
-170:     } else if (parsed.type === 'builtin' && parsed.builtinId) {
-171:       const builtin = builtinInstructions.find(bi => bi.id === parsed.builtinId);
-172:       setInstructionInlineContent(builtin?.content || '');
-173:     } else {
-174:       setInstructionInlineContent(parsed.content);
-175:     }
-176:     
-177:     setEditModalVisible(true);
-178:     selectAgent(agent.id);
-179:   };
-180: 
-181:   const handleView = (agent: AgentDefinition) => {
-182:     selectAgent(agent.id);
-183:     setDetailDrawerVisible(true);
-184:   };
-185: 
-186:   const handleDelete = async (id: string) => {
-187:     try {
-188:       await deleteAgent(id);
-189:       message.success('Agent deleted successfully');
-190:     } catch (error) {
-191:       message.error('Failed to delete agent');
-192:     }
-193:   };
-194: 
-195:   const handleSave = async () => {
-196:     try {
-197:       const values = await form.validateFields();
-198:       
-199:       
-200:       const tools: ToolReference[] = (values.tools || []).map((toolId: string) => ({
-201:         tool_id: toolId,
-202:       }));
-203:       
-204:       
-205:       let instruction = '';
-206:       switch (instructionType) {
-207:         case 'builtin':
-208:           instruction = `builtin:
-209:           beak;
-210:         case 'file':
-211:           instruction = `file:
-212:           beak;
-213:         case 'inline':
-214:           instruction = `inline:
-215:           beak;
-216:       }
-217:       
-218:       const agent: AgentDefinition = {
-219:         ...editingAgent,
-220:         ...values,
-221:         instruction,
-222:         tools,
-223:         metadata: {},
-224:       };
-225: 
-226:       const validation = await validateAgent(agent);
-227:       if (!validation.valid) {
-228:         const errors = validation.issues.map(i => i.message).join(', ');
-229:         message.error(`Validation failed: ${errors}`);
-230:         return;
-231:       }
-232: 
-233:       await saveAgent(agent);
-234:       message.success('Agent saved successfully');
-235:       setEditModalVisible(false);
-236:     } catch (error) {
-237:       message.error('Failed to save agent');
-238:     }
-239:   };
-240: 
-241:   const handleExport = async (id: string) => {
-242:     try {
-243:       const json = await exportConfig('agent', id);
-244:       navigator.clipboard.writeText(json);
-245:       message.success('Agent exported to clipboard');
-246:     } catch (error) {
-247:       message.error('Failed to export agent');
-248:     }
-249:   };
-250: 
-251:   const handleImport = async () => {
-252:     try {
-253:       await importConfig('agent', importJson);
-254:       message.success('Agent imported successfully');
-255:       setImportModalVisible(false);
-256:       setImportJson('');
-257:     } catch (error) {
-258:       message.error('Failed to import agent');
-259:     }
-260:   };
-261: 
-262:   const selectedAgentData = selectedAgent ? agents[selectedAgent] : null;
-263: 
-264:   const getAgentTypeTag = (type: AgentType) => {
-265:     if (typeof type === 'string') {
-266:       return <Tag color="blue">{type}</Tag>;
-267:     }
-268:     return <Tag color="purple">loop ({(type as { loop: { max_iterations?: number } }).loop?.max_iterations || 'unlimited'})</Tag>;
-269:   };
-270: 
-271:   
-272:   const handleSelectInstructionFile = async () => {
-273:     try {
-274:       const selected = await open({
-275:         multiple: false,
-276:         filters: [{ name: 'Markdown', extensions: ['md', 'txt'] }],
-277:       });
-278:       if (selected && typeof selected === 'string') {
-279:         setInstructionFilePath(selected);
-280:       }
-281:     } catch (error) {
-282:       console.error('Failed to select file:', error);
-283:     }
-284:   };
-285: 
-286:   
-287:   const handleBuiltinChange = (builtinId: string) => {
-288:     setSelectedBuiltinId(builtinId);
-289:     const builtin = builtinInstructions.find(bi => bi.id === builtinId);
-290:     if (builtin) {
-291:       setInstructionInlineContent(builtin.content);
-292:     }
-293:   };
-294: 
-295:   
-296:   const handleInstructionTypeChange = (type: InstructionType) => {
-297:     setInstructionType(type);
-298:     
-299:     if (type === 'inline' && selectedBuiltinId) {
-300:       const builtin = builtinInstructions.find(bi => bi.id === selectedBuiltinId);
-301:       if (builtin) {
-302:         setInstructionInlineContent(builtin.content);
-303:       }
-304:     }
-305:   };
-306: 
-307:   const availableSkills = Object.keys(skills);
-308: 
-309:   return (
-310:     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-311:       <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-312:         <Title level={5} style={{ margin: 0 }}>Agent Definitions</Title>
-313:         <Space>
-314:           <Button icon={<ImportOutlined />} onClick={() => setImportModalVisible(true)}>
-315:             Import
-316:           </Button>
-317:           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-318:             New Agent
-319:           </Button>
-320:         </Space>
-321:       </div>
-322: 
-323:       {Object.keys(agents).length === 0 ? (
-324:         <Empty description="No agents defined" style={{ marginTop: '40px' }} />
-325:       ) : (
-326:         <List
-327:           style={{ flex: 1, overflow: 'auto', padding: '0 16px' }}
-328:           dataSource={Object.values(agents).sort((a, b) => a.name.localeCompare(b.name))}
-329:           renderItem={(agent) => (
-330:             <List.Item
-331:               actions={[
-332:                 <Button
-333:                   key="view"
-334:                   type="link"
-335:                   size="small"
-336:                   icon={<RobotOutlined />}
-337:                   onClick={() => handleView(agent)}
-338:                 >
-339:                   View
-340:                 </Button>,
-341:                 <Button
-342:                   key="edit"
-343:                   type="link"
-344:                   size="small"
-345:                   icon={<EditOutlined />}
-346:                   onClick={() => handleEdit(agent)}
-347:                 >
-348:                   Edit
-349:                 </Button>,
-350:                 <Button
-351:                   key="export"
-352:                   type="link"
-353:                   size="small"
-354:                   icon={<ExportOutlined />}
-355:                   onClick={() => handleExport(agent.id)}
-356:                 >
-357:                   Export
-358:                 </Button>,
-359:                 <Popconfirm
-360:                   key="delete"
-361:                   title="Delete this agent?"
-362:                   onConfirm={() => handleDelete(agent.id)}
-363:                 >
-364:                   <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-365:                     Delete
-366:                   </Button>
-367:                 </Popconfirm>,
-368:               ]}
-369:             >
-370:               <List.Item.Meta
-371:                 title={
-372:                   <Space>
-373:                     {agent.name}
-374:                     {agent.version && <Tag>{agent.version}</Tag>}
-375:                     {getAgentTypeTag(agent.agent_type)}
-376:                   </Space>
-377:                 }
-378:                 description={
-379:                   <Space orientation="vertical" size="small">
-380:                     <Text type="secondary">{agent.description || 'No description'}</Text>
-381:                     <Space size={4}>
-382:                       {agent.tools.slice(0, 5).map((t, i) => (
-383:                         <Tag key={i} color="blue" style={{ fontSize: '11px' }}>{t.tool_id}</Tag>
-384:                       ))}
-385:                       {agent.tools.length > 5 && <Tag>+{agent.tools.length - 5}</Tag>}
-386:                     </Space>
-387:                   </Space>
-388:                 }
-389:               />
-390:             </List.Item>
-391:           )}
-392:         />
-393:       )}
-394: 
-395:       {}
-396:       <Modal
-397:         title={editingAgent ? 'Edit Agent' : 'Create Agent'}
-398:         open={editModalVisible}
-399:         onCancel={() => setEditModalVisible(false)}
-400:         onOk={handleSave}
-401:         width={800}
-402:         okText="Save"
-403:       >
-404:         <Form form={form} layout="vertical">
-405:           <Tabs
-406:             items={[
-407:               {
-408:                 key: 'basic',
-409:                 label: 'Basic',
-410:                 children: (
-411:                   <>
-412:                     <Form.Item name="id" label="ID" rules={[{ required: true }]}>
-413:                       <Input disabled={!!editingAgent} />
-414:                     </Form.Item>
-415:                     <Form.Item name="name" label="Name" rules={[{ required: true }]}>
-416:                       <Input />
-417:                     </Form.Item>
-418:                     <Form.Item name="description" label="Description">
-419:                       <TextArea rows={2} />
-420:                     </Form.Item>
-421:                     <Form.Item name="version" label="Version">
-422:                       <Input placeholder="e.g., 1.0.0" />
-423:                     </Form.Item>
-424:                     <Form.Item name="agent_type" label="Agent Type">
-425:                       <Select>
-426:                         <Select.Option value="simple">Simple (Single Execution)</Select.Option>
-427:                         <Select.Option value="loop">Loop (Actor-Critic)</Select.Option>
-428:                       </Select>
-429:                     </Form.Item>
-430:                   </>
-431:                 ),
-432:               },
-433:               {
-434:                 key: 'instruction',
-435:                 label: 'Instruction',
-436:                 children: (
-437:                   <div style={{ maxWidth: 700 }}>
-438:                     <Form.Item label="Instruction Type">
-439:                       <Select 
-440:                         value={instructionType} 
-441:                         onChange={handleInstructionTypeChange}
-442:                         style={{ width: '100%' }}
-443:                       >
-444:                         <Select.Option value="builtin">
-445:                           <Space>
-446:                             <Tag color="blue">Built-in</Tag>
-447:                             <span>Use a predefined instruction template</span>
-448:                           </Space>
-449:                         </Select.Option>
-450:                         <Select.Option value="file">
-451:                           <Space>
-452:                             <Tag color="green">File</Tag>
-453:                             <span>Load instruction from a file</span>
-454:                           </Space>
-455:                         </Select.Option>
-456:                         <Select.Option value="inline">
-457:                           <Space>
-458:                             <Tag color="purple">Inline</Tag>
-459:                             <span>Write custom instruction content</span>
-460:                           </Space>
-461:                         </Select.Option>
-462:                       </Select>
-463:                     </Form.Item>
-464:                     
-465:                     {instructionType === 'builtin' && (
-466:                       <>
-467:                         <Form.Item 
-468:                           label="Built-in Instruction"
-469:                           required
-470:                           validateStatus={!selectedBuiltinId && 'error'}
-471:                           help={!selectedBuiltinId && 'Please select a built-in instruction'}
-472:                         >
-473:                           <Select
-474:                             value={selectedBuiltinId || undefined}
-475:                             onChange={handleBuiltinChange}
-476:                             placeholder="Select a built-in instruction..."
-477:                             showSearch
-478:                             optionFilterProp="label"
-479:                             style={{ width: '100%' }}
-480:                             listHeight={300}
-481:                           >
-482:                             {(builtinInstructions || []).map(bi => (
-483:                               <Select.Option 
-484:                                 key={bi.id} 
-485:                                 value={bi.id}
-486:                                 label={bi.name}
-487:                               >
-488:                                 <div style={{ padding: '4px 0' }}>
-489:                                   <Text strong>{bi.name}</Text>
-490:                                   <b />
-491:                                   <Text type="secondary" style={{ fontSize: 12 }}>
-492:                                     {bi.description}
-493:                                   </Text>
-494:                                 </div>
-495:                               </Select.Option>
-496:                             ))}
-497:                           </Select>
-498:                         </Form.Item>
-499:                         
-500:                         {selectedBuiltinId && (
-501:                           <div style={{ marginBottom: 16 }}>
-502:                             <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>
-503:                               Instruction Preview:
-504:                             </Text>
-505:                             <div
-506:                               style={{
-507:                                 background: '#fafafa',
-508:                                 border: '1px solid #d9d9d9',
-509:                                 borderRadius: 6,
-510:                                 padding: 12,
-511:                                 maxHeight: 200,
-512:                                 overflow: 'auto',
-513:                                 fontSize: 12,
-514:                                 whiteSpace: 'pre-wrap',
-515:                                 fontFamily: 'monospace',
-516:                               }}
-517:                             >
-518:                               {(builtinInstructions || []).find(bi => bi.id === selectedBuiltinId)?.content || ''}
-519:                             </div>
-520:                           </div>
-521:                         )}
-522:                       </>
-523:                     )}
-524:                     
-525:                     {instructionType === 'file' && (
-526:                       <>
-527:                         <Form.Item 
-528:                           label="Instruction File"
-529:                           required
-530:                           validateStatus={!instructionFilePath && 'error'}
-531:                           help={!instructionFilePath && 'Please select or enter a file path'}
-532:                         >
-533:                           <Space.Compact style={{ width: '100%' }}>
-534:                             <Input
-535:                               value={instructionFilePath}
-536:                               onChange={(e) => setInstructionFilePath(e.target.value)}
-537:                               placeholder="./prompts/my_instruction.md"
-538:                               style={{ flex: 1 }}
-539:                             />
-540:                             <Button 
-541:                               icon={<FolderOpenOutlined />} 
-542:                               onClick={handleSelectInstructionFile}
-543:                             >
-544:                               Browse
-545:                             </Button>
-546:                           </Space.Compact>
-547:                         </Form.Item>
-548:                         <Text type="secondary" style={{ fontSize: 12 }}>
-549:                           Select a markdown (.md) or text (.txt) file containing the instruction
-550:                         </Text>
-551:                       </>
-552:                     )}
-553:                     
-554:                     {instructionType === 'inline' && (
-555:                       <>
-556:                         <Form.Item 
-557:                           label="Instruction Content"
-558:                           required
-559:                           validateStatus={!instructionInlineContent?.trim() && 'error'}
-560:                           help={!instructionInlineContent?.trim() && 'Please enter instruction content'}
-561:                         >
-562:                           <TextArea
-563:                             rows={12}
-564:                             value={instructionInlineContent}
-565:                             onChange={(e) => setInstructionInlineContent(e.target.value)}
-566:                             placeholder="Enter your custom instruction here..."
-567:                             style={{ fontFamily: 'monospace' }}
-568:                           />
-569:                         </Form.Item>
-570:                         <Space>
-571:                           <Text type="secondary" style={{ fontSize: 12 }}>
-572:                             Tip: Select a built-in instruction first, then switch to Inline mode to customize it.
-573:                           </Text>
-574:                         </Space>
-575:                       </>
-576:                     )}
-577:                   </div>
-578:                 ),
-579:               },
-580:               {
-581:                 key: 'tools',
-582:                 label: 'Tools',
-583:                 children: (
-584:                   <>
-585:                     <Form.Item name="tools" label="Available Tools">
-586:                       <Select 
-587:                         mode="multiple" 
-588:                         placeholder="Select tools"
-589:                         optionFilterProp="label"
-590:                         showSearch
-591:                         listHeight={400}
-592:                       >
-593:                         {Object.entries(getToolsByCategory()).map(([category, tools]) => (
-594:                           <Select.OptGroup key={category} label={category}>
-595:                             {tools.map(tool => (
-596:                               <Select.Option 
-597:                                 key={tool.id} 
-598:                                 value={tool.id}
-599:                                 label={tool.name}
-600:                               >
-601:                                 <Tooltip title={tool.description}>
-602:                                   <span>{tool.name}</span>
-603:                                 </Tooltip>
-604:                               </Select.Option>
-605:                             ))}
-606:                           </Select.OptGroup>
-607:                         ))}
-608:                       </Select>
-609:                     </Form.Item>
-610:                     <Form.Item name="skills" label="Skills">
-611:                       <Select mode="multiple" placeholder="Select skills">
-612:                         {availableSkills.map(skill => (
-613:                           <Select.Option key={skill} value={skill}>{skill}</Select.Option>
-614:                         ))}
-615:                       </Select>
-616:                     </Form.Item>
-617:                   </>
-618:                 ),
-619:               },
-620:               {
-621:                 key: 'advanced',
-622:                 label: 'Advanced',
-623:                 children: (
-624:                   <>
-625:                     <Form.Item name="include_contents" label="Include Contents Mode">
-626:                       <Select>
-627:                         <Select.Option value="none">None</Select.Option>
-628:                         <Select.Option value="all">All</Select.Option>
-629:                         <Select.Option value="selected">Selected</Select.Option>
-630:                       </Select>
-631:                     </Form.Item>
-632:                     <Form.Item name="tags" label="Tags">
-633:                       <Select mode="tags" placeholder="Add tags" />
-634:                     </Form.Item>
-635:                   </>
-636:                 ),
-637:               },
-638:             ]}
-639:           />
-640:         </Form>
-641:       </Modal>
-642: 
-643:       {}
-644:       <Drawer
-645:         title={selectedAgentData?.name || 'Agent Details'}
-646:         placement="right"
-647:         width={500}
-648:         onClose={() => setDetailDrawerVisible(false)}
-649:         open={detailDrawerVisible}
-650:       >
-651:         {selectedAgentData && (
-652:           <Space orientation="vertical" style={{ width: '100%' }} size="large">
-653:             <Descriptions column={1} bordered size="small">
-654:               <Descriptions.Item label="ID">{selectedAgentData.id}</Descriptions.Item>
-655:               <Descriptions.Item label="Version">{selectedAgentData.version || '-'}</Descriptions.Item>
-656:               <Descriptions.Item label="Type">
-657:                 {getAgentTypeTag(selectedAgentData.agent_type)}
-658:               </Descriptions.Item>
-659:               <Descriptions.Item label="Description">
-660:                 {selectedAgentData.description || '-'}
-661:               </Descriptions.Item>
-662:             </Descriptions>
-663: 
-664:             <Title level={5}>Tools ({selectedAgentData.tools?.length || 0})</Title>
-665:             <Space wrap>
-666:               {selectedAgentData.tools?.map((tool, i) => (
-667:                 <Tag key={i} color="blue">{tool.tool_id}</Tag>
-668:               ))}
-669:             </Space>
-670: 
-671:             {(selectedAgentData.skills?.length || 0) > 0 && (
-672:               <>
-673:                 <Title level={5}>Skills ({selectedAgentData.skills?.length || 0})</Title>
-674:                 <Space wrap>
-675:                   {selectedAgentData.skills?.map((skill, i) => (
-676:                     <Tag key={i} color="purple">{skill}</Tag>
-677:                   ))}
-678:                 </Space>
-679:               </>
-680:             )}
-681: 
-682:             <Title level={5}>Instruction</Title>
-683:             <Paragraph
-684:               ellipsis={{ rows: 5, expandable: true, symbol: 'more' }}
-685:               style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}
-686:             >
-687:               {selectedAgentData.instruction}
-688:             </Paragraph>
-689:           </Space>
-690:         )}
-691:       </Drawer>
-692: 
-693:       {}
-694:       <Modal
-695:         title="Import Agent"
-696:         open={importModalVisible}
-697:         onCancel={() => setImportModalVisible(false)}
-698:         onOk={handleImport}
-699:         okText="Import"
-700:       >
-701:         <TextArea
-702:           rows={10}
-703:           placeholder="Paste agent JSON here..."
-704:           value={importJson}
-705:           onChange={(e) => setImportJson(e.target.value)}
-706:         />
-707:       </Modal>
-708:     </div>
-709:   );
-710: };
-711: 
-712: export default AgentConfigForm;
+1: LogEntry
+2: ⋮----
+3: {
+4:   type: string;
+5:   content: string;
+6:   timestamp: Date;
+7: }
+8: ⋮----
+9: ProjectRuntimeInfo
+10: ⋮----
+11: {
+12:   has_frontend: boolean;
+13:   has_backend: boolean;
+14:   preview_url?: string;
+15:   frontend_port?: number;
+16:   backend_port?: number;
+17:   start_command?: string;
+18: }
+19: ⋮----
+20: RunResult
+21: ⋮----
+22: {
+23:   process_id?: number;
+24:   frontend_pid?: number;
+25:   backend_pid?: number;
+26:   frontend_url?: string;
+27:   backend_url?: string;
+28:   command?: string;
+29:   is_fullstack?: boolean;
+30: }
+31: ⋮----
+32: RunnerPanelProps
+33: ⋮----
+34: {
+35:   iterationId: string;
+36: }
+```
+
+### crates/cowork-gui/src/components/iterations/IterationDetailsModal.tsx (11 lines)
+
+```
+1: IterationDetailsModalProps
+2: ⋮----
+3: {
+4:   open: boolean;
+5:   onClose: () => void;
+6:   iteration: IterationInfo | null;
+7: }
+8: ⋮----
+9: getStatusColor
+10: ⋮----
+11: (iteration.status)
 ```
 
 ### crates/cowork-gui/src/hooks/useIterationActions.ts (98 lines)
@@ -15248,6 +15895,96 @@ LICENSE
 96: 		handleCommandSelect
 97: 	};
 98: }
+```
+
+### crates/cowork-gui/src/main.tsx (85 lines)
+
+```
+1: import { createRoot } from 'react-dom/client';
+2: import { ConfigProvider, theme, App as AntApp } from 'antd';
+3: import App from './App';
+4: import './styles.css';
+5: 
+6: 
+7: 
+8: const lightTheme = {
+9:   algorithm: theme.defaultAlgorithm,
+10:   token: {
+11:     colorPrimary: '#2563eb',
+12:     colorPrimaryHover: '#1d4ed8',
+13:     colorPrimaryActive: '#1e40af',
+14:     colorBgBase: '#ffffff',
+15:     colorBgContainer: '#f8fafc',
+16:     colorBgElevated: '#f1f5f9',
+17:     colorBgLayout: '#f8fafc',
+18:     colorBorder: '#e2e8f0',
+19:     colorBorderSecondary: '#f1f5f9',
+20:     colorText: '#1e293b',
+21:     colorTextSecondary: '#64748b',
+22:     colorTextTertiary: '#94a3b8',
+23:     borderRadius: 4,
+24:     borderRadiusLG: 6,
+25:     borderRadiusSM: 3,
+26:     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+27:     boxShadowSecondary: '0 4px 12px rgba(0, 0, 0, 0.08)',
+28:     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+29:     padding: 16,
+30:     paddingLG: 24,
+31:     paddingSM: 12,
+32:   },
+33:   components: {
+34:     Layout: {
+35:       headerBg: '#ffffff',
+36:       siderBg: '#f8fafc',
+37:       bodyBg: '#ffffff',
+38:     },
+39:     Menu: {
+40:       itemBg: 'transparent',
+41:       itemSelectedBg: '#dbeafe',
+42:       itemColor: '#64748b',
+43:       itemSelectedColor: '#2563eb',
+44:       itemHoverBg: '#f1f5f9',
+45:       itemHoverColor: '#1e293b',
+46:     },
+47:     Button: {
+48:       borderRadius: 4,
+49:       boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+50:     },
+51:     Input: {
+52:       borderRadius: 5,
+53:       activeShadow: '0 0 0 3px rgba(37, 99, 235, 0.1)',
+54:     },
+55:     Card: {
+56:       borderRadius: 6,
+57:       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+58:     },
+59:     Tabs: {
+60:       cardBg: '#f8fafc',
+61:       itemColor: '#64748b',
+62:       itemSelectedColor: '#2563eb',
+63:     },
+64:     Tag: {
+65:       borderRadius: 3,
+66:     },
+67:     Alert: {
+68:       borderRadius: 5,
+69:     },
+70:     Modal: {
+71:       borderRadius: 8,
+72:     },
+73:     Dropdown: {
+74:       borderRadius: 6,
+75:     },
+76:   },
+77: };
+78: 
+79: createRoot(document.getElementById('root')!).render(
+80:   <ConfigProvider theme={lightTheme}>
+81:     <AntApp>
+82:       <App />
+83:     </AntApp>
+84:   </ConfigProvider>
+85: );
 ```
 
 ### crates/cowork-gui/src/stores/agentStore.ts (117 lines)
@@ -15372,594 +16109,276 @@ LICENSE
 117: }
 ```
 
-### crates/cowork-gui/src/styles/components.css (368 lines)
+### crates/cowork-gui/src/styles/antd-overrides.css (267 lines)
 
 ```
-1: .artifact-content {
-2:   padding: 24px;
-3:   background: var(--bg-container);
-4:   color: var(--text-primary);
-5:   flex: 1;
-6:   min-height: 0;
-7:   overflow: auto;
-8: }
-9: 
-10: .artifact-content h3 {
-11:   color: var(--text-primary);
-12:   margin-bottom: 16px;
-13:   font-size: 18px;
+1: .ant-layout {
+2:   background: var(--bg-base) !important;
+3: }
+4: 
+5: .ant-layout-header {
+6:   background: var(--bg-base) !important;
+7:   border-bottom: 1px solid var(--border-color);
+8:   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+9: }
+10: 
+11: .ant-layout-sider {
+12:   background: var(--bg-sidebar) !important;
+13:   border-right: 1px solid var(--border-color);
 14: }
 15: 
 16: 
-17: .markdown-content {
-18:   color: var(--text-primary);
-19:   font-size: 14px;
-20:   line-height: 1.8;
-21: }
-22: 
-23: 
-24: .markdown-content h1,
-25: .markdown-content h2,
-26: .markdown-content h3,
-27: .markdown-content h4,
-28: .markdown-content h5,
-29: .markdown-content h6 {
-30:   color: var(--text-primary);
-31:   margin-top: 28px;
-32:   margin-bottom: 12px;
-33:   font-weight: 600;
-34:   line-height: 1.35;
-35: }
-36: 
-37: .markdown-content h1 { font-size: 1.5em; }
-38: .markdown-content h2 {
-39:   font-size: 1.25em;
-40:   border-bottom: 1px solid var(--border-light);
-41:   padding-bottom: 8px;
-42: }
-43: .markdown-content h3 { font-size: 1.15em; }
-44: .markdown-content h4 { font-size: 1.05em; }
-45: 
-46: 
-47: .markdown-content > :first-child,
-48: .markdown-content > h1:first-child,
-49: .markdown-content > h2:first-child,
-50: .markdown-content > h3:first-child,
-51: .markdown-content > h4:first-child {
-52:   margin-top: 0;
-53: }
-54: 
-55: 
-56: .markdown-content p {
-57:   margin-bottom: 14px;
-58: }
-59: 
-60: .markdown-content p:last-child {
-61:   margin-bottom: 0;
-62: }
-63: 
-64: 
-65: .markdown-content strong {
-66:   color: var(--text-primary);
-67:   font-weight: 600;
-68: }
-69: 
-70: .markdown-content em {
-71:   color: var(--text-secondary);
-72: }
-73: 
-74: 
-75: .markdown-content code:not(pre code) {
-76:   background: var(--bg-elevated);
-77:   color: var(--primary);
-78:   padding: 2px 7px;
-79:   border-radius: 2px;
-80:   font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
-81:   font-size: 0.88em;
-82:   border: 1px solid var(--border-light);
-83: }
-84: 
-85: 
-86: .markdown-content ul,
-87: .markdown-content ol {
-88:   margin: 16px 0;
-89:   padding-left: 26px;
-90: }
-91: 
-92: .markdown-content li {
-93:   margin-bottom: 8px;
-94:   line-height: 1.75;
-95: }
-96: 
-97: .markdown-content li:last-child {
-98:   margin-bottom: 0;
-99: }
-100: 
-101: .markdown-content ul li::marker {
-102:   color: var(--primary);
-103:   font-weight: 500;
-104: }
-105: 
-106: .markdown-content ol li::marker {
-107:   color: var(--primary);
-108:   font-weight: 600;
-109: }
-110: 
-111: 
-112: .markdown-content li > ul,
-113: .markdown-content li > ol {
-114:   margin: 6px 0;
-115: }
-116: 
-117: 
-118: .markdown-content blockquote {
-119:   border-left: 3px solid var(--primary);
-120:   padding: 10px 18px;
-121:   margin: 16px 0;
-122:   background: var(--bg-elevated);
-123:   border-radius: 0 4px 4px 0;
-124:   color: var(--text-secondary);
-125:   line-height: 1.7;
-126: }
-127: 
-128: .markdown-content blockquote p {
-129:   margin: 0;
-130: }
-131: 
-132: 
-133: .markdown-content a {
-134:   color: var(--primary);
-135:   text-decoration: none;
-136:   border-bottom: 1px solid transparent;
-137:   transition: all 0.15s;
-138: }
-139: 
-140: .markdown-content a:hover {
-141:   border-bottom-color: var(--primary);
-142: }
-143: 
-144: 
-145: .markdown-content table {
-146:   width: 100%;
-147:   border-collapse: collapse;
-148:   margin: 16px 0;
-149:   font-size: 13px;
-150:   border: 1px solid var(--border-color);
-151:   border-radius: 4px;
-152:   overflow: hidden;
-153: }
-154: 
-155: .markdown-content th {
-156:   background: var(--bg-elevated);
-157:   color: var(--text-primary);
-158:   font-weight: 600;
-159:   text-align: left;
-160:   padding: 10px 14px;
-161:   border-bottom: 1px solid var(--border-color);
-162:   font-size: 12px;
-163: }
-164: 
-165: .markdown-content td {
-166:   padding: 9px 14px;
-167:   border-bottom: 1px solid var(--border-light);
-168: }
-169: 
-170: .markdown-content tr:last-child td {
-171:   border-bottom: none;
-172: }
-173: 
-174: .markdown-content tr:hover td {
-175:   background: var(--bg-container);
-176: }
-177: 
-178: 
-179: .markdown-content hr {
-180:   border: none;
-181:   border-top: 1px solid var(--border-light);
-182:   margin: 24px 0;
-183: }
-184: 
-185: 
-186: .markdown-content img {
-187:   max-width: 100%;
-188:   border-radius: 4px;
-189:   margin: 16px 0;
-190: }
-191: 
-192: 
-193: .markdown-content pre {
-194:   margin: 16px 0;
-195:   border-radius: 4px;
-196:   overflow: hidden;
-197:   border: 1px solid var(--border-color);
-198:   background: #1e293b;
-199:   padding: 14px 16px;
-200: }
-201: 
-202: .markdown-content pre code {
-203:   background: transparent !important;
-204:   border: none !important;
-205:   padding: 0 !important;
-206:   color: #e2e8f0 !important;
-207:   font-size: 13px;
-208:   line-height: 1.65;
-209: }
-210: 
-211: .artifacts-tabs {
-212:   height: 100%;
-213:   display: flex;
-214:   flex-direction: column;
-215:   min-height: 0;
-216: }
-217: 
-218: .artifacts-tabs > .ant-tabs-nav {
-219:   margin-bottom: 0;
-220:   flex-shrink: 0;
-221: }
-222: 
-223: .artifacts-tabs .ant-tabs-content-holder {
-224:   flex: 1;
-225:   overflow: hidden;
-226:   display: flex;
-227:   flex-direction: column;
-228:   min-height: 0;
-229: }
-230: 
-231: .artifacts-tabs .ant-tabs-content {
-232:   height: 100%;
-233:   overflow: hidden;
-234: }
-235: 
-236: .artifacts-tabs .ant-tabs-tabpane {
-237:   height: 100%;
-238:   overflow: hidden;
-239: }
-240: 
-241: .artifacts-tabs .ant-tabs-tabpane > div {
-242:   height: 100%;
-243: }
-244: 
-245: 
-246: .code-editor-tabs {
-247:   height: 100%;
-248:   display: flex;
-249:   flex-direction: column;
-250: }
-251: 
-252: .code-editor-tabs .ant-tabs-content {
-253:   flex: 1;
-254:   overflow: hidden;
-255:   display: flex;
-256:   flex-direction: column;
-257: }
-258: 
-259: .code-editor-tabs .ant-tabs-content-holder {
-260:   flex: 1;
-261:   overflow: hidden;
-262:   display: flex;
-263:   flex-direction: column;
-264: }
-265: 
-266: .code-editor-tabs .ant-tabs-tabpane {
-267:   height: 100% !important;
-268:   overflow: hidden !important;
-269:   display: none !important;
-270: }
-271: 
-272: .code-editor-tabs .ant-tabs-tabpane-active {
-273:   display: flex !important;
-274:   flex-direction: column !important;
-275: }
-276: 
-277: .code-editor-tabs .ant-tabs-tabpane > div {
-278:   height: 100% !important;
-279:   display: flex !important;
-280:   flex-direction: column !important;
-281:   position: relative;
-282: }
-283: 
-284: .code-editor-tabs .ant-tabs-tabpane > div > div {
-285:   flex: 1;
-286:   overflow: hidden;
-287:   position: relative;
-288: }
-289: 
-290: .code-editor-tabs .monaco-editor {
-291:   height: 100% !important;
-292: }
-293: 
-294: 
-295: .react-json-view {
-296:   background: var(--bg-container) !important;
-297:   padding: 20px;
-298:   border-radius: 12px;
-299:   border: 1px solid var(--border-color);
-300:   font-size: 14px;
-301:   line-height: 1.8;
-302: }
-303: 
-304: .react-json-view .string-key {
-305:   color: var(--primary) !important;
-306:   font-weight: 600;
-307: }
-308: 
-309: .react-json-view .object-key {
-310:   color: var(--primary) !important;
-311:   font-weight: 600;
-312: }
-313: 
-314: .react-json-view .string-value {
-315:   color: #059669 !important;
-316: }
-317: 
-318: .react-json-view .variable-value {
-319:   color: #059669 !important;
-320: }
-321: 
-322: .react-json-view .number-value {
-323:   color: #2563eb !important;
-324: }
-325: 
-326: .react-json-view .boolean-value {
-327:   color: #d97706 !important;
-328:   font-weight: 500;
-329: }
-330: 
-331: .react-json-view .null-value {
-332:   color: #dc2626 !important;
-333:   font-weight: 500;
-334: }
-335: 
-336: .react-json-view .array-key {
-337:   color: var(--primary) !important;
-338:   font-weight: 600;
-339: }
-340: 
-341: .react-json-view .string-literal {
-342:   color: #059669 !important;
-343: }
-344: 
-345: .react-json-view .object-name {
-346:   color: var(--primary) !important;
-347:   font-weight: 600;
-348: }
-349: 
-350: .react-json-view .array-name {
-351:   color: var(--primary) !important;
-352:   font-weight: 600;
-353: }
-354: 
-355: .react-json-view .br-row,
-356: .react-json-view .bracket {
-357:   color: var(--text-tertiary) !important;
-358: }
-359: 
-360: .react-json-view .colon {
-361:   color: var(--text-tertiary) !important;
-362: }
-363: 
-364: .react-json-view .arrow-icon,
-365: .react-json-view .expanded-icon,
-366: .react-json-view .collapsed-icon {
-367:   fill: var(--primary) !important;
-368: }
-```
-
-### crates/cowork-gui/src/styles/markdown.css (212 lines)
-
-```
-1: .markdown-body {
-2:   color: var(--text-primary);
-3:   line-height: 1.7;
-4:   font-size: 14px;
-5: }
-6: 
-7: 
-8: .markdown-body p {
-9:   margin: 0 0 12px;
-10: }
-11: 
-12: .markdown-body p:last-child {
-13:   margin-bottom: 0;
-14: }
-15: 
-16: 
-17: .markdown-body h1,
-18: .markdown-body h2,
-19: .markdown-body h3,
-20: .markdown-body h4,
-21: .markdown-body h5,
-22: .markdown-body h6 {
-23:   color: var(--text-primary);
-24:   margin: 20px 0 8px;
-25:   font-weight: 600;
-26:   line-height: 1.3;
-27: }
-28: 
-29: .markdown-body h1 { font-size: 1.4em; }
-30: .markdown-body h2 { font-size: 1.2em; border-bottom: 1px solid var(--border-light); padding-bottom: 6px; }
-31: .markdown-body h3 { font-size: 1.1em; }
-32: .markdown-body h4 { font-size: 1em; }
-33: 
+17: .ant-menu {
+18:   background: transparent !important;
+19:   border-right: none !important;
+20: }
+21: 
+22: .ant-menu-item {
+23:   color: var(--text-secondary) !important;
+24:   border-radius: 4px !important;
+25:   margin: 4px 12px !important;
+26:   padding-left: 16px !important;
+27:   transition: all 0.2s ease !important;
+28: }
+29: 
+30: .ant-menu-item:hover {
+31:   background: var(--bg-elevated) !important;
+32:   color: var(--text-primary) !important;
+33: }
 34: 
-35: .markdown-body strong {
-36:   color: var(--text-primary);
-37:   font-weight: 600;
-38: }
-39: 
-40: .markdown-body em {
-41:   color: var(--text-secondary);
-42: }
-43: 
+35: .ant-menu-item-selected {
+36:   background: var(--primary-light) !important;
+37:   color: var(--primary) !important;
+38:   font-weight: 500;
+39: }
+40: 
+41: .ant-menu-item-selected::after {
+42:   display: none !important;
+43: }
 44: 
-45: .markdown-body code {
-46:   background: var(--bg-elevated);
-47:   color: var(--primary);
-48:   padding: 2px 6px;
-49:   border-radius: 4px;
-50:   font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
-51:   font-size: 0.88em;
-52:   border: 1px solid var(--border-light);
+45: .ant-menu-item .anticon {
+46:   font-size: 18px;
+47:   margin-right: 12px;
+48: }
+49: 
+50: 
+51: .ant-tabs {
+52:   background: var(--bg-base);
 53: }
 54: 
-55: 
-56: .markdown-code-block {
-57:   position: relative;
-58:   margin: 12px 0;
-59:   border-radius: 4px;
-60:   overflow: hidden;
-61:   border: 1px solid var(--border-color);
-62:   background: #1e293b;
+55: .ant-tabs-nav {
+56:   margin-bottom: 0 !important;
+57: }
+58: 
+59: .ant-tabs-tab {
+60:   color: var(--text-secondary) !important;
+61:   border-radius: 3px 3px 0 0 !important;
+62:   transition: all 0.2s ease !important;
 63: }
 64: 
-65: .markdown-code-header {
-66:   display: flex;
-67:   align-items: center;
-68:   justify-content: space-between;
-69:   padding: 6px 12px;
-70:   background: rgba(0, 0, 0, 0.2);
-71:   font-size: 11px;
-72:   color: #94a3b8;
-73:   font-family: 'JetBrains Mono', 'Consolas', monospace;
-74: }
-75: 
-76: .markdown-code-copy {
-77:   background: none;
-78:   border: 1px solid rgba(148, 163, 184, 0.3);
-79:   color: #94a3b8;
-80:   padding: 2px 8px;
-81:   border-radius: 2px;
-82:   cursor: pointer;
-83:   font-size: 11px;
-84:   font-family: inherit;
-85:   transition: all 0.15s;
-86: }
-87: 
-88: .markdown-code-copy:hover {
-89:   background: rgba(148, 163, 184, 0.15);
-90:   color: #e2e8f0;
-91:   border-color: rgba(148, 163, 184, 0.5);
-92: }
-93: 
-94: .markdown-code-block pre {
-95:   margin: 0;
-96:   padding: 14px 16px;
-97:   overflow-x: auto;
-98:   background: transparent !important;
-99:   border: none !important;
-100:   border-radius: 0 !important;
-101: }
-102: 
-103: .markdown-code-block code {
-104:   background: transparent !important;
-105:   border: none !important;
-106:   padding: 0 !important;
-107:   color: #e2e8f0 !important;
-108:   font-size: 13px;
-109:   line-height: 1.6;
+65: .ant-tabs-tab:hover {
+66:   color: var(--text-primary) !important;
+67: }
+68: 
+69: .ant-tabs-tab-active {
+70:   color: var(--primary) !important;
+71:   background: var(--bg-base) !important;
+72:   font-weight: 500;
+73: }
+74: 
+75: .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
+76:   background: var(--bg-container) !important;
+77:   border-color: var(--border-color) !important;
+78: }
+79: 
+80: .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab-active {
+81:   background: var(--bg-base) !important;
+82:   border-bottom-color: var(--bg-base) !important;
+83: }
+84: 
+85: .ant-tabs-content-holder {
+86:   background: var(--bg-base);
+87: }
+88: 
+89: 
+90: .ant-btn {
+91:   background: var(--bg-base);
+92:   border-color: var(--border-color);
+93:   color: var(--text-primary);
+94:   border-radius: 4px;
+95:   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+96:   transition: all 0.2s ease;
+97: }
+98: 
+99: .ant-btn:hover {
+100:   background: var(--bg-elevated);
+101:   border-color: var(--primary);
+102:   color: var(--primary);
+103: }
+104: 
+105: .ant-btn-primary {
+106:   background: var(--primary) !important;
+107:   border-color: var(--primary) !important;
+108:   color: white !important;
+109:   box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
 110: }
 111: 
-112: 
-113: .markdown-body ul,
-114: .markdown-body ol {
-115:   margin: 8px 0;
-116:   padding-left: 24px;
-117: }
+112: .ant-btn-primary:hover {
+113:   background: var(--primary-hover) !important;
+114:   border-color: var(--primary-hover) !important;
+115:   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+116: }
+117: 
 118: 
-119: .markdown-body li {
-120:   margin-bottom: 4px;
-121:   color: var(--text-primary);
-122: }
-123: 
-124: .markdown-body ul li::marker {
-125:   color: var(--primary);
+119: .ant-input,
+120: .ant-input-affix-wrapper {
+121:   background: var(--bg-container) !important;
+122:   border-color: var(--border-color) !important;
+123:   color: var(--text-primary) !important;
+124:   border-radius: 5px !important;
+125:   transition: all 0.2s ease;
 126: }
 127: 
-128: .markdown-body ol li::marker {
-129:   color: var(--primary);
-130:   font-weight: 600;
+128: .ant-input:hover,
+129: .ant-input-affix-wrapper:hover {
+130:   border-color: var(--primary) !important;
 131: }
 132: 
-133: 
-134: .markdown-body blockquote {
-135:   border-left: 3px solid var(--primary);
-136:   padding: 8px 16px;
-137:   margin: 12px 0;
-138:   background: var(--primary-lighter);
-139:   border-radius: 0 4px 4px 0;
-140:   color: var(--text-secondary);
-141: }
-142: 
-143: .markdown-body blockquote p {
-144:   margin: 0;
-145: }
-146: 
-147: 
-148: .markdown-body a {
-149:   color: var(--primary);
-150:   text-decoration: none;
-151:   border-bottom: 1px solid transparent;
-152:   transition: all 0.15s;
-153: }
-154: 
-155: .markdown-body a:hover {
-156:   border-bottom-color: var(--primary);
-157: }
+133: .ant-input:focus,
+134: .ant-input-affix-wrapper:focus,
+135: .ant-input-affix-wrapper-focused {
+136:   background: var(--bg-base) !important;
+137:   border-color: var(--primary) !important;
+138:   box-shadow: 0 0 0 3px var(--primary-light) !important;
+139: }
+140: 
+141: 
+142: .ant-select:not(.ant-select-customize-input) .ant-select-selector {
+143:   background: var(--bg-container) !important;
+144:   border-color: var(--border-color) !important;
+145:   color: var(--text-primary) !important;
+146:   border-radius: 4px !important;
+147: }
+148: 
+149: .ant-select:not(.ant-select-customize-input) .ant-select-selector:hover {
+150:   border-color: var(--primary) !important;
+151: }
+152: 
+153: .ant-select-focused .ant-select-selector {
+154:   border-color: var(--primary) !important;
+155:   box-shadow: 0 0 0 3px var(--primary-light) !important;
+156: }
+157: 
 158: 
-159: 
-160: .markdown-body table {
-161:   width: 100%;
-162:   border-collapse: collapse;
-163:   margin: 12px 0;
-164:   font-size: 13px;
-165:   border: 1px solid var(--border-color);
-166:   border-radius: 4px;
-167:   overflow: hidden;
-168: }
-169: 
-170: .markdown-body th {
-171:   background: var(--bg-elevated);
-172:   color: var(--text-primary);
-173:   font-weight: 600;
-174:   text-align: left;
-175:   padding: 10px 14px;
-176:   border-bottom: 1px solid var(--border-color);
-177:   font-size: 12px;
-178: }
-179: 
-180: .markdown-body td {
-181:   padding: 8px 14px;
-182:   border-bottom: 1px solid var(--border-light);
-183: }
+159: .ant-dropdown-menu {
+160:   background: var(--bg-base) !important;
+161:   border: 1px solid var(--border-color);
+162:   border-radius: 6px !important;
+163:   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1) !important;
+164:   padding: 8px !important;
+165: }
+166: 
+167: .ant-dropdown-menu-item {
+168:   border-radius: 4px !important;
+169:   color: var(--text-primary) !important;
+170: }
+171: 
+172: .ant-dropdown-menu-item:hover {
+173:   background: var(--bg-elevated) !important;
+174: }
+175: 
+176: 
+177: .ant-card {
+178:   background: var(--bg-base);
+179:   border-color: var(--border-color);
+180:   border-radius: 6px;
+181:   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+182: }
+183: 
 184: 
-185: .markdown-body tr:last-child td {
-186:   border-bottom: none;
-187: }
-188: 
-189: .markdown-body tr:hover td {
-190:   background: var(--bg-container);
-191: }
-192: 
-193: 
-194: .markdown-body hr {
-195:   border: none;
-196:   border-top: 1px solid var(--border-light);
-197:   margin: 20px 0;
+185: .ant-modal-content {
+186:   background: var(--bg-base) !important;
+187:   border-radius: 4px !important;
+188:   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15) !important;
+189:   border: 1px solid var(--border-color);
+190: }
+191: 
+192: .ant-modal-header {
+193:   background: var(--bg-base) !important;
+194:   border-bottom: 1px solid var(--border-color) !important;
+195:   border-radius: 4px 4px 0 0 !important;
+196:   padding: 16px 20px !important;
+197:   margin-bottom: 0 !important;
 198: }
 199: 
-200: 
-201: .markdown-body img {
-202:   max-width: 100%;
-203:   border-radius: 4px;
-204:   margin: 12px 0;
-205: }
-206: 
-207: 
-208: .hljs {
-209:   background: transparent !important;
-210:   color: #e2e8f0 !important;
-211:   padding: 0 !important;
-212: }
+200: .ant-modal-title {
+201:   color: var(--text-primary) !important;
+202:   font-weight: 600 !important;
+203:   font-size: 15px !important;
+204: }
+205: 
+206: .ant-modal-body {
+207:   padding: 20px !important;
+208:   color: var(--text-primary);
+209: }
+210: 
+211: .ant-modal-footer {
+212:   border-top: 1px solid var(--border-light) !important;
+213:   padding: 12px 20px !important;
+214:   background: var(--bg-base) !important;
+215:   border-radius: 0 0 4px 4px !important;
+216: }
+217: 
+218: .ant-modal-close-icon {
+219:   color: var(--text-tertiary) !important;
+220: }
+221: 
+222: .ant-modal-close:hover .ant-modal-close-icon {
+223:   color: var(--text-primary) !important;
+224: }
+225: 
+226: 
+227: .ant-tag {
+228:   border-radius: 3px;
+229:   border: none;
+230:   padding: 4px 10px;
+231: }
+232: 
+233: 
+234: .ant-alert {
+235:   border-radius: 5px;
+236:   border: none;
+237: }
+238: 
+239: .ant-alert-success {
+240:   background: var(--success-light);
+241: }
+242: 
+243: .ant-alert-warning {
+244:   background: var(--warning-light);
+245: }
+246: 
+247: .ant-alert-error {
+248:   background: var(--error-light);
+249: }
+250: 
+251: .ant-alert-info {
+252:   background: var(--info-light);
+253: }
+254: 
+255: 
+256: .ant-spin {
+257:   color: var(--primary);
+258: }
+259: 
+260: .ant-spin-dot-item {
+261:   background-color: var(--primary);
+262: }
+263: 
+264: 
+265: .ant-empty-description {
+266:   color: var(--text-secondary);
+267: }
 ```
 
 ### crates/cowork-gui/src/types/config.ts (291 lines)
@@ -22993,6 +23412,29 @@ LICENSE
 24: }
 ```
 
+### crates/cowork-gui/src/components/CommandPalette.tsx (18 lines)
+
+```
+1: Command
+2: ⋮----
+3: {
+4:   id: string;
+5:   label: string;
+6:   icon: React.ReactNode;
+7:   category: string;
+8:   shortcut: string;
+9:   action: () => void;
+10: }
+11: ⋮----
+12: CommandPaletteProps
+13: ⋮----
+14: {
+15:   visible: boolean;
+16:   onClose: () => void;
+17:   onCommandSelect: (commandId: string) => void;
+18: }
+```
+
 ### crates/cowork-gui/src/components/IterationsPanel.tsx (7 lines)
 
 ```
@@ -23003,47 +23445,6 @@ LICENSE
 5:   selectedIterationId?: string | null;
 6:   onExecuteStatusChange?: (iterationId: string, status: string) => void;
 7: }
-```
-
-### crates/cowork-gui/src/components/RunnerPanel.tsx (36 lines)
-
-```
-1: LogEntry
-2: ⋮----
-3: {
-4:   type: string;
-5:   content: string;
-6:   timestamp: Date;
-7: }
-8: ⋮----
-9: ProjectRuntimeInfo
-10: ⋮----
-11: {
-12:   has_frontend: boolean;
-13:   has_backend: boolean;
-14:   preview_url?: string;
-15:   frontend_port?: number;
-16:   backend_port?: number;
-17:   start_command?: string;
-18: }
-19: ⋮----
-20: RunResult
-21: ⋮----
-22: {
-23:   process_id?: number;
-24:   frontend_pid?: number;
-25:   backend_pid?: number;
-26:   frontend_url?: string;
-27:   backend_url?: string;
-28:   command?: string;
-29:   is_fullstack?: boolean;
-30: }
-31: ⋮----
-32: RunnerPanelProps
-33: ⋮----
-34: {
-35:   iterationId: string;
-36: }
 ```
 
 ### crates/cowork-gui/src/components/config/FlowConfigPanel.tsx (3 lines)
@@ -23302,22 +23703,6 @@ LICENSE
 235: };
 236: 
 237: export default SkillManager;
-```
-
-### crates/cowork-gui/src/components/iterations/IterationDetailsModal.tsx (11 lines)
-
-```
-1: IterationDetailsModalProps
-2: ⋮----
-3: {
-4:   open: boolean;
-5:   onClose: () => void;
-6:   iteration: IterationInfo | null;
-7: }
-8: ⋮----
-9: getStatusColor
-10: ⋮----
-11: (iteration.status)
 ```
 
 ### crates/cowork-gui/src/components/projects/ImportProjectModal.tsx (37 lines)
@@ -23743,96 +24128,6 @@ LICENSE
 201: }
 ```
 
-### crates/cowork-gui/src/main.tsx (85 lines)
-
-```
-1: import { createRoot } from 'react-dom/client';
-2: import { ConfigProvider, theme, App as AntApp } from 'antd';
-3: import App from './App';
-4: import './styles.css';
-5: 
-6: 
-7: 
-8: const lightTheme = {
-9:   algorithm: theme.defaultAlgorithm,
-10:   token: {
-11:     colorPrimary: '#2563eb',
-12:     colorPrimaryHover: '#1d4ed8',
-13:     colorPrimaryActive: '#1e40af',
-14:     colorBgBase: '#ffffff',
-15:     colorBgContainer: '#f8fafc',
-16:     colorBgElevated: '#f1f5f9',
-17:     colorBgLayout: '#f8fafc',
-18:     colorBorder: '#e2e8f0',
-19:     colorBorderSecondary: '#f1f5f9',
-20:     colorText: '#1e293b',
-21:     colorTextSecondary: '#64748b',
-22:     colorTextTertiary: '#94a3b8',
-23:     borderRadius: 8,
-24:     borderRadiusLG: 12,
-25:     borderRadiusSM: 6,
-26:     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-27:     boxShadowSecondary: '0 4px 12px rgba(0, 0, 0, 0.08)',
-28:     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-29:     padding: 16,
-30:     paddingLG: 24,
-31:     paddingSM: 12,
-32:   },
-33:   components: {
-34:     Layout: {
-35:       headerBg: '#ffffff',
-36:       siderBg: '#f8fafc',
-37:       bodyBg: '#ffffff',
-38:     },
-39:     Menu: {
-40:       itemBg: 'transparent',
-41:       itemSelectedBg: '#dbeafe',
-42:       itemColor: '#64748b',
-43:       itemSelectedColor: '#2563eb',
-44:       itemHoverBg: '#f1f5f9',
-45:       itemHoverColor: '#1e293b',
-46:     },
-47:     Button: {
-48:       borderRadius: 8,
-49:       boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-50:     },
-51:     Input: {
-52:       borderRadius: 10,
-53:       activeShadow: '0 0 0 3px rgba(37, 99, 235, 0.1)',
-54:     },
-55:     Card: {
-56:       borderRadius: 12,
-57:       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-58:     },
-59:     Tabs: {
-60:       cardBg: '#f8fafc',
-61:       itemColor: '#64748b',
-62:       itemSelectedColor: '#2563eb',
-63:     },
-64:     Tag: {
-65:       borderRadius: 6,
-66:     },
-67:     Alert: {
-68:       borderRadius: 10,
-69:     },
-70:     Modal: {
-71:       borderRadius: 16,
-72:     },
-73:     Dropdown: {
-74:       borderRadius: 12,
-75:     },
-76:   },
-77: };
-78: 
-79: createRoot(document.getElementById('root')!).render(
-80:   <ConfigProvider theme={lightTheme}>
-81:     <AntApp>
-82:       <App />
-83:     </AntApp>
-84:   </ConfigProvider>
-85: );
-```
-
 ### crates/cowork-gui/src/stores/configStore.ts (49 lines)
 
 ```
@@ -23948,278 +24243,6 @@ LICENSE
 56:   setIterationsLoaded: (loaded: boolean) => void;
 57:   clearProject: () => void;
 58: }
-```
-
-### crates/cowork-gui/src/styles/antd-overrides.css (267 lines)
-
-```
-1: .ant-layout {
-2:   background: var(--bg-base) !important;
-3: }
-4: 
-5: .ant-layout-header {
-6:   background: var(--bg-base) !important;
-7:   border-bottom: 1px solid var(--border-color);
-8:   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-9: }
-10: 
-11: .ant-layout-sider {
-12:   background: var(--bg-sidebar) !important;
-13:   border-right: 1px solid var(--border-color);
-14: }
-15: 
-16: 
-17: .ant-menu {
-18:   background: transparent !important;
-19:   border-right: none !important;
-20: }
-21: 
-22: .ant-menu-item {
-23:   color: var(--text-secondary) !important;
-24:   border-radius: 4px !important;
-25:   margin: 4px 12px !important;
-26:   padding-left: 16px !important;
-27:   transition: all 0.2s ease !important;
-28: }
-29: 
-30: .ant-menu-item:hover {
-31:   background: var(--bg-elevated) !important;
-32:   color: var(--text-primary) !important;
-33: }
-34: 
-35: .ant-menu-item-selected {
-36:   background: var(--primary-light) !important;
-37:   color: var(--primary) !important;
-38:   font-weight: 500;
-39: }
-40: 
-41: .ant-menu-item-selected::after {
-42:   display: none !important;
-43: }
-44: 
-45: .ant-menu-item .anticon {
-46:   font-size: 18px;
-47:   margin-right: 12px;
-48: }
-49: 
-50: 
-51: .ant-tabs {
-52:   background: var(--bg-base);
-53: }
-54: 
-55: .ant-tabs-nav {
-56:   margin-bottom: 0 !important;
-57: }
-58: 
-59: .ant-tabs-tab {
-60:   color: var(--text-secondary) !important;
-61:   border-radius: 6px 6px 0 0 !important;
-62:   transition: all 0.2s ease !important;
-63: }
-64: 
-65: .ant-tabs-tab:hover {
-66:   color: var(--text-primary) !important;
-67: }
-68: 
-69: .ant-tabs-tab-active {
-70:   color: var(--primary) !important;
-71:   background: var(--bg-base) !important;
-72:   font-weight: 500;
-73: }
-74: 
-75: .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
-76:   background: var(--bg-container) !important;
-77:   border-color: var(--border-color) !important;
-78: }
-79: 
-80: .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab-active {
-81:   background: var(--bg-base) !important;
-82:   border-bottom-color: var(--bg-base) !important;
-83: }
-84: 
-85: .ant-tabs-content-holder {
-86:   background: var(--bg-base);
-87: }
-88: 
-89: 
-90: .ant-btn {
-91:   background: var(--bg-base);
-92:   border-color: var(--border-color);
-93:   color: var(--text-primary);
-94:   border-radius: 8px;
-95:   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-96:   transition: all 0.2s ease;
-97: }
-98: 
-99: .ant-btn:hover {
-100:   background: var(--bg-elevated);
-101:   border-color: var(--primary);
-102:   color: var(--primary);
-103: }
-104: 
-105: .ant-btn-primary {
-106:   background: var(--primary) !important;
-107:   border-color: var(--primary) !important;
-108:   color: white !important;
-109:   box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
-110: }
-111: 
-112: .ant-btn-primary:hover {
-113:   background: var(--primary-hover) !important;
-114:   border-color: var(--primary-hover) !important;
-115:   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
-116: }
-117: 
-118: 
-119: .ant-input,
-120: .ant-input-affix-wrapper {
-121:   background: var(--bg-container) !important;
-122:   border-color: var(--border-color) !important;
-123:   color: var(--text-primary) !important;
-124:   border-radius: 10px !important;
-125:   transition: all 0.2s ease;
-126: }
-127: 
-128: .ant-input:hover,
-129: .ant-input-affix-wrapper:hover {
-130:   border-color: var(--primary) !important;
-131: }
-132: 
-133: .ant-input:focus,
-134: .ant-input-affix-wrapper:focus,
-135: .ant-input-affix-wrapper-focused {
-136:   background: var(--bg-base) !important;
-137:   border-color: var(--primary) !important;
-138:   box-shadow: 0 0 0 3px var(--primary-light) !important;
-139: }
-140: 
-141: 
-142: .ant-select:not(.ant-select-customize-input) .ant-select-selector {
-143:   background: var(--bg-container) !important;
-144:   border-color: var(--border-color) !important;
-145:   color: var(--text-primary) !important;
-146:   border-radius: 4px !important;
-147: }
-148: 
-149: .ant-select:not(.ant-select-customize-input) .ant-select-selector:hover {
-150:   border-color: var(--primary) !important;
-151: }
-152: 
-153: .ant-select-focused .ant-select-selector {
-154:   border-color: var(--primary) !important;
-155:   box-shadow: 0 0 0 3px var(--primary-light) !important;
-156: }
-157: 
-158: 
-159: .ant-dropdown-menu {
-160:   background: var(--bg-base) !important;
-161:   border: 1px solid var(--border-color);
-162:   border-radius: 12px !important;
-163:   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1) !important;
-164:   padding: 8px !important;
-165: }
-166: 
-167: .ant-dropdown-menu-item {
-168:   border-radius: 4px !important;
-169:   color: var(--text-primary) !important;
-170: }
-171: 
-172: .ant-dropdown-menu-item:hover {
-173:   background: var(--bg-elevated) !important;
-174: }
-175: 
-176: 
-177: .ant-card {
-178:   background: var(--bg-base);
-179:   border-color: var(--border-color);
-180:   border-radius: 12px;
-181:   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-182: }
-183: 
-184: 
-185: .ant-modal-content {
-186:   background: var(--bg-base) !important;
-187:   border-radius: 4px !important;
-188:   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15) !important;
-189:   border: 1px solid var(--border-color);
-190: }
-191: 
-192: .ant-modal-header {
-193:   background: var(--bg-base) !important;
-194:   border-bottom: 1px solid var(--border-color) !important;
-195:   border-radius: 4px 4px 0 0 !important;
-196:   padding: 16px 20px !important;
-197:   margin-bottom: 0 !important;
-198: }
-199: 
-200: .ant-modal-title {
-201:   color: var(--text-primary) !important;
-202:   font-weight: 600 !important;
-203:   font-size: 15px !important;
-204: }
-205: 
-206: .ant-modal-body {
-207:   padding: 20px !important;
-208:   color: var(--text-primary);
-209: }
-210: 
-211: .ant-modal-footer {
-212:   border-top: 1px solid var(--border-light) !important;
-213:   padding: 12px 20px !important;
-214:   background: var(--bg-base) !important;
-215:   border-radius: 0 0 4px 4px !important;
-216: }
-217: 
-218: .ant-modal-close-icon {
-219:   color: var(--text-tertiary) !important;
-220: }
-221: 
-222: .ant-modal-close:hover .ant-modal-close-icon {
-223:   color: var(--text-primary) !important;
-224: }
-225: 
-226: 
-227: .ant-tag {
-228:   border-radius: 6px;
-229:   border: none;
-230:   padding: 4px 10px;
-231: }
-232: 
-233: 
-234: .ant-alert {
-235:   border-radius: 10px;
-236:   border: none;
-237: }
-238: 
-239: .ant-alert-success {
-240:   background: var(--success-light);
-241: }
-242: 
-243: .ant-alert-warning {
-244:   background: var(--warning-light);
-245: }
-246: 
-247: .ant-alert-error {
-248:   background: var(--error-light);
-249: }
-250: 
-251: .ant-alert-info {
-252:   background: var(--info-light);
-253: }
-254: 
-255: 
-256: .ant-spin {
-257:   color: var(--primary);
-258: }
-259: 
-260: .ant-spin-dot-item {
-261:   background-color: var(--primary);
-262: }
-263: 
-264: 
-265: .ant-empty-description {
-266:   color: var(--text-secondary);
-267: }
 ```
 
 ### crates/cowork-gui/src/styles/global.css (34 lines)
@@ -32064,29 +32087,6 @@ LICENSE
 11:     <script type="module" src="/src/main.tsx"></script>
 12:   </body>
 13: </html>
-```
-
-### crates/cowork-gui/src/components/CommandPalette.tsx (18 lines)
-
-```
-1: Command
-2: ⋮----
-3: {
-4:   id: string;
-5:   label: string;
-6:   icon: React.ReactNode;
-7:   category: string;
-8:   shortcut: string;
-9:   action: () => void;
-10: }
-11: ⋮----
-12: CommandPaletteProps
-13: ⋮----
-14: {
-15:   visible: boolean;
-16:   onClose: () => void;
-17:   onCommandSelect: (commandId: string) => void;
-18: }
 ```
 
 ### crates/cowork-gui/src/components/PreviewPanel.tsx (12 lines)
