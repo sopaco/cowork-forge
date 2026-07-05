@@ -295,15 +295,29 @@ export const useAgentStore = create<AgentState>((set, get) => ({
           }
 
           if (lastPmAgentIdx >= 0) {
-            const lastMsg = msgs[lastPmAgentIdx] as PMAgentMessage;
+            const lastMsg = msgs[lastPmAgentIdx] as PMAgentMessage & { isStreaming?: boolean };
             if (!lastMsg.actions || lastMsg.actions.length === 0) {
-              msgs[lastPmAgentIdx] = { ...lastMsg, actions: response.actions };
+              // 关键：必须显式置 isStreaming: false，否则 PM action 按钮永远不渲染
+              msgs[lastPmAgentIdx] = { ...lastMsg, actions: response.actions, isStreaming: false } as PMAgentMessage;
             }
           }
           return { pmMessages: msgs, pmProcessing: false };
         });
       } else {
-        set({ pmProcessing: false });
+        // 即使没有 actions，也要把末尾 PM 消息的 isStreaming 关掉
+        set((state) => {
+          const msgs = [...state.pmMessages];
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].type === 'pm_agent') {
+              const last = msgs[i] as PMAgentMessage & { isStreaming?: boolean };
+              if (last.isStreaming) {
+                msgs[i] = { ...last, isStreaming: false } as PMAgentMessage;
+              }
+              break;
+            }
+          }
+          return { pmMessages: msgs, pmProcessing: false };
+        });
       }
     } catch (error) {
       set({ pmProcessing: false });

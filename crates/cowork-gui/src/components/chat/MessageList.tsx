@@ -65,30 +65,45 @@ const getMessageKey = (msg: ChatMessage, index: number): string => {
 };
 
 // 估算每条消息行高（用于 react-window）
+// 注意：宁可高估也不要低估 — 低估会导致行底部被裁剪（用户气泡底部被遮住）
 const estimateItemSize = (msg: ChatMessage | undefined, containerWidth: number): number => {
   if (!msg) return 80;
-  const width = Math.max(containerWidth - 80, 200); // 减去 padding/avatar
   switch (msg.type) {
     case 'user': {
       const content = (msg as { content: string }).content || '';
-      // 估算：每行 ~50 字符，行高 22px，最小 50
-      const lines = Math.ceil(content.length / Math.max(width / 8, 30));
-      return Math.max(50, lines * 22 + 24);
+      // 用户气泡 max-width 75% + padding 10/16，行 padding 16/24
+      // 每行 ~50 字符（14px font, ~7-8px/char, 可用宽度 ~container * 0.75 - 32）
+      const charsPerLine = Math.max(Math.floor((containerWidth * 0.75 - 32) / 8), 20);
+      const lines = Math.ceil(content.length / charsPerLine) + (content.includes('\n') ? content.split('\n').length - 1 : 0);
+      // row padding 32 + bubble padding 20 + content
+      return Math.max(80, lines * 22 + 56);
     }
     case 'tool_call':
     case 'tool_result':
-      return 56;
+      return 64;
     case 'thinking':
-      return (msg as ThinkingMessage).isExpanded ? 200 : 44;
+      return (msg as ThinkingMessage).isExpanded ? 220 : 48;
     case 'error':
-      return 60;
-    case 'pm_agent':
+      return 72;
+    case 'pm_agent': {
+      const content = (msg as { content: string }).content || '';
+      const charsPerLine = Math.max(Math.floor((containerWidth - 80) / 8), 30);
+      const explicitLines = content.split('\n').length;
+      const wrappedLines = Math.ceil(content.length / charsPerLine);
+      const lines = Math.max(explicitLines, wrappedLines);
+      // 留出 actions 按钮区域 (~50px) 和 header (~32px)
+      const actions = (msg as { actions?: unknown[] }).actions;
+      const actionsHeight = actions && actions.length > 0 ? 50 : 0;
+      return Math.max(120, lines * 22 + 80 + actionsHeight);
+    }
     case 'agent':
     default: {
       const content = (msg as { content: string }).content || '';
-      // markdown 估算：每 8 字符约 1px 宽度，行高 22
-      const lines = Math.ceil(content.length / Math.max(width / 8, 30));
-      return Math.max(80, lines * 22 + 60);
+      const charsPerLine = Math.max(Math.floor((containerWidth - 80) / 8), 30);
+      const explicitLines = content.split('\n').length;
+      const wrappedLines = Math.ceil(content.length / charsPerLine);
+      const lines = Math.max(explicitLines, wrappedLines);
+      return Math.max(100, lines * 22 + 80);
     }
   }
 };
@@ -331,12 +346,13 @@ const MessageListInner: React.FC<MessageListProps> = ({
   const activeMessages = mode === 'pm_agent' ? safePmMessages : safeMessages;
   const isEmpty = activeMessages.length === 0;
 
-  // 自动滚动到底部
+  // 自动滚动到底部 + 流式期间重新测量行高（避免高度缓存导致气泡被裁剪）
   useEffect(() => {
     if (activeMessages.length === 0) return;
-    // 新消息到达时滚动到底部
     if (activeMessages.length !== lastCountRef.current) {
       lastCountRef.current = activeMessages.length;
+      // 新消息到达时重置后面所有项的缓存高度
+      listRef.current?.resetAfterIndex(activeMessages.length - 2);
       requestAnimationFrame(() => {
         listRef.current?.scrollToItem(activeMessages.length - 1, 'end');
       });
@@ -349,11 +365,21 @@ const MessageListInner: React.FC<MessageListProps> = ({
     : 0;
   useEffect(() => {
     if (activeMessages.length === 0) return;
-    // 只在最后一条 content 增长时滚（流式）
+    // 流式期间重新测量最后一条的高度（content 增长后高度可能变化）
+    listRef.current?.resetAfterIndex(activeMessages.length - 1);
     requestAnimationFrame(() => {
       listRef.current?.scrollToItem(activeMessages.length - 1, 'end');
     });
   }, [lastContentLen, activeMessages.length]);
+
+  // 当 PM actions 到达时重新测量（actions 增加高度）
+  const lastActionsLen = activeMessages.length > 0
+    ? (activeMessages[activeMessages.length - 1] as { actions?: unknown[] })?.actions?.length || 0
+    : 0;
+  useEffect(() => {
+    if (activeMessages.length === 0 || lastActionsLen === 0) return;
+    listRef.current?.resetAfterIndex(activeMessages.length - 1);
+  }, [lastActionsLen, activeMessages.length]);
 
   const rowData: RowData = useMemo(() => ({
     messages: activeMessages as ChatMessage[],

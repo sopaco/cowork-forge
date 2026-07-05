@@ -499,9 +499,10 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({
                     <div
                       style={{
                         marginBottom: "16px",
-                        padding: "20px",
-                        background: "#f5f5f5",
-                        borderRadius: "4px",
+                        padding: "16px 20px",
+                        background: "var(--bg-elevated)",
+                        borderRadius: "6px",
+                        border: "1px solid var(--border-light)",
                       }}
                     >
                       <Space orientation="vertical" style={{ width: "100%" }}>
@@ -554,9 +555,10 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({
                       style={{
                         maxHeight: "50vh",
                         overflow: "auto",
-                        padding: "20px",
-                        backgroundColor: "#fafafa",
-                        borderRadius: "4px",
+                        padding: "16px 20px",
+                        background: "var(--bg-container)",
+                        borderRadius: "6px",
+                        border: "1px solid var(--border-light)",
                       }}
                     >
                       <ReactMarkdown
@@ -581,9 +583,10 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({
                       <Divider style={{ margin: "8px 0" }} />
                       <div
                         style={{
-                          padding: "20px",
-                          backgroundColor: "#fafafa",
-                          borderRadius: "4px",
+                          padding: "16px 20px",
+                          background: "var(--bg-container)",
+                          borderRadius: "6px",
+                          border: "1px solid var(--border-light)",
                           maxHeight: "60vh",
                           overflow: "auto",
                         }}

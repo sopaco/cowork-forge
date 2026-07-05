@@ -264,6 +264,7 @@ crates/
       utils/
         errorHandler.ts
         index.ts
+        markdown.ts
       App.tsx
       assets.d.ts
       main.tsx
@@ -1923,120 +1924,6 @@ LICENSE
 309: }
 ```
 
-### crates/cowork-core/src/lib.rs (109 lines)
-
-```
-1: pub mod config;
-2: 
-3: 
-4: pub mod config_definition;
-5: 
-6: 
-7: pub mod acp;
-8: 
-9: 
-10: pub mod domain;
-11: pub mod persistence;
-12: 
-13: 
-14: pub mod data;
-15: 
-16: 
-17: pub mod tech_stack;
-18: 
-19: 
-20: pub mod project_runtime;
-21: pub mod runtime_security;
-22: pub mod runtime_analyzer;
-23: 
-24: 
-25: pub mod llm;
-26: pub mod tools;
-27: pub mod agents;
-28: pub mod pipeline;
-29: pub mod instructions;
-30: pub mod interaction;
-31: 
-32: 
-33: pub mod skills;
-34: 
-35: 
-36: pub mod integration;
-37: 
-38: 
-39: pub mod importer;
-40: 
-41: 
-42: pub use domain::*;
-43: pub use persistence::*;
-44: pub use data::*;
-45: pub use llm::*;
-46: pub use agents::{create_project_manager_agent, execute_pm_agent_message, execute_pm_agent_message_streaming, PMAgentResult, PMAgentAction, PMAgentStreamCallback, create_legacy_project_analyzer, create_legacy_project_analyzer_with_context};
-47: pub use tech_stack::*;
-48: 
-49: 
-50: pub use project_runtime::{
-51:     ProjectRuntimeConfig, RuntimeType, FrontendFramework, FrontendRuntime,
-52:     BackendFramework, BackendRuntime, FullstackRuntime, DependencyConfig,
-53:     ProxyConfig, PackageManager as RuntimePackageManager, SecurityCheckResult,
-54:     get_preset_config,
-55: };
-56: pub use runtime_security::RuntimeSecurityChecker;
-57: pub use runtime_analyzer::{
-58:     RuntimeAnalyzer, ProjectInfo, save_runtime_config, load_runtime_config, has_runtime_config,
-59: };
-60: 
-61: 
-62: pub use config::{get_system_locale, set_system_locale, get_language_instruction};
-63: 
-64: 
-65: pub use acp::{AcpClient, AcpTaskResult};
-66: 
-67: 
-68: pub use config_definition::{
-69:     AgentDefinition, AgentType, ModelConfig, ToolReference, IncludeContentsMode,
-70:     StageDefinition, StageType, HookConfig, HookPoint, ArtifactConfig, StageRetryConfig,
-71:     FlowDefinition, StageReference, FlowConfig, MemoryScope, InheritanceConfig, InheritanceMode,
-72:     IntegrationDefinition, IntegrationType, ConnectionConfig, AuthConfig, IntegrationEvent,
-73:     ConfigRegistry, global_registry, LoadReport, ConfigValidator, ValidationResult,
-74:     create_agent_for_stage, create_agent_from_config, initialize_config_registry,
-75:     initialize_mcp_toolsets, is_mcp_initialized,
-76: };
-77: 
-78: 
-79: pub use skills::{
-80:     SkillManager, SkillManagerConfig,
-81:     
-82:     SkillDocument, SkillIndex, SkillSummary, SkillMatch,
-83:     
-84:     SelectionPolicy,
-85:     
-86:     SkillInjector, SkillInjectorConfig,
-87:     apply_skill_injection, select_skill_prompt_block,
-88:     
-89:     load_skill_index, parse_skill_markdown, parse_instruction_markdown,
-90:     
-91:     discover_skill_files, discover_instruction_files,
-92:     
-93:     SkillError, SkillResult,
-94: };
-95: 
-96: 
-97: pub use integration::{
-98:     HookManager, HookExecutionContext, HookExecutionResult,
-99:     IntegrationAdapter, AdapterError, RestAdapter,
-100: };
-101: 
-102: 
-103: pub use importer::{
-104:     ImportConfig, ImportResult, ImportPreview, ArtifactOptions,
-105:     ProjectAnalysis, ProjectStructure, DetectedTechnology,
-106: };
-107: 
-108: 
-109: pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-```
-
 ### crates/cowork-core/src/pipeline/executor/mod.rs (643 lines)
 
 ```
@@ -3048,62 +2935,180 @@ LICENSE
 358: }
 ```
 
-### Cargo.toml (53 lines)
+### crates/cowork-gui/src/components/chat/InputArea.tsx (18 lines)
 
 ```
-1: [workspace]
-2: resolver = "2"
-3: members = [
-4:     "crates/cowork-core",
-5:     "crates/cowork-cli",
-6:     "crates/cowork-gui/src-tauri",
-7: ]
+1: TextAreaRef
+2: ⋮----
+3: React.ComponentRef<typeof TextArea>
+4: ⋮----
+5: InputAreaProps
+6: ⋮----
+7: {
+8:   userInput: string;
+9:   onUserInputChange: (value: string) => void;
+10:   onSend: () => void;
+11:   onDumpChat: () => void;
+12:   inputRequest?: InputRequest | null;
+13:   onSelectOption: (option: InputOption) => void;
+14:   onSubmitFeedback: () => void;
+15:   onCancelFeedback: () => void;
+16:   disabled?: boolean;
+17:   mode: 'pipeline' | 'pm_agent';
+18: }
+```
+
+### crates/cowork-gui/src/components/chat/MessageList.tsx (34 lines)
+
+```
+1: ToolCallMessage
+2: ⋮----
+3: {
+4:   toolName: string;
+5:   arguments: Record<string, unknown>;
+6:   agentName: string;
+7: }
+8: ⋮----
+9: ToolResultMessage
+10: ⋮----
+11: {
+12:   toolName: string;
+13:   result: string;
+14:   success: boolean;
+15:   agentName: string;
+16: }
+17: ⋮----
+18: PMAgentMessage
+19: ⋮----
+20: {
+21:   actions?: PMAction[];
+22: }
+23: ⋮----
+24: MessageListProps
+25: ⋮----
+26: {
+27:   messages: ChatMessage[];
+28:   pmMessages?: (ChatMessage & { type: 'user' | 'pm_agent' })[];
+29:   mode: 'pipeline' | 'pm_agent';
+30:   isProcessing: boolean;
+31:   currentAgent: string | null;
+32:   onToggleThinking: (index: number) => void;
+33:   onActionClick?: (action: PMAction) => void;
+34: }
+```
+
+### crates/cowork-core/src/lib.rs (109 lines)
+
+```
+1: pub mod config;
+2: 
+3: 
+4: pub mod config_definition;
+5: 
+6: 
+7: pub mod acp;
 8: 
-9: [workspace.package]
-10: version = "2.5.2"
-11: edition = "2024"
-12: authors = ["Sopaco"]
-13: license = "MIT"
-14: repository = "https://github.com/sopaco/cowork-forge"
+9: 
+10: pub mod domain;
+11: pub mod persistence;
+12: 
+13: 
+14: pub mod data;
 15: 
-16: [workspace.dependencies]
-17: adk-rust = "1.0.0"
-18: adk-core = "1.0.0"
-19: adk-agent = "1.0.0"
-20: adk-model = { version = "1.0.0", features = ["openai"] }
-21: adk-tool = "1.0.0"
-22: adk-runner = "1.0.0"
-23: adk-session = "1.0.0"
-24: adk-skill = "1.0.0"
-25: 
-26: tokio = { version = "1", features = ["full"] }
-27: tokio-util = { version = "0.7", features = ["compat"] }
-28: anyhow = "1"
-29: thiserror = "2"
-30: serde = { version = "1", features = ["derive"] }
-31: serde_json = "1"
+16: 
+17: pub mod tech_stack;
+18: 
+19: 
+20: pub mod project_runtime;
+21: pub mod runtime_security;
+22: pub mod runtime_analyzer;
+23: 
+24: 
+25: pub mod llm;
+26: pub mod tools;
+27: pub mod agents;
+28: pub mod pipeline;
+29: pub mod instructions;
+30: pub mod interaction;
+31: 
 32: 
-33: toml = "1.0"
+33: pub mod skills;
 34: 
-35: clap = { version = "4", features = ["derive"] }
-36: dialoguer = "0.12"
-37: console = "0.16"
+35: 
+36: pub mod integration;
+37: 
 38: 
-39: tracing = "0.1"
-40: tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+39: pub mod importer;
+40: 
 41: 
-42: chrono = { version = "0.4", features = ["serde"] }
-43: uuid = { version = "1", features = ["v4", "serde"] }
-44: 
-45: dirs = "6"
-46: walkdir = "2"
-47: ignore = "0.4"
+42: pub use domain::*;
+43: pub use persistence::*;
+44: pub use data::*;
+45: pub use llm::*;
+46: pub use agents::{create_project_manager_agent, execute_pm_agent_message, execute_pm_agent_message_streaming, PMAgentResult, PMAgentAction, PMAgentStreamCallback, create_legacy_project_analyzer, create_legacy_project_analyzer_with_context};
+47: pub use tech_stack::*;
 48: 
-49: futures = "0.3"
-50: 
-51: tempfile = "3"
-52: 
-53: agent-client-protocol = "0.9"
+49: 
+50: pub use project_runtime::{
+51:     ProjectRuntimeConfig, RuntimeType, FrontendFramework, FrontendRuntime,
+52:     BackendFramework, BackendRuntime, FullstackRuntime, DependencyConfig,
+53:     ProxyConfig, PackageManager as RuntimePackageManager, SecurityCheckResult,
+54:     get_preset_config,
+55: };
+56: pub use runtime_security::RuntimeSecurityChecker;
+57: pub use runtime_analyzer::{
+58:     RuntimeAnalyzer, ProjectInfo, save_runtime_config, load_runtime_config, has_runtime_config,
+59: };
+60: 
+61: 
+62: pub use config::{get_system_locale, set_system_locale, get_language_instruction};
+63: 
+64: 
+65: pub use acp::{AcpClient, AcpTaskResult};
+66: 
+67: 
+68: pub use config_definition::{
+69:     AgentDefinition, AgentType, ModelConfig, ToolReference, IncludeContentsMode,
+70:     StageDefinition, StageType, HookConfig, HookPoint, ArtifactConfig, StageRetryConfig,
+71:     FlowDefinition, StageReference, FlowConfig, MemoryScope, InheritanceConfig, InheritanceMode,
+72:     IntegrationDefinition, IntegrationType, ConnectionConfig, AuthConfig, IntegrationEvent,
+73:     ConfigRegistry, global_registry, LoadReport, ConfigValidator, ValidationResult,
+74:     create_agent_for_stage, create_agent_from_config, initialize_config_registry,
+75:     initialize_mcp_toolsets, is_mcp_initialized,
+76: };
+77: 
+78: 
+79: pub use skills::{
+80:     SkillManager, SkillManagerConfig,
+81:     
+82:     SkillDocument, SkillIndex, SkillSummary, SkillMatch,
+83:     
+84:     SelectionPolicy,
+85:     
+86:     SkillInjector, SkillInjectorConfig,
+87:     apply_skill_injection, select_skill_prompt_block,
+88:     
+89:     load_skill_index, parse_skill_markdown, parse_instruction_markdown,
+90:     
+91:     discover_skill_files, discover_instruction_files,
+92:     
+93:     SkillError, SkillResult,
+94: };
+95: 
+96: 
+97: pub use integration::{
+98:     HookManager, HookExecutionContext, HookExecutionResult,
+99:     IntegrationAdapter, AdapterError, RestAdapter,
+100: };
+101: 
+102: 
+103: pub use importer::{
+104:     ImportConfig, ImportResult, ImportPreview, ArtifactOptions,
+105:     ProjectAnalysis, ProjectStructure, DetectedTechnology,
+106: };
+107: 
+108: 
+109: pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 ```
 
 ### crates/cowork-core/src/tools/control_tools.rs (263 lines)
@@ -3403,62 +3408,465 @@ LICENSE
 24: }
 ```
 
-### crates/cowork-gui/src/components/chat/InputArea.tsx (14 lines)
+### crates/cowork-gui/src/hooks/useAppEvents.ts (456 lines)
 
 ```
-1: InputAreaProps
-2: ⋮----
-3: {
-4:   userInput: string;
-5:   onUserInputChange: (value: string) => void;
-6:   onSend: () => void;
-7:   onDumpChat: () => void;
-8:   inputRequest?: InputRequest | null;
-9:   onSelectOption: (option: InputOption) => void;
-10:   onSubmitFeedback: () => void;
-11:   onCancelFeedback: () => void;
-12:   disabled?: boolean;
-13:   mode: 'pipeline' | 'pm_agent';
-14: }
-```
-
-### crates/cowork-gui/src/components/chat/MessageList.tsx (34 lines)
-
-```
-1: ToolCallMessage
-2: ⋮----
-3: {
-4:   toolName: string;
-5:   arguments: Record<string, unknown>;
-6:   agentName: string;
-7: }
-8: ⋮----
-9: ToolResultMessage
-10: ⋮----
-11: {
-12:   toolName: string;
-13:   result: string;
-14:   success: boolean;
-15:   agentName: string;
-16: }
-17: ⋮----
-18: PMAgentMessage
-19: ⋮----
-20: {
-21:   actions?: PMAction[];
-22: }
-23: ⋮----
-24: MessageListProps
-25: ⋮----
-26: {
-27:   messages: ChatMessage[];
-28:   pmMessages?: (ChatMessage & { type: 'user' | 'pm_agent' })[];
-29:   mode: 'pipeline' | 'pm_agent';
-30:   isProcessing: boolean;
-31:   currentAgent: string | null;
-32:   onToggleThinking: (index: number) => void;
-33:   onActionClick?: (action: PMAction) => void;
-34: }
+1: function useAppEvents(userInput: string, setUserInput: (input: string) => void) {
+2: 	const { message } = AntApp.useApp();
+3: 	const listenersRegistered = useRef(false);
+4: 
+5: 	
+6: 	const projectActions = useProjectStore(
+7: 		useShallow(s => ({
+8: 			loadProject: s.loadProject,
+9: 			loadIterations: s.loadIterations,
+10: 			setCurrentIteration: s.setCurrentIteration,
+11: 			updateCurrentIterationStatus: s.updateCurrentIterationStatus,
+12: 			setIsExecuting: s.setIsExecuting,
+13: 		}))
+14: 	);
+15: 
+16: 	
+17: 	const agentActions = useAgentStore(
+18: 		useShallow(s => ({
+19: 			setMessages: s.setMessages,
+20: 			clearMessages: s.clearMessages,
+21: 			setPMMessages: s.setPMMessages,
+22: 			clearPMMessages: s.clearPMMessages,
+23: 			setProcessing: s.setProcessing,
+24: 			setCurrentAgent: s.setCurrentAgent,
+25: 			setCurrentStage: s.setCurrentStage,
+26: 			setInputRequest: s.setInputRequest,
+27: 			setPmProcessing: s.setPmProcessing,
+28: 			submitInput: s.submitInput,
+29: 			loadPMWelcomeMessage: s.loadPMWelcomeMessage,
+30: 			appendLastMessageContent: s.appendLastMessageContent,
+31: 			appendLastPMMessageContent: s.appendLastPMMessageContent,
+32: 			addMessage: s.addMessage,
+33: 		}))
+34: 	);
+35: 
+36: 	
+37: 	const uiState = useUIStore(
+38: 		useShallow(s => ({
+39: 			commandPaletteVisible: s.commandPaletteVisible,
+40: 			setActiveView: s.setActiveView,
+41: 			setCommandPaletteVisible: s.setCommandPaletteVisible,
+42: 			setActiveArtifactTab: s.setActiveArtifactTab,
+43: 			triggerArtifactsRefresh: s.triggerArtifactsRefresh,
+44: 			triggerCodeRefresh: s.triggerCodeRefresh,
+45: 			triggerMemoryRefresh: s.triggerMemoryRefresh,
+46: 			triggerKnowledgeRefresh: s.triggerKnowledgeRefresh,
+47: 		}))
+48: 	);
+49: 
+50: 	useEffect(() => {
+51: 		const setupListeners = async () => {
+52: 			if (listenersRegistered.current) return;
+53: 			listenersRegistered.current = true;
+54: 
+55: 			
+56: 			
+57: 			let pipelineBuffer = '';
+58: 			let pipelineLastMeta: { isLast?: boolean; agentName?: string; msgType?: string } | null = null;
+59: 			let pipelineRafId: number | null = null;
+60: 			
+61: 			let pmBuffer = '';
+62: 			let pmLastMeta: { isLast?: boolean } | null = null;
+63: 			let pmRafId: number | null = null;
+64: 
+65: 			const flushPipeline = () => {
+66: 				pipelineRafId = null;
+67: 				if (!pipelineBuffer) {
+68: 					
+69: 					if (pipelineLastMeta?.isLast && pipelineLastMeta.agentName) {
+70: 						
+71: 						agentActions.appendLastMessageContent('', { isLast: true, agentName: pipelineLastMeta.agentName, msgType: pipelineLastMeta.msgType });
+72: 					}
+73: 					pipelineLastMeta = null;
+74: 					return;
+75: 				}
+76: 				agentActions.appendLastMessageContent(pipelineBuffer, {
+77: 					isLast: pipelineLastMeta?.isLast,
+78: 					agentName: pipelineLastMeta?.agentName,
+79: 					msgType: pipelineLastMeta?.msgType,
+80: 				});
+81: 				pipelineBuffer = '';
+82: 				pipelineLastMeta = null;
+83: 			};
+84: 
+85: 			const flushPM = () => {
+86: 				pmRafId = null;
+87: 				if (!pmBuffer) {
+88: 					if (pmLastMeta?.isLast) {
+89: 						agentActions.appendLastPMMessageContent('', { isLast: true });
+90: 					}
+91: 					pmLastMeta = null;
+92: 					return;
+93: 				}
+94: 				agentActions.appendLastPMMessageContent(pmBuffer, { isLast: pmLastMeta?.isLast });
+95: 				pmBuffer = '';
+96: 				pmLastMeta = null;
+97: 			};
+98: 
+99: 			const schedulePipelineFlush = () => {
+100: 				if (pipelineRafId == null) {
+101: 					pipelineRafId = requestAnimationFrame(flushPipeline);
+102: 				}
+103: 			};
+104: 			const schedulePMFlush = () => {
+105: 				if (pmRafId == null) {
+106: 					pmRafId = requestAnimationFrame(flushPM);
+107: 				}
+108: 			};
+109: 
+110: 			
+111: 			const listenerPromises = [
+112: 				
+113: 				listen('iteration_created', () => {
+114: 					projectActions.loadProject();
+115: 					message.success('Iteration created');
+116: 				}),
+117: 
+118: 				listen('iteration_started', () => {
+119: 					agentActions.setProcessing(true);
+120: 					projectActions.setIsExecuting(true);
+121: 					projectActions.updateCurrentIterationStatus('Running');
+122: 					uiState.setActiveView('chat');
+123: 					message.info('Iteration started');
+124: 				}),
+125: 
+126: 				listen('iteration_continued', () => {
+127: 					agentActions.setProcessing(true);
+128: 					projectActions.setIsExecuting(true);
+129: 					projectActions.updateCurrentIterationStatus('Running');
+130: 					uiState.setActiveView('chat');
+131: 					message.info('Iteration continued');
+132: 				}),
+133: 
+134: 				listen('iteration_retrying', () => {
+135: 					agentActions.setProcessing(true);
+136: 					projectActions.setIsExecuting(true);
+137: 					projectActions.updateCurrentIterationStatus('Running');
+138: 					uiState.setActiveView('chat');
+139: 					message.info('Retrying iteration...');
+140: 				}),
+141: 
+142: 				listen('iteration_completed', (event) => {
+143: 					const iterationId = event.payload as string;
+144: 					agentActions.setProcessing(false);
+145: 					projectActions.setIsExecuting(false);
+146: 					agentActions.setCurrentAgent(null);
+147: 					agentActions.setCurrentStage(null);
+148: 					agentActions.setInputRequest(null);
+149: 					projectActions.updateCurrentIterationStatus('Completed');
+150: 					projectActions.loadProject();
+151: 					uiState.triggerMemoryRefresh();
+152: 					uiState.triggerKnowledgeRefresh();
+153: 					agentActions.clearPMMessages();
+154: 					uiState.setActiveView('chat');
+155: 					agentActions.loadPMWelcomeMessage(iterationId);
+156: 					message.success('Iteration completed');
+157: 				}),
+158: 
+159: 				listen('iteration_failed', (event) => {
+160: 					const [, error] = event.payload as [string, string];
+161: 					agentActions.setProcessing(false);
+162: 					projectActions.setIsExecuting(false);
+163: 					agentActions.setCurrentAgent(null);
+164: 					agentActions.setCurrentStage(null);
+165: 					agentActions.setInputRequest(null);
+166: 					projectActions.updateCurrentIterationStatus('Failed');
+167: 					projectActions.loadProject();
+168: 					message.error('Iteration failed: ' + error);
+169: 				}),
+170: 
+171: 				
+172: 				listen('agent_event', (event) => {
+173: 					const { content, agent_name, message_type, stage_name, level } = event.payload as {
+174: 						content?: string;
+175: 						agent_name?: string;
+176: 						message_type?: string;
+177: 						stage_name?: string;
+178: 						level?: string;
+179: 					};
+180: 
+181: 					if (agent_name) agentActions.setCurrentAgent(agent_name);
+182: 					if (stage_name) agentActions.setCurrentStage(stage_name);
+183: 					if (!content) return;
+184: 
+185: 					
+186: 					agentActions.setMessages((prev) => {
+187: 						const lastMsg = prev[prev.length - 1];
+188: 						const isThinking = message_type === 'thinking';
+189: 
+190: 						if (isThinking) {
+191: 							if (
+192: 								lastMsg?.type === 'thinking' &&
+193: 								(lastMsg as ThinkingMessage).isStreaming &&
+194: 								(lastMsg as ThinkingMessage).agentName === agent_name
+195: 							) {
+196: 								return [
+197: 									...prev.slice(0, -1),
+198: 									{
+199: 										...lastMsg,
+200: 										content: (lastMsg as ThinkingMessage).content + content
+201: 									} as ChatMessage
+202: 								];
+203: 							}
+204: 							return [
+205: 								...prev,
+206: 								{
+207: 									type: 'thinking',
+208: 									content,
+209: 									agentName: agent_name || 'AI Agent',
+210: 									stageName: stage_name,
+211: 									isStreaming: true,
+212: 									isExpanded: false,
+213: 									timestamp: new Date().toISOString()
+214: 								} as ThinkingMessage
+215: 							] as ChatMessage[];
+216: 						} else {
+217: 							if (
+218: 								lastMsg?.type === 'agent' &&
+219: 								(lastMsg as { isStreaming?: boolean }).isStreaming &&
+220: 								(lastMsg as { agentName?: string }).agentName === agent_name
+221: 							) {
+222: 								return [
+223: 									...prev.slice(0, -1),
+224: 									{
+225: 										...lastMsg,
+226: 										content: (lastMsg as { content: string }).content + content
+227: 									} as ChatMessage
+228: 								];
+229: 							}
+230: 							return [
+231: 								...prev,
+232: 								{
+233: 									type: 'agent',
+234: 									content,
+235: 									agentName: agent_name || 'AI Agent',
+236: 									stageName: stage_name,
+237: 									level,
+238: 									isStreaming: true,
+239: 									timestamp: new Date().toISOString()
+240: 								} as ChatMessage
+241: 							] as ChatMessage[];
+242: 						}
+243: 					});
+244: 				}),
+245: 
+246: 				
+247: 				listen('agent_streaming', (event) => {
+248: 					const { content, agent_name, is_thinking, is_first, is_last } = event.payload as {
+249: 						content?: string;
+250: 						agent_name?: string;
+251: 						is_thinking?: boolean;
+252: 						is_first?: boolean;
+253: 						is_last?: boolean;
+254: 					};
+255: 
+256: 					
+257: 					if (agent_name === 'PM Agent') {
+258: 						if (is_last && !content) {
+259: 							
+260: 							agentActions.setPMMessages((prev) => {
+261: 								const lastMsg = prev[prev.length - 1];
+262: 								if (lastMsg?.type === 'pm_agent') {
+263: 									return [...prev.slice(0, -1), { ...lastMsg } as PMAgentMessage];
+264: 								}
+265: 								return prev;
+266: 							});
+267: 							agentActions.setPmProcessing(false);
+268: 							return;
+269: 						}
+270: 
+271: 						if (!content) return;
+272: 
+273: 						
+274: 						if (is_first && pmBuffer) {
+275: 							flushPM();
+276: 						}
+277: 
+278: 						pmBuffer += content;
+279: 						pmLastMeta = { isLast: is_last };
+280: 						schedulePMFlush();
+281: 						return;
+282: 					}
+283: 
+284: 					
+285: 					if (!content) return;
+286: 					const msgType = is_thinking ? 'thinking' : 'agent';
+287: 
+288: 					
+289: 					if (is_first && pipelineBuffer) {
+290: 						flushPipeline();
+291: 					}
+292: 
+293: 					pipelineBuffer += content;
+294: 					pipelineLastMeta = { isLast: is_last, agentName: agent_name, msgType };
+295: 					schedulePipelineFlush();
+296: 				}),
+297: 
+298: 				
+299: 				listen('tool_call', (event) => {
+300: 					const { tool_name, arguments: args, agent_name } = event.payload as {
+301: 						tool_name: string;
+302: 						arguments: Record<string, unknown>;
+303: 						agent_name?: string;
+304: 					};
+305: 					
+306: 					if (pipelineBuffer) flushPipeline();
+307: 					agentActions.addMessage({
+308: 						type: 'tool_call',
+309: 						toolName: tool_name,
+310: 						arguments: args,
+311: 						agentName: agent_name || 'AI Agent',
+312: 						timestamp: new Date().toISOString()
+313: 					} as ChatMessage);
+314: 				}),
+315: 
+316: 				listen('tool_result', (event) => {
+317: 					const { tool_name, result, success, agent_name } = event.payload as {
+318: 						tool_name: string;
+319: 						result: string;
+320: 						success: boolean;
+321: 						agent_name?: string;
+322: 					};
+323: 					if (pipelineBuffer) flushPipeline();
+324: 					agentActions.addMessage({
+325: 						type: 'tool_result',
+326: 						toolName: tool_name,
+327: 						result,
+328: 						success,
+329: 						agentName: agent_name || 'AI Agent',
+330: 						timestamp: new Date().toISOString()
+331: 					} as ChatMessage);
+332: 				}),
+333: 
+334: 				
+335: 				listen('pm_actions', (event) => {
+336: 					const { actions } = event.payload as { actions: PMAction[] };
+337: 					agentActions.setPMMessages((prev) => {
+338: 						const lastMsg = prev[prev.length - 1];
+339: 						if (lastMsg?.type === 'pm_agent') {
+340: 							return [
+341: 								...prev.slice(0, -1),
+342: 								{
+343: 									...lastMsg,
+344: 									actions: [...((lastMsg as PMAgentMessage).actions || []), ...actions]
+345: 								} as PMAgentMessage
+346: 							];
+347: 						}
+348: 						return prev;
+349: 					});
+350: 				}),
+351: 
+352: 				
+353: 				listen('input_request', async (event) => {
+354: 					const [requestId, prompt, options] = event.payload as [string, string, InputOption[]];
+355: 					projectActions.updateCurrentIterationStatus('Paused');
+356: 
+357: 					const artifactMatch = prompt.match(/\[ARTIFACT_TYPE:(\w+)\]$/);
+358: 					if (artifactMatch) {
+359: 						const artifactType = artifactMatch[1];
+360: 						const cleanPrompt = prompt.replace(/\[ARTIFACT_TYPE:\w+\]$/, '').trim();
+361: 
+362: 						
+363: 						try {
+364: 							await projectActions.loadIterations();
+365: 							const latestIterations = useProjectStore.getState().iterations;
+366: 							if (latestIterations && latestIterations.length > 0) {
+367: 								const latestIteration = latestIterations[latestIterations.length - 1];
+368: 								const fullIteration = await API.iteration.get(latestIteration.id);
+369: 								projectActions.setCurrentIteration(fullIteration);
+370: 							}
+371: 						} catch (err) {
+372: 							console.error('[App] Failed to refresh iteration before confirmation:', err);
+373: 						}
+374: 
+375: 						agentActions.setInputRequest({
+376: 							requestId,
+377: 							prompt: cleanPrompt,
+378: 							options,
+379: 							isArtifactConfirmation: true,
+380: 							artifactType
+381: 						});
+382: 					} else {
+383: 						agentActions.setInputRequest({ requestId, prompt, options });
+384: 					}
+385: 					setUserInput('');
+386: 				}),
+387: 
+388: 				
+389: 				listen('project_loaded', async () => {
+390: 					agentActions.setProcessing(false);
+391: 					agentActions.setCurrentAgent(null);
+392: 					agentActions.setInputRequest(null);
+393: 					agentActions.clearMessages();
+394: 					projectActions.setCurrentIteration(null);
+395: 					await projectActions.loadProject();
+396: 					uiState.setActiveView('iterations');
+397: 					message.success('Project loaded');
+398: 				}),
+399: 
+400: 				listen('project_initialized', async () => {
+401: 					agentActions.setProcessing(false);
+402: 					agentActions.setCurrentAgent(null);
+403: 					agentActions.setInputRequest(null);
+404: 					agentActions.clearMessages();
+405: 					projectActions.setCurrentIteration(null);
+406: 					await projectActions.loadProject();
+407: 					uiState.setActiveView('iterations');
+408: 					message.success('Project initialized');
+409: 				}),
+410: 
+411: 				
+412: 				listen('knowledge_regeneration_completed', () => {
+413: 					uiState.triggerKnowledgeRefresh();
+414: 					message.success('Knowledge updated');
+415: 				}),
+416: 
+417: 				listen<[string, string]>('knowledge_regeneration_failed', (event) => {
+418: 					const [iterationId, error] = event.payload;
+419: 					console.error('[App] Knowledge regeneration failed:', iterationId, error);
+420: 					message.error('Knowledge generation failed: ' + error);
+421: 				}),
+422: 			];
+423: 
+424: 			
+425: 			await Promise.all(listenerPromises);
+426: 
+427: 			
+428: 			try {
+429: 				const hasOpenProject = await API.workspace.hasOpen();
+430: 				if (hasOpenProject) {
+431: 					await projectActions.loadProject();
+432: 					uiState.setActiveView('iterations');
+433: 				}
+434: 			} catch (error) {
+435: 				console.error('[App] Failed to check for open project:', error);
+436: 			}
+437: 		};
+438: 
+439: 		setupListeners();
+440: 
+441: 		
+442: 		const handleKeyDown = (e: KeyboardEvent) => {
+443: 			if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+444: 				e.preventDefault();
+445: 				uiState.setCommandPaletteVisible(!uiState.commandPaletteVisible);
+446: 			}
+447: 		};
+448: 
+449: 		window.addEventListener('keydown', handleKeyDown);
+450: 		return () => window.removeEventListener('keydown', handleKeyDown);
+451: 	}, []);
+452: 
+453: 	return {
+454: 		
+455: 	};
+456: }
 ```
 
 ### litho.docs/en/1.Overview.md (296 lines)
@@ -3762,6 +4170,64 @@ LICENSE
 296: **Next Steps**: Refer to Container and Component Level diagrams for detailed internal architecture documentation.
 ````
 
+### Cargo.toml (53 lines)
+
+```
+1: [workspace]
+2: resolver = "2"
+3: members = [
+4:     "crates/cowork-core",
+5:     "crates/cowork-cli",
+6:     "crates/cowork-gui/src-tauri",
+7: ]
+8: 
+9: [workspace.package]
+10: version = "2.5.2"
+11: edition = "2024"
+12: authors = ["Sopaco"]
+13: license = "MIT"
+14: repository = "https://github.com/sopaco/cowork-forge"
+15: 
+16: [workspace.dependencies]
+17: adk-rust = "1.0.0"
+18: adk-core = "1.0.0"
+19: adk-agent = "1.0.0"
+20: adk-model = { version = "1.0.0", features = ["openai"] }
+21: adk-tool = "1.0.0"
+22: adk-runner = "1.0.0"
+23: adk-session = "1.0.0"
+24: adk-skill = "1.0.0"
+25: 
+26: tokio = { version = "1", features = ["full"] }
+27: tokio-util = { version = "0.7", features = ["compat"] }
+28: anyhow = "1"
+29: thiserror = "2"
+30: serde = { version = "1", features = ["derive"] }
+31: serde_json = "1"
+32: 
+33: toml = "1.0"
+34: 
+35: clap = { version = "4", features = ["derive"] }
+36: dialoguer = "0.12"
+37: console = "0.16"
+38: 
+39: tracing = "0.1"
+40: tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+41: 
+42: chrono = { version = "0.4", features = ["serde"] }
+43: uuid = { version = "1", features = ["v4", "serde"] }
+44: 
+45: dirs = "6"
+46: walkdir = "2"
+47: ignore = "0.4"
+48: 
+49: futures = "0.3"
+50: 
+51: tempfile = "3"
+52: 
+53: agent-client-protocol = "0.9"
+```
+
 ### crates/cowork-core/src/instructions/check.rs (93 lines)
 
 ````
@@ -3955,504 +4421,16 @@ LICENSE
 90: }
 ```
 
-### crates/cowork-gui/src/hooks/useAppEvents.ts (440 lines)
+### crates/cowork-gui/src/components/common/MarkdownMessage.tsx (7 lines)
 
 ```
-1: function useAppEvents(userInput: string, setUserInput: (input: string) => void) {
-2: 	const { message } = AntApp.useApp();
-3: 	const listenersRegistered = useRef(false);
-4: 
-5: 	
-6: 	const {
-7: 		loadProject,
-8: 		loadIterations,
-9: 		setCurrentIteration,
-10: 		updateCurrentIterationStatus,
-11: 		setIsExecuting
-12: 	} = useProjectStore();
-13: 
-14: 	
-15: 	const {
-16: 		setMessages,
-17: 		clearMessages,
-18: 		setPMMessages,
-19: 		clearPMMessages,
-20: 		setProcessing,
-21: 		setCurrentAgent,
-22: 		setCurrentStage,
-23: 		setInputRequest,
-24: 		setPmProcessing,
-25: 		submitInput,
-26: 		loadPMWelcomeMessage
-27: 	} = useAgentStore();
-28: 
-29: 	
-30: 	const {
-31: 		commandPaletteVisible,
-32: 		setActiveView,
-33: 		setCommandPaletteVisible,
-34: 		setActiveArtifactTab,
-35: 		triggerArtifactsRefresh,
-36: 		triggerCodeRefresh,
-37: 		triggerMemoryRefresh,
-38: 		triggerKnowledgeRefresh
-39: 	} = useUIStore();
-40: 
-41: 	useEffect(() => {
-42: 		const setupListeners = async () => {
-43: 			if (listenersRegistered.current) return;
-44: 			listenersRegistered.current = true;
-45: 
-46: 			
-47: 			const listenerPromises = [
-48: 				
-49: 				listen('iteration_created', () => {
-50: 					loadProject();
-51: 					message.success('Iteration created');
-52: 				}),
-53: 
-54: 				listen('iteration_started', (event) => {
-55: 					const iterationId = event.payload as string;
-56: 					setProcessing(true);
-57: 					setIsExecuting(true);
-58: 					updateCurrentIterationStatus('Running');
-59: 					setActiveView('chat');
-60: 					message.info('Iteration started');
-61: 				}),
-62: 
-63: 				listen('iteration_continued', (event) => {
-64: 					const iterationId = event.payload as string;
-65: 					setProcessing(true);
-66: 					setIsExecuting(true);
-67: 					updateCurrentIterationStatus('Running');
-68: 					setActiveView('chat');
-69: 					message.info('Iteration continued');
-70: 				}),
-71: 
-72: 				listen('iteration_retrying', (event) => {
-73: 					const iterationId = event.payload as string;
-74: 					setProcessing(true);
-75: 					setIsExecuting(true);
-76: 					updateCurrentIterationStatus('Running');
-77: 					setActiveView('chat');
-78: 					message.info('Retrying iteration...');
-79: 				}),
-80: 
-81: 				listen('iteration_completed', (event) => {
-82: 					const iterationId = event.payload as string;
-83: 					setProcessing(false);
-84: 					setIsExecuting(false);
-85: 					setCurrentAgent(null);
-86: 					setCurrentStage(null);
-87: 					setInputRequest(null);
-88: 					updateCurrentIterationStatus('Completed');
-89: 					loadProject();
-90: 					triggerMemoryRefresh();
-91: 					triggerKnowledgeRefresh();
-92: 					clearPMMessages();
-93: 					setActiveView('chat');
-94: 					loadPMWelcomeMessage(iterationId);
-95: 					message.success('Iteration completed');
-96: 				}),
-97: 
-98: 				listen('iteration_failed', (event) => {
-99: 					const [, error] = event.payload as [string, string];
-100: 					setProcessing(false);
-101: 					setIsExecuting(false);
-102: 					setCurrentAgent(null);
-103: 					setCurrentStage(null);
-104: 					setInputRequest(null);
-105: 					updateCurrentIterationStatus('Failed');
-106: 					loadProject();
-107: 					message.error('Iteration failed: ' + error);
-108: 				}),
-109: 
-110: 				
-111: 				listen('agent_event', (event) => {
-112: 					const { content, agent_name, message_type, stage_name, level } = event.payload as {
-113: 						content?: string;
-114: 						agent_name?: string;
-115: 						message_type?: string;
-116: 						stage_name?: string;
-117: 						level?: string;
-118: 					};
-119: 
-120: 					if (agent_name) setCurrentAgent(agent_name);
-121: 					if (stage_name) setCurrentStage(stage_name);
-122: 					if (!content) return;
-123: 
-124: 					setMessages((prev) => {
-125: 						const lastMsg = prev[prev.length - 1];
-126: 						const isThinking = message_type === 'thinking';
-127: 
-128: 						if (isThinking) {
-129: 							if (
-130: 								lastMsg?.type === 'thinking' &&
-131: 								(lastMsg as ThinkingMessage).isStreaming &&
-132: 								(lastMsg as ThinkingMessage).agentName === agent_name
-133: 							) {
-134: 								return [
-135: 									...prev.slice(0, -1),
-136: 									{
-137: 										...lastMsg,
-138: 										content: (lastMsg as ThinkingMessage).content + content
-139: 									} as ChatMessage
-140: 								];
-141: 							}
-142: 							return [
-143: 								...prev,
-144: 								{
-145: 									type: 'thinking',
-146: 									content,
-147: 									agentName: agent_name || 'AI Agent',
-148: 									stageName: stage_name,
-149: 									isStreaming: true,
-150: 									isExpanded: false,
-151: 									timestamp: new Date().toISOString()
-152: 								} as ThinkingMessage
-153: 							] as ChatMessage[];
-154: 						} else {
-155: 							if (
-156: 								lastMsg?.type === 'agent' &&
-157: 								(lastMsg as { isStreaming?: boolean }).isStreaming &&
-158: 								(lastMsg as { agentName?: string }).agentName === agent_name
-159: 							) {
-160: 								return [
-161: 									...prev.slice(0, -1),
-162: 									{
-163: 										...lastMsg,
-164: 										content: (lastMsg as { content: string }).content + content
-165: 									} as ChatMessage
-166: 								];
-167: 							}
-168: 							return [
-169: 								...prev,
-170: 								{
-171: 									type: 'agent',
-172: 									content,
-173: 									agentName: agent_name || 'AI Agent',
-174: 									stageName: stage_name,
-175: 									level,
-176: 									isStreaming: true,
-177: 									timestamp: new Date().toISOString()
-178: 								} as ChatMessage
-179: 							];
-180: 						}
-181: 					});
-182: 				}),
-183: 
-184: 				
-185: 				listen('agent_streaming', (event) => {
-186: 					const { content, agent_name, is_thinking, is_first, is_last } = event.payload as {
-187: 						content?: string;
-188: 						agent_name?: string;
-189: 						is_thinking?: boolean;
-190: 						is_first?: boolean;
-191: 						is_last?: boolean;
-192: 					};
-193: 
-194: 					
-195: 					if (agent_name === 'PM Agent') {
-196: 						if (is_last && !content) {
-197: 							setPMMessages((prev) => {
-198: 								const lastMsg = prev[prev.length - 1];
-199: 								if (lastMsg?.type === 'pm_agent') {
-200: 									return [...prev.slice(0, -1), { ...lastMsg } as PMAgentMessage];
-201: 								}
-202: 								return prev;
-203: 							});
-204: 							setPmProcessing(false);
-205: 							return;
-206: 						}
-207: 
-208: 						if (!content) return;
-209: 
-210: 						setPMMessages((prev) => {
-211: 							const lastMsg = prev[prev.length - 1];
-212: 							if (
-213: 								is_first ||
-214: 								!lastMsg ||
-215: 								lastMsg.type !== 'pm_agent' ||
-216: 								!(lastMsg as PMAgentMessage & { isStreaming?: boolean }).isStreaming
-217: 							) {
-218: 								return [
-219: 									...prev,
-220: 									{
-221: 										type: 'pm_agent' as const,
-222: 										content,
-223: 										isStreaming: !is_last,
-224: 										timestamp: new Date().toISOString()
-225: 									} as PMAgentMessage & { isStreaming?: boolean }
-226: 								];
-227: 							}
-228: 							return [
-229: 								...prev.slice(0, -1),
-230: 								{
-231: 									...lastMsg,
-232: 									content: (lastMsg as PMAgentMessage).content + content,
-233: 									isStreaming: !is_last
-234: 								} as PMAgentMessage & { isStreaming?: boolean }
-235: 							];
-236: 						});
-237: 						return;
-238: 					}
-239: 
-240: 					
-241: 					if (!content) return;
-242: 					const msgType = is_thinking ? 'thinking' : 'agent';
-243: 
-244: 					setMessages((prev) => {
-245: 						const lastMsg = prev[prev.length - 1];
-246: 						if (
-247: 							lastMsg?.type === msgType &&
-248: 							(lastMsg as { isStreaming?: boolean }).isStreaming &&
-249: 							(lastMsg as { agentName?: string }).agentName === agent_name
-250: 						) {
-251: 							return [
-252: 								...prev.slice(0, -1),
-253: 								{
-254: 									...lastMsg,
-255: 									content: (lastMsg as { content: string }).content + content,
-256: 									isStreaming: !is_last
-257: 								} as ChatMessage
-258: 							];
-259: 						}
-260: 						return [
-261: 							...prev,
-262: 							{
-263: 								type: msgType,
-264: 								content,
-265: 								agentName: agent_name || 'AI Agent',
-266: 								isStreaming: !is_last,
-267: 								isExpanded: false,
-268: 								timestamp: new Date().toISOString()
-269: 							} as ChatMessage
-270: 						];
-271: 					});
-272: 				}),
-273: 
-274: 				
-275: 				listen('tool_call', (event) => {
-276: 					const { tool_name, arguments: args, agent_name } = event.payload as {
-277: 						tool_name: string;
-278: 						arguments: Record<string, unknown>;
-279: 						agent_name?: string;
-280: 					};
-281: 					setMessages((prev) => [
-282: 						...prev,
-283: 						{
-284: 							type: 'tool_call',
-285: 							toolName: tool_name,
-286: 							arguments: args,
-287: 							agentName: agent_name || 'AI Agent',
-288: 							timestamp: new Date().toISOString()
-289: 						} as ChatMessage
-290: 					]);
-291: 				}),
-292: 
-293: 				listen('tool_result', (event) => {
-294: 					const { tool_name, result, success, agent_name } = event.payload as {
-295: 						tool_name: string;
-296: 						result: string;
-297: 						success: boolean;
-298: 						agent_name?: string;
-299: 					};
-300: 					setMessages((prev) => [
-301: 						...prev,
-302: 						{
-303: 							type: 'tool_result',
-304: 							toolName: tool_name,
-305: 							result,
-306: 							success,
-307: 							agentName: agent_name || 'AI Agent',
-308: 							timestamp: new Date().toISOString()
-309: 						} as ChatMessage
-310: 					]);
-311: 				}),
-312: 
-313: 				
-314: 				listen('pm_actions', (event) => {
-315: 					const { actions } = event.payload as { actions: PMAction[] };
-316: 					setPMMessages((prev) => {
-317: 						const lastMsg = prev[prev.length - 1];
-318: 						if (lastMsg?.type === 'pm_agent') {
-319: 							return [
-320: 								...prev.slice(0, -1),
-321: 								{
-322: 									...lastMsg,
-323: 									actions: [...((lastMsg as PMAgentMessage).actions || []), ...actions]
-324: 								} as PMAgentMessage
-325: 							];
-326: 						}
-327: 						return prev;
-328: 					});
-329: 				}),
-330: 
-331: 				
-332: 			listen('input_request', async (event) => {
-333: 				const [requestId, prompt, options] = event.payload as [string, string, InputOption[]];
-334: 				updateCurrentIterationStatus('Paused');
-335: 
-336: 				const artifactMatch = prompt.match(/\[ARTIFACT_TYPE:(\w+)\]$/);
-337: 				if (artifactMatch) {
-338: 					const artifactType = artifactMatch[1];
-339: 					const cleanPrompt = prompt.replace(/\[ARTIFACT_TYPE:\w+\]$/, '').trim();
-340: 
-341: 					
-342: 					
-343: 					
-344: 					
-345: 					try {
-346: 						await loadIterations();
-347: 						const latestIterations = useProjectStore.getState().iterations;
-348: 						if (latestIterations && latestIterations.length > 0) {
-349: 							const latestIteration = latestIterations[latestIterations.length - 1];
-350: 							const fullIteration = await API.iteration.get(latestIteration.id);
-351: 							setCurrentIteration(fullIteration);
-352: 						}
-353: 					} catch (err) {
-354: 						console.error('[App] Failed to refresh iteration before confirmation:', err);
-355: 					}
-356: 
-357: 					setInputRequest({
-358: 						requestId,
-359: 						prompt: cleanPrompt,
-360: 						options,
-361: 						isArtifactConfirmation: true,
-362: 						artifactType
-363: 					});
-364: 				} else {
-365: 					setInputRequest({ requestId, prompt, options });
-366: 				}
-367: 				setUserInput('');
-368: 			}),
-369: 
-370: 				
-371: 				listen('project_loaded', async () => {
-372: 					setProcessing(false);
-373: 					setCurrentAgent(null);
-374: 					setInputRequest(null);
-375: 					clearMessages();
-376: 					setCurrentIteration(null);
-377: 					await loadProject();
-378: 					setActiveView('iterations');
-379: 					message.success('Project loaded');
-380: 				}),
-381: 
-382: 				listen('project_initialized', async () => {
-383: 					setProcessing(false);
-384: 					setCurrentAgent(null);
-385: 					setInputRequest(null);
-386: 					clearMessages();
-387: 					setCurrentIteration(null);
-388: 					await loadProject();
-389: 					setActiveView('iterations');
-390: 					message.success('Project initialized');
-391: 				}),
-392: 
-393: 				
-394: 				listen('knowledge_regeneration_completed', () => {
-395: 					triggerKnowledgeRefresh();
-396: 					message.success('Knowledge updated');
-397: 				}),
-398: 
-399: 				listen<[string, string]>('knowledge_regeneration_failed', (event) => {
-400: 					const [iterationId, error] = event.payload;
-401: 					console.error('[App] Knowledge regeneration failed:', iterationId, error);
-402: 					message.error('Knowledge generation failed: ' + error);
-403: 				}),
-404: 			];
-405: 
-406: 			
-407: 			await Promise.all(listenerPromises);
-408: 
-409: 			
-410: 			
-411: 			try {
-412: 				const hasOpenProject = await API.workspace.hasOpen();
-413: 				if (hasOpenProject) {
-414: 					console.log('[App] Detected open project on startup, loading project...');
-415: 					await loadProject();
-416: 					setActiveView('iterations');
-417: 				}
-418: 			} catch (error) {
-419: 				console.error('[App] Failed to check for open project:', error);
-420: 			}
-421: 		};
-422: 
-423: 		setupListeners();
-424: 
-425: 		
-426: 		const handleKeyDown = (e: KeyboardEvent) => {
-427: 			if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-428: 				e.preventDefault();
-429: 				setCommandPaletteVisible(!commandPaletteVisible);
-430: 			}
-431: 		};
-432: 
-433: 		window.addEventListener('keydown', handleKeyDown);
-434: 		return () => window.removeEventListener('keydown', handleKeyDown);
-435: 	}, []);
-436: 
-437: 	return {
-438: 		
-439: 	};
-440: }
-```
-
-### crates/cowork-gui/src-tauri/Cargo.toml (50 lines)
-
-```
-1: [package]
-2: name = "cowork-gui"
-3: version.workspace = true
-4: edition.workspace = true
-5: authors.workspace = true
-6: license.workspace = true
-7: description = "Cowork Forge GUI"
-8: 
-9: [lib]
-10: name = "cowork_gui_lib"
-11: crate-type = ["staticlib", "cdylib", "rlib"]
-12: 
-13: [build-dependencies]
-14: tauri-build = { version = "2.6.3", features = [] }
-15: 
-16: [dependencies]
-17: tauri = { version = "2.11.5", features = [] }
-18: tauri-plugin-opener = "2.5.4"
-19: tauri-plugin-dialog = "2.7.1"
-20: serde = { version = "1", features = ["derive"] }
-21: serde_json = "1"
-22: tokio = { version = "1", features = ["sync", "full"] }
-23: tokio-stream = "0.1"
-24: async-trait = "0.1"
-25: chrono = "0.4"
-26: uuid = { workspace = true }
-27: anyhow = "1"
-28: thiserror = "2"
-29: futures = "0.3"
-30: 
-31: tiny_http = "0.12"
-32: attohttpc = "0.30"
-33: urlencoding = "2.1"
-34: 
-35: lazy_static = "1.5"
-36: 
-37: tracing = "0.1"
-38: 
-39: dirs = { workspace = true }
-40: 
-41: sys-locale = "0.3"
-42: 
-43: cowork-core = { path = "../../cowork-core" }
-44: 
-45: adk-core = { workspace = true }
-46: adk-runner = { workspace = true }
-47: adk-session = { workspace = true }
-48: adk-skill = { workspace = true }
-49: adk-tool = { workspace = true, features = ["http-transport"] }
-50: which = "8.0.0"
+1: MarkdownMessageProps
+2: ⋮----
+3: {
+4:   content: string;
+5:   
+6:   streaming?: boolean;
+7: }
 ```
 
 ### crates/cowork-core/src/agents/external_coding_agent.rs (209 lines)
@@ -4669,188 +4647,6 @@ LICENSE
 209: }
 ```
 
-### crates/cowork-core/src/config_definition/agent_definition.rs (177 lines)
-
-```
-1: AgentType
-2: ⋮----
-3: {
-4:     
-5:     #[default]
-6:     Simple,
-7:     
-8:     Loop {
-9:         
-10:         max_iterations: Option<u32>,
-11:     },
-12: }
-13: ⋮----
-14: ModelConfig
-15: ⋮----
-16: {
-17:     
-18:     pub model_id: Option<String>,
-19:     
-20:     pub temperature: Option<f32>,
-21:     
-22:     pub max_tokens: Option<u32>,
-23:     
-24:     pub top_p: Option<f32>,
-25: }
-26: ⋮----
-27: ModelConfig
-28: ⋮----
-29: {
-30:     fn default() -> Self {
-31:         Self {
-32:             model_id: None,
-33:             temperature: Some(0.7),
-34:             max_tokens: None,
-35:             top_p: None,
-36:         }
-37:     }
-38: }
-39: ⋮----
-40: ToolReference
-41: ⋮----
-42: {
-43:     
-44:     pub tool_id: String,
-45:     
-46:     pub config: Option<HashMap<String, serde_json::Value>>,
-47: }
-48: ⋮----
-49: AgentDefinition
-50: ⋮----
-51: {
-52:     
-53:     pub id: String,
-54:     
-55:     pub name: String,
-56:     
-57:     pub description: Option<String>,
-58:     
-59:     pub version: Option<String>,
-60: 
-61:     
-62:     #[serde(default)]
-63:     pub agent_type: AgentType,
-64: 
-65:     
-66:     
-67:     
-68:     
-69:     
-70:     pub instruction: String,
-71: 
-72:     
-73:     #[serde(default)]
-74:     pub tools: Vec<ToolReference>,
-75: 
-76:     
-77:     #[serde(default)]
-78:     pub model: ModelConfig,
-79: 
-80:     
-81:     #[serde(default)]
-82:     pub include_contents: IncludeContentsMode,
-83: 
-84:     
-85:     #[serde(default)]
-86:     pub tags: Vec<String>,
-87: 
-88:     
-89:     #[serde(default)]
-90:     pub metadata: HashMap<String, serde_json::Value>,
-91: }
-92: ⋮----
-93: IncludeContentsMode
-94: ⋮----
-95: {
-96:     
-97:     #[default]
-98:     None,
-99:     
-100:     Default,
-101:     
-102:     All,
-103:     
-104:     Selected(Vec<String>),
-105: }
-106: ⋮----
-107: ActorCriticDefinition
-108: ⋮----
-109: {
-110:     
-111:     pub actor: AgentDefinition,
-112:     
-113:     pub critic: AgentDefinition,
-114:     
-115:     pub max_iterations: Option<u32>,
-116: }
-117: ⋮----
-118: AgentDefinition
-119: ⋮----
-120: {
-121:     
-122:     pub fn new(id: impl Into<String>, name: impl Into<String>, instruction: impl Into<String>) -> Self {
-123:         Self {
-124:             id: id.into(),
-125:             name: name.into(),
-126:             description: None,
-127:             version: None,
-128:             agent_type: AgentType::Simple,
-129:             instruction: instruction.into(),
-130:             tools: Vec::new(),
-131:             model: ModelConfig::default(),
-132:             include_contents: IncludeContentsMode::None,
-133:             tags: Vec::new(),
-134:             metadata: HashMap::new(),
-135:         }
-136:     }
-137: 
-138:     
-139:     pub fn with_tool(mut self, tool_id: impl Into<String>) -> Self {
-140:         self.tools.push(ToolReference {
-141:             tool_id: tool_id.into(),
-142:             config: None,
-143:         });
-144:         self
-145:     }
-146: 
-147:     
-148:     pub fn with_tool_config(mut self, tool_id: impl Into<String>, config: HashMap<String, serde_json::Value>) -> Self {
-149:         self.tools.push(ToolReference {
-150:             tool_id: tool_id.into(),
-151:             config: Some(config),
-152:         });
-153:         self
-154:     }
-155: 
-156:     
-157:     pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
-158:         self.tags.push(tag.into());
-159:         self
-160:     }
-161: 
-162:     
-163:     pub fn as_loop(mut self, max_iterations: Option<u32>) -> Self {
-164:         self.agent_type = AgentType::Loop { max_iterations };
-165:         self
-166:     }
-167: 
-168:     
-169:     pub fn with_model(mut self, model: ModelConfig) -> Self {
-170:         self.model = model;
-171:         self
-172:     }
-173: }
-174: ⋮----
-175: test_agent_definition_serialization
-176: ⋮----
-177: ()
-```
-
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/design_critic.json (51 lines)
 
 ```
@@ -5011,28 +4807,6 @@ LICENSE
 46:   "include_contents": "none",
 47:   "tags": ["built-in", "requirements", "critic"]
 48: }
-```
-
-### crates/cowork-core/src/config_definition/mod.rs (17 lines)
-
-```
-1: pub mod agent_definition;
-2: pub mod stage_definition;
-3: pub mod flow_definition;
-4: pub mod integration_definition;
-5: pub mod registry;
-6: pub mod validator;
-7: pub mod builtin;
-8: pub mod agent_factory;
-9: 
-10: pub use agent_definition::*;
-11: pub use stage_definition::*;
-12: pub use flow_definition::*;
-13: pub use integration_definition::*;
-14: pub use registry::*;
-15: pub use validator::*;
-16: pub use builtin::load_builtin_configs;
-17: pub use agent_factory::{create_agent_for_stage, create_agent_from_config, initialize_config_registry, initialize_mcp_toolsets, is_mcp_initialized};
 ```
 
 ### crates/cowork-core/src/instructions/plan.rs (401 lines)
@@ -7107,300 +6881,151 @@ LICENSE
 324: }
 ```
 
-### crates/cowork-gui/src/types/config.ts (291 lines)
+### crates/cowork-gui/src/components/ArtifactsViewer.tsx (34 lines)
 
 ```
-1: AgentType
+1: ArtifactsData
 2: ⋮----
-3: "simple" | { loop: { max_iterations?: number } }
-4: ⋮----
-5: ModelConfig
-6: ⋮----
-7: {
-8:   model_id?: string;
-9:   temperature?: number;
-10:   max_tokens?: number;
-11:   top_p?: number;
-12: }
-13: ⋮----
-14: ToolReference
+3: {
+4:   iteration_id?: string;
+5:   idea?: string;
+6:   requirements?: string;
+7:   design?: unknown;
+8:   design_raw?: string;
+9:   plan?: unknown;
+10:   plan_raw?: string;
+11:   code_files?: FileInfo[];
+12:   check_report?: string;
+13:   delivery_report?: string;
+14: }
 15: ⋮----
-16: {
-17:   tool_id: string;
-18:   config?: Record<string, unknown>;
-19: }
-20: ⋮----
-21: IncludeContentsMode
-22: ⋮----
-23: "none" | "all" | { selected: string[] }
-24: ⋮----
-25: AgentDefinition
+16: FileInfo
+17: ⋮----
+18: {
+19:   path: string;
+20:   name: string;
+21:   size: number;
+22:   is_dir: boolean;
+23:   language?: string;
+24:   modified_at?: string;
+25: }
 26: ⋮----
-27: {
-28:   id: string;
-29:   name: string;
-30:   description?: string;
-31:   version?: string;
-32:   agent_type: AgentType;
-33:   instruction: string;
-34:   tools: ToolReference[];
-35:   skills: string[];
-36:   model: ModelConfig;
-37:   include_contents: IncludeContentsMode;
-38:   tags: string[];
-39:   metadata: Record<string, unknown>;
-40: }
+27: ArtifactsViewerProps
+28: ⋮----
+29: {
+30:   iterationId: string;
+31:   activeTab?: string;
+32:   onTabChange?: (key: string) => void;
+33:   refreshTrigger?: number;
+34: }
+```
+
+### crates/cowork-gui/src/components/MemoryPanel.tsx (48 lines)
+
+```
+1: Memory
+2: ⋮----
+3: {
+4:   id: string;
+5:   title: string;
+6:   summary: string;
+7:   category: string;
+8:   stage?: string;
+9:   created_at: string;
+10:   impact?: string;
+11:   tags?: string[];
+12:   file?: string;
+13:   _ts?: number;
+14: }
+15: ⋮----
+16: MemoryDetail
+17: ⋮----
+18: {
+19:   content: string;
+20: }
+21: ⋮----
+22: MemoryQueryResult
+23: ⋮----
+24: {
+25:   results: Memory[];
+26:   total: number;
+27: }
+28: ⋮----
+29: MemoryPanelProps
+30: ⋮----
+31: {
+32:   currentSession?: string;
+33:   refreshTrigger?: number;
+34: }
+35: ⋮----
+36: getCategoryColor
+37: ⋮----
+38: (memory.category)
+39: ⋮----
+40: getCategoryColor
 41: ⋮----
-42: StageType
-43: ⋮----
-44: | "idea"
-45:   | "prd"
-46:   | "design"
-47:   | "plan"
-48:   | "coding"
-49:   | "check"
-50:   | "delivery"
-51: ⋮----
-52: HookPoint
-53: ⋮----
-54: | "pre_execute"
-55:   | "post_execute"
-56:   | "pre_confirmation"
-57:   | "post_confirmation"
-58:   | "on_failure"
-59: ⋮----
-60: HookConfig
-61: ⋮----
-62: {
-63:   integration_id: string;
-64:   point: HookPoint;
-65:   action: string;
-66:   params?: Record<string, unknown>;
-67:   blocking?: boolean;
-68:   timeout_secs?: number;
-69:   on_failure?: "ignore" | "warn" | "abort";
-70: }
-71: ⋮----
-72: ArtifactConfig
-73: ⋮----
-74: {
-75:   save_path: string;
-76:   format: string;
-77:   include_metadata?: boolean;
-78: }
-79: ⋮----
-80: StageRetryConfig
-81: ⋮----
-82: {
-83:   max_retries: number;
-84:   backoff_ms?: number;
-85:   retry_on?: string[];
-86: }
-87: ⋮----
-88: StageDefinition
-89: ⋮----
-90: {
-91:   id: string;
-92:   name: string;
-93:   description?: string;
-94:   stage_type: StageType;
-95:   agent_id: string;
-96:   needs_confirmation?: boolean;
-97:   confirmation_prompt?: string;
-98:   hooks: HookConfig[];
-99:   artifacts?: Record<string, ArtifactConfig>;
-100:   retry?: StageRetryConfig;
-101:   timeout_secs?: number;
-102:   tags: string[];
-103: }
-104: ⋮----
-105: MemoryScope
-106: ⋮----
-107: "project" | "iteration" | "merged"
-108: ⋮----
-109: InheritanceMode
-110: ⋮----
-111: "none" | "partial" | "full"
-112: ⋮----
-113: InheritanceConfig
-114: ⋮----
-115: {
-116:   default_mode: InheritanceMode;
-117:   stage_mapping: Record<string, string>;
-118: }
-119: ⋮----
-120: FlowConfig
-121: ⋮----
-122: {
-123:   stop_on_failure: boolean;
-124:   max_total_time_secs?: number;
-125:   save_state_on_interrupt: boolean;
-126:   memory_scope: MemoryScope;
-127:   inheritance: InheritanceConfig;
-128: }
-129: ⋮----
-130: StageOverrides
-131: ⋮----
-132: {
-133:   needs_confirmation?: boolean;
-134:   hooks: HookConfig[];
-135:   timeout_secs?: number;
-136:   skip: boolean;
-137: }
-138: ⋮----
-139: StageReference
-140: ⋮----
-141: {
-142:   stage_id: string;
-143:   alias?: string;
-144:   overrides: StageOverrides;
-145:   condition?: string;
-146:   on_success?: string;
-147:   on_failure?: string;
-148: }
-149: ⋮----
-150: GlobalHookConfig
-151: ⋮----
-152: {
-153:   integration_id: string;
-154:   points: HookPoint[];
-155:   blocking: boolean;
-156:   timeout_secs: number;
-157: }
-158: ⋮----
-159: FlowDefinition
-160: ⋮----
-161: {
-162:   id: string;
-163:   name: string;
-164:   description?: string;
-165:   version?: string;
-166:   stages: StageReference[];
-167:   start_stage?: string;
-168:   global_hooks: GlobalHookConfig[];
-169:   config: FlowConfig;
-170:   tags: string[];
-171:   metadata: Record<string, unknown>;
-172:   
-173:   is_builtin?: boolean;
-174: }
-175: ⋮----
-176: SkillInfo
-177: ⋮----
-178: {
-179:   id: string;
-180:   name: string;
-181:   description: string;
-182:   tags: string[];
-183:   body: string;
-184: }
-185: ⋮----
-186: IntegrationType
-187: ⋮----
-188: | "rest_api"
-189:   | "webhook"
-190:   | "message_queue"
-191:   | "database"
-192: ⋮----
-193: AuthType
-194: ⋮----
-195: | "none"
-196:   | "api_key"
-197:   | "bearer_token"
-198:   | "basic_auth"
-199:   | "oauth2"
-200: ⋮----
-201: CredentialSource
-202: ⋮----
-203: "env" | "config" | "prompt"
-204: ⋮----
-205: AuthConfig
-206: ⋮----
-207: {
-208:   auth_type: AuthType;
-209:   credential_source: CredentialSource;
-210:   credential_key?: string;
-211:   additional_headers?: Record<string, string>;
-212: }
-213: ⋮----
-214: ConnectionConfig
-215: ⋮----
-216: {
-217:   base_url?: string;
-218:   timeout_secs?: number;
-219:   retry_count?: number;
-220:   retry_delay_ms?: number;
-221: }
-222: ⋮----
-223: IntegrationEvent
-224: ⋮----
-225: | "on_stage_start"
-226:   | "on_stage_complete"
-227:   | "on_flow_start"
-228:   | "on_flow_complete"
-229:   | "on_error"
-230: ⋮----
-231: IntegrationDefinition
-232: ⋮----
-233: {
-234:   id: string;
-235:   name: string;
-236:   description?: string;
-237:   integration_type: IntegrationType;
-238:   connection: ConnectionConfig;
-239:   auth: AuthConfig;
-240:   events: IntegrationEvent[];
-241:   enabled: boolean;
-242:   metadata: Record<string, unknown>;
-243: }
-244: ⋮----
-245: ValidationIssue
-246: ⋮----
-247: {
-248:   path: string;
-249:   message: string;
-250:   severity: "error" | "warning";
-251: }
-252: ⋮----
-253: ValidationResult
-254: ⋮----
-255: {
-256:   valid: boolean;
-257:   issues: ValidationIssue[];
-258: }
-259: ⋮----
-260: ConfigRegistryState
-261: ⋮----
-262: {
-263:   agents: Record<string, AgentDefinition>;
-264:   stages: Record<string, StageDefinition>;
-265:   flows: Record<string, FlowDefinition>;
-266:   skills: SkillInfo[];
-267:   integrations: Record<string, IntegrationDefinition>;
-268:   default_flow_id?: string;
-269: }
-270: ⋮----
-271: BuiltinInstruction
-272: ⋮----
-273: {
-274:   id: string;
-275:   name: string;
-276:   description: string;
-277:   content: string;
-278: }
-279: ⋮----
-280: InstructionType
-281: ⋮----
-282: "builtin" | "file" | "inline"
-283: ⋮----
-284: ToolInfo
-285: ⋮----
-286: {
-287:   id: string;
-288:   name: string;
-289:   category: string;
-290:   description: string;
-291: }
+42: (
+43:                               selectedMemory?.category || "",
+44:                             )
+45: ⋮----
+46: getImpactColor
+47: ⋮----
+48: (selectedMemory.impact)
+```
+
+### crates/cowork-gui/src-tauri/Cargo.toml (50 lines)
+
+```
+1: [package]
+2: name = "cowork-gui"
+3: version.workspace = true
+4: edition.workspace = true
+5: authors.workspace = true
+6: license.workspace = true
+7: description = "Cowork Forge GUI"
+8: 
+9: [lib]
+10: name = "cowork_gui_lib"
+11: crate-type = ["staticlib", "cdylib", "rlib"]
+12: 
+13: [build-dependencies]
+14: tauri-build = { version = "2.6.3", features = [] }
+15: 
+16: [dependencies]
+17: tauri = { version = "2.11.5", features = [] }
+18: tauri-plugin-opener = "2.5.4"
+19: tauri-plugin-dialog = "2.7.1"
+20: serde = { version = "1", features = ["derive"] }
+21: serde_json = "1"
+22: tokio = { version = "1", features = ["sync", "full"] }
+23: tokio-stream = "0.1"
+24: async-trait = "0.1"
+25: chrono = "0.4"
+26: uuid = { workspace = true }
+27: anyhow = "1"
+28: thiserror = "2"
+29: futures = "0.3"
+30: 
+31: tiny_http = "0.12"
+32: attohttpc = "0.30"
+33: urlencoding = "2.1"
+34: 
+35: lazy_static = "1.5"
+36: 
+37: tracing = "0.1"
+38: 
+39: dirs = { workspace = true }
+40: 
+41: sys-locale = "0.3"
+42: 
+43: cowork-core = { path = "../../cowork-core" }
+44: 
+45: adk-core = { workspace = true }
+46: adk-runner = { workspace = true }
+47: adk-session = { workspace = true }
+48: adk-skill = { workspace = true }
+49: adk-tool = { workspace = true, features = ["http-transport"] }
+50: which = "8.0.0"
 ```
 
 ### crates/cowork-gui/src-tauri/src/commands/import_cmd.rs (88 lines)
@@ -7494,6 +7119,14 @@ LICENSE
 86: copy_dir_recursive
 87: ⋮----
 88: (src: &PathBuf, dst: &PathBuf, skip_hidden: bool)
+```
+
+### crates/cowork-gui/vite.config.js (3 lines)
+
+```
+1: manualChunks
+2: ⋮----
+3: (id)
 ```
 
 ### litho.docs/en/2.Architecture.md (1224 lines)
@@ -8725,72 +8358,186 @@ LICENSE
 1224: The system is well-positioned for evolutionary extension, with clear domain boundaries supporting future enhancements such as team collaboration features, additional AI model integrations, or custom pipeline stages.
 ````
 
-### crates/cowork-core/Cargo.toml (63 lines)
+### crates/cowork-core/src/config_definition/agent_definition.rs (177 lines)
 
 ```
-1: [package]
-2: name = "cowork-core"
-3: version.workspace = true
-4: edition.workspace = true
-5: authors.workspace = true
-6: license.workspace = true
-7: repository.workspace = true
-8: description = "AI-powered software development system - Core library with adk-rust framework"
-9: 
-10: [dependencies]
-11: adk-rust = { workspace = true }
-12: adk-core = { workspace = true }
-13: adk-agent = { workspace = true }
-14: adk-model = { workspace = true, features = ["openai"] }
-15: adk-tool = { workspace = true, features = ["http-transport"] }
-16: adk-skill = { workspace = true }
-17: 
-18: tokio = { workspace = true }
-19: async-trait = "0.1"
-20: async-stream = "0.3"
-21: futures = { workspace = true }
-22: 
-23: anyhow = { workspace = true }
-24: thiserror = { workspace = true }
-25: 
-26: serde = { workspace = true }
-27: serde_json = { workspace = true }
-28: 
-29: toml = { workspace = true }
-30: 
-31: chrono = { workspace = true }
-32: uuid = { workspace = true }
-33: 
-34: tracing = { workspace = true }
-35: 
-36: walkdir = { workspace = true }
-37: ignore = { workspace = true }
-38: 
-39: reqwest = { version = "0.13", features = ["json", "stream"] }
-40: 
-41: dialoguer = { workspace = true }
-42: console = { workspace = true }
-43: 
-44: once_cell = "1.21"
-45: 
-46: lazy_static = "1.5"
-47: 
-48: dirs = "5.0"
-49: 
-50: regex = "1"
-51: 
-52: semver = "1.0"
-53: 
-54: schemars = "1.0"
-55: 
-56: include_dir = "0.7"
-57: 
-58: agent-client-protocol = { workspace = true }
-59: 
-60: tokio-util = { workspace = true }
-61: 
-62: [dev-dependencies]
-63: tempfile = { workspace = true }
+1: AgentType
+2: ⋮----
+3: {
+4:     
+5:     #[default]
+6:     Simple,
+7:     
+8:     Loop {
+9:         
+10:         max_iterations: Option<u32>,
+11:     },
+12: }
+13: ⋮----
+14: ModelConfig
+15: ⋮----
+16: {
+17:     
+18:     pub model_id: Option<String>,
+19:     
+20:     pub temperature: Option<f32>,
+21:     
+22:     pub max_tokens: Option<u32>,
+23:     
+24:     pub top_p: Option<f32>,
+25: }
+26: ⋮----
+27: ModelConfig
+28: ⋮----
+29: {
+30:     fn default() -> Self {
+31:         Self {
+32:             model_id: None,
+33:             temperature: Some(0.7),
+34:             max_tokens: None,
+35:             top_p: None,
+36:         }
+37:     }
+38: }
+39: ⋮----
+40: ToolReference
+41: ⋮----
+42: {
+43:     
+44:     pub tool_id: String,
+45:     
+46:     pub config: Option<HashMap<String, serde_json::Value>>,
+47: }
+48: ⋮----
+49: AgentDefinition
+50: ⋮----
+51: {
+52:     
+53:     pub id: String,
+54:     
+55:     pub name: String,
+56:     
+57:     pub description: Option<String>,
+58:     
+59:     pub version: Option<String>,
+60: 
+61:     
+62:     #[serde(default)]
+63:     pub agent_type: AgentType,
+64: 
+65:     
+66:     
+67:     
+68:     
+69:     
+70:     pub instruction: String,
+71: 
+72:     
+73:     #[serde(default)]
+74:     pub tools: Vec<ToolReference>,
+75: 
+76:     
+77:     #[serde(default)]
+78:     pub model: ModelConfig,
+79: 
+80:     
+81:     #[serde(default)]
+82:     pub include_contents: IncludeContentsMode,
+83: 
+84:     
+85:     #[serde(default)]
+86:     pub tags: Vec<String>,
+87: 
+88:     
+89:     #[serde(default)]
+90:     pub metadata: HashMap<String, serde_json::Value>,
+91: }
+92: ⋮----
+93: IncludeContentsMode
+94: ⋮----
+95: {
+96:     
+97:     #[default]
+98:     None,
+99:     
+100:     Default,
+101:     
+102:     All,
+103:     
+104:     Selected(Vec<String>),
+105: }
+106: ⋮----
+107: ActorCriticDefinition
+108: ⋮----
+109: {
+110:     
+111:     pub actor: AgentDefinition,
+112:     
+113:     pub critic: AgentDefinition,
+114:     
+115:     pub max_iterations: Option<u32>,
+116: }
+117: ⋮----
+118: AgentDefinition
+119: ⋮----
+120: {
+121:     
+122:     pub fn new(id: impl Into<String>, name: impl Into<String>, instruction: impl Into<String>) -> Self {
+123:         Self {
+124:             id: id.into(),
+125:             name: name.into(),
+126:             description: None,
+127:             version: None,
+128:             agent_type: AgentType::Simple,
+129:             instruction: instruction.into(),
+130:             tools: Vec::new(),
+131:             model: ModelConfig::default(),
+132:             include_contents: IncludeContentsMode::None,
+133:             tags: Vec::new(),
+134:             metadata: HashMap::new(),
+135:         }
+136:     }
+137: 
+138:     
+139:     pub fn with_tool(mut self, tool_id: impl Into<String>) -> Self {
+140:         self.tools.push(ToolReference {
+141:             tool_id: tool_id.into(),
+142:             config: None,
+143:         });
+144:         self
+145:     }
+146: 
+147:     
+148:     pub fn with_tool_config(mut self, tool_id: impl Into<String>, config: HashMap<String, serde_json::Value>) -> Self {
+149:         self.tools.push(ToolReference {
+150:             tool_id: tool_id.into(),
+151:             config: Some(config),
+152:         });
+153:         self
+154:     }
+155: 
+156:     
+157:     pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
+158:         self.tags.push(tag.into());
+159:         self
+160:     }
+161: 
+162:     
+163:     pub fn as_loop(mut self, max_iterations: Option<u32>) -> Self {
+164:         self.agent_type = AgentType::Loop { max_iterations };
+165:         self
+166:     }
+167: 
+168:     
+169:     pub fn with_model(mut self, model: ModelConfig) -> Self {
+170:         self.model = model;
+171:         self
+172:     }
+173: }
+174: ⋮----
+175: test_agent_definition_serialization
+176: ⋮----
+177: ()
 ```
 
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/check_agent.json (51 lines)
@@ -9174,662 +8921,26 @@ LICENSE
 60: }
 ```
 
-### crates/cowork-core/src/config_definition/registry.rs (653 lines)
+### crates/cowork-core/src/config_definition/mod.rs (17 lines)
 
 ```
-1: get_user_config_dir
-2: ⋮----
-3: ()
-4: ⋮----
-5: ensure_user_config_dir
-6: ⋮----
-7: ()
-8: ⋮----
-9: ConfigRegistry
-10: ⋮----
-11: {
-12:     
-13:     agents: RwLock<HashMap<String, AgentDefinition>>,
-14:     
-15:     stages: RwLock<HashMap<String, StageDefinition>>,
-16:     
-17:     flows: RwLock<HashMap<String, FlowDefinition>>,
-18:     
-19:     integrations: RwLock<HashMap<String, IntegrationDefinition>>,
-20:     
-21:     default_flow: RwLock<Option<String>>,
-22: }
-23: ⋮----
-24: ConfigRegistry
-25: ⋮----
-26: {
-27:     fn default() -> Self {
-28:         Self::new()
-29:     }
-30: }
-31: ⋮----
-32: ConfigRegistry
-33: ⋮----
-34: {
-35:     
-36:     pub fn new() -> Self {
-37:         Self {
-38:             agents: RwLock::new(HashMap::new()),
-39:             stages: RwLock::new(HashMap::new()),
-40:             flows: RwLock::new(HashMap::new()),
-41:             integrations: RwLock::new(HashMap::new()),
-42:             default_flow: RwLock::new(None),
-43:         }
-44:     }
-45:     
-46:     
-47:     
-48:     
-49:     
-50:     
-51:     pub fn register_agent(&self, definition: AgentDefinition) -> Result<()> {
-52:         let id = definition.id.clone();
-53:         let mut agents = self.agents.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-54:         agents.insert(id.clone(), definition);
-55:         tracing::debug!("Registered agent: {}", id);
-56:         Ok(())
-57:     }
-58:     
-59:     
-60:     pub fn get_agent(&self, id: &str) -> Option<AgentDefinition> {
-61:         let agents = self.agents.read().ok()?;
-62:         agents.get(id).cloned()
-63:     }
-64:     
-65:     
-66:     pub fn list_agents(&self) -> Vec<String> {
-67:         let agents = self.agents.read().unwrap_or_else(|e| {
-68:             tracing::error!("Lock error: {}", e);
-69:             panic!("Lock error")
-70:         });
-71:         agents.keys().cloned().collect()
-72:     }
-73:     
-74:     
-75:     pub fn unregister_agent(&self, id: &str) -> bool {
-76:         let mut agents = self.agents.write().unwrap_or_else(|e| {
-77:             tracing::error!("Lock error: {}", e);
-78:             panic!("Lock error")
-79:         });
-80:         agents.remove(id).is_some()
-81:     }
-82:     
-83:     
-84:     
-85:     
-86:     
-87:     
-88:     pub fn register_stage(&self, definition: StageDefinition) -> Result<()> {
-89:         let id = definition.id.clone();
-90:         let mut stages = self.stages.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-91:         stages.insert(id.clone(), definition);
-92:         tracing::debug!("Registered stage: {}", id);
-93:         Ok(())
-94:     }
-95:     
-96:     
-97:     pub fn get_stage(&self, id: &str) -> Option<StageDefinition> {
-98:         let stages = self.stages.read().ok()?;
-99:         stages.get(id).cloned()
-100:     }
-101:     
-102:     
-103:     pub fn list_stages(&self) -> Vec<String> {
-104:         let stages = self.stages.read().unwrap_or_else(|e| {
-105:             tracing::error!("Lock error: {}", e);
-106:             panic!("Lock error")
-107:         });
-108:         stages.keys().cloned().collect()
-109:     }
-110:     
-111:     
-112:     
-113:     
-114:     
-115:     
-116:     pub fn register_flow(&self, definition: FlowDefinition) -> Result<()> {
-117:         let id = definition.id.clone();
-118:         let mut flows = self.flows.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-119:         flows.insert(id.clone(), definition);
-120:         tracing::debug!("Registered flow: {}", id);
-121:         Ok(())
-122:     }
-123:     
-124:     
-125:     pub fn get_flow(&self, id: &str) -> Option<FlowDefinition> {
-126:         let flows = self.flows.read().ok()?;
-127:         flows.get(id).cloned()
-128:     }
-129:     
-130:     
-131:     pub fn list_flows(&self) -> Vec<String> {
-132:         let flows = self.flows.read().unwrap_or_else(|e| {
-133:             tracing::error!("Lock error: {}", e);
-134:             panic!("Lock error")
-135:         });
-136:         flows.keys().cloned().collect()
-137:     }
-138:     
-139:     
-140:     pub fn unregister_flow(&self, id: &str) -> bool {
-141:         let mut flows = self.flows.write().unwrap_or_else(|e| {
-142:             tracing::error!("Lock error: {}", e);
-143:             panic!("Lock error")
-144:         });
-145:         flows.remove(id).is_some()
-146:     }
-147:     
-148:     
-149:     pub fn set_default_flow(&self, id: Option<String>) -> Result<()> {
-150:         {
-151:             let mut default_flow = self.default_flow.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-152:             *default_flow = id.clone();
-153:         }
-154:         
-155:         self.save_settings()?;
-156:         Ok(())
-157:     }
-158:     
-159:     
-160:     
-161:     pub fn set_default_flow_without_save(&self, id: Option<String>) {
-162:         if let Ok(mut default_flow) = self.default_flow.write() {
-163:             *default_flow = id;
-164:         }
-165:     }
-166:     
-167:     
-168:     pub fn get_default_flow_id(&self) -> Option<String> {
-169:         let default_flow = self.default_flow.read().ok()?;
-170:         default_flow.clone()
-171:     }
-172:     
-173:     
-174:     pub fn get_default_flow(&self) -> Option<FlowDefinition> {
-175:         let default_flow = self.default_flow.read().ok()?;
-176:         let flow_id = default_flow.as_ref()?;
-177:         self.get_flow(flow_id)
-178:     }
-179:     
-180:     
-181:     
-182:     
-183:     
-184:     
-185:     fn get_settings_file_path() -> Option<PathBuf> {
-186:         get_user_config_dir().map(|dir| dir.join("settings.json"))
-187:     }
-188:     
-189:     
-190:     pub fn save_settings(&self) -> Result<()> {
-191:         let settings = Settings {
-192:             default_flow_id: self.get_default_flow_id(),
-193:         };
-194:         
-195:         let config_dir = ensure_user_config_dir()?;
-196:         let file_path = config_dir.join("settings.json");
-197:         let content = serde_json::to_string_pretty(&settings)
-198:             .with_context(|| "Failed to serialize settings")?;
-199:         
-200:         fs::write(&file_path, content)
-201:             .with_context(|| format!("Failed to write settings file: {:?}", file_path))?;
-202:         
-203:         tracing::debug!("Saved settings to {:?}", file_path);
-204:         Ok(())
-205:     }
-206:     
-207:     
-208:     pub fn load_settings(&self) -> Result<()> {
-209:         if let Some(file_path) = Self::get_settings_file_path() {
-210:             if file_path.exists() {
-211:                 match fs::read_to_string(&file_path)
-212:                     .and_then(|content| serde_json::from_str::<Settings>(&content)
-213:                         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-214:                 {
-215:                     Ok(settings) => {
-216:                         if let Some(flow_id) = settings.default_flow_id {
-217:                             
-218:                             if self.get_flow(&flow_id).is_some() {
-219:                                 let mut default_flow = self.default_flow.write()
-220:                                     .map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-221:                                 *default_flow = Some(flow_id.clone());
-222:                                 tracing::info!("Loaded default flow setting: {}", flow_id);
-223:                             } else {
-224:                                 tracing::warn!("Default flow '{}' not found, ignoring setting", flow_id);
-225:                             }
-226:                         }
-227:                     }
-228:                     Err(e) => {
-229:                         tracing::warn!("Failed to load settings: {}", e);
-230:                     }
-231:                 }
-232:             }
-233:         }
-234:         Ok(())
-235:     }
-236:     
-237:     
-238:     
-239:     
-240:     
-241:     
-242:     pub fn register_integration(&self, definition: IntegrationDefinition) -> Result<()> {
-243:         let id = definition.id.clone();
-244:         let mut integrations = self.integrations.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-245:         integrations.insert(id.clone(), definition);
-246:         tracing::debug!("Registered integration: {}", id);
-247:         Ok(())
-248:     }
-249:     
-250:     
-251:     pub fn get_integration(&self, id: &str) -> Option<IntegrationDefinition> {
-252:         let integrations = self.integrations.read().ok()?;
-253:         integrations.get(id).cloned()
-254:     }
-255:     
-256:     
-257:     pub fn list_integrations(&self) -> Vec<String> {
-258:         let integrations = self.integrations.read().unwrap_or_else(|e| {
-259:             tracing::error!("Lock error: {}", e);
-260:             panic!("Lock error")
-261:         });
-262:         integrations.keys().cloned().collect()
-263:     }
-264:     
-265:     
-266:     pub fn get_enabled_integrations(&self) -> Vec<IntegrationDefinition> {
-267:         let integrations = self.integrations.read().unwrap_or_else(|e| {
-268:             tracing::error!("Lock error: {}", e);
-269:             panic!("Lock error")
-270:         });
-271:         integrations.values().filter(|i| i.enabled).cloned().collect()
-272:     }
-273:     
-274:     
-275:     
-276:     
-277:     
-278:     
-279:     pub fn clear(&self) -> Result<()> {
-280:         {
-281:             let mut agents = self.agents.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-282:             agents.clear();
-283:         }
-284:         {
-285:             let mut stages = self.stages.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-286:             stages.clear();
-287:         }
-288:         {
-289:             let mut flows = self.flows.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-290:             flows.clear();
-291:         }
-292:         {
-293:             let mut integrations = self.integrations.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-294:             integrations.clear();
-295:         }
-296:         Ok(())
-297:     }
-298:     
-299:     
-300:     pub fn stats(&self) -> RegistryStats {
-301:         RegistryStats {
-302:             agents: self.agents.read().map(|g| g.len()).unwrap_or(0),
-303:             stages: self.stages.read().map(|g| g.len()).unwrap_or(0),
-304:             flows: self.flows.read().map(|g| g.len()).unwrap_or(0),
-305:             integrations: self.integrations.read().map(|g| g.len()).unwrap_or(0),
-306:         }
-307:     }
-308:     
-309:     
-310:     
-311:     
-312:     
-313:     
-314:     pub fn save_agent_to_file(&self, agent: &AgentDefinition) -> Result<()> {
-315:         let config_dir = ensure_user_config_dir()?;
-316:         let agents_dir = config_dir.join("agents");
-317:         fs::create_dir_all(&agents_dir)
-318:             .with_context(|| format!("Failed to create agents directory: {:?}", agents_dir))?;
-319:         
-320:         let file_path = agents_dir.join(format!("{}.json", agent.id));
-321:         let content = serde_json::to_string_pretty(agent)
-322:             .with_context(|| format!("Failed to serialize agent: {}", agent.id))?;
-323:         
-324:         fs::write(&file_path, content)
-325:             .with_context(|| format!("Failed to write agent file: {:?}", file_path))?;
-326:         
-327:         tracing::info!("Saved agent '{}' to {:?}", agent.id, file_path);
-328:         Ok(())
-329:     }
-330:     
-331:     
-332:     pub fn delete_agent_file(&self, id: &str) -> Result<()> {
-333:         if let Some(config_dir) = get_user_config_dir() {
-334:             let file_path = config_dir.join("agents").join(format!("{}.json", id));
-335:             if file_path.exists() {
-336:                 fs::remove_file(&file_path)
-337:                     .with_context(|| format!("Failed to delete agent file: {:?}", file_path))?;
-338:                 tracing::info!("Deleted agent file: {:?}", file_path);
-339:             }
-340:         }
-341:         Ok(())
-342:     }
-343:     
-344:     
-345:     pub fn save_stage_to_file(&self, stage: &StageDefinition) -> Result<()> {
-346:         let config_dir = ensure_user_config_dir()?;
-347:         let stages_dir = config_dir.join("stages");
-348:         fs::create_dir_all(&stages_dir)
-349:             .with_context(|| format!("Failed to create stages directory: {:?}", stages_dir))?;
-350:         
-351:         let file_path = stages_dir.join(format!("{}.json", stage.id));
-352:         let content = serde_json::to_string_pretty(stage)
-353:             .with_context(|| format!("Failed to serialize stage: {}", stage.id))?;
-354:         
-355:         fs::write(&file_path, content)
-356:             .with_context(|| format!("Failed to write stage file: {:?}", file_path))?;
-357:         
-358:         tracing::info!("Saved stage '{}' to {:?}", stage.id, file_path);
-359:         Ok(())
-360:     }
-361:     
-362:     
-363:     pub fn delete_stage_file(&self, id: &str) -> Result<()> {
-364:         if let Some(config_dir) = get_user_config_dir() {
-365:             let file_path = config_dir.join("stages").join(format!("{}.json", id));
-366:             if file_path.exists() {
-367:                 fs::remove_file(&file_path)
-368:                     .with_context(|| format!("Failed to delete stage file: {:?}", file_path))?;
-369:                 tracing::info!("Deleted stage file: {:?}", file_path);
-370:             }
-371:         }
-372:         Ok(())
-373:     }
-374:     
-375:     
-376:     pub fn save_flow_to_file(&self, flow: &FlowDefinition) -> Result<()> {
-377:         let config_dir = ensure_user_config_dir()?;
-378:         let flows_dir = config_dir.join("flows");
-379:         fs::create_dir_all(&flows_dir)
-380:             .with_context(|| format!("Failed to create flows directory: {:?}", flows_dir))?;
-381:         
-382:         let file_path = flows_dir.join(format!("{}.json", flow.id));
-383:         let content = serde_json::to_string_pretty(flow)
-384:             .with_context(|| format!("Failed to serialize flow: {}", flow.id))?;
-385:         
-386:         fs::write(&file_path, content)
-387:             .with_context(|| format!("Failed to write flow file: {:?}", file_path))?;
-388:         
-389:         tracing::info!("Saved flow '{}' to {:?}", flow.id, file_path);
-390:         Ok(())
-391:     }
-392:     
-393:     
-394:     pub fn delete_flow_file(&self, id: &str) -> Result<()> {
-395:         if let Some(config_dir) = get_user_config_dir() {
-396:             let file_path = config_dir.join("flows").join(format!("{}.json", id));
-397:             if file_path.exists() {
-398:                 fs::remove_file(&file_path)
-399:                     .with_context(|| format!("Failed to delete flow file: {:?}", file_path))?;
-400:                 tracing::info!("Deleted flow file: {:?}", file_path);
-401:             }
-402:         }
-403:         Ok(())
-404:     }
-405:     
-406:     
-407:     pub fn save_integration_to_file(&self, integration: &IntegrationDefinition) -> Result<()> {
-408:         let config_dir = ensure_user_config_dir()?;
-409:         let integrations_dir = config_dir.join("integrations");
-410:         fs::create_dir_all(&integrations_dir)
-411:             .with_context(|| format!("Failed to create integrations directory: {:?}", integrations_dir))?;
-412:         
-413:         let file_path = integrations_dir.join(format!("{}.json", integration.id));
-414:         let content = serde_json::to_string_pretty(integration)
-415:             .with_context(|| format!("Failed to serialize integration: {}", integration.id))?;
-416:         
-417:         fs::write(&file_path, content)
-418:             .with_context(|| format!("Failed to write integration file: {:?}", file_path))?;
-419:         
-420:         tracing::info!("Saved integration '{}' to {:?}", integration.id, file_path);
-421:         Ok(())
-422:     }
-423:     
-424:     
-425:     pub fn delete_integration_file(&self, id: &str) -> Result<()> {
-426:         if let Some(config_dir) = get_user_config_dir() {
-427:             let file_path = config_dir.join("integrations").join(format!("{}.json", id));
-428:             if file_path.exists() {
-429:                 fs::remove_file(&file_path)
-430:                     .with_context(|| format!("Failed to delete integration file: {:?}", file_path))?;
-431:                 tracing::info!("Deleted integration file: {:?}", file_path);
-432:             }
-433:         }
-434:         Ok(())
-435:     }
-436:     
-437:     
-438:     pub fn load_user_configs(&self) -> Result<LoadUserReport> {
-439:         let mut report = LoadUserReport::default();
-440:         
-441:         if let Some(config_dir) = get_user_config_dir() {
-442:             if config_dir.exists() {
-443:                 
-444:                 let agents_dir = config_dir.join("agents");
-445:                 if agents_dir.exists() {
-446:                     for entry in fs::read_dir(&agents_dir)
-447:                         .with_context(|| format!("Failed to read agents directory: {:?}", agents_dir))?
-448:                         .filter_map(|e| e.ok())
-449:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
-450:                     {
-451:                         let path = entry.path();
-452:                         match fs::read_to_string(&path)
-453:                             .and_then(|content| serde_json::from_str::<AgentDefinition>(&content)
-454:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-455:                         {
-456:                             Ok(agent) => {
-457:                                 let id = agent.id.clone();
-458:                                 self.register_agent(agent)?;
-459:                                 report.agents_loaded += 1;
-460:                                 tracing::debug!("Loaded user agent: {} from {:?}", id, path);
-461:                             }
-462:                             Err(e) => {
-463:                                 report.errors.push(format!("Failed to load agent from {:?}: {}", path, e));
-464:                             }
-465:                         }
-466:                     }
-467:                 }
-468:                 
-469:                 
-470:                 let stages_dir = config_dir.join("stages");
-471:                 if stages_dir.exists() {
-472:                     for entry in fs::read_dir(&stages_dir)
-473:                         .with_context(|| format!("Failed to read stages directory: {:?}", stages_dir))?
-474:                         .filter_map(|e| e.ok())
-475:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
-476:                     {
-477:                         let path = entry.path();
-478:                         match fs::read_to_string(&path)
-479:                             .and_then(|content| serde_json::from_str::<StageDefinition>(&content)
-480:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-481:                         {
-482:                             Ok(stage) => {
-483:                                 let id = stage.id.clone();
-484:                                 self.register_stage(stage)?;
-485:                                 report.stages_loaded += 1;
-486:                                 tracing::debug!("Loaded user stage: {} from {:?}", id, path);
-487:                             }
-488:                             Err(e) => {
-489:                                 report.errors.push(format!("Failed to load stage from {:?}: {}", path, e));
-490:                             }
-491:                         }
-492:                     }
-493:                 }
-494:                 
-495:                 
-496:                 let flows_dir = config_dir.join("flows");
-497:                 if flows_dir.exists() {
-498:                     for entry in fs::read_dir(&flows_dir)
-499:                         .with_context(|| format!("Failed to read flows directory: {:?}", flows_dir))?
-500:                         .filter_map(|e| e.ok())
-501:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
-502:                     {
-503:                         let path = entry.path();
-504:                         match fs::read_to_string(&path)
-505:                             .and_then(|content| serde_json::from_str::<FlowDefinition>(&content)
-506:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-507:                         {
-508:                             Ok(flow) => {
-509:                                 let id = flow.id.clone();
-510:                                 
-511:                                 if let Some(existing) = self.get_flow(&id) {
-512:                                     if existing.is_builtin {
-513:                                         tracing::debug!(
-514:                                             "Skipping user flow '{}' - builtin preset with same ID exists",
-515:                                             id
-516:                                         );
-517:                                         continue;
-518:                                     }
-519:                                 }
-520:                                 self.register_flow(flow)?;
-521:                                 report.flows_loaded += 1;
-522:                                 tracing::debug!("Loaded user flow: {} from {:?}", id, path);
-523:                             }
-524:                             Err(e) => {
-525:                                 report.errors.push(format!("Failed to load flow from {:?}: {}", path, e));
-526:                             }
-527:                         }
-528:                     }
-529:                 }
-530:                 
-531:                 
-532:                 let integrations_dir = config_dir.join("integrations");
-533:                 if integrations_dir.exists() {
-534:                     for entry in fs::read_dir(&integrations_dir)
-535:                         .with_context(|| format!("Failed to read integrations directory: {:?}", integrations_dir))?
-536:                         .filter_map(|e| e.ok())
-537:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
-538:                     {
-539:                         let path = entry.path();
-540:                         match fs::read_to_string(&path)
-541:                             .and_then(|content| serde_json::from_str::<IntegrationDefinition>(&content)
-542:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-543:                         {
-544:                             Ok(integration) => {
-545:                                 let id = integration.id.clone();
-546:                                 self.register_integration(integration)?;
-547:                                 report.integrations_loaded += 1;
-548:                                 tracing::debug!("Loaded user integration: {} from {:?}", id, path);
-549:                             }
-550:                             Err(e) => {
-551:                                 report.errors.push(format!("Failed to load integration from {:?}: {}", path, e));
-552:                             }
-553:                         }
-554:                     }
-555:                 }
-556:                 
-557:                 
-558:                 if let Err(e) = self.load_settings() {
-559:                     tracing::warn!("Failed to load settings: {}", e);
-560:                 }
-561:                 
-562:                 
-563:                 
-564:                 if self.get_default_flow_id().is_none() {
-565:                     if self.get_flow("default").is_some() {
-566:                         if let Err(e) = self.set_default_flow(Some("default".to_string())) {
-567:                             tracing::warn!("Failed to set default flow: {}", e);
-568:                         } else {
-569:                             tracing::info!("Set 'default' as the default flow (first time initialization)");
-570:                         }
-571:                     }
-572:                 }
-573:             }
-574:         } else {
-575:             
-576:             
-577:             if let Some(flow_id) = self.get_default_flow_id() {
-578:                 if let Err(e) = self.set_default_flow(Some(flow_id)) {
-579:                     tracing::warn!("Failed to save initial default flow setting: {}", e);
-580:                 }
-581:             }
-582:         }
-583:         
-584:         Ok(report)
-585:     }
-586: }
-587: ⋮----
-588: RegistryStats
-589: ⋮----
-590: {
-591:     pub agents: usize,
-592:     pub stages: usize,
-593:     pub flows: usize,
-594:     pub integrations: usize,
-595: }
-596: ⋮----
-597: LoadUserReport
-598: ⋮----
-599: {
-600:     pub agents_loaded: usize,
-601:     pub stages_loaded: usize,
-602:     pub flows_loaded: usize,
-603:     pub integrations_loaded: usize,
-604:     pub errors: Vec<String>,
-605: }
-606: ⋮----
-607: LoadReport
-608: ⋮----
-609: {
-610:     pub agents_loaded: usize,
-611:     pub stages_loaded: usize,
-612:     pub flows_loaded: usize,
-613:     pub integrations_loaded: usize,
-614:     pub default_flow_set: bool,
-615:     pub errors: Vec<String>,
-616: }
-617: ⋮----
-618: LoadReport
-619: ⋮----
-620: {
-621:     pub fn total_loaded(&self) -> usize {
-622:         self.agents_loaded + self.stages_loaded + self.flows_loaded + self.integrations_loaded
-623:     }
-624: 
-625:     pub fn has_errors(&self) -> bool {
-626:         !self.errors.is_empty()
-627:     }
-628: }
-629: ⋮----
-630: Settings
-631: ⋮----
-632: {
-633:     
-634:     pub default_flow_id: Option<String>,
-635: }
-636: ⋮----
-637: Settings
-638: ⋮----
-639: {
-640:     fn default() -> Self {
-641:         Self {
-642:             default_flow_id: None,
-643:         }
-644:     }
-645: }
-646: ⋮----
-647: global_registry
-648: ⋮----
-649: ()
-650: ⋮----
-651: test_registry_operations
-652: ⋮----
-653: ()
+1: pub mod agent_definition;
+2: pub mod stage_definition;
+3: pub mod flow_definition;
+4: pub mod integration_definition;
+5: pub mod registry;
+6: pub mod validator;
+7: pub mod builtin;
+8: pub mod agent_factory;
+9: 
+10: pub use agent_definition::*;
+11: pub use stage_definition::*;
+12: pub use flow_definition::*;
+13: pub use integration_definition::*;
+14: pub use registry::*;
+15: pub use validator::*;
+16: pub use builtin::load_builtin_configs;
+17: pub use agent_factory::{create_agent_for_stage, create_agent_from_config, initialize_config_registry, initialize_mcp_toolsets, is_mcp_initialized};
 ```
 
 ### crates/cowork-core/src/domain/iteration.rs (319 lines)
@@ -13962,310 +13073,1650 @@ LICENSE
 167:     )
 ```
 
-### crates/cowork-gui/src/components/common/MarkdownMessage.tsx (5 lines)
+### crates/cowork-gui/package.json (44 lines)
 
 ```
-1: MarkdownMessageProps
-2: ⋮----
-3: {
-4:   content: string;
-5: }
+1: {
+2:   "name": "cowork-gui",
+3:   "private": true,
+4:   "type": "module",
+5:   "version": "2.6.0",
+6:   "scripts": {
+7:     "dev": "vite --port 15173",
+8:     "build": "tsc && vite build",
+9:     "tauri": "tauri",
+10:     "tauri:dev": "tauri dev --port 15173",
+11:     "tauri:build": "tauri build",
+12:     "typecheck": "tsc --noEmit"
+13:   },
+14:   "dependencies": {
+15:     "@ant-design/icons": "^6.3.2",
+16:     "@monaco-editor/react": "^4.7.0",
+17:     "@tauri-apps/api": "^2.11.1",
+18:     "@tauri-apps/plugin-dialog": "^2.7.1",
+19:     "antd": "^6.5.0",
+20:     "react": "^19.2.6",
+21:     "react-dom": "^19.2.6",
+22:     "react-json-view": "^1.21.3",
+23:     "react-markdown": "^10.1.0",
+24:     "react-window": "^1.8.11",
+25:     "rehype-highlight": "^7.0.2",
+26:     "rehype-raw": "^7.0.0",
+27:     "remark-gfm": "^4.0.1",
+28:     "zustand": "^5.0.14"
+29:   },
+30:   "devDependencies": {
+31:     "@babel/core": "^8.0.0",
+32:     "@rolldown/plugin-babel": "^0.2.3",
+33:     "@tauri-apps/cli": "^2.11.4",
+34:     "@types/babel__core": "^7.20.5",
+35:     "@types/node": "^20.0.0",
+36:     "@types/react": "^19.2.0",
+37:     "@types/react-dom": "^19.2.0",
+38:     "@types/react-window": "1.8.8",
+39:     "@vitejs/plugin-react": "^6.0.3",
+40:     "babel-plugin-react-compiler": "^1.0.0",
+41:     "typescript": "^5.7.0",
+42:     "vite": "^8.1.3"
+43:   }
+44: }
 ```
 
-### crates/cowork-gui/src/components/config/SkillManager.tsx (237 lines)
+### crates/cowork-gui/src/App.tsx (419 lines)
 
 ```
-1: import React, { useState } from "react";
-2: import {
-3:   List,
-4:   Button,
-5:   Space,
-6:   Typography,
-7:   Tag,
-8:   message,
-9:   Popconfirm,
-10:   Empty,
-11:   Drawer,
-12:   Descriptions,
-13:   Card,
-14:   Badge,
-15: } from "antd";
-16: import {
-17:   PlusOutlined,
-18:   DeleteOutlined,
-19:   ThunderboltOutlined,
-20:   FolderOpenOutlined,
-21:   InfoCircleOutlined,
-22:   TagOutlined,
-23: } from "@ant-design/icons";
-24: import { open } from "@tauri-apps/plugin-dialog";
-25: import { useConfigStore } from "../../stores/configStore";
-26: import type { SkillInfo } from "../../types/config";
+1: import React, { useEffect, useRef, useState, useMemo, useCallback, Suspense, lazy } from 'react';
+2: import { Layout, Menu, Button, Empty, App as AntApp, Tag, Spin } from 'antd';
+3: import {
+4: 	FolderOutlined,
+5: 	FileTextOutlined,
+6: 	CodeOutlined,
+7: 	EyeOutlined,
+8: 	PlayCircleOutlined,
+9: 	ReloadOutlined,
+10: 	MessageOutlined,
+11: 	AppstoreOutlined,
+12: 	DatabaseOutlined,
+13: 	BranchesOutlined,
+14: 	CheckCircleOutlined,
+15: 	RocketOutlined,
+16: 	BookOutlined,
+17: 	SettingOutlined,
+18: 	ControlOutlined
+19: } from '@ant-design/icons';
+20: 
+21: import { useProjectStore, useAgentStore, useUIStore } from './stores';
+22: import { LoadingScreen, StatusBadge } from './components/common';
+23: import { useAppEvents, usePMAgent, useIterationActions, useChatInput } from './hooks';
+24: 
+25: import type { ChatMode, PMAction, PMAgentMessage, ChatMessage } from './stores';
+26: 
 27: 
-28: const { Title, Text, Paragraph } = Typography;
+28: import ProjectsPanel from './components/ProjectsPanel';
 29: 
-30: const SkillManager: React.FC = () => {
-31:   const { skills, selectedSkill, selectSkill, installSkill, uninstallSkill } =
-32:     useConfigStore();
-33: 
-34:   const [detailDrawerVisible, setDetailDrawerVisible] = useState(false);
-35:   const [installing, setInstalling] = useState(false);
-36: 
-37:   const handleSelectFolder = async () => {
-38:     const selected = await open({
-39:       directory: true,
-40:       multiple: false,
-41:       title: "Select Skill Directory (contains Skill.md)",
-42:     });
+30: 
+31: const ArtifactsViewer = lazy(() => import('./components/ArtifactsViewer'));
+32: const CodeEditor = lazy(() => import('./components/CodeEditor'));
+33: const RunnerPanel = lazy(() => import('./components/RunnerPanel'));
+34: const MemoryPanel = lazy(() => import('./components/MemoryPanel'));
+35: const KnowledgePanel = lazy(() => import('./components/KnowledgePanel'));
+36: const CommandPalette = lazy(() => import('./components/CommandPalette'));
+37: const IterationsPanel = lazy(() => import('./components/IterationsPanel'));
+38: const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
+39: 
+40: const ChatPanel = lazy(() => import('./components/chat').then(m => ({ default: m.ChatPanel })));
+41: 
+42: const AgentsSetupPanel = lazy(() => import('./components/config').then(m => ({ default: m.AgentsSetupPanel })));
 43: 
-44:     if (selected) {
-45:       await handleInstall(selected as string);
-46:     }
-47:   };
-48: 
-49:   const handleInstall = async (skillPath: string) => {
-50:     setInstalling(true);
-51:     try {
-52:       await installSkill(skillPath);
-53:       message.success("Skill installed successfully");
-54:     } catch (error) {
-55:       message.error("Failed to install skill");
-56:     } finally {
-57:       setInstalling(false);
-58:     }
-59:   };
+44: const { Sider, Content, Header, Footer } = Layout;
+45: 
+46: function App() {
+47: 	
+48: 	const [userInput, setUserInput] = useState('');
+49: 	const messagesContainerRef = useRef<HTMLDivElement>(null);
+50: 	const pmMessagesContainerRef = useRef<HTMLDivElement>(null);
+51: 
+52: 	
+53: 	const project = useProjectStore(state => state.project);
+54: 	const iterations = useProjectStore(state => state.iterations);
+55: 	const currentIteration = useProjectStore(state => state.currentIteration);
+56: 	const loading = useProjectStore(state => state.loading);
+57: 	const loadProject = useProjectStore(state => state.loadProject);
+58: 	const setCurrentIteration = useProjectStore(state => state.setCurrentIteration);
+59: 	const updateCurrentIterationStatus = useProjectStore(state => state.updateCurrentIterationStatus);
 60: 
-61:   const handleView = (skill: SkillInfo) => {
-62:     selectSkill(skill.name);
-63:     setDetailDrawerVisible(true);
-64:   };
-65: 
-66:   const handleUninstall = async (name: string) => {
-67:     try {
-68:       await uninstallSkill(name);
-69:       message.success("Skill uninstalled successfully");
-70:     } catch (error) {
-71:       message.error("Failed to uninstall skill");
-72:     }
-73:   };
-74: 
-75:   const selectedSkillData = selectedSkill
-76:     ? skills.find((s) => s.name === selectedSkill)
-77:     : null;
-78: 
-79:   return (
-80:     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-81:       <div
-82:         style={{
-83:           padding: "16px",
-84:           display: "flex",
-85:           justifyContent: "space-between",
-86:           alignItems: "center",
-87:         }}
-88:       >
-89:         <Title level={5} style={{ margin: 0 }}>
-90:           Skill Manager
-91:           <Badge count={skills.length} style={{ marginLeft: 8 }} />
-92:         </Title>
-93:         <Button
-94:           type="primary"
-95:           icon={<PlusOutlined />}
-96:           onClick={handleSelectFolder}
-97:           loading={installing}
-98:         >
-99:           Install Skill
-100:         </Button>
-101:       </div>
-102: 
-103:       {skills.length === 0 ? (
-104:         <Empty
-105:           description={
-106:             <Space direction="vertical" size="small">
-107:               <Text>No skills installed</Text>
-108:               <Text type="secondary">
-109:                 Install skills to extend agent capabilities
-110:               </Text>
-111:             </Space>
-112:           }
-113:           style={{ marginTop: "40px" }}
-114:         />
-115:       ) : (
-116:         <div style={{ flex: 1, overflow: "auto", padding: "0 16px" }}>
-117:           <Card size="small" style={{ marginBottom: 16 }}>
-118:             <List
-119:               dataSource={skills.sort((a, b) => a.name.localeCompare(b.name))}
-120:               renderItem={(skill) => (
-121:                 <List.Item
-122:                   actions={[
-123:                     <Button
-124:                       key="view"
-125:                       type="link"
-126:                       size="small"
-127:                       icon={<InfoCircleOutlined />}
-128:                       onClick={() => handleView(skill)}
-129:                     >
-130:                       Details
-131:                     </Button>,
-132:                     <Popconfirm
-133:                       key="uninstall"
-134:                       title="Uninstall this skill?"
-135:                       onConfirm={() => handleUninstall(skill.name)}
-136:                     >
-137:                       <Button
-138:                         type="link"
-139:                         size="small"
-140:                         danger
-141:                         icon={<DeleteOutlined />}
-142:                       >
-143:                         Uninstall
-144:                       </Button>
-145:                     </Popconfirm>,
-146:                   ]}
-147:                 >
-148:                   <List.Item.Meta
-149:                     avatar={
-150:                       <ThunderboltOutlined
-151:                         style={{ fontSize: 24, color: "#1890ff" }}
-152:                       />
-153:                     }
-154:                     title={
-155:                       <Space>
-156:                         <Text strong>{skill.name}</Text>
-157:                       </Space>
-158:                     }
-159:                     description={
-160:                       <Space direction="vertical" size="small">
-161:                         <Text type="secondary">{skill.description}</Text>
-162:                         <Space size={4}>
-163:                           {skill.tags.slice(0, 3).map((tag, i) => (
-164:                             <Tag key={i} color="blue">
-165:                               {tag}
-166:                             </Tag>
-167:                           ))}
-168:                           {skill.tags.length > 3 && (
-169:                             <Tag>+{skill.tags.length - 3}</Tag>
-170:                           )}
-171:                         </Space>
-172:                       </Space>
-173:                     }
-174:                   />
-175:                 </List.Item>
-176:               )}
-177:             />
-178:           </Card>
-179:         </div>
-180:       )}
-181: 
-182:       {}
-183:       <Drawer
-184:         title={selectedSkillData?.name || "Skill Details"}
-185:         placement="right"
-186:         width={600}
-187:         onClose={() => setDetailDrawerVisible(false)}
-188:         open={detailDrawerVisible}
-189:       >
-190:         {selectedSkillData && (
-191:           <Space direction="vertical" style={{ width: "100%" }} size="large">
-192:             <Descriptions column={1} bordered size="small">
-193:               <Descriptions.Item label="ID">
-194:                 {selectedSkillData.id}
-195:               </Descriptions.Item>
-196:               <Descriptions.Item label="Name">
-197:                 {selectedSkillData.name}
-198:               </Descriptions.Item>
-199:               <Descriptions.Item label="Description">
-200:                 {selectedSkillData.description}
-201:               </Descriptions.Item>
-202:             </Descriptions>
-203: 
-204:             <Title level={5}>
-205:               <TagOutlined style={{ marginRight: 8 }} />
-206:               Tags
-207:             </Title>
-208:             <Space wrap>
-209:               {selectedSkillData.tags.length > 0 ? (
-210:                 selectedSkillData.tags.map((tag, i) => (
-211:                   <Tag key={i} color="blue">
-212:                     {tag}
-213:                   </Tag>
-214:                 ))
-215:               ) : (
-216:                 <Text type="secondary">No tags</Text>
-217:               )}
-218:             </Space>
-219: 
-220:             <Title level={5}>Skill Instructions</Title>
-221:             {selectedSkillData.body ? (
-222:               <Card size="small" style={{ maxHeight: 400, overflow: "auto" }}>
-223:                 <Paragraph style={{ whiteSpace: "pre-wrap", marginBottom: 0 }}>
-224:                   {selectedSkillData.body}
-225:                 </Paragraph>
-226:               </Card>
-227:             ) : (
-228:               <Text type="secondary">No instructions defined</Text>
-229:             )}
-230:           </Space>
-231:         )}
-232:       </Drawer>
-233:     </div>
-234:   );
-235: };
-236: 
-237: export default SkillManager;
+61: 	
+62: 	const messages = useAgentStore(state => state.messages);
+63: 	const pmMessages = useAgentStore(state => state.pmMessages);
+64: 	const isProcessing = useAgentStore(state => state.isProcessing);
+65: 	const currentAgent = useAgentStore(state => state.currentAgent);
+66: 	const currentStage = useAgentStore(state => state.currentStage);
+67: 	const inputRequest = useAgentStore(state => state.inputRequest);
+68: 	const pmProcessing = useAgentStore(state => state.pmProcessing);
+69: 	const setInputRequest = useAgentStore(state => state.setInputRequest);
+70: 	const loadPMWelcomeMessage = useAgentStore(state => state.loadPMWelcomeMessage);
+71: 
+72: 	
+73: 	const activeView = useUIStore(state => state.activeView);
+74: 	const commandPaletteVisible = useUIStore(state => state.commandPaletteVisible);
+75: 	const activeArtifactTab = useUIStore(state => state.activeArtifactTab);
+76: 	const artifactsRefreshTrigger = useUIStore(state => state.artifactsRefreshTrigger);
+77: 	const codeRefreshTrigger = useUIStore(state => state.codeRefreshTrigger);
+78: 	const memoryRefreshTrigger = useUIStore(state => state.memoryRefreshTrigger);
+79: 	const knowledgeRefreshTrigger = useUIStore(state => state.knowledgeRefreshTrigger);
+80: 	const setActiveView = useUIStore(state => state.setActiveView);
+81: 	const setCommandPaletteVisible = useUIStore(state => state.setCommandPaletteVisible);
+82: 	const setActiveArtifactTab = useUIStore(state => state.setActiveArtifactTab);
+83: 
+84: 	
+85: 	useAppEvents(userInput, setUserInput);
+86: 	const { handlePMSendMessage, handlePMAction } = usePMAgent();
+87: 	const { handleSelectIteration, handleExecuteIteration, handleOpenProjectFolder, handleOpenIterationFolder, handleCommandSelect } = useIterationActions();
+88: 	const {
+89: 		inputRequest: chatInputRequest,
+90: 		handleSendUserMessage,
+91: 		handleSelectOption,
+92: 		handleSubmitFeedback,
+93: 		handleToggleThinking,
+94: 		handleCancelFeedback
+95: 	} = useChatInput();
+96: 
+97: 	
+98: 	const chatMode = useMemo<ChatMode>(() => {
+99: 		if (!currentIteration) return 'disabled';
+100: 		if (currentIteration.status === 'Completed') return 'pm_agent';
+101: 		if (isProcessing || currentIteration.status === 'Running') return 'pipeline';
+102: 		return 'pipeline';
+103: 	}, [currentIteration, isProcessing]);
+104: 
+105: 	
+106: 	useEffect(() => {
+107: 		if (chatMode === 'pm_agent' && currentIteration) {
+108: 			const pmMessages = useAgentStore.getState().pmMessages;
+109: 			if (pmMessages.length === 0) {
+110: 				loadPMWelcomeMessage(currentIteration.id);
+111: 			}
+112: 		}
+113: 	}, [chatMode, currentIteration?.id, loadPMWelcomeMessage]);
+114: 
+115: 	
+116: 	useEffect(() => {
+117: 		if (messagesContainerRef.current) {
+118: 			messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+119: 		}
+120: 	}, [messages]);
+121: 
+122: 	useEffect(() => {
+123: 		if (pmMessagesContainerRef.current && pmMessages.length > 0) {
+124: 			pmMessagesContainerRef.current.scrollTop = pmMessagesContainerRef.current.scrollHeight;
+125: 		}
+126: 	}, [pmMessages]);
+127: 
+128: 	
+129: 	const handleSend = useCallback(() => {
+130: 		if (chatMode === 'pm_agent') {
+131: 			handlePMSendMessage(userInput, setUserInput);
+132: 		} else {
+133: 			handleSendUserMessage(userInput, setUserInput);
+134: 		}
+135: 	}, [chatMode, userInput, handlePMSendMessage, handleSendUserMessage]);
+136: 
+137: 	const handleSelectOptionWrapper = useCallback((option: Parameters<typeof handleSelectOption>[0]) => {
+138: 		handleSelectOption(option, userInput, setUserInput);
+139: 	}, [handleSelectOption, userInput]);
+140: 
+141: 	const handleSubmitFeedbackWrapper = useCallback(() => {
+142: 		handleSubmitFeedback(userInput, setUserInput, updateCurrentIterationStatus);
+143: 	}, [handleSubmitFeedback, userInput, updateCurrentIterationStatus]);
+144: 
+145: 	const handlePMActionWrapper = useCallback((action: PMAction) => {
+146: 		handlePMAction(action, pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]);
+147: 	}, [handlePMAction, pmMessages]);
+148: 
+149: 	
+150: 	const loadingFallback = (
+151: 		<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+152: 			<Spin size="large" tip="Loading..." />
+153: 		</div>
+154: 	);
+155: 
+156: 	
+157: 	
+158: 	
+159: 	const renderContent = () => (
+160: 		<div style={{ height: '100%' }}>
+161: 			{activeView === 'iterations' && (
+162: 				<Suspense fallback={loadingFallback}>
+163: 					<IterationsPanel
+164: 						key="iterations"
+165: 						onSelectIteration={handleSelectIteration}
+166: 						selectedIterationId={currentIteration?.id}
+167: 					/>
+168: 				</Suspense>
+169: 			)}
+170: 
+171: 			{activeView === 'projects' && (
+172: 				<ProjectsPanel key="projects" />
+173: 			)}
+174: 
+175: 			{activeView === 'artifacts' && (
+176: 				currentIteration ? (
+177: 					<Suspense fallback={loadingFallback}>
+178: 						<ArtifactsViewer
+179: 							key={`artifacts-${currentIteration.id}`}
+180: 							iterationId={currentIteration.id}
+181: 							activeTab={activeArtifactTab}
+182: 							onTabChange={setActiveArtifactTab}
+183: 							refreshTrigger={artifactsRefreshTrigger}
+184: 						/>
+185: 					</Suspense>
+186: 				) : (
+187: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
+188: 				)
+189: 			)}
+190: 
+191: 			{activeView === 'code' && (
+192: 				currentIteration ? (
+193: 					<Suspense fallback={loadingFallback}>
+194: 						<CodeEditor
+195: 							key={`code-${currentIteration.id}`}
+196: 							iterationId={currentIteration.id}
+197: 							refreshTrigger={codeRefreshTrigger}
+198: 						/>
+199: 					</Suspense>
+200: 				) : (
+201: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
+202: 				)
+203: 			)}
+204: 
+205: 			{activeView === 'run' && (
+206: 				currentIteration ? (
+207: 					<Suspense fallback={loadingFallback}>
+208: 						<RunnerPanel key={`run-${currentIteration.id}`} iterationId={currentIteration.id} />
+209: 					</Suspense>
+210: 				) : (
+211: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
+212: 				)
+213: 			)}
+214: 
+215: 			{activeView === 'execution-memory' && (
+216: 				<Suspense fallback={loadingFallback}>
+217: 					<MemoryPanel
+218: 						key={`memory-${memoryRefreshTrigger}`}
+219: 						currentSession={currentIteration?.id}
+220: 						refreshTrigger={memoryRefreshTrigger}
+221: 					/>
+222: 				</Suspense>
+223: 			)}
+224: 
+225: 			{activeView === 'project-knowledge' && (
+226: 				<Suspense fallback={loadingFallback}>
+227: 					<KnowledgePanel
+228: 						key={`knowledge-${knowledgeRefreshTrigger}`}
+229: 						currentSession={project?.id}
+230: 						currentIterationId={currentIteration?.id}
+231: 						refreshTrigger={knowledgeRefreshTrigger}
+232: 					/>
+233: 				</Suspense>
+234: 			)}
+235: 
+236: 			{activeView === 'settings' && (
+237: 				<div style={{ height: '100%', overflow: 'auto' }}>
+238: 					<Suspense fallback={loadingFallback}>
+239: 						<SettingsPanel />
+240: 					</Suspense>
+241: 				</div>
+242: 			)}
+243: 
+244: 			{activeView === 'config' && (
+245: 				<div style={{ height: '100%', overflow: 'auto' }}>
+246: 					<Suspense fallback={loadingFallback}>
+247: 						<AgentsSetupPanel />
+248: 					</Suspense>
+249: 				</div>
+250: 			)}
+251: 
+252: 			{activeView === 'chat' && (
+253: 				currentIteration ? (
+254: 					<Suspense fallback={loadingFallback}>
+255: 						<ChatPanel
+256: 							messages={messages}
+257: 							pmMessages={pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]}
+258: 							mode={chatMode}
+259: 							isProcessing={isProcessing}
+260: 							pmProcessing={pmProcessing}
+261: 							currentAgent={currentAgent}
+262: 							iterationTitle={currentIteration.title}
+263: 							iterationDescription={currentIteration.description}
+264: 							currentStage={currentStage}
+265: 							inputRequest={inputRequest}
+266: 							userInput={userInput}
+267: 							messagesContainerRef={messagesContainerRef as React.RefObject<HTMLDivElement>}
+268: 							pmMessagesContainerRef={pmMessagesContainerRef as React.RefObject<HTMLDivElement>}
+269: 							onUserInputChange={setUserInput}
+270: 							onSend={handleSend}
+271: 							onSelectOption={handleSelectOptionWrapper}
+272: 							onSubmitFeedback={handleSubmitFeedbackWrapper}
+273: 							onCancelFeedback={handleCancelFeedback}
+274: 							onToggleThinking={handleToggleThinking}
+275: 							onActionClick={handlePMActionWrapper}
+276: 						/>
+277: 					</Suspense>
+278: 				) : (
+279: 					<Empty description="Select an iteration to view chat" style={{ marginTop: '40px' }} />
+280: 				)
+281: 			)}
+282: 		</div>
+283: 	);
+284: 
+285: 	if (loading) {
+286: 		return <LoadingScreen />;
+287: 	}
+288: 
+289: 	return (
+290: 		<Layout style={{ minHeight: '100vh' }}>
+291: 			<Header
+292: 				style={{
+293: 					background: '#fff',
+294: 					borderBottom: '1px solid #e8e8e8',
+295: 					padding: '0 24px',
+296: 					display: 'flex',
+297: 					alignItems: 'center',
+298: 					justifyContent: 'space-between'
+299: 				}}
+300: 			>
+301: 				<div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+302: 					<h1 style={{ margin: 0, fontSize: '18px' }}>
+303: 						<RocketOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
+304: 						Cowork Forge
+305: 					</h1>
+306: 					{project && (
+307: 						<Tag color="blue" style={{ cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
+308: 							{project.name}
+309: 						</Tag>
+310: 					)}
+311: 				</div>
+312: 
+313: 				<div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+314: 					{currentIteration && (
+315: 						<>
+316: 							<StatusBadge status={currentIteration.status} />
+317: 							{(currentIteration.status === 'Draft' || currentIteration.status === 'Paused') && (
+318: 								<Button
+319: 									type="primary"
+320: 									icon={
+321: 										currentIteration.status === 'Draft' ? (
+322: 											<PlayCircleOutlined />
+323: 										) : (
+324: 											<ReloadOutlined />
+325: 										)
+326: 									}
+327: 									onClick={handleExecuteIteration}
+328: 									loading={isProcessing}
+329: 								>
+330: 									{currentIteration.status === 'Draft' ? 'Start Iteration' : 'Continue'}
+331: 								</Button>
+332: 							)}
+333: 						</>
+334: 					)}
+335: 				</div>
+336: 			</Header>
+337: 
+338: 			<Layout style={{ height: 'calc(100vh - 64px - 48px)' }}>
+339: 				<Sider width={200} style={{ background: '#fff', borderRight: '1px solid #e8e8e8' }}>
+340: 					<Menu
+341: 						mode="inline"
+342: 						selectedKeys={[activeView]}
+343: 						onClick={({ key }) => setActiveView(key as typeof activeView)}
+344: 						style={{ height: '100%', borderRight: 0 }}
+345: 						items={[
+346: 							{ key: 'projects', icon: <AppstoreOutlined />, label: 'Projects' },
+347: 							{ key: 'iterations', icon: <BranchesOutlined />, label: 'Iterations' },
+348: 							{ key: 'chat', icon: <MessageOutlined />, label: 'Collaborate' },
+349: 							{ key: 'artifacts', icon: <FileTextOutlined />, label: 'Artifacts' },
+350: 							{ key: 'code', icon: <CodeOutlined />, label: 'Code' },
+351: 							{ key: 'run', icon: <PlayCircleOutlined />, label: 'Run' },
+352: 							{ key: 'execution-memory', icon: <DatabaseOutlined />, label: 'Memory' },
+353: 							{ key: 'project-knowledge', icon: <BookOutlined />, label: 'Knowledge' },
+354: 							{ type: 'divider' },
+355: 							{ key: 'config', icon: <ControlOutlined />, label: 'Agents Setup' },
+356: 							{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' }
+357: 						]}
+358: 					/>
+359: 				</Sider>
+360: 
+361: 				<Content style={{ overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
+362: 					{renderContent()}
+363: 				</Content>
+364: 			</Layout>
+365: 
+366: 			<Footer
+367: 				style={{
+368: 					background: '#fff',
+369: 					borderTop: '1px solid #e8e8e8',
+370: 					padding: '12px 24px',
+371: 					display: 'flex',
+372: 					justifyContent: 'space-between',
+373: 					alignItems: 'center'
+374: 				}}
+375: 			>
+376: 				<div style={{ fontSize: '12px', color: '#888' }}>
+377: 					{project ? (
+378: 						<>
+379: 							<span style={{ marginRight: '16px', cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
+380: 								Project: <strong>{project.name}</strong>
+381: 							</span>
+382: 							<span
+383: 								style={{ cursor: currentIteration ? 'pointer' : 'default' }}
+384: 								onClick={() => currentIteration && handleOpenIterationFolder(currentIteration.id)}
+385: 								title={currentIteration ? `Click to open iteration folder: ${currentIteration.id}` : undefined}
+386: 							>
+387: 								Iterations: <strong>{iterations.length}</strong>
+388: 								{currentIteration && <span style={{ marginLeft: '4px', color: '#1890ff' }}>(#{currentIteration.number})</span>}
+389: 							</span>
+390: 						</>
+391: 					) : (
+392: 						'No project loaded'
+393: 					)}
+394: 				</div>
+395: 				<div style={{ fontSize: '12px', color: '#888' }}>
+396: 					{isProcessing ? (
+397: 						<span style={{ color: '#1890ff' }}>
+398: 							<Spin size="small" style={{ marginRight: '8px' }} />
+399: 							{currentAgent ? `${currentAgent} is working...` : 'Processing...'}
+400: 						</span>
+401: 					) : (
+402: 						<span style={{ color: '#52c41a' }}>
+403: 							<CheckCircleOutlined style={{ marginRight: '4px' }} />
+404: 							Ready
+405: 						</span>
+406: 					)}
+407: 				</div>
+408: 			</Footer>
+409: 
+410: 			<CommandPalette
+411: 				visible={commandPaletteVisible}
+412: 				onClose={() => setCommandPaletteVisible(false)}
+413: 				onCommandSelect={handleCommandSelect}
+414: 			/>
+415: 		</Layout>
+416: 	);
+417: }
+418: 
+419: export default App;
 ```
 
-### crates/cowork-gui/src/stores/configStore.ts (49 lines)
+### crates/cowork-gui/src/components/ProjectsPanel.tsx (348 lines)
 
 ```
-1: ConfigState
-2: ⋮----
-3: {
-4:   loading: boolean;
-5:   error: string | null;
-6:   selectedFlow: string | null;
-7:   selectedAgent: string | null;
-8:   selectedStage: string | null;
-9:   selectedSkill: string | null;  
-10:   selectedIntegration: string | null;
-11:   availableTools: ToolInfo[];  
-12: 
-13:   
-14:   loadConfigs: () => Promise<void>;
-15:   resetConfigs: () => Promise<void>;
-16:   selectFlow: (id: string | null) => void;
-17:   selectAgent: (id: string | null) => void;
-18:   selectStage: (id: string | null) => void;
-19:   selectSkill: (name: string | null) => void;
-20:   selectIntegration: (id: string | null) => void;
-21: 
-22:   
-23:   saveAgent: (agent: AgentDefinition) => Promise<void>;
-24:   deleteAgent: (id: string) => Promise<void>;
-25:   saveStage: (stage: StageDefinition) => Promise<void>;
-26:   deleteStage: (id: string) => Promise<void>;
-27:   saveFlow: (flow: FlowDefinition) => Promise<void>;
-28:   deleteFlow: (id: string) => Promise<void>;
-29:   setDefaultFlow: (id: string) => Promise<void>;
-30:   installSkill: (skillPath: string) => Promise<void>;
-31:   uninstallSkill: (name: string) => Promise<void>;
-32:   saveIntegration: (integration: IntegrationDefinition) => Promise<void>;
-33:   deleteIntegration: (id: string) => Promise<void>;
-34: 
-35:   
-36:   validateAgent: (agent: AgentDefinition) => Promise<ValidationResult>;
-37:   validateFlow: (flow: FlowDefinition) => Promise<ValidationResult>;
-38: 
-39:   
-40:   exportConfig: (type: 'agent' | 'stage' | 'flow', id: string) => Promise<string>;
-41:   importConfig: (type: 'agent' | 'stage' | 'flow', jsonData: string) => Promise<void>;
+1: import { useState } from "react";
+2: import { invoke } from "@tauri-apps/api/core";
+3: import {
+4:   App,
+5:   Card,
+6:   Button,
+7:   Modal,
+8:   Tag,
+9:   Empty,
+10:   Spin,
+11:   Tooltip,
+12:   Space,
+13: } from "antd";
+14: import {
+15:   FolderOpenOutlined,
+16:   DeleteOutlined,
+17:   EditOutlined,
+18:   CheckCircleOutlined,
+19:   ClockCircleOutlined,
+20:   PlusOutlined,
+21:   ImportOutlined,
+22: } from "@ant-design/icons";
+23: 
+24: import { useProjectsData } from '../hooks';
+25: import { CreateProjectModal, EditProjectModal, ImportProjectModal } from './projects';
+26: import type { ProjectData } from '../types';
+27: 
+28: const ProjectsPanel: React.FC = () => {
+29:   const { message } = App.useApp();
+30:   const { projects, loading, loadProjects } = useProjectsData();
+31: 
+32:   
+33:   const [showCreateModal, setShowCreateModal] = useState(false);
+34:   const [showEditModal, setShowEditModal] = useState(false);
+35:   const [showImportModal, setShowImportModal] = useState(false);
+36:   const [selectedProject, setSelectedProject] = useState<ProjectData | null>(null);
+37: 
+38:   
+39:   const handleDeleteProject = async (project: ProjectData) => {
+40:     Modal.confirm({
+41:       title: "Delete Project",
+42:       content: `Remove "${project.name}" from project list? The project files will remain on disk.`,
+43:       okText: "Delete",
+44:       okType: "danger",
+45:       onOk: async () => {
+46:         try {
+47:           await invoke("delete_project", { projectId: project.project_id });
+48:           message.success("Project removed from list");
+49:           loadProjects();
+50:         } catch (error) {
+51:           message.error("Failed to delete project: " + error);
+52:         }
+53:       },
+54:     });
+55:   };
+56: 
+57:   const handleOpenProject = async (projectId: string) => {
+58:     try {
+59:       const hasProject = await invoke<boolean>("has_open_project");
+60: 
+61:       if (hasProject) {
+62:         await invoke("open_project", { projectId });
+63:         message.info("Opening project in new window...");
+64:       } else {
+65:         await invoke("open_project_in_current_window", { projectId });
+66:         message.success("Project opened successfully");
+67:       }
+68:     } catch (error) {
+69:       message.error("Failed to open project: " + error);
+70:     }
+71:   };
+72: 
+73:   const handleOpenEditModal = (project: ProjectData) => {
+74:     setSelectedProject(project);
+75:     setShowEditModal(true);
+76:   };
+77: 
+78:   const handleProjectCreated = async (projectId: string, projectName: string) => {
+79:     loadProjects();
+80: 
+81:     
+82:     Modal.confirm({
+83:       title: "Open Project?",
+84:       content: `Would you like to open "${projectName}" now?`,
+85:       okText: "Open Project",
+86:       cancelText: "Later",
+87:       onOk: async () => {
+88:         try {
+89:           const hasProject = await invoke<boolean>("has_open_project");
+90:           if (hasProject) {
+91:             await invoke("open_project", { projectId });
+92:             message.info("Opening project in new window...");
+93:           } else {
+94:             await invoke("open_project_in_current_window", { projectId });
+95:             message.success("Project opened successfully");
+96:           }
+97:         } catch (error) {
+98:           message.error("Failed to open project: " + error);
+99:         }
+100:       },
+101:     });
+102:   };
+103: 
+104:   const handleProjectImported = async (projectId: string, projectName: string) => {
+105:     loadProjects();
+106:     message.success(`Project "${projectName}" imported successfully!`);
+107: 
+108:     
+109:     Modal.confirm({
+110:       title: "Open Project?",
+111:       content: `Would you like to open "${projectName}" now?`,
+112:       okText: "Open Project",
+113:       cancelText: "Later",
+114:       onOk: async () => {
+115:         try {
+116:           const hasProject = await invoke<boolean>("has_open_project");
+117:           if (hasProject) {
+118:             await invoke("open_project", { projectId });
+119:             message.info("Opening project in new window...");
+120:           } else {
+121:             await invoke("open_project_in_current_window", { projectId });
+122:             message.success("Project opened successfully");
+123:           }
+124:         } catch (error) {
+125:           message.error("Failed to open project: " + error);
+126:         }
+127:       },
+128:     });
+129:   };
+130: 
+131:   
+132:   const formatDate = (dateString?: string): string => {
+133:     if (!dateString) return "Never";
+134:     const date = new Date(dateString);
+135:     return date.toLocaleDateString("en-US", {
+136:       year: "numeric",
+137:       month: "short",
+138:       day: "numeric",
+139:       hour: "2-digit",
+140:       minute: "2-digit",
+141:     });
+142:   };
+143: 
+144:   const getDisplayPath = (fullPath?: string): string => {
+145:     if (!fullPath) return "No path";
+146:     const parts = fullPath.split(/[/\\]/);
+147:     if (parts.length >= 2) {
+148:       return ".../" + parts.slice(-2).join("/");
+149:     }
+150:     return fullPath;
+151:   };
+152: 
+153:   const getStatusColor = (status: string): "green" | "default" | "red" => {
+154:     switch (status) {
+155:       case "active":
+156:         return "green";
+157:       case "archived":
+158:         return "default";
+159:       case "deleted":
+160:         return "red";
+161:       default:
+162:         return "default";
+163:     }
+164:   };
+165: 
+166:   
+167:   if (loading) {
+168:     return (
+169:       <div style={{ textAlign: "center", padding: "60px 0" }}>
+170:         <Spin size="large" />
+171:         <div style={{ marginTop: "16px", color: "#999" }}>Loading projects...</div>
+172:       </div>
+173:     );
+174:   }
+175: 
+176:   return (
+177:     <div style={{ padding: "24px" }}>
+178:       {}
+179:       <div
+180:         style={{
+181:           marginBottom: "24px",
+182:           display: "flex",
+183:           justifyContent: "space-between",
+184:           alignItems: "center",
+185:         }}
+186:       >
+187:         <h2 style={{ margin: 0 }}>Projects</h2>
+188:         <Space>
+189:           <Button icon={<ImportOutlined />} onClick={() => setShowImportModal(true)}>
+190:             Import Project
+191:           </Button>
+192:           <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>
+193:             New Project
+194:           </Button>
+195:         </Space>
+196:       </div>
+197: 
+198:       {}
+199:       {projects.length === 0 ? (
+200:         <Empty description="No projects yet" image={Empty.PRESENTED_IMAGE_SIMPLE}>
+201:           <Space orientation="vertical">
+202:             <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>
+203:               Create Your First Project
+204:             </Button>
+205:             <Button icon={<ImportOutlined />} onClick={() => setShowImportModal(true)}>
+206:               Import Existing Project
+207:             </Button>
+208:           </Space>
+209:         </Empty>
+210:       ) : (
+211:         <div
+212:           style={{
+213:             display: "grid",
+214:             gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))",
+215:             gap: "20px",
+216:           }}
+217:         >
+218:           {projects.map((project) => (
+219:             <Card
+220:               key={project.project_id}
+221:               hoverable
+222:               actions={[
+223:                 <Button
+224:                   type="link"
+225:                   icon={<FolderOpenOutlined />}
+226:                   onClick={() => handleOpenProject(project.project_id || project.projectId || "")}
+227:                   style={{ color: "#1890ff", width: "90%" }}
+228:                 >
+229:                   Open
+230:                 </Button>,
+231:                 <Button
+232:                   type="link"
+233:                   icon={<EditOutlined />}
+234:                   style={{ color: "#1890ff", width: "90%" }}
+235:                   onClick={() => handleOpenEditModal(project)}
+236:                 >
+237:                   Edit
+238:                 </Button>,
+239:                 <Button
+240:                   type="link"
+241:                   danger
+242:                   icon={<DeleteOutlined />}
+243:                   style={{ width: "90%" }}
+244:                   onClick={() => handleDeleteProject(project)}
+245:                 >
+246:                   Delete
+247:                 </Button>,
+248:               ]}
+249:             >
+250:               <Card.Meta
+251:                 title={
+252:                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+253:                     <span>{project.name}</span>
+254:                     <Tag color={getStatusColor(project.status)} style={{ margin: 0 }}>
+255:                       {project.status}
+256:                     </Tag>
+257:                   </div>
+258:                 }
+259:                 description={
+260:                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+261:                     <Tooltip title={project.description || "No description provided"}>
+262:                       <div
+263:                         style={{
+264:                           color: "#666",
+265:                           fontSize: "14px",
+266:                           whiteSpace: "nowrap",
+267:                           overflow: "hidden",
+268:                           textOverflow: "ellipsis",
+269:                           cursor: "help",
+270:                         }}
+271:                       >
+272:                         {project.description || "No description provided"}
+273:                       </div>
+274:                     </Tooltip>
+275:                     <div style={{ fontSize: "12px", color: "#999", minWidth: 0 }}>
+276:                       <Tooltip title={project.workspace_path || project.workspacePath || "No path"}>
+277:                         <span
+278:                           style={{
+279:                             display: "flex",
+280:                             alignItems: "center",
+281:                             maxWidth: "100%",
+282:                             overflow: "hidden",
+283:                             textOverflow: "ellipsis",
+284:                             whiteSpace: "nowrap",
+285:                           }}
+286:                         >
+287:                           <FolderOpenOutlined style={{ marginRight: "4px", flexShrink: 0 }} />
+288:                           {getDisplayPath(project.workspace_path || project.workspacePath)}
+289:                         </span>
+290:                       </Tooltip>
+291:                     </div>
+292:                     <div style={{ display: "flex", gap: "16px", fontSize: "12px", color: "#999" }}>
+293:                       <span>
+294:                         <CheckCircleOutlined style={{ marginRight: "4px" }} />
+295:                         {project.metadata?.session_count || 0} sessions
+296:                       </span>
+297:                       <span>
+298:                         <ClockCircleOutlined style={{ marginRight: "4px" }} />
+299:                         Last opened: {formatDate(project.last_opened_at)}
+300:                       </span>
+301:                     </div>
+302:                     {project.metadata?.technology_stack?.length > 0 && (
+303:                       <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+304:                         {project.metadata.technology_stack.slice(0, 4).map((tech, idx) => (
+305:                           <Tag key={idx} color="blue">
+306:                             {tech}
+307:                           </Tag>
+308:                         ))}
+309:                         {project.metadata.technology_stack.length > 4 && (
+310:                           <Tag color="default">+{project.metadata.technology_stack.length - 4}</Tag>
+311:                         )}
+312:                       </div>
+313:                     )}
+314:                   </div>
+315:                 }
+316:               />
+317:             </Card>
+318:           ))}
+319:         </div>
+320:       )}
+321: 
+322:       {}
+323:       <CreateProjectModal
+324:         open={showCreateModal}
+325:         onClose={() => setShowCreateModal(false)}
+326:         onSuccess={handleProjectCreated}
+327:       />
+328: 
+329:       <EditProjectModal
+330:         open={showEditModal}
+331:         onClose={() => {
+332:           setShowEditModal(false);
+333:           setSelectedProject(null);
+334:         }}
+335:         onSuccess={loadProjects}
+336:         project={selectedProject}
+337:       />
+338: 
+339:       <ImportProjectModal
+340:         open={showImportModal}
+341:         onClose={() => setShowImportModal(false)}
+342:         onSuccess={handleProjectImported}
+343:       />
+344:     </div>
+345:   );
+346: };
+347: 
+348: export default ProjectsPanel;
+```
+
+### crates/cowork-gui/src/components/config/AgentConfigForm.tsx (712 lines)
+
+```
+1: import React, { useState, useEffect } from 'react';
+2: import {
+3:   Card,
+4:   List,
+5:   Button,
+6:   Space,
+7:   Typography,
+8:   Tag,
+9:   Modal,
+10:   Form,
+11:   Input,
+12:   Select,
+13:   Switch,
+14:   Slider,
+15:   message,
+16:   Popconfirm,
+17:   Empty,
+18:   Drawer,
+19:   Descriptions,
+20:   Divider,
+21:   Tabs,
+22:   InputNumber,
+23:   Alert,
+24:   Tooltip,
+25: } from 'antd';
+26: import {
+27:   PlusOutlined,
+28:   EditOutlined,
+29:   DeleteOutlined,
+30:   ExportOutlined,
+31:   ImportOutlined,
+32:   RobotOutlined,
+33:   ToolOutlined,
+34:   CodeOutlined,
+35:   SettingOutlined,
+36:   InfoCircleOutlined,
+37:   FolderOpenOutlined,
+38: } from '@ant-design/icons';
+39: import { useConfigStore } from '../../stores/configStore';
+40: import type { AgentDefinition, ToolReference, AgentType, ModelConfig, BuiltinInstruction, InstructionType, ToolInfo } from '../../types/config';
+41: import { open } from '@tauri-apps/plugin-dialog';
 42: 
-43:   
-44:   getBuiltinInstructions: () => Promise<BuiltinInstruction[]>;
-45:   
-46:   
-47:   loadAvailableTools: () => Promise<void>;
-48:   getToolsByCategory: () => Record<string, ToolInfo[]>;
-49: }
+43: const { Title, Text, Paragraph } = Typography;
+44: const { TextArea } = Input;
+45: 
+46: const AgentConfigForm: React.FC = () => {
+47:   const {
+48:     agents,
+49:     skills,
+50:     selectedAgent,
+51:     selectAgent,
+52:     saveAgent,
+53:     deleteAgent,
+54:     validateAgent,
+55:     exportConfig,
+56:     importConfig,
+57:     getBuiltinInstructions,
+58:     availableTools,
+59:     loadAvailableTools,
+60:     getToolsByCategory,
+61:   } = useConfigStore();
+62: 
+63:   const [editModalVisible, setEditModalVisible] = useState(false);
+64:   const [editingAgent, setEditingAgent] = useState<AgentDefinition | null>(null);
+65:   const [detailDrawerVisible, setDetailDrawerVisible] = useState(false);
+66:   const [importModalVisible, setImportModalVisible] = useState(false);
+67:   const [importJson, setImportJson] = useState('');
+68:   const [form] = Form.useForm();
+69:   
+70:   
+71:   const [builtinInstructions, setBuiltinInstructions] = useState<BuiltinInstruction[]>([]);
+72:   const [instructionType, setInstructionType] = useState<InstructionType>('builtin');
+73:   const [selectedBuiltinId, setSelectedBuiltinId] = useState<string>('');
+74:   const [instructionFilePath, setInstructionFilePath] = useState<string>('');
+75:   const [instructionInlineContent, setInstructionInlineContent] = useState<string>('');
+76:   
+77:   
+78:   useEffect(() => {
+79:     getBuiltinInstructions().then(setBuiltinInstructions);
+80:     loadAvailableTools();  
+81:   }, [getBuiltinInstructions, loadAvailableTools]);
+82: 
+83:   const handleCreate = () => {
+84:     setEditingAgent(null);
+85:     form.resetFields();
+86:     form.setFieldsValue({
+87:       id: `agent-${Date.now()}`,
+88:       name: '',
+89:       description: '',
+90:       agent_type: 'simple',
+91:       instruction: '',
+92:       tools: [],
+93:       skills: [],
+94:       model: {},
+95:       include_contents: 'none',
+96:       tags: [],
+97:     });
+98:     
+99:     setInstructionType('builtin');
+100:     setSelectedBuiltinId('');
+101:     setInstructionFilePath('');
+102:     setInstructionInlineContent('');
+103:     setEditModalVisible(true);
+104:   };
+105: 
+106:   
+107:   const parseInstruction = (instruction: string): { type: InstructionType; builtinId: string; filePath: string; content: string } => {
+108:     if (instruction.startsWith('builtin://')) {
+109:       return {
+110:         type: 'builtin',
+111:         builtinId: instruction.substring('builtin://'.length),
+112:         filePath: '',
+113:         content: '',
+114:       };
+115:     } else if (instruction.startsWith('file://')) {
+116:       return {
+117:         type: 'file',
+118:         builtinId: '',
+119:         filePath: instruction.substring('file://'.length),
+120:         content: '',
+121:       };
+122:     } else if (instruction.startsWith('inline://')) {
+123:       return {
+124:         type: 'inline',
+125:         builtinId: '',
+126:         filePath: '',
+127:         content: instruction.substring('inline://'.length),
+128:       };
+129:     } else {
+130:       
+131:       
+132:       const matchingBuiltin = builtinInstructions.find(bi => bi.id === instruction);
+133:       if (matchingBuiltin) {
+134:         return {
+135:           type: 'builtin',
+136:           builtinId: instruction,
+137:           filePath: '',
+138:           content: '',
+139:         };
+140:       }
+141:       
+142:       return {
+143:         type: 'inline',
+144:         builtinId: '',
+145:         filePath: '',
+146:         content: instruction,
+147:       };
+148:     }
+149:   };
+150: 
+151:   const handleEdit = (agent: AgentDefinition) => {
+152:     setEditingAgent(agent);
+153:     
+154:     const toolIds = agent.tools.map(t => t.tool_id);
+155:     form.setFieldsValue({
+156:       ...agent,
+157:       agent_type: typeof agent.agent_type === 'string' ? agent.agent_type : 'loop',
+158:       tools: toolIds,
+159:     });
+160:     
+161:     
+162:     const parsed = parseInstruction(agent.instruction);
+163:     setInstructionType(parsed.type);
+164:     setSelectedBuiltinId(parsed.builtinId);
+165:     setInstructionFilePath(parsed.filePath);
+166:     
+167:     
+168:     if (parsed.type === 'inline' && parsed.content) {
+169:       setInstructionInlineContent(parsed.content);
+170:     } else if (parsed.type === 'builtin' && parsed.builtinId) {
+171:       const builtin = builtinInstructions.find(bi => bi.id === parsed.builtinId);
+172:       setInstructionInlineContent(builtin?.content || '');
+173:     } else {
+174:       setInstructionInlineContent(parsed.content);
+175:     }
+176:     
+177:     setEditModalVisible(true);
+178:     selectAgent(agent.id);
+179:   };
+180: 
+181:   const handleView = (agent: AgentDefinition) => {
+182:     selectAgent(agent.id);
+183:     setDetailDrawerVisible(true);
+184:   };
+185: 
+186:   const handleDelete = async (id: string) => {
+187:     try {
+188:       await deleteAgent(id);
+189:       message.success('Agent deleted successfully');
+190:     } catch (error) {
+191:       message.error('Failed to delete agent');
+192:     }
+193:   };
+194: 
+195:   const handleSave = async () => {
+196:     try {
+197:       const values = await form.validateFields();
+198:       
+199:       
+200:       const tools: ToolReference[] = (values.tools || []).map((toolId: string) => ({
+201:         tool_id: toolId,
+202:       }));
+203:       
+204:       
+205:       let instruction = '';
+206:       switch (instructionType) {
+207:         case 'builtin':
+208:           instruction = `builtin:
+209:           beak;
+210:         case 'file':
+211:           instruction = `file:
+212:           beak;
+213:         case 'inline':
+214:           instruction = `inline:
+215:           beak;
+216:       }
+217:       
+218:       const agent: AgentDefinition = {
+219:         ...editingAgent,
+220:         ...values,
+221:         instruction,
+222:         tools,
+223:         metadata: {},
+224:       };
+225: 
+226:       const validation = await validateAgent(agent);
+227:       if (!validation.valid) {
+228:         const errors = validation.issues.map(i => i.message).join(', ');
+229:         message.error(`Validation failed: ${errors}`);
+230:         return;
+231:       }
+232: 
+233:       await saveAgent(agent);
+234:       message.success('Agent saved successfully');
+235:       setEditModalVisible(false);
+236:     } catch (error) {
+237:       message.error('Failed to save agent');
+238:     }
+239:   };
+240: 
+241:   const handleExport = async (id: string) => {
+242:     try {
+243:       const json = await exportConfig('agent', id);
+244:       navigator.clipboard.writeText(json);
+245:       message.success('Agent exported to clipboard');
+246:     } catch (error) {
+247:       message.error('Failed to export agent');
+248:     }
+249:   };
+250: 
+251:   const handleImport = async () => {
+252:     try {
+253:       await importConfig('agent', importJson);
+254:       message.success('Agent imported successfully');
+255:       setImportModalVisible(false);
+256:       setImportJson('');
+257:     } catch (error) {
+258:       message.error('Failed to import agent');
+259:     }
+260:   };
+261: 
+262:   const selectedAgentData = selectedAgent ? agents[selectedAgent] : null;
+263: 
+264:   const getAgentTypeTag = (type: AgentType) => {
+265:     if (typeof type === 'string') {
+266:       return <Tag color="blue">{type}</Tag>;
+267:     }
+268:     return <Tag color="purple">loop ({(type as { loop: { max_iterations?: number } }).loop?.max_iterations || 'unlimited'})</Tag>;
+269:   };
+270: 
+271:   
+272:   const handleSelectInstructionFile = async () => {
+273:     try {
+274:       const selected = await open({
+275:         multiple: false,
+276:         filters: [{ name: 'Markdown', extensions: ['md', 'txt'] }],
+277:       });
+278:       if (selected && typeof selected === 'string') {
+279:         setInstructionFilePath(selected);
+280:       }
+281:     } catch (error) {
+282:       console.error('Failed to select file:', error);
+283:     }
+284:   };
+285: 
+286:   
+287:   const handleBuiltinChange = (builtinId: string) => {
+288:     setSelectedBuiltinId(builtinId);
+289:     const builtin = builtinInstructions.find(bi => bi.id === builtinId);
+290:     if (builtin) {
+291:       setInstructionInlineContent(builtin.content);
+292:     }
+293:   };
+294: 
+295:   
+296:   const handleInstructionTypeChange = (type: InstructionType) => {
+297:     setInstructionType(type);
+298:     
+299:     if (type === 'inline' && selectedBuiltinId) {
+300:       const builtin = builtinInstructions.find(bi => bi.id === selectedBuiltinId);
+301:       if (builtin) {
+302:         setInstructionInlineContent(builtin.content);
+303:       }
+304:     }
+305:   };
+306: 
+307:   const availableSkills = Object.keys(skills);
+308: 
+309:   return (
+310:     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+311:       <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+312:         <Title level={5} style={{ margin: 0 }}>Agent Definitions</Title>
+313:         <Space>
+314:           <Button icon={<ImportOutlined />} onClick={() => setImportModalVisible(true)}>
+315:             Import
+316:           </Button>
+317:           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+318:             New Agent
+319:           </Button>
+320:         </Space>
+321:       </div>
+322: 
+323:       {Object.keys(agents).length === 0 ? (
+324:         <Empty description="No agents defined" style={{ marginTop: '40px' }} />
+325:       ) : (
+326:         <List
+327:           style={{ flex: 1, overflow: 'auto', padding: '0 16px' }}
+328:           dataSource={Object.values(agents).sort((a, b) => a.name.localeCompare(b.name))}
+329:           renderItem={(agent) => (
+330:             <List.Item
+331:               actions={[
+332:                 <Button
+333:                   key="view"
+334:                   type="link"
+335:                   size="small"
+336:                   icon={<RobotOutlined />}
+337:                   onClick={() => handleView(agent)}
+338:                 >
+339:                   View
+340:                 </Button>,
+341:                 <Button
+342:                   key="edit"
+343:                   type="link"
+344:                   size="small"
+345:                   icon={<EditOutlined />}
+346:                   onClick={() => handleEdit(agent)}
+347:                 >
+348:                   Edit
+349:                 </Button>,
+350:                 <Button
+351:                   key="export"
+352:                   type="link"
+353:                   size="small"
+354:                   icon={<ExportOutlined />}
+355:                   onClick={() => handleExport(agent.id)}
+356:                 >
+357:                   Export
+358:                 </Button>,
+359:                 <Popconfirm
+360:                   key="delete"
+361:                   title="Delete this agent?"
+362:                   onConfirm={() => handleDelete(agent.id)}
+363:                 >
+364:                   <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+365:                     Delete
+366:                   </Button>
+367:                 </Popconfirm>,
+368:               ]}
+369:             >
+370:               <List.Item.Meta
+371:                 title={
+372:                   <Space>
+373:                     {agent.name}
+374:                     {agent.version && <Tag>{agent.version}</Tag>}
+375:                     {getAgentTypeTag(agent.agent_type)}
+376:                   </Space>
+377:                 }
+378:                 description={
+379:                   <Space orientation="vertical" size="small">
+380:                     <Text type="secondary">{agent.description || 'No description'}</Text>
+381:                     <Space size={4}>
+382:                       {agent.tools.slice(0, 5).map((t, i) => (
+383:                         <Tag key={i} color="blue" style={{ fontSize: '11px' }}>{t.tool_id}</Tag>
+384:                       ))}
+385:                       {agent.tools.length > 5 && <Tag>+{agent.tools.length - 5}</Tag>}
+386:                     </Space>
+387:                   </Space>
+388:                 }
+389:               />
+390:             </List.Item>
+391:           )}
+392:         />
+393:       )}
+394: 
+395:       {}
+396:       <Modal
+397:         title={editingAgent ? 'Edit Agent' : 'Create Agent'}
+398:         open={editModalVisible}
+399:         onCancel={() => setEditModalVisible(false)}
+400:         onOk={handleSave}
+401:         width={800}
+402:         okText="Save"
+403:       >
+404:         <Form form={form} layout="vertical">
+405:           <Tabs
+406:             items={[
+407:               {
+408:                 key: 'basic',
+409:                 label: 'Basic',
+410:                 children: (
+411:                   <>
+412:                     <Form.Item name="id" label="ID" rules={[{ required: true }]}>
+413:                       <Input disabled={!!editingAgent} />
+414:                     </Form.Item>
+415:                     <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+416:                       <Input />
+417:                     </Form.Item>
+418:                     <Form.Item name="description" label="Description">
+419:                       <TextArea rows={2} />
+420:                     </Form.Item>
+421:                     <Form.Item name="version" label="Version">
+422:                       <Input placeholder="e.g., 1.0.0" />
+423:                     </Form.Item>
+424:                     <Form.Item name="agent_type" label="Agent Type">
+425:                       <Select>
+426:                         <Select.Option value="simple">Simple (Single Execution)</Select.Option>
+427:                         <Select.Option value="loop">Loop (Actor-Critic)</Select.Option>
+428:                       </Select>
+429:                     </Form.Item>
+430:                   </>
+431:                 ),
+432:               },
+433:               {
+434:                 key: 'instruction',
+435:                 label: 'Instruction',
+436:                 children: (
+437:                   <div style={{ maxWidth: 700 }}>
+438:                     <Form.Item label="Instruction Type">
+439:                       <Select 
+440:                         value={instructionType} 
+441:                         onChange={handleInstructionTypeChange}
+442:                         style={{ width: '100%' }}
+443:                       >
+444:                         <Select.Option value="builtin">
+445:                           <Space>
+446:                             <Tag color="blue">Built-in</Tag>
+447:                             <span>Use a predefined instruction template</span>
+448:                           </Space>
+449:                         </Select.Option>
+450:                         <Select.Option value="file">
+451:                           <Space>
+452:                             <Tag color="green">File</Tag>
+453:                             <span>Load instruction from a file</span>
+454:                           </Space>
+455:                         </Select.Option>
+456:                         <Select.Option value="inline">
+457:                           <Space>
+458:                             <Tag color="purple">Inline</Tag>
+459:                             <span>Write custom instruction content</span>
+460:                           </Space>
+461:                         </Select.Option>
+462:                       </Select>
+463:                     </Form.Item>
+464:                     
+465:                     {instructionType === 'builtin' && (
+466:                       <>
+467:                         <Form.Item 
+468:                           label="Built-in Instruction"
+469:                           required
+470:                           validateStatus={!selectedBuiltinId && 'error'}
+471:                           help={!selectedBuiltinId && 'Please select a built-in instruction'}
+472:                         >
+473:                           <Select
+474:                             value={selectedBuiltinId || undefined}
+475:                             onChange={handleBuiltinChange}
+476:                             placeholder="Select a built-in instruction..."
+477:                             showSearch
+478:                             optionFilterProp="label"
+479:                             style={{ width: '100%' }}
+480:                             listHeight={300}
+481:                           >
+482:                             {(builtinInstructions || []).map(bi => (
+483:                               <Select.Option 
+484:                                 key={bi.id} 
+485:                                 value={bi.id}
+486:                                 label={bi.name}
+487:                               >
+488:                                 <div style={{ padding: '4px 0' }}>
+489:                                   <Text strong>{bi.name}</Text>
+490:                                   <b />
+491:                                   <Text type="secondary" style={{ fontSize: 12 }}>
+492:                                     {bi.description}
+493:                                   </Text>
+494:                                 </div>
+495:                               </Select.Option>
+496:                             ))}
+497:                           </Select>
+498:                         </Form.Item>
+499:                         
+500:                         {selectedBuiltinId && (
+501:                           <div style={{ marginBottom: 16 }}>
+502:                             <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>
+503:                               Instruction Preview:
+504:                             </Text>
+505:                             <div
+506:                               style={{
+507:                                 background: '#fafafa',
+508:                                 border: '1px solid #d9d9d9',
+509:                                 borderRadius: 6,
+510:                                 padding: 12,
+511:                                 maxHeight: 200,
+512:                                 overflow: 'auto',
+513:                                 fontSize: 12,
+514:                                 whiteSpace: 'pre-wrap',
+515:                                 fontFamily: 'monospace',
+516:                               }}
+517:                             >
+518:                               {(builtinInstructions || []).find(bi => bi.id === selectedBuiltinId)?.content || ''}
+519:                             </div>
+520:                           </div>
+521:                         )}
+522:                       </>
+523:                     )}
+524:                     
+525:                     {instructionType === 'file' && (
+526:                       <>
+527:                         <Form.Item 
+528:                           label="Instruction File"
+529:                           required
+530:                           validateStatus={!instructionFilePath && 'error'}
+531:                           help={!instructionFilePath && 'Please select or enter a file path'}
+532:                         >
+533:                           <Space.Compact style={{ width: '100%' }}>
+534:                             <Input
+535:                               value={instructionFilePath}
+536:                               onChange={(e) => setInstructionFilePath(e.target.value)}
+537:                               placeholder="./prompts/my_instruction.md"
+538:                               style={{ flex: 1 }}
+539:                             />
+540:                             <Button 
+541:                               icon={<FolderOpenOutlined />} 
+542:                               onClick={handleSelectInstructionFile}
+543:                             >
+544:                               Browse
+545:                             </Button>
+546:                           </Space.Compact>
+547:                         </Form.Item>
+548:                         <Text type="secondary" style={{ fontSize: 12 }}>
+549:                           Select a markdown (.md) or text (.txt) file containing the instruction
+550:                         </Text>
+551:                       </>
+552:                     )}
+553:                     
+554:                     {instructionType === 'inline' && (
+555:                       <>
+556:                         <Form.Item 
+557:                           label="Instruction Content"
+558:                           required
+559:                           validateStatus={!instructionInlineContent?.trim() && 'error'}
+560:                           help={!instructionInlineContent?.trim() && 'Please enter instruction content'}
+561:                         >
+562:                           <TextArea
+563:                             rows={12}
+564:                             value={instructionInlineContent}
+565:                             onChange={(e) => setInstructionInlineContent(e.target.value)}
+566:                             placeholder="Enter your custom instruction here..."
+567:                             style={{ fontFamily: 'monospace' }}
+568:                           />
+569:                         </Form.Item>
+570:                         <Space>
+571:                           <Text type="secondary" style={{ fontSize: 12 }}>
+572:                             Tip: Select a built-in instruction first, then switch to Inline mode to customize it.
+573:                           </Text>
+574:                         </Space>
+575:                       </>
+576:                     )}
+577:                   </div>
+578:                 ),
+579:               },
+580:               {
+581:                 key: 'tools',
+582:                 label: 'Tools',
+583:                 children: (
+584:                   <>
+585:                     <Form.Item name="tools" label="Available Tools">
+586:                       <Select 
+587:                         mode="multiple" 
+588:                         placeholder="Select tools"
+589:                         optionFilterProp="label"
+590:                         showSearch
+591:                         listHeight={400}
+592:                       >
+593:                         {Object.entries(getToolsByCategory()).map(([category, tools]) => (
+594:                           <Select.OptGroup key={category} label={category}>
+595:                             {tools.map(tool => (
+596:                               <Select.Option 
+597:                                 key={tool.id} 
+598:                                 value={tool.id}
+599:                                 label={tool.name}
+600:                               >
+601:                                 <Tooltip title={tool.description}>
+602:                                   <span>{tool.name}</span>
+603:                                 </Tooltip>
+604:                               </Select.Option>
+605:                             ))}
+606:                           </Select.OptGroup>
+607:                         ))}
+608:                       </Select>
+609:                     </Form.Item>
+610:                     <Form.Item name="skills" label="Skills">
+611:                       <Select mode="multiple" placeholder="Select skills">
+612:                         {availableSkills.map(skill => (
+613:                           <Select.Option key={skill} value={skill}>{skill}</Select.Option>
+614:                         ))}
+615:                       </Select>
+616:                     </Form.Item>
+617:                   </>
+618:                 ),
+619:               },
+620:               {
+621:                 key: 'advanced',
+622:                 label: 'Advanced',
+623:                 children: (
+624:                   <>
+625:                     <Form.Item name="include_contents" label="Include Contents Mode">
+626:                       <Select>
+627:                         <Select.Option value="none">None</Select.Option>
+628:                         <Select.Option value="all">All</Select.Option>
+629:                         <Select.Option value="selected">Selected</Select.Option>
+630:                       </Select>
+631:                     </Form.Item>
+632:                     <Form.Item name="tags" label="Tags">
+633:                       <Select mode="tags" placeholder="Add tags" />
+634:                     </Form.Item>
+635:                   </>
+636:                 ),
+637:               },
+638:             ]}
+639:           />
+640:         </Form>
+641:       </Modal>
+642: 
+643:       {}
+644:       <Drawer
+645:         title={selectedAgentData?.name || 'Agent Details'}
+646:         placement="right"
+647:         width={500}
+648:         onClose={() => setDetailDrawerVisible(false)}
+649:         open={detailDrawerVisible}
+650:       >
+651:         {selectedAgentData && (
+652:           <Space orientation="vertical" style={{ width: '100%' }} size="large">
+653:             <Descriptions column={1} bordered size="small">
+654:               <Descriptions.Item label="ID">{selectedAgentData.id}</Descriptions.Item>
+655:               <Descriptions.Item label="Version">{selectedAgentData.version || '-'}</Descriptions.Item>
+656:               <Descriptions.Item label="Type">
+657:                 {getAgentTypeTag(selectedAgentData.agent_type)}
+658:               </Descriptions.Item>
+659:               <Descriptions.Item label="Description">
+660:                 {selectedAgentData.description || '-'}
+661:               </Descriptions.Item>
+662:             </Descriptions>
+663: 
+664:             <Title level={5}>Tools ({selectedAgentData.tools?.length || 0})</Title>
+665:             <Space wrap>
+666:               {selectedAgentData.tools?.map((tool, i) => (
+667:                 <Tag key={i} color="blue">{tool.tool_id}</Tag>
+668:               ))}
+669:             </Space>
+670: 
+671:             {(selectedAgentData.skills?.length || 0) > 0 && (
+672:               <>
+673:                 <Title level={5}>Skills ({selectedAgentData.skills?.length || 0})</Title>
+674:                 <Space wrap>
+675:                   {selectedAgentData.skills?.map((skill, i) => (
+676:                     <Tag key={i} color="purple">{skill}</Tag>
+677:                   ))}
+678:                 </Space>
+679:               </>
+680:             )}
+681: 
+682:             <Title level={5}>Instruction</Title>
+683:             <Paragraph
+684:               ellipsis={{ rows: 5, expandable: true, symbol: 'more' }}
+685:               style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}
+686:             >
+687:               {selectedAgentData.instruction}
+688:             </Paragraph>
+689:           </Space>
+690:         )}
+691:       </Drawer>
+692: 
+693:       {}
+694:       <Modal
+695:         title="Import Agent"
+696:         open={importModalVisible}
+697:         onCancel={() => setImportModalVisible(false)}
+698:         onOk={handleImport}
+699:         okText="Import"
+700:       >
+701:         <TextArea
+702:           rows={10}
+703:           placeholder="Paste agent JSON here..."
+704:           value={importJson}
+705:           onChange={(e) => setImportJson(e.target.value)}
+706:         />
+707:       </Modal>
+708:     </div>
+709:   );
+710: };
+711: 
+712: export default AgentConfigForm;
+```
+
+### crates/cowork-gui/src/hooks/useIterationActions.ts (98 lines)
+
+```
+1: function useIterationActions() {
+2: 	const { message } = AntApp.useApp();
+3: 
+4: 	
+5: 	const projectActions = useProjectStore(
+6: 		useShallow(s => ({ currentIteration: s.currentIteration, setCurrentIteration: s.setCurrentIteration, setIsExecuting: s.setIsExecuting }))
+7: 	);
+8: 	const { currentIteration, setCurrentIteration, setIsExecuting } = projectActions;
+9: 
+10: 	
+11: 	const setProcessing = useAgentStore(s => s.setProcessing);
+12: 
+13: 	
+14: 	const uiState = useUIStore(
+15: 		useShallow(s => ({ activeView: s.activeView, setActiveView: s.setActiveView }))
+16: 	);
+17: 	const { activeView, setActiveView } = uiState;
+18: 
+19: 	
+20: 	const handleSelectIteration = useCallback(
+21: 		async (iterationId: string) => {
+22: 			try {
+23: 				const { currentIteration, isExecuting } = useProjectStore.getState();
+24: 				const fullIteration = await API.iteration.get(iterationId);
+25: 				
+26: 				if (isExecuting && currentIteration?.id === iterationId) {
+27: 					setCurrentIteration({ ...fullIteration, status: currentIteration.status });
+28: 				} else {
+29: 					setCurrentIteration(fullIteration);
+30: 				}
+31: 				setActiveView('chat');
+32: 			} catch (error) {
+33: 				console.error('Failed to load iteration:', error);
+34: 				message.error('Failed to load iteration: ' + error);
+35: 			}
+36: 		},
+37: 		[setCurrentIteration, setActiveView, message]
+38: 	);
+39: 
+40: 	
+41: 	const handleExecuteIteration = useCallback(async () => {
+42: 		if (!currentIteration) return;
+43: 		try {
+44: 			setProcessing(true);
+45: 			await API.iteration.execute(currentIteration.id);
+46: 			message.info('Iteration execution started');
+47: 		} catch (error) {
+48: 			message.error('Failed to execute iteration: ' + error);
+49: 			setProcessing(false);
+50: 		}
+51: 	}, [currentIteration, setProcessing, message]);
+52: 
+53: 	
+54: 	const handleOpenProjectFolder = useCallback(async () => {
+55: 		try {
+56: 			await API.util.openInFileManager('.');
+57: 		} catch (error) {
+58: 			message.error('Failed to open project folder');
+59: 		}
+60: 	}, [message]);
+61: 
+62: 	
+63: 	const handleOpenIterationFolder = useCallback(async (iterationId: string) => {
+64: 		try {
+65: 			await API.util.openInFileManager(iterationId);
+66: 		} catch (error) {
+67: 			message.error('Failed to open iteration folder: ' + error);
+68: 		}
+69: 	}, [message]);
+70: 
+71: 	
+72: 	const handleCommandSelect = useCallback(
+73: 		(commandId: string) => {
+74: 			const viewMap: Record<string, string> = {
+75: 				'view-iterations': 'iterations',
+76: 				'view-chat': 'chat',
+77: 				'view-artifacts': 'artifacts',
+78: 				'view-code': 'code',
+79: 				'view-run': 'run',
+80: 				'view-memory': 'execution-memory',
+81: 				'view-projects': 'projects',
+82: 				'view-settings': 'settings'
+83: 			};
+84: 			if (viewMap[commandId]) {
+85: 				setActiveView(viewMap[commandId] as typeof activeView);
+86: 			}
+87: 		},
+88: 		[setActiveView]
+89: 	);
+90: 
+91: 	return {
+92: 		handleSelectIteration,
+93: 		handleExecuteIteration,
+94: 		handleOpenProjectFolder,
+95: 		handleOpenIterationFolder,
+96: 		handleCommandSelect
+97: 	};
+98: }
 ```
 
 ### crates/cowork-gui/src/styles/chat.css (432 lines)
@@ -14705,82 +15156,300 @@ LICENSE
 432: }
 ```
 
-### crates/cowork-gui/src/types/index.ts (73 lines)
+### crates/cowork-gui/src/types/config.ts (291 lines)
 
 ```
-1: export type {
-2:   IterationInfo,
-3:   IterationStatus,
-4:   InheritanceMode,
-5:   CreateIterationRequest,
-6:   StageDef,
-7: } from './iteration';
-8: 
-9: 
-10: export type {
-11:   ProjectMetadata,
-12:   ProjectData,
-13:   ProjectStatus,
-14:   ProjectInfo,
-15:   CreateProjectRequest,
-16:   UpdateProjectRequest,
-17:   CreateProjectResponse,
-18: } from './project';
-19: 
-20: 
-21: export type {
-22:   ThinkingMessage,
-23:   AgentMessage,
-24:   UserMessage,
-25:   PMAgentMessage,
-26:   ToolCallMessage,
-27:   ToolResultMessage,
-28:   ChatMessage,
-29:   ChatMode,
-30:   PMAction,
-31:   InputOption,
-32:   InputRequest,
-33: } from './agent';
-34: 
-35: 
-36: export type {
-37:   Knowledge,
-38:   KnowledgeListResult,
-39: } from './knowledge';
-40: 
-41: 
-42: export type {
-43:   AgentType,
-44:   ModelConfig,
-45:   ToolReference,
-46:   IncludeContentsMode,
-47:   AgentDefinition,
-48:   StageType,
-49:   HookPoint,
-50:   HookConfig,
-51:   ArtifactConfig,
-52:   StageRetryConfig,
-53:   StageDefinition,
-54:   MemoryScope,
-55:   
-56:   InheritanceConfig,
-57:   FlowConfig,
-58:   StageOverrides,
-59:   StageReference,
-60:   GlobalHookConfig,
-61:   FlowDefinition,
-62:   SkillInfo,
-63:   IntegrationType,
-64:   AuthType,
-65:   CredentialSource,
-66:   AuthConfig,
-67:   ConnectionConfig,
-68:   IntegrationEvent,
-69:   IntegrationDefinition,
-70:   ValidationIssue,
-71:   ValidationResult,
-72:   ConfigRegistryState,
-73: } from './config';
+1: AgentType
+2: ⋮----
+3: "simple" | { loop: { max_iterations?: number } }
+4: ⋮----
+5: ModelConfig
+6: ⋮----
+7: {
+8:   model_id?: string;
+9:   temperature?: number;
+10:   max_tokens?: number;
+11:   top_p?: number;
+12: }
+13: ⋮----
+14: ToolReference
+15: ⋮----
+16: {
+17:   tool_id: string;
+18:   config?: Record<string, unknown>;
+19: }
+20: ⋮----
+21: IncludeContentsMode
+22: ⋮----
+23: "none" | "all" | { selected: string[] }
+24: ⋮----
+25: AgentDefinition
+26: ⋮----
+27: {
+28:   id: string;
+29:   name: string;
+30:   description?: string;
+31:   version?: string;
+32:   agent_type: AgentType;
+33:   instruction: string;
+34:   tools: ToolReference[];
+35:   skills: string[];
+36:   model: ModelConfig;
+37:   include_contents: IncludeContentsMode;
+38:   tags: string[];
+39:   metadata: Record<string, unknown>;
+40: }
+41: ⋮----
+42: StageType
+43: ⋮----
+44: | "idea"
+45:   | "prd"
+46:   | "design"
+47:   | "plan"
+48:   | "coding"
+49:   | "check"
+50:   | "delivery"
+51: ⋮----
+52: HookPoint
+53: ⋮----
+54: | "pre_execute"
+55:   | "post_execute"
+56:   | "pre_confirmation"
+57:   | "post_confirmation"
+58:   | "on_failure"
+59: ⋮----
+60: HookConfig
+61: ⋮----
+62: {
+63:   integration_id: string;
+64:   point: HookPoint;
+65:   action: string;
+66:   params?: Record<string, unknown>;
+67:   blocking?: boolean;
+68:   timeout_secs?: number;
+69:   on_failure?: "ignore" | "warn" | "abort";
+70: }
+71: ⋮----
+72: ArtifactConfig
+73: ⋮----
+74: {
+75:   save_path: string;
+76:   format: string;
+77:   include_metadata?: boolean;
+78: }
+79: ⋮----
+80: StageRetryConfig
+81: ⋮----
+82: {
+83:   max_retries: number;
+84:   backoff_ms?: number;
+85:   retry_on?: string[];
+86: }
+87: ⋮----
+88: StageDefinition
+89: ⋮----
+90: {
+91:   id: string;
+92:   name: string;
+93:   description?: string;
+94:   stage_type: StageType;
+95:   agent_id: string;
+96:   needs_confirmation?: boolean;
+97:   confirmation_prompt?: string;
+98:   hooks: HookConfig[];
+99:   artifacts?: Record<string, ArtifactConfig>;
+100:   retry?: StageRetryConfig;
+101:   timeout_secs?: number;
+102:   tags: string[];
+103: }
+104: ⋮----
+105: MemoryScope
+106: ⋮----
+107: "project" | "iteration" | "merged"
+108: ⋮----
+109: InheritanceMode
+110: ⋮----
+111: "none" | "partial" | "full"
+112: ⋮----
+113: InheritanceConfig
+114: ⋮----
+115: {
+116:   default_mode: InheritanceMode;
+117:   stage_mapping: Record<string, string>;
+118: }
+119: ⋮----
+120: FlowConfig
+121: ⋮----
+122: {
+123:   stop_on_failure: boolean;
+124:   max_total_time_secs?: number;
+125:   save_state_on_interrupt: boolean;
+126:   memory_scope: MemoryScope;
+127:   inheritance: InheritanceConfig;
+128: }
+129: ⋮----
+130: StageOverrides
+131: ⋮----
+132: {
+133:   needs_confirmation?: boolean;
+134:   hooks: HookConfig[];
+135:   timeout_secs?: number;
+136:   skip: boolean;
+137: }
+138: ⋮----
+139: StageReference
+140: ⋮----
+141: {
+142:   stage_id: string;
+143:   alias?: string;
+144:   overrides: StageOverrides;
+145:   condition?: string;
+146:   on_success?: string;
+147:   on_failure?: string;
+148: }
+149: ⋮----
+150: GlobalHookConfig
+151: ⋮----
+152: {
+153:   integration_id: string;
+154:   points: HookPoint[];
+155:   blocking: boolean;
+156:   timeout_secs: number;
+157: }
+158: ⋮----
+159: FlowDefinition
+160: ⋮----
+161: {
+162:   id: string;
+163:   name: string;
+164:   description?: string;
+165:   version?: string;
+166:   stages: StageReference[];
+167:   start_stage?: string;
+168:   global_hooks: GlobalHookConfig[];
+169:   config: FlowConfig;
+170:   tags: string[];
+171:   metadata: Record<string, unknown>;
+172:   
+173:   is_builtin?: boolean;
+174: }
+175: ⋮----
+176: SkillInfo
+177: ⋮----
+178: {
+179:   id: string;
+180:   name: string;
+181:   description: string;
+182:   tags: string[];
+183:   body: string;
+184: }
+185: ⋮----
+186: IntegrationType
+187: ⋮----
+188: | "rest_api"
+189:   | "webhook"
+190:   | "message_queue"
+191:   | "database"
+192: ⋮----
+193: AuthType
+194: ⋮----
+195: | "none"
+196:   | "api_key"
+197:   | "bearer_token"
+198:   | "basic_auth"
+199:   | "oauth2"
+200: ⋮----
+201: CredentialSource
+202: ⋮----
+203: "env" | "config" | "prompt"
+204: ⋮----
+205: AuthConfig
+206: ⋮----
+207: {
+208:   auth_type: AuthType;
+209:   credential_source: CredentialSource;
+210:   credential_key?: string;
+211:   additional_headers?: Record<string, string>;
+212: }
+213: ⋮----
+214: ConnectionConfig
+215: ⋮----
+216: {
+217:   base_url?: string;
+218:   timeout_secs?: number;
+219:   retry_count?: number;
+220:   retry_delay_ms?: number;
+221: }
+222: ⋮----
+223: IntegrationEvent
+224: ⋮----
+225: | "on_stage_start"
+226:   | "on_stage_complete"
+227:   | "on_flow_start"
+228:   | "on_flow_complete"
+229:   | "on_error"
+230: ⋮----
+231: IntegrationDefinition
+232: ⋮----
+233: {
+234:   id: string;
+235:   name: string;
+236:   description?: string;
+237:   integration_type: IntegrationType;
+238:   connection: ConnectionConfig;
+239:   auth: AuthConfig;
+240:   events: IntegrationEvent[];
+241:   enabled: boolean;
+242:   metadata: Record<string, unknown>;
+243: }
+244: ⋮----
+245: ValidationIssue
+246: ⋮----
+247: {
+248:   path: string;
+249:   message: string;
+250:   severity: "error" | "warning";
+251: }
+252: ⋮----
+253: ValidationResult
+254: ⋮----
+255: {
+256:   valid: boolean;
+257:   issues: ValidationIssue[];
+258: }
+259: ⋮----
+260: ConfigRegistryState
+261: ⋮----
+262: {
+263:   agents: Record<string, AgentDefinition>;
+264:   stages: Record<string, StageDefinition>;
+265:   flows: Record<string, FlowDefinition>;
+266:   skills: SkillInfo[];
+267:   integrations: Record<string, IntegrationDefinition>;
+268:   default_flow_id?: string;
+269: }
+270: ⋮----
+271: BuiltinInstruction
+272: ⋮----
+273: {
+274:   id: string;
+275:   name: string;
+276:   description: string;
+277:   content: string;
+278: }
+279: ⋮----
+280: InstructionType
+281: ⋮----
+282: "builtin" | "file" | "inline"
+283: ⋮----
+284: ToolInfo
+285: ⋮----
+286: {
+287:   id: string;
+288:   name: string;
+289:   category: string;
+290:   description: string;
+291: }
 ```
 
 ### crates/cowork-gui/src-tauri/src/commands/mod.rs (7 lines)
@@ -17353,6 +18022,74 @@ LICENSE
 3: (s: &str, max_len: usize)
 ```
 
+### crates/cowork-core/Cargo.toml (63 lines)
+
+```
+1: [package]
+2: name = "cowork-core"
+3: version.workspace = true
+4: edition.workspace = true
+5: authors.workspace = true
+6: license.workspace = true
+7: repository.workspace = true
+8: description = "AI-powered software development system - Core library with adk-rust framework"
+9: 
+10: [dependencies]
+11: adk-rust = { workspace = true }
+12: adk-core = { workspace = true }
+13: adk-agent = { workspace = true }
+14: adk-model = { workspace = true, features = ["openai"] }
+15: adk-tool = { workspace = true, features = ["http-transport"] }
+16: adk-skill = { workspace = true }
+17: 
+18: tokio = { workspace = true }
+19: async-trait = "0.1"
+20: async-stream = "0.3"
+21: futures = { workspace = true }
+22: 
+23: anyhow = { workspace = true }
+24: thiserror = { workspace = true }
+25: 
+26: serde = { workspace = true }
+27: serde_json = { workspace = true }
+28: 
+29: toml = { workspace = true }
+30: 
+31: chrono = { workspace = true }
+32: uuid = { workspace = true }
+33: 
+34: tracing = { workspace = true }
+35: 
+36: walkdir = { workspace = true }
+37: ignore = { workspace = true }
+38: 
+39: reqwest = { version = "0.13", features = ["json", "stream"] }
+40: 
+41: dialoguer = { workspace = true }
+42: console = { workspace = true }
+43: 
+44: once_cell = "1.21"
+45: 
+46: lazy_static = "1.5"
+47: 
+48: dirs = "5.0"
+49: 
+50: regex = "1"
+51: 
+52: semver = "1.0"
+53: 
+54: schemars = "1.0"
+55: 
+56: include_dir = "0.7"
+57: 
+58: agent-client-protocol = { workspace = true }
+59: 
+60: tokio-util = { workspace = true }
+61: 
+62: [dev-dependencies]
+63: tempfile = { workspace = true }
+```
+
 ### crates/cowork-core/src/agents/legacy_project_analyzer.rs (18 lines)
 
 ```
@@ -18020,79 +18757,662 @@ LICENSE
 269: ()
 ```
 
-### crates/cowork-core/src/config_definition/validator.rs (70 lines)
+### crates/cowork-core/src/config_definition/registry.rs (653 lines)
 
 ```
-1: ValidationResult
+1: get_user_config_dir
 2: ⋮----
-3: {
-4:     pub is_valid: bool,
-5:     pub errors: Vec<String>,
-6:     pub warnings: Vec<String>,
-7: }
+3: ()
+4: ⋮----
+5: ensure_user_config_dir
+6: ⋮----
+7: ()
 8: ⋮----
-9: ValidationResult
+9: ConfigRegistry
 10: ⋮----
 11: {
-12:     pub fn new() -> Self {
-13:         Self {
-14:             is_valid: true,
-15:             errors: Vec::new(),
-16:             warnings: Vec::new(),
-17:         }
-18:     }
-19:     
-20:     pub fn error(&mut self, message: impl Into<String>) {
-21:         self.errors.push(message.into());
-22:         self.is_valid = false;
-23:     }
-24:     
-25:     pub fn warning(&mut self, message: impl Into<String>) {
-26:         self.warnings.push(message.into());
-27:     }
-28:     
-29:     pub fn merge(&mut self, other: ValidationResult) {
-30:         if !other.is_valid {
-31:             self.is_valid = false;
-32:         }
-33:         self.errors.extend(other.errors);
-34:         self.warnings.extend(other.warnings);
-35:     }
-36: }
-37: ⋮----
-38: ConfigValidator
-39: ⋮----
-40: {
-41:     registry: &'a ConfigRegistry,
-42: }
-43: ⋮----
-44: new
-45: ⋮----
-46: (registry: &'a ConfigRegistry)
-47: ⋮----
-48: validate_all
-49: ⋮----
-50: (&self)
-51: ⋮----
-52: validate_agent
-53: ⋮----
-54: (&self, agent: &AgentDefinition)
-55: ⋮----
-56: validate_stage
-57: ⋮----
-58: (&self, stage: &StageDefinition)
-59: ⋮----
-60: validate_flow
-61: ⋮----
-62: (&self, flow: &FlowDefinition)
-63: ⋮----
-64: validate_integration
-65: ⋮----
-66: (&self, integration: &IntegrationDefinition)
-67: ⋮----
-68: test_validate_agent
-69: ⋮----
-70: ()
+12:     
+13:     agents: RwLock<HashMap<String, AgentDefinition>>,
+14:     
+15:     stages: RwLock<HashMap<String, StageDefinition>>,
+16:     
+17:     flows: RwLock<HashMap<String, FlowDefinition>>,
+18:     
+19:     integrations: RwLock<HashMap<String, IntegrationDefinition>>,
+20:     
+21:     default_flow: RwLock<Option<String>>,
+22: }
+23: ⋮----
+24: ConfigRegistry
+25: ⋮----
+26: {
+27:     fn default() -> Self {
+28:         Self::new()
+29:     }
+30: }
+31: ⋮----
+32: ConfigRegistry
+33: ⋮----
+34: {
+35:     
+36:     pub fn new() -> Self {
+37:         Self {
+38:             agents: RwLock::new(HashMap::new()),
+39:             stages: RwLock::new(HashMap::new()),
+40:             flows: RwLock::new(HashMap::new()),
+41:             integrations: RwLock::new(HashMap::new()),
+42:             default_flow: RwLock::new(None),
+43:         }
+44:     }
+45:     
+46:     
+47:     
+48:     
+49:     
+50:     
+51:     pub fn register_agent(&self, definition: AgentDefinition) -> Result<()> {
+52:         let id = definition.id.clone();
+53:         let mut agents = self.agents.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+54:         agents.insert(id.clone(), definition);
+55:         tracing::debug!("Registered agent: {}", id);
+56:         Ok(())
+57:     }
+58:     
+59:     
+60:     pub fn get_agent(&self, id: &str) -> Option<AgentDefinition> {
+61:         let agents = self.agents.read().ok()?;
+62:         agents.get(id).cloned()
+63:     }
+64:     
+65:     
+66:     pub fn list_agents(&self) -> Vec<String> {
+67:         let agents = self.agents.read().unwrap_or_else(|e| {
+68:             tracing::error!("Lock error: {}", e);
+69:             panic!("Lock error")
+70:         });
+71:         agents.keys().cloned().collect()
+72:     }
+73:     
+74:     
+75:     pub fn unregister_agent(&self, id: &str) -> bool {
+76:         let mut agents = self.agents.write().unwrap_or_else(|e| {
+77:             tracing::error!("Lock error: {}", e);
+78:             panic!("Lock error")
+79:         });
+80:         agents.remove(id).is_some()
+81:     }
+82:     
+83:     
+84:     
+85:     
+86:     
+87:     
+88:     pub fn register_stage(&self, definition: StageDefinition) -> Result<()> {
+89:         let id = definition.id.clone();
+90:         let mut stages = self.stages.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+91:         stages.insert(id.clone(), definition);
+92:         tracing::debug!("Registered stage: {}", id);
+93:         Ok(())
+94:     }
+95:     
+96:     
+97:     pub fn get_stage(&self, id: &str) -> Option<StageDefinition> {
+98:         let stages = self.stages.read().ok()?;
+99:         stages.get(id).cloned()
+100:     }
+101:     
+102:     
+103:     pub fn list_stages(&self) -> Vec<String> {
+104:         let stages = self.stages.read().unwrap_or_else(|e| {
+105:             tracing::error!("Lock error: {}", e);
+106:             panic!("Lock error")
+107:         });
+108:         stages.keys().cloned().collect()
+109:     }
+110:     
+111:     
+112:     
+113:     
+114:     
+115:     
+116:     pub fn register_flow(&self, definition: FlowDefinition) -> Result<()> {
+117:         let id = definition.id.clone();
+118:         let mut flows = self.flows.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+119:         flows.insert(id.clone(), definition);
+120:         tracing::debug!("Registered flow: {}", id);
+121:         Ok(())
+122:     }
+123:     
+124:     
+125:     pub fn get_flow(&self, id: &str) -> Option<FlowDefinition> {
+126:         let flows = self.flows.read().ok()?;
+127:         flows.get(id).cloned()
+128:     }
+129:     
+130:     
+131:     pub fn list_flows(&self) -> Vec<String> {
+132:         let flows = self.flows.read().unwrap_or_else(|e| {
+133:             tracing::error!("Lock error: {}", e);
+134:             panic!("Lock error")
+135:         });
+136:         flows.keys().cloned().collect()
+137:     }
+138:     
+139:     
+140:     pub fn unregister_flow(&self, id: &str) -> bool {
+141:         let mut flows = self.flows.write().unwrap_or_else(|e| {
+142:             tracing::error!("Lock error: {}", e);
+143:             panic!("Lock error")
+144:         });
+145:         flows.remove(id).is_some()
+146:     }
+147:     
+148:     
+149:     pub fn set_default_flow(&self, id: Option<String>) -> Result<()> {
+150:         {
+151:             let mut default_flow = self.default_flow.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+152:             *default_flow = id.clone();
+153:         }
+154:         
+155:         self.save_settings()?;
+156:         Ok(())
+157:     }
+158:     
+159:     
+160:     
+161:     pub fn set_default_flow_without_save(&self, id: Option<String>) {
+162:         if let Ok(mut default_flow) = self.default_flow.write() {
+163:             *default_flow = id;
+164:         }
+165:     }
+166:     
+167:     
+168:     pub fn get_default_flow_id(&self) -> Option<String> {
+169:         let default_flow = self.default_flow.read().ok()?;
+170:         default_flow.clone()
+171:     }
+172:     
+173:     
+174:     pub fn get_default_flow(&self) -> Option<FlowDefinition> {
+175:         let default_flow = self.default_flow.read().ok()?;
+176:         let flow_id = default_flow.as_ref()?;
+177:         self.get_flow(flow_id)
+178:     }
+179:     
+180:     
+181:     
+182:     
+183:     
+184:     
+185:     fn get_settings_file_path() -> Option<PathBuf> {
+186:         get_user_config_dir().map(|dir| dir.join("settings.json"))
+187:     }
+188:     
+189:     
+190:     pub fn save_settings(&self) -> Result<()> {
+191:         let settings = Settings {
+192:             default_flow_id: self.get_default_flow_id(),
+193:         };
+194:         
+195:         let config_dir = ensure_user_config_dir()?;
+196:         let file_path = config_dir.join("settings.json");
+197:         let content = serde_json::to_string_pretty(&settings)
+198:             .with_context(|| "Failed to serialize settings")?;
+199:         
+200:         fs::write(&file_path, content)
+201:             .with_context(|| format!("Failed to write settings file: {:?}", file_path))?;
+202:         
+203:         tracing::debug!("Saved settings to {:?}", file_path);
+204:         Ok(())
+205:     }
+206:     
+207:     
+208:     pub fn load_settings(&self) -> Result<()> {
+209:         if let Some(file_path) = Self::get_settings_file_path() {
+210:             if file_path.exists() {
+211:                 match fs::read_to_string(&file_path)
+212:                     .and_then(|content| serde_json::from_str::<Settings>(&content)
+213:                         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+214:                 {
+215:                     Ok(settings) => {
+216:                         if let Some(flow_id) = settings.default_flow_id {
+217:                             
+218:                             if self.get_flow(&flow_id).is_some() {
+219:                                 let mut default_flow = self.default_flow.write()
+220:                                     .map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+221:                                 *default_flow = Some(flow_id.clone());
+222:                                 tracing::info!("Loaded default flow setting: {}", flow_id);
+223:                             } else {
+224:                                 tracing::warn!("Default flow '{}' not found, ignoring setting", flow_id);
+225:                             }
+226:                         }
+227:                     }
+228:                     Err(e) => {
+229:                         tracing::warn!("Failed to load settings: {}", e);
+230:                     }
+231:                 }
+232:             }
+233:         }
+234:         Ok(())
+235:     }
+236:     
+237:     
+238:     
+239:     
+240:     
+241:     
+242:     pub fn register_integration(&self, definition: IntegrationDefinition) -> Result<()> {
+243:         let id = definition.id.clone();
+244:         let mut integrations = self.integrations.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+245:         integrations.insert(id.clone(), definition);
+246:         tracing::debug!("Registered integration: {}", id);
+247:         Ok(())
+248:     }
+249:     
+250:     
+251:     pub fn get_integration(&self, id: &str) -> Option<IntegrationDefinition> {
+252:         let integrations = self.integrations.read().ok()?;
+253:         integrations.get(id).cloned()
+254:     }
+255:     
+256:     
+257:     pub fn list_integrations(&self) -> Vec<String> {
+258:         let integrations = self.integrations.read().unwrap_or_else(|e| {
+259:             tracing::error!("Lock error: {}", e);
+260:             panic!("Lock error")
+261:         });
+262:         integrations.keys().cloned().collect()
+263:     }
+264:     
+265:     
+266:     pub fn get_enabled_integrations(&self) -> Vec<IntegrationDefinition> {
+267:         let integrations = self.integrations.read().unwrap_or_else(|e| {
+268:             tracing::error!("Lock error: {}", e);
+269:             panic!("Lock error")
+270:         });
+271:         integrations.values().filter(|i| i.enabled).cloned().collect()
+272:     }
+273:     
+274:     
+275:     
+276:     
+277:     
+278:     
+279:     pub fn clear(&self) -> Result<()> {
+280:         {
+281:             let mut agents = self.agents.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+282:             agents.clear();
+283:         }
+284:         {
+285:             let mut stages = self.stages.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+286:             stages.clear();
+287:         }
+288:         {
+289:             let mut flows = self.flows.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+290:             flows.clear();
+291:         }
+292:         {
+293:             let mut integrations = self.integrations.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+294:             integrations.clear();
+295:         }
+296:         Ok(())
+297:     }
+298:     
+299:     
+300:     pub fn stats(&self) -> RegistryStats {
+301:         RegistryStats {
+302:             agents: self.agents.read().map(|g| g.len()).unwrap_or(0),
+303:             stages: self.stages.read().map(|g| g.len()).unwrap_or(0),
+304:             flows: self.flows.read().map(|g| g.len()).unwrap_or(0),
+305:             integrations: self.integrations.read().map(|g| g.len()).unwrap_or(0),
+306:         }
+307:     }
+308:     
+309:     
+310:     
+311:     
+312:     
+313:     
+314:     pub fn save_agent_to_file(&self, agent: &AgentDefinition) -> Result<()> {
+315:         let config_dir = ensure_user_config_dir()?;
+316:         let agents_dir = config_dir.join("agents");
+317:         fs::create_dir_all(&agents_dir)
+318:             .with_context(|| format!("Failed to create agents directory: {:?}", agents_dir))?;
+319:         
+320:         let file_path = agents_dir.join(format!("{}.json", agent.id));
+321:         let content = serde_json::to_string_pretty(agent)
+322:             .with_context(|| format!("Failed to serialize agent: {}", agent.id))?;
+323:         
+324:         fs::write(&file_path, content)
+325:             .with_context(|| format!("Failed to write agent file: {:?}", file_path))?;
+326:         
+327:         tracing::info!("Saved agent '{}' to {:?}", agent.id, file_path);
+328:         Ok(())
+329:     }
+330:     
+331:     
+332:     pub fn delete_agent_file(&self, id: &str) -> Result<()> {
+333:         if let Some(config_dir) = get_user_config_dir() {
+334:             let file_path = config_dir.join("agents").join(format!("{}.json", id));
+335:             if file_path.exists() {
+336:                 fs::remove_file(&file_path)
+337:                     .with_context(|| format!("Failed to delete agent file: {:?}", file_path))?;
+338:                 tracing::info!("Deleted agent file: {:?}", file_path);
+339:             }
+340:         }
+341:         Ok(())
+342:     }
+343:     
+344:     
+345:     pub fn save_stage_to_file(&self, stage: &StageDefinition) -> Result<()> {
+346:         let config_dir = ensure_user_config_dir()?;
+347:         let stages_dir = config_dir.join("stages");
+348:         fs::create_dir_all(&stages_dir)
+349:             .with_context(|| format!("Failed to create stages directory: {:?}", stages_dir))?;
+350:         
+351:         let file_path = stages_dir.join(format!("{}.json", stage.id));
+352:         let content = serde_json::to_string_pretty(stage)
+353:             .with_context(|| format!("Failed to serialize stage: {}", stage.id))?;
+354:         
+355:         fs::write(&file_path, content)
+356:             .with_context(|| format!("Failed to write stage file: {:?}", file_path))?;
+357:         
+358:         tracing::info!("Saved stage '{}' to {:?}", stage.id, file_path);
+359:         Ok(())
+360:     }
+361:     
+362:     
+363:     pub fn delete_stage_file(&self, id: &str) -> Result<()> {
+364:         if let Some(config_dir) = get_user_config_dir() {
+365:             let file_path = config_dir.join("stages").join(format!("{}.json", id));
+366:             if file_path.exists() {
+367:                 fs::remove_file(&file_path)
+368:                     .with_context(|| format!("Failed to delete stage file: {:?}", file_path))?;
+369:                 tracing::info!("Deleted stage file: {:?}", file_path);
+370:             }
+371:         }
+372:         Ok(())
+373:     }
+374:     
+375:     
+376:     pub fn save_flow_to_file(&self, flow: &FlowDefinition) -> Result<()> {
+377:         let config_dir = ensure_user_config_dir()?;
+378:         let flows_dir = config_dir.join("flows");
+379:         fs::create_dir_all(&flows_dir)
+380:             .with_context(|| format!("Failed to create flows directory: {:?}", flows_dir))?;
+381:         
+382:         let file_path = flows_dir.join(format!("{}.json", flow.id));
+383:         let content = serde_json::to_string_pretty(flow)
+384:             .with_context(|| format!("Failed to serialize flow: {}", flow.id))?;
+385:         
+386:         fs::write(&file_path, content)
+387:             .with_context(|| format!("Failed to write flow file: {:?}", file_path))?;
+388:         
+389:         tracing::info!("Saved flow '{}' to {:?}", flow.id, file_path);
+390:         Ok(())
+391:     }
+392:     
+393:     
+394:     pub fn delete_flow_file(&self, id: &str) -> Result<()> {
+395:         if let Some(config_dir) = get_user_config_dir() {
+396:             let file_path = config_dir.join("flows").join(format!("{}.json", id));
+397:             if file_path.exists() {
+398:                 fs::remove_file(&file_path)
+399:                     .with_context(|| format!("Failed to delete flow file: {:?}", file_path))?;
+400:                 tracing::info!("Deleted flow file: {:?}", file_path);
+401:             }
+402:         }
+403:         Ok(())
+404:     }
+405:     
+406:     
+407:     pub fn save_integration_to_file(&self, integration: &IntegrationDefinition) -> Result<()> {
+408:         let config_dir = ensure_user_config_dir()?;
+409:         let integrations_dir = config_dir.join("integrations");
+410:         fs::create_dir_all(&integrations_dir)
+411:             .with_context(|| format!("Failed to create integrations directory: {:?}", integrations_dir))?;
+412:         
+413:         let file_path = integrations_dir.join(format!("{}.json", integration.id));
+414:         let content = serde_json::to_string_pretty(integration)
+415:             .with_context(|| format!("Failed to serialize integration: {}", integration.id))?;
+416:         
+417:         fs::write(&file_path, content)
+418:             .with_context(|| format!("Failed to write integration file: {:?}", file_path))?;
+419:         
+420:         tracing::info!("Saved integration '{}' to {:?}", integration.id, file_path);
+421:         Ok(())
+422:     }
+423:     
+424:     
+425:     pub fn delete_integration_file(&self, id: &str) -> Result<()> {
+426:         if let Some(config_dir) = get_user_config_dir() {
+427:             let file_path = config_dir.join("integrations").join(format!("{}.json", id));
+428:             if file_path.exists() {
+429:                 fs::remove_file(&file_path)
+430:                     .with_context(|| format!("Failed to delete integration file: {:?}", file_path))?;
+431:                 tracing::info!("Deleted integration file: {:?}", file_path);
+432:             }
+433:         }
+434:         Ok(())
+435:     }
+436:     
+437:     
+438:     pub fn load_user_configs(&self) -> Result<LoadUserReport> {
+439:         let mut report = LoadUserReport::default();
+440:         
+441:         if let Some(config_dir) = get_user_config_dir() {
+442:             if config_dir.exists() {
+443:                 
+444:                 let agents_dir = config_dir.join("agents");
+445:                 if agents_dir.exists() {
+446:                     for entry in fs::read_dir(&agents_dir)
+447:                         .with_context(|| format!("Failed to read agents directory: {:?}", agents_dir))?
+448:                         .filter_map(|e| e.ok())
+449:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+450:                     {
+451:                         let path = entry.path();
+452:                         match fs::read_to_string(&path)
+453:                             .and_then(|content| serde_json::from_str::<AgentDefinition>(&content)
+454:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+455:                         {
+456:                             Ok(agent) => {
+457:                                 let id = agent.id.clone();
+458:                                 self.register_agent(agent)?;
+459:                                 report.agents_loaded += 1;
+460:                                 tracing::debug!("Loaded user agent: {} from {:?}", id, path);
+461:                             }
+462:                             Err(e) => {
+463:                                 report.errors.push(format!("Failed to load agent from {:?}: {}", path, e));
+464:                             }
+465:                         }
+466:                     }
+467:                 }
+468:                 
+469:                 
+470:                 let stages_dir = config_dir.join("stages");
+471:                 if stages_dir.exists() {
+472:                     for entry in fs::read_dir(&stages_dir)
+473:                         .with_context(|| format!("Failed to read stages directory: {:?}", stages_dir))?
+474:                         .filter_map(|e| e.ok())
+475:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+476:                     {
+477:                         let path = entry.path();
+478:                         match fs::read_to_string(&path)
+479:                             .and_then(|content| serde_json::from_str::<StageDefinition>(&content)
+480:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+481:                         {
+482:                             Ok(stage) => {
+483:                                 let id = stage.id.clone();
+484:                                 self.register_stage(stage)?;
+485:                                 report.stages_loaded += 1;
+486:                                 tracing::debug!("Loaded user stage: {} from {:?}", id, path);
+487:                             }
+488:                             Err(e) => {
+489:                                 report.errors.push(format!("Failed to load stage from {:?}: {}", path, e));
+490:                             }
+491:                         }
+492:                     }
+493:                 }
+494:                 
+495:                 
+496:                 let flows_dir = config_dir.join("flows");
+497:                 if flows_dir.exists() {
+498:                     for entry in fs::read_dir(&flows_dir)
+499:                         .with_context(|| format!("Failed to read flows directory: {:?}", flows_dir))?
+500:                         .filter_map(|e| e.ok())
+501:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+502:                     {
+503:                         let path = entry.path();
+504:                         match fs::read_to_string(&path)
+505:                             .and_then(|content| serde_json::from_str::<FlowDefinition>(&content)
+506:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+507:                         {
+508:                             Ok(flow) => {
+509:                                 let id = flow.id.clone();
+510:                                 
+511:                                 if let Some(existing) = self.get_flow(&id) {
+512:                                     if existing.is_builtin {
+513:                                         tracing::debug!(
+514:                                             "Skipping user flow '{}' - builtin preset with same ID exists",
+515:                                             id
+516:                                         );
+517:                                         continue;
+518:                                     }
+519:                                 }
+520:                                 self.register_flow(flow)?;
+521:                                 report.flows_loaded += 1;
+522:                                 tracing::debug!("Loaded user flow: {} from {:?}", id, path);
+523:                             }
+524:                             Err(e) => {
+525:                                 report.errors.push(format!("Failed to load flow from {:?}: {}", path, e));
+526:                             }
+527:                         }
+528:                     }
+529:                 }
+530:                 
+531:                 
+532:                 let integrations_dir = config_dir.join("integrations");
+533:                 if integrations_dir.exists() {
+534:                     for entry in fs::read_dir(&integrations_dir)
+535:                         .with_context(|| format!("Failed to read integrations directory: {:?}", integrations_dir))?
+536:                         .filter_map(|e| e.ok())
+537:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+538:                     {
+539:                         let path = entry.path();
+540:                         match fs::read_to_string(&path)
+541:                             .and_then(|content| serde_json::from_str::<IntegrationDefinition>(&content)
+542:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+543:                         {
+544:                             Ok(integration) => {
+545:                                 let id = integration.id.clone();
+546:                                 self.register_integration(integration)?;
+547:                                 report.integrations_loaded += 1;
+548:                                 tracing::debug!("Loaded user integration: {} from {:?}", id, path);
+549:                             }
+550:                             Err(e) => {
+551:                                 report.errors.push(format!("Failed to load integration from {:?}: {}", path, e));
+552:                             }
+553:                         }
+554:                     }
+555:                 }
+556:                 
+557:                 
+558:                 if let Err(e) = self.load_settings() {
+559:                     tracing::warn!("Failed to load settings: {}", e);
+560:                 }
+561:                 
+562:                 
+563:                 
+564:                 if self.get_default_flow_id().is_none() {
+565:                     if self.get_flow("default").is_some() {
+566:                         if let Err(e) = self.set_default_flow(Some("default".to_string())) {
+567:                             tracing::warn!("Failed to set default flow: {}", e);
+568:                         } else {
+569:                             tracing::info!("Set 'default' as the default flow (first time initialization)");
+570:                         }
+571:                     }
+572:                 }
+573:             }
+574:         } else {
+575:             
+576:             
+577:             if let Some(flow_id) = self.get_default_flow_id() {
+578:                 if let Err(e) = self.set_default_flow(Some(flow_id)) {
+579:                     tracing::warn!("Failed to save initial default flow setting: {}", e);
+580:                 }
+581:             }
+582:         }
+583:         
+584:         Ok(report)
+585:     }
+586: }
+587: ⋮----
+588: RegistryStats
+589: ⋮----
+590: {
+591:     pub agents: usize,
+592:     pub stages: usize,
+593:     pub flows: usize,
+594:     pub integrations: usize,
+595: }
+596: ⋮----
+597: LoadUserReport
+598: ⋮----
+599: {
+600:     pub agents_loaded: usize,
+601:     pub stages_loaded: usize,
+602:     pub flows_loaded: usize,
+603:     pub integrations_loaded: usize,
+604:     pub errors: Vec<String>,
+605: }
+606: ⋮----
+607: LoadReport
+608: ⋮----
+609: {
+610:     pub agents_loaded: usize,
+611:     pub stages_loaded: usize,
+612:     pub flows_loaded: usize,
+613:     pub integrations_loaded: usize,
+614:     pub default_flow_set: bool,
+615:     pub errors: Vec<String>,
+616: }
+617: ⋮----
+618: LoadReport
+619: ⋮----
+620: {
+621:     pub fn total_loaded(&self) -> usize {
+622:         self.agents_loaded + self.stages_loaded + self.flows_loaded + self.integrations_loaded
+623:     }
+624: 
+625:     pub fn has_errors(&self) -> bool {
+626:         !self.errors.is_empty()
+627:     }
+628: }
+629: ⋮----
+630: Settings
+631: ⋮----
+632: {
+633:     
+634:     pub default_flow_id: Option<String>,
+635: }
+636: ⋮----
+637: Settings
+638: ⋮----
+639: {
+640:     fn default() -> Self {
+641:         Self {
+642:             default_flow_id: None,
+643:         }
+644:     }
+645: }
+646: ⋮----
+647: global_registry
+648: ⋮----
+649: ()
+650: ⋮----
+651: test_registry_operations
+652: ⋮----
+653: ()
 ```
 
 ### crates/cowork-core/src/data/mod.rs (2 lines)
@@ -20344,234 +21664,6 @@ LICENSE
 269: ()
 ```
 
-### crates/cowork-core/src/skills/manager.rs (198 lines)
-
-```
-1: SkillManagerConfig
-2: ⋮----
-3: {
-4:     
-5:     pub root_path: PathBuf,
-6:     
-7:     pub selection_policy: SelectionPolicy,
-8:     
-9:     pub max_injected_chars: usize,
-10: }
-11: ⋮----
-12: SkillManagerConfig
-13: ⋮----
-14: {
-15:     fn default() -> Self {
-16:         Self {
-17:             root_path: PathBuf::from("."),
-18:             selection_policy: SelectionPolicy::default(),
-19:             max_injected_chars: 2000,
-20:         }
-21:     }
-22: }
-23: ⋮----
-24: SkillManagerConfig
-25: ⋮----
-26: {
-27:     
-28:     pub fn new(root_path: impl Into<PathBuf>) -> Self {
-29:         Self {
-30:             root_path: root_path.into(),
-31:             ..Default::default()
-32:         }
-33:     }
-34: 
-35:     
-36:     pub fn with_policy(mut self, policy: SelectionPolicy) -> Self {
-37:         self.selection_policy = policy;
-38:         self
-39:     }
-40: 
-41:     
-42:     pub fn with_max_injected_chars(mut self, max: usize) -> Self {
-43:         self.max_injected_chars = max;
-44:         self
-45:     }
-46: }
-47: ⋮----
-48: SkillManager
-49: ⋮----
-50: {
-51:     config: SkillManagerConfig,
-52:     index: SkillIndex,
-53: }
-54: ⋮----
-55: SkillManager
-56: ⋮----
-57: {
-58:     
-59:     pub fn new(config: SkillManagerConfig) -> Result<Self> {
-60:         let index = load_skill_index(&config.root_path)
-61:             .map_err(|e| anyhow::anyhow!("Failed to load skill index: {}", e))?;
-62: 
-63:         tracing::info!(
-64:             "SkillManager initialized with {} skills from {:?}",
-65:             index.len(),
-66:             config.root_path
-67:         );
-68: 
-69:         Ok(Self { config, index })
-70:     }
-71: 
-72:     
-73:     pub fn for_project(project_path: impl AsRef<Path>) -> Result<Self> {
-74:         let config = SkillManagerConfig::new(project_path.as_ref());
-75:         Self::new(config)
-76:     }
-77: 
-78:     
-79:     pub fn index(&self) -> &SkillIndex {
-80:         &self.index
-81:     }
-82: 
-83:     
-84:     pub fn list_skills(&self) -> &[SkillDocument] {
-85:         self.index.skills()
-86:     }
-87: 
-88:     
-89:     pub fn skill_count(&self) -> usize {
-90:         self.index.len()
-91:     }
-92: 
-93:     
-94:     pub fn is_empty(&self) -> bool {
-95:         self.index.is_empty()
-96:     }
-97: 
-98:     
-99:     pub fn find_skill(&self, name: &str) -> Option<&SkillDocument> {
-100:         self.index.skills().iter().find(|s| s.name == name)
-101:     }
-102: 
-103:     
-104:     pub fn find_skill_by_id(&self, id: &str) -> Option<&SkillDocument> {
-105:         self.index.skills().iter().find(|s| s.id == id)
-106:     }
-107: 
-108:     
-109:     pub fn select(&self, query: &str) -> Vec<SkillMatch> {
-110:         select_skills(&self.index, query, &self.config.selection_policy)
-111:     }
-112: 
-113:     
-114:     pub fn select_best(&self, query: &str) -> Option<SkillMatch> {
-115:         self.select(query).into_iter().next()
-116:     }
-117: 
-118:     
-119:     pub fn select_with_policy(&self, query: &str, policy: &SelectionPolicy) -> Vec<SkillMatch> {
-120:         select_skills(&self.index, query, policy)
-121:     }
-122: 
-123:     
-124:     pub fn get_summaries(&self) -> Vec<adk_skill::SkillSummary> {
-125:         self.index.summaries()
-126:     }
-127: 
-128:     
-129:     pub fn reload(&mut self) -> Result<()> {
-130:         self.index = load_skill_index(&self.config.root_path)
-131:             .map_err(|e| anyhow::anyhow!("Failed to reload skill index: {}", e))?;
-132: 
-133:         tracing::info!(
-134:             "SkillManager reloaded with {} skills",
-135:             self.index.len()
-136:         );
-137: 
-138:         Ok(())
-139:     }
-140: 
-141:     
-142:     
-143:     
-144:     pub fn install_skill_from_dir(&self, source_dir: &Path) -> Result<String> {
-145:         
-146:         let skill_md_path = source_dir.join("SKILL.md");
-147:         if !skill_md_path.exists() {
-148:             anyhow::bail!("Source directory does not contain SKILL.md: {:?}", source_dir);
-149:         }
-150: 
-151:         let content = std::fs::read_to_string(&skill_md_path)
-152:             .with_context(|| format!("Failed to read {:?}", skill_md_path))?;
-153: 
-154:         
-155:         let parsed = adk_skill::parse_skill_markdown(&skill_md_path, &content)
-156:             .map_err(|e| anyhow::anyhow!("Failed to parse SKILL.md: {}", e))?;
-157: 
-158:         let skill_name = parsed.name.clone();
-159: 
-160:         
-161:         let target_dir = self.config.root_path.join(".skills").join(&skill_name);
-162:         std::fs::create_dir_all(&target_dir)
-163:             .with_context(|| format!("Failed to create target directory: {:?}", target_dir))?;
-164: 
-165:         
-166:         copy_dir_all(source_dir, &target_dir)?;
-167: 
-168:         tracing::info!("Installed skill '{}' to {:?}", skill_name, target_dir);
-169: 
-170:         Ok(skill_name)
-171:     }
-172: 
-173:     
-174:     pub fn skills_directory(&self) -> PathBuf {
-175:         self.config.root_path.join(".skills")
-176:     }
-177: 
-178:     
-179:     pub fn has_skill(&self, name: &str) -> bool {
-180:         self.index.skills().iter().any(|s| s.name == name)
-181:     }
-182: }
-183: ⋮----
-184: copy_dir_all
-185: ⋮----
-186: (src: &Path, dst: &Path)
-187: ⋮----
-188: test_skill_manager_empty
-189: ⋮----
-190: ()
-191: ⋮----
-192: test_skill_manager_with_skill
-193: ⋮----
-194: ()
-195: ⋮----
-196: test_skill_selection
-197: ⋮----
-198: ()
-```
-
-### crates/cowork-core/src/skills/mod.rs (20 lines)
-
-```
-1: mod manager;
-2: 
-3: pub use manager::{SkillManager, SkillManagerConfig};
-4: 
-5: 
-6: pub use adk_skill::{
-7:     
-8:     SkillDocument, SkillIndex, SkillSummary, SkillMatch,
-9:     
-10:     SelectionPolicy,
-11:     
-12:     SkillInjector, SkillInjectorConfig,
-13:     apply_skill_injection, select_skill_prompt_block,
-14:     
-15:     load_skill_index, parse_skill_markdown, parse_instruction_markdown,
-16:     
-17:     discover_skill_files, discover_instruction_files,
-18:     
-19:     SkillError, SkillResult,
-20: };
-```
-
 ### crates/cowork-core/src/tools/memory_tools.rs (489 lines)
 
 ```
@@ -21066,467 +22158,6 @@ LICENSE
 489: }
 ```
 
-### crates/cowork-gui/package.json (38 lines)
-
-```
-1: {
-2:   "name": "cowork-gui",
-3:   "private": true,
-4:   "type": "module",
-5:   "version": "2.5.2",
-6:   "scripts": {
-7:     "dev": "vite --port 15173",
-8:     "build": "tsc && vite build",
-9:     "tauri": "tauri",
-10:     "tauri:dev": "tauri dev --port 15173",
-11:     "tauri:build": "tauri build",
-12:     "typecheck": "tsc --noEmit"
-13:   },
-14:   "dependencies": {
-15:     "@monaco-editor/react": "^4.6.0",
-16:     "@tauri-apps/api": "^2.11.1",
-17:     "@tauri-apps/plugin-dialog": "^2.7.1",
-18:     "antd": "^5.12.0",
-19:     "react": "^18.3.1",
-20:     "react-dom": "^18.3.1",
-21:     "react-json-view": "^1.21.3",
-22:     "react-markdown": "^9.0.1",
-23:     "react-window": "^2.2.6",
-24:     "rehype-highlight": "^7.0.2",
-25:     "rehype-raw": "^7.0.0",
-26:     "remark-gfm": "^4.0.1",
-27:     "zustand": "^4.5.0"
-28:   },
-29:   "devDependencies": {
-30:     "@tauri-apps/cli": "^2.11.4",
-31:     "@types/node": "^20.0.0",
-32:     "@types/react": "^18.3.0",
-33:     "@types/react-dom": "^18.3.0",
-34:     "@vitejs/plugin-react": "^4.3.0",
-35:     "typescript": "^5.3.0",
-36:     "vite": "^5.0.0"
-37:   }
-38: }
-```
-
-### crates/cowork-gui/src/App.tsx (413 lines)
-
-```
-1: import React, { useEffect, useRef, useState, useMemo, useCallback, Suspense, lazy } from 'react';
-2: import { Layout, Menu, Button, Empty, App as AntApp, Tag, Spin } from 'antd';
-3: import {
-4: 	FolderOutlined,
-5: 	FileTextOutlined,
-6: 	CodeOutlined,
-7: 	EyeOutlined,
-8: 	PlayCircleOutlined,
-9: 	ReloadOutlined,
-10: 	MessageOutlined,
-11: 	AppstoreOutlined,
-12: 	DatabaseOutlined,
-13: 	BranchesOutlined,
-14: 	CheckCircleOutlined,
-15: 	RocketOutlined,
-16: 	BookOutlined,
-17: 	SettingOutlined,
-18: 	ControlOutlined
-19: } from '@ant-design/icons';
-20: 
-21: import { useProjectStore, useAgentStore, useUIStore } from './stores';
-22: import { LoadingScreen, StatusBadge } from './components/common';
-23: import { useAppEvents, usePMAgent, useIterationActions, useChatInput } from './hooks';
-24: 
-25: import type { ChatMode, PMAction, PMAgentMessage, ChatMessage } from './stores';
-26: 
-27: 
-28: import ProjectsPanel from './components/ProjectsPanel';
-29: 
-30: 
-31: const ArtifactsViewer = lazy(() => import('./components/ArtifactsViewer'));
-32: const CodeEditor = lazy(() => import('./components/CodeEditor'));
-33: const RunnerPanel = lazy(() => import('./components/RunnerPanel'));
-34: const MemoryPanel = lazy(() => import('./components/MemoryPanel'));
-35: const KnowledgePanel = lazy(() => import('./components/KnowledgePanel'));
-36: const CommandPalette = lazy(() => import('./components/CommandPalette'));
-37: const IterationsPanel = lazy(() => import('./components/IterationsPanel'));
-38: const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
-39: 
-40: const ChatPanel = lazy(() => import('./components/chat').then(m => ({ default: m.ChatPanel })));
-41: 
-42: const AgentsSetupPanel = lazy(() => import('./components/config').then(m => ({ default: m.AgentsSetupPanel })));
-43: 
-44: const { Sider, Content, Header, Footer } = Layout;
-45: 
-46: function App() {
-47: 	
-48: 	const [userInput, setUserInput] = useState('');
-49: 	const messagesContainerRef = useRef<HTMLDivElement>(null);
-50: 	const pmMessagesContainerRef = useRef<HTMLDivElement>(null);
-51: 
-52: 	
-53: 	const project = useProjectStore(state => state.project);
-54: 	const iterations = useProjectStore(state => state.iterations);
-55: 	const currentIteration = useProjectStore(state => state.currentIteration);
-56: 	const loading = useProjectStore(state => state.loading);
-57: 	const loadProject = useProjectStore(state => state.loadProject);
-58: 	const setCurrentIteration = useProjectStore(state => state.setCurrentIteration);
-59: 	const updateCurrentIterationStatus = useProjectStore(state => state.updateCurrentIterationStatus);
-60: 
-61: 	
-62: 	const messages = useAgentStore(state => state.messages);
-63: 	const pmMessages = useAgentStore(state => state.pmMessages);
-64: 	const isProcessing = useAgentStore(state => state.isProcessing);
-65: 	const currentAgent = useAgentStore(state => state.currentAgent);
-66: 	const currentStage = useAgentStore(state => state.currentStage);
-67: 	const inputRequest = useAgentStore(state => state.inputRequest);
-68: 	const pmProcessing = useAgentStore(state => state.pmProcessing);
-69: 	const setInputRequest = useAgentStore(state => state.setInputRequest);
-70: 	const loadPMWelcomeMessage = useAgentStore(state => state.loadPMWelcomeMessage);
-71: 
-72: 	
-73: 	const activeView = useUIStore(state => state.activeView);
-74: 	const commandPaletteVisible = useUIStore(state => state.commandPaletteVisible);
-75: 	const activeArtifactTab = useUIStore(state => state.activeArtifactTab);
-76: 	const artifactsRefreshTrigger = useUIStore(state => state.artifactsRefreshTrigger);
-77: 	const codeRefreshTrigger = useUIStore(state => state.codeRefreshTrigger);
-78: 	const memoryRefreshTrigger = useUIStore(state => state.memoryRefreshTrigger);
-79: 	const knowledgeRefreshTrigger = useUIStore(state => state.knowledgeRefreshTrigger);
-80: 	const setActiveView = useUIStore(state => state.setActiveView);
-81: 	const setCommandPaletteVisible = useUIStore(state => state.setCommandPaletteVisible);
-82: 	const setActiveArtifactTab = useUIStore(state => state.setActiveArtifactTab);
-83: 
-84: 	
-85: 	useAppEvents(userInput, setUserInput);
-86: 	const { handlePMSendMessage, handlePMAction } = usePMAgent();
-87: 	const { handleSelectIteration, handleExecuteIteration, handleOpenProjectFolder, handleOpenIterationFolder, handleCommandSelect } = useIterationActions();
-88: 	const {
-89: 		inputRequest: chatInputRequest,
-90: 		handleSendUserMessage,
-91: 		handleSelectOption,
-92: 		handleSubmitFeedback,
-93: 		handleToggleThinking,
-94: 		handleCancelFeedback
-95: 	} = useChatInput();
-96: 
-97: 	
-98: 	const chatMode = useMemo<ChatMode>(() => {
-99: 		if (!currentIteration) return 'disabled';
-100: 		if (currentIteration.status === 'Completed') return 'pm_agent';
-101: 		if (isProcessing || currentIteration.status === 'Running') return 'pipeline';
-102: 		return 'pipeline';
-103: 	}, [currentIteration, isProcessing]);
-104: 
-105: 	
-106: 	useEffect(() => {
-107: 		if (chatMode === 'pm_agent' && currentIteration) {
-108: 			const pmMessages = useAgentStore.getState().pmMessages;
-109: 			if (pmMessages.length === 0) {
-110: 				loadPMWelcomeMessage(currentIteration.id);
-111: 			}
-112: 		}
-113: 	}, [chatMode, currentIteration?.id, loadPMWelcomeMessage]);
-114: 
-115: 	
-116: 	useEffect(() => {
-117: 		if (messagesContainerRef.current) {
-118: 			messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-119: 		}
-120: 	}, [messages]);
-121: 
-122: 	useEffect(() => {
-123: 		if (pmMessagesContainerRef.current && pmMessages.length > 0) {
-124: 			pmMessagesContainerRef.current.scrollTop = pmMessagesContainerRef.current.scrollHeight;
-125: 		}
-126: 	}, [pmMessages]);
-127: 
-128: 	
-129: 	const handleSend = useCallback(() => {
-130: 		if (chatMode === 'pm_agent') {
-131: 			handlePMSendMessage(userInput, setUserInput);
-132: 		} else {
-133: 			handleSendUserMessage(userInput, setUserInput);
-134: 		}
-135: 	}, [chatMode, userInput, handlePMSendMessage, handleSendUserMessage]);
-136: 
-137: 	const handleSelectOptionWrapper = useCallback((option: Parameters<typeof handleSelectOption>[0]) => {
-138: 		handleSelectOption(option, userInput, setUserInput);
-139: 	}, [handleSelectOption, userInput]);
-140: 
-141: 	const handleSubmitFeedbackWrapper = useCallback(() => {
-142: 		handleSubmitFeedback(userInput, setUserInput, updateCurrentIterationStatus);
-143: 	}, [handleSubmitFeedback, userInput, updateCurrentIterationStatus]);
-144: 
-145: 	const handlePMActionWrapper = useCallback((action: PMAction) => {
-146: 		handlePMAction(action, pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]);
-147: 	}, [handlePMAction, pmMessages]);
-148: 
-149: 	
-150: 	const loadingFallback = (
-151: 		<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-152: 			<Spin size="large" tip="Loading..." />
-153: 		</div>
-154: 	);
-155: 
-156: 	
-157: 	const renderContent = () => (
-158: 		<div style={{ height: '100%' }}>
-159: 			<div style={{ height: '100%', display: activeView === 'iterations' ? 'block' : 'none' }}>
-160: 				<Suspense fallback={loadingFallback}>
-161: 					<IterationsPanel
-162: 						key="iterations"
-163: 						onSelectIteration={handleSelectIteration}
-164: 						selectedIterationId={currentIteration?.id}
-165: 					/>
-166: 				</Suspense>
-167: 			</div>
-168: 
-169: 			<div style={{ height: '100%', display: activeView === 'projects' ? 'block' : 'none' }}>
-170: 				<ProjectsPanel key="projects" />
-171: 			</div>
-172: 
-173: 			<div style={{ height: '100%', display: activeView === 'artifacts' ? 'block' : 'none' }}>
-174: 				{currentIteration ? (
-175: 					<Suspense fallback={loadingFallback}>
-176: 						<ArtifactsViewer
-177: 							key={`artifacts-${currentIteration.id}`}
-178: 							iterationId={currentIteration.id}
-179: 							activeTab={activeArtifactTab}
-180: 							onTabChange={setActiveArtifactTab}
-181: 							refreshTrigger={artifactsRefreshTrigger}
-182: 						/>
-183: 					</Suspense>
-184: 				) : (
-185: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-186: 				)}
-187: 			</div>
-188: 
-189: 			<div style={{ height: '100%', display: activeView === 'code' ? 'block' : 'none' }}>
-190: 				{currentIteration ? (
-191: 					<Suspense fallback={loadingFallback}>
-192: 						<CodeEditor
-193: 							key={`code-${currentIteration.id}`}
-194: 							iterationId={currentIteration.id}
-195: 							refreshTrigger={codeRefreshTrigger}
-196: 						/>
-197: 					</Suspense>
-198: 				) : (
-199: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-200: 				)}
-201: 			</div>
-202: 
-203: 			<div style={{ height: '100%', display: activeView === 'run' ? 'block' : 'none' }}>
-204: 				{currentIteration ? (
-205: 					<Suspense fallback={loadingFallback}>
-206: 						<RunnerPanel key={`run-${currentIteration.id}`} iterationId={currentIteration.id} />
-207: 					</Suspense>
-208: 				) : (
-209: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-210: 				)}
-211: 			</div>
-212: 
-213: 			<div style={{ height: '100%', display: activeView === 'execution-memory' ? 'block' : 'none' }}>
-214: 				<Suspense fallback={loadingFallback}>
-215: 					<MemoryPanel
-216: 						key={`memory-${memoryRefreshTrigger}`}
-217: 						currentSession={currentIteration?.id}
-218: 						refreshTrigger={memoryRefreshTrigger}
-219: 					/>
-220: 				</Suspense>
-221: 			</div>
-222: 
-223: 			<div style={{ height: '100%', display: activeView === 'project-knowledge' ? 'block' : 'none' }}>
-224: 				<Suspense fallback={loadingFallback}>
-225: 					<KnowledgePanel
-226: 						key={`knowledge-${knowledgeRefreshTrigger}`}
-227: 						currentSession={project?.id}
-228: 						currentIterationId={currentIteration?.id}
-229: 						refreshTrigger={knowledgeRefreshTrigger}
-230: 					/>
-231: 				</Suspense>
-232: 			</div>
-233: 
-234: 			<div style={{ height: '100%', display: activeView === 'settings' ? 'block' : 'none', overflow: 'auto' }}>
-235: 				<Suspense fallback={loadingFallback}>
-236: 					<SettingsPanel />
-237: 				</Suspense>
-238: 			</div>
-239: 
-240: 			<div style={{ height: '100%', display: activeView === 'config' ? 'block' : 'none', overflow: 'auto' }}>
-241: 				<Suspense fallback={loadingFallback}>
-242: 					<AgentsSetupPanel />
-243: 				</Suspense>
-244: 			</div>
-245: 
-246: 			<div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
-247: 				{currentIteration ? (
-248: 					<Suspense fallback={loadingFallback}>
-249: 						<ChatPanel
-250: 							messages={messages}
-251: 							pmMessages={pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]}
-252: 							mode={chatMode}
-253: 							isProcessing={isProcessing}
-254: 							pmProcessing={pmProcessing}
-255: 							currentAgent={currentAgent}
-256: 							iterationTitle={currentIteration.title}
-257: 							iterationDescription={currentIteration.description}
-258: 							currentStage={currentStage}
-259: 							inputRequest={inputRequest}
-260: 							userInput={userInput}
-261: 							messagesContainerRef={messagesContainerRef as React.RefObject<HTMLDivElement>}
-262: 							pmMessagesContainerRef={pmMessagesContainerRef as React.RefObject<HTMLDivElement>}
-263: 							onUserInputChange={setUserInput}
-264: 							onSend={handleSend}
-265: 							onSelectOption={handleSelectOptionWrapper}
-266: 							onSubmitFeedback={handleSubmitFeedbackWrapper}
-267: 							onCancelFeedback={handleCancelFeedback}
-268: 							onToggleThinking={handleToggleThinking}
-269: 							onActionClick={handlePMActionWrapper}
-270: 						/>
-271: 					</Suspense>
-272: 				) : (
-273: 					<Empty description="Select an iteration to view chat" style={{ marginTop: '40px' }} />
-274: 				)}
-275: 			</div>
-276: 		</div>
-277: 	);
-278: 
-279: 	if (loading) {
-280: 		return <LoadingScreen />;
-281: 	}
-282: 
-283: 	return (
-284: 		<Layout style={{ minHeight: '100vh' }}>
-285: 			<Header
-286: 				style={{
-287: 					background: '#fff',
-288: 					borderBottom: '1px solid #e8e8e8',
-289: 					padding: '0 24px',
-290: 					display: 'flex',
-291: 					alignItems: 'center',
-292: 					justifyContent: 'space-between'
-293: 				}}
-294: 			>
-295: 				<div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-296: 					<h1 style={{ margin: 0, fontSize: '18px' }}>
-297: 						<RocketOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
-298: 						Cowork Forge
-299: 					</h1>
-300: 					{project && (
-301: 						<Tag color="blue" style={{ cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
-302: 							{project.name}
-303: 						</Tag>
-304: 					)}
-305: 				</div>
-306: 
-307: 				<div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-308: 					{currentIteration && (
-309: 						<>
-310: 							<StatusBadge status={currentIteration.status} />
-311: 							{(currentIteration.status === 'Draft' || currentIteration.status === 'Paused') && (
-312: 								<Button
-313: 									type="primary"
-314: 									icon={
-315: 										currentIteration.status === 'Draft' ? (
-316: 											<PlayCircleOutlined />
-317: 										) : (
-318: 											<ReloadOutlined />
-319: 										)
-320: 									}
-321: 									onClick={handleExecuteIteration}
-322: 									loading={isProcessing}
-323: 								>
-324: 									{currentIteration.status === 'Draft' ? 'Start Iteration' : 'Continue'}
-325: 								</Button>
-326: 							)}
-327: 						</>
-328: 					)}
-329: 				</div>
-330: 			</Header>
-331: 
-332: 			<Layout style={{ height: 'calc(100vh - 64px - 48px)' }}>
-333: 				<Sider width={200} style={{ background: '#fff', borderRight: '1px solid #e8e8e8' }}>
-334: 					<Menu
-335: 						mode="inline"
-336: 						selectedKeys={[activeView]}
-337: 						onClick={({ key }) => setActiveView(key as typeof activeView)}
-338: 						style={{ height: '100%', borderRight: 0 }}
-339: 						items={[
-340: 							{ key: 'projects', icon: <AppstoreOutlined />, label: 'Projects' },
-341: 							{ key: 'iterations', icon: <BranchesOutlined />, label: 'Iterations' },
-342: 							{ key: 'chat', icon: <MessageOutlined />, label: 'Collaborate' },
-343: 							{ key: 'artifacts', icon: <FileTextOutlined />, label: 'Artifacts' },
-344: 							{ key: 'code', icon: <CodeOutlined />, label: 'Code' },
-345: 							{ key: 'run', icon: <PlayCircleOutlined />, label: 'Run' },
-346: 							{ key: 'execution-memory', icon: <DatabaseOutlined />, label: 'Memory' },
-347: 							{ key: 'project-knowledge', icon: <BookOutlined />, label: 'Knowledge' },
-348: 							{ type: 'divider' },
-349: 							{ key: 'config', icon: <ControlOutlined />, label: 'Agents Setup' },
-350: 							{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' }
-351: 						]}
-352: 					/>
-353: 				</Sider>
-354: 
-355: 				<Content style={{ overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
-356: 					{renderContent()}
-357: 				</Content>
-358: 			</Layout>
-359: 
-360: 			<Footer
-361: 				style={{
-362: 					background: '#fff',
-363: 					borderTop: '1px solid #e8e8e8',
-364: 					padding: '12px 24px',
-365: 					display: 'flex',
-366: 					justifyContent: 'space-between',
-367: 					alignItems: 'center'
-368: 				}}
-369: 			>
-370: 				<div style={{ fontSize: '12px', color: '#888' }}>
-371: 					{project ? (
-372: 						<>
-373: 							<span style={{ marginRight: '16px', cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
-374: 								Project: <strong>{project.name}</strong>
-375: 							</span>
-376: 							<span
-377: 								style={{ cursor: currentIteration ? 'pointer' : 'default' }}
-378: 								onClick={() => currentIteration && handleOpenIterationFolder(currentIteration.id)}
-379: 								title={currentIteration ? `Click to open iteration folder: ${currentIteration.id}` : undefined}
-380: 							>
-381: 								Iterations: <strong>{iterations.length}</strong>
-382: 								{currentIteration && <span style={{ marginLeft: '4px', color: '#1890ff' }}>(#{currentIteration.number})</span>}
-383: 							</span>
-384: 						</>
-385: 					) : (
-386: 						'No project loaded'
-387: 					)}
-388: 				</div>
-389: 				<div style={{ fontSize: '12px', color: '#888' }}>
-390: 					{isProcessing ? (
-391: 						<span style={{ color: '#1890ff' }}>
-392: 							<Spin size="small" style={{ marginRight: '8px' }} />
-393: 							{currentAgent ? `${currentAgent} is working...` : 'Processing...'}
-394: 						</span>
-395: 					) : (
-396: 						<span style={{ color: '#52c41a' }}>
-397: 							<CheckCircleOutlined style={{ marginRight: '4px' }} />
-398: 							Ready
-399: 						</span>
-400: 					)}
-401: 				</div>
-402: 			</Footer>
-403: 
-404: 			<CommandPalette
-405: 				visible={commandPaletteVisible}
-406: 				onClose={() => setCommandPaletteVisible(false)}
-407: 				onCommandSelect={handleCommandSelect}
-408: 			/>
-409: 		</Layout>
-410: 	);
-411: }
-412: 
-413: export default App;
-```
-
 ### crates/cowork-gui/src/assets.d.ts (24 lines)
 
 ```
@@ -21556,43 +22187,49 @@ LICENSE
 24: }
 ```
 
-### crates/cowork-gui/src/components/ArtifactsViewer.tsx (34 lines)
+### crates/cowork-gui/src/components/CodeEditor.tsx (40 lines)
 
 ```
-1: ArtifactsData
+1: FileTreeNode
 2: ⋮----
 3: {
-4:   iteration_id?: string;
-5:   idea?: string;
-6:   requirements?: string;
-7:   design?: unknown;
-8:   design_raw?: string;
-9:   plan?: unknown;
-10:   plan_raw?: string;
-11:   code_files?: FileInfo[];
-12:   check_report?: string;
-13:   delivery_report?: string;
-14: }
-15: ⋮----
-16: FileInfo
-17: ⋮----
-18: {
-19:   path: string;
-20:   name: string;
-21:   size: number;
-22:   is_dir: boolean;
-23:   language?: string;
-24:   modified_at?: string;
-25: }
-26: ⋮----
-27: ArtifactsViewerProps
-28: ⋮----
-29: {
-30:   iterationId: string;
-31:   activeTab?: string;
-32:   onTabChange?: (key: string) => void;
-33:   refreshTrigger?: number;
-34: }
+4:   name: string;
+5:   path: string;
+6:   is_dir: boolean;
+7:   children?: FileTreeNode[];
+8:   is_expanded?: boolean;
+9:   language?: string;
+10: }
+11: ⋮----
+12: FlatFileTreeNode
+13: ⋮----
+14: {
+15:   depth: number;
+16:   key: string;
+17: }
+18: ⋮----
+19: FileReadResult
+20: ⋮----
+21: {
+22:   content: string;
+23:   is_partial: boolean;
+24:   offset: number;
+25:   total_size: number;
+26: }
+27: ⋮----
+28: FormatResult
+29: ⋮----
+30: {
+31:   success: boolean;
+32:   formatted_files: string[];
+33: }
+34: ⋮----
+35: CodeEditorProps
+36: ⋮----
+37: {
+38:   iterationId: string;
+39:   refreshTrigger?: number;
+40: }
 ```
 
 ### crates/cowork-gui/src/components/IterationsPanel.tsx (7 lines)
@@ -21607,1127 +22244,349 @@ LICENSE
 7: }
 ```
 
-### crates/cowork-gui/src/components/MemoryPanel.tsx (48 lines)
+### crates/cowork-gui/src/components/KnowledgePanel.tsx (41 lines)
 
 ```
-1: Memory
+1: Knowledge
 2: ⋮----
 3: {
-4:   id: string;
+4:   iteration_id: string;
 5:   title: string;
-6:   summary: string;
-7:   category: string;
-8:   stage?: string;
-9:   created_at: string;
-10:   impact?: string;
-11:   tags?: string[];
-12:   file?: string;
-13:   _ts?: number;
-14: }
-15: ⋮----
-16: MemoryDetail
-17: ⋮----
-18: {
-19:   content: string;
-20: }
+6:   idea_summary?: string;
+7:   design_summary?: string;
+8:   plan_summary?: string;
+9:   code_structure?: string;
+10:   created_at: string;
+11:   tech_stack?: string[];
+12:   key_decisions?: string[];
+13:   key_patterns?: string[];
+14:   known_issues?: string[];
+15: }
+16: ⋮----
+17: KnowledgeListResult
+18: ⋮----
+19: {
+20:   knowledge_list: Knowledge[];
+21: }
+22: ⋮----
+23: IterationInfo
+24: ⋮----
+25: {
+26:   id: string;
+27:   number: number;
+28:   title: string;
+29:   description: string;
+30:   status: string;
+31:   current_stage: string | null;
+32:   created_at: string;
+33: }
+34: ⋮----
+35: KnowledgePanelProps
+36: ⋮----
+37: {
+38:   currentSession?: string;
+39:   currentIterationId?: string | null;
+40:   refreshTrigger?: number;
+41: }
+```
+
+### crates/cowork-gui/src/components/RunnerPanel.tsx (36 lines)
+
+```
+1: LogEntry
+2: ⋮----
+3: {
+4:   type: string;
+5:   content: string;
+6:   timestamp: Date;
+7: }
+8: ⋮----
+9: ProjectRuntimeInfo
+10: ⋮----
+11: {
+12:   has_frontend: boolean;
+13:   has_backend: boolean;
+14:   preview_url?: string;
+15:   frontend_port?: number;
+16:   backend_port?: number;
+17:   start_command?: string;
+18: }
+19: ⋮----
+20: RunResult
 21: ⋮----
-22: MemoryQueryResult
-23: ⋮----
-24: {
-25:   results: Memory[];
-26:   total: number;
-27: }
-28: ⋮----
-29: MemoryPanelProps
-30: ⋮----
-31: {
-32:   currentSession?: string;
-33:   refreshTrigger?: number;
-34: }
-35: ⋮----
-36: getCategoryColor
-37: ⋮----
-38: (memory.category)
-39: ⋮----
-40: getCategoryColor
-41: ⋮----
-42: (
-43:                             selectedMemory?.category || "",
-44:                           )
-45: ⋮----
-46: getImpactColor
-47: ⋮----
-48: (selectedMemory.impact)
+22: {
+23:   process_id?: number;
+24:   frontend_pid?: number;
+25:   backend_pid?: number;
+26:   frontend_url?: string;
+27:   backend_url?: string;
+28:   command?: string;
+29:   is_fullstack?: boolean;
+30: }
+31: ⋮----
+32: RunnerPanelProps
+33: ⋮----
+34: {
+35:   iterationId: string;
+36: }
 ```
 
-### crates/cowork-gui/src/components/ProjectsPanel.tsx (348 lines)
+### crates/cowork-gui/src/components/config/FlowConfigPanel.tsx (3 lines)
 
 ```
-1: import { useState } from "react";
-2: import { invoke } from "@tauri-apps/api/core";
-3: import {
-4:   App,
-5:   Card,
-6:   Button,
-7:   Modal,
-8:   Tag,
-9:   Empty,
-10:   Spin,
-11:   Tooltip,
-12:   Space,
-13: } from "antd";
-14: import {
-15:   FolderOpenOutlined,
-16:   DeleteOutlined,
-17:   EditOutlined,
-18:   CheckCircleOutlined,
-19:   ClockCircleOutlined,
-20:   PlusOutlined,
-21:   ImportOutlined,
-22: } from "@ant-design/icons";
-23: 
-24: import { useProjectsData } from '../hooks';
-25: import { CreateProjectModal, EditProjectModal, ImportProjectModal } from './projects';
-26: import type { ProjectData } from '../types';
-27: 
-28: const ProjectsPanel: React.FC = () => {
-29:   const { message } = App.useApp();
-30:   const { projects, loading, loadProjects } = useProjectsData();
-31: 
-32:   
-33:   const [showCreateModal, setShowCreateModal] = useState(false);
-34:   const [showEditModal, setShowEditModal] = useState(false);
-35:   const [showImportModal, setShowImportModal] = useState(false);
-36:   const [selectedProject, setSelectedProject] = useState<ProjectData | null>(null);
-37: 
-38:   
-39:   const handleDeleteProject = async (project: ProjectData) => {
-40:     Modal.confirm({
-41:       title: "Delete Project",
-42:       content: `Remove "${project.name}" from project list? The project files will remain on disk.`,
-43:       okText: "Delete",
-44:       okType: "danger",
-45:       onOk: async () => {
-46:         try {
-47:           await invoke("delete_project", { projectId: project.project_id });
-48:           message.success("Project removed from list");
-49:           loadProjects();
-50:         } catch (error) {
-51:           message.error("Failed to delete project: " + error);
-52:         }
-53:       },
-54:     });
-55:   };
-56: 
-57:   const handleOpenProject = async (projectId: string) => {
-58:     try {
-59:       const hasProject = await invoke<boolean>("has_open_project");
-60: 
-61:       if (hasProject) {
-62:         await invoke("open_project", { projectId });
-63:         message.info("Opening project in new window...");
-64:       } else {
-65:         await invoke("open_project_in_current_window", { projectId });
-66:         message.success("Project opened successfully");
-67:       }
-68:     } catch (error) {
-69:       message.error("Failed to open project: " + error);
-70:     }
-71:   };
-72: 
-73:   const handleOpenEditModal = (project: ProjectData) => {
-74:     setSelectedProject(project);
-75:     setShowEditModal(true);
-76:   };
-77: 
-78:   const handleProjectCreated = async (projectId: string, projectName: string) => {
-79:     loadProjects();
-80: 
-81:     
-82:     Modal.confirm({
-83:       title: "Open Project?",
-84:       content: `Would you like to open "${projectName}" now?`,
-85:       okText: "Open Project",
-86:       cancelText: "Later",
-87:       onOk: async () => {
-88:         try {
-89:           const hasProject = await invoke<boolean>("has_open_project");
-90:           if (hasProject) {
-91:             await invoke("open_project", { projectId });
-92:             message.info("Opening project in new window...");
-93:           } else {
-94:             await invoke("open_project_in_current_window", { projectId });
-95:             message.success("Project opened successfully");
-96:           }
-97:         } catch (error) {
-98:           message.error("Failed to open project: " + error);
-99:         }
-100:       },
-101:     });
-102:   };
-103: 
-104:   const handleProjectImported = async (projectId: string, projectName: string) => {
-105:     loadProjects();
-106:     message.success(`Project "${projectName}" imported successfully!`);
-107: 
-108:     
-109:     Modal.confirm({
-110:       title: "Open Project?",
-111:       content: `Would you like to open "${projectName}" now?`,
-112:       okText: "Open Project",
-113:       cancelText: "Later",
-114:       onOk: async () => {
-115:         try {
-116:           const hasProject = await invoke<boolean>("has_open_project");
-117:           if (hasProject) {
-118:             await invoke("open_project", { projectId });
-119:             message.info("Opening project in new window...");
-120:           } else {
-121:             await invoke("open_project_in_current_window", { projectId });
-122:             message.success("Project opened successfully");
-123:           }
-124:         } catch (error) {
-125:           message.error("Failed to open project: " + error);
-126:         }
-127:       },
-128:     });
-129:   };
-130: 
-131:   
-132:   const formatDate = (dateString?: string): string => {
-133:     if (!dateString) return "Never";
-134:     const date = new Date(dateString);
-135:     return date.toLocaleDateString("en-US", {
-136:       year: "numeric",
-137:       month: "short",
-138:       day: "numeric",
-139:       hour: "2-digit",
-140:       minute: "2-digit",
-141:     });
-142:   };
-143: 
-144:   const getDisplayPath = (fullPath?: string): string => {
-145:     if (!fullPath) return "No path";
-146:     const parts = fullPath.split(/[/\\]/);
-147:     if (parts.length >= 2) {
-148:       return ".../" + parts.slice(-2).join("/");
-149:     }
-150:     return fullPath;
-151:   };
-152: 
-153:   const getStatusColor = (status: string): "green" | "default" | "red" => {
-154:     switch (status) {
-155:       case "active":
-156:         return "green";
-157:       case "archived":
-158:         return "default";
-159:       case "deleted":
-160:         return "red";
-161:       default:
-162:         return "default";
-163:     }
-164:   };
-165: 
-166:   
-167:   if (loading) {
-168:     return (
-169:       <div style={{ textAlign: "center", padding: "60px 0" }}>
-170:         <Spin size="large" />
-171:         <div style={{ marginTop: "16px", color: "#999" }}>Loading projects...</div>
-172:       </div>
-173:     );
-174:   }
-175: 
-176:   return (
-177:     <div style={{ padding: "24px" }}>
-178:       {}
-179:       <div
-180:         style={{
-181:           marginBottom: "24px",
-182:           display: "flex",
-183:           justifyContent: "space-between",
-184:           alignItems: "center",
-185:         }}
-186:       >
-187:         <h2 style={{ margin: 0 }}>Projects</h2>
-188:         <Space>
-189:           <Button icon={<ImportOutlined />} onClick={() => setShowImportModal(true)}>
-190:             Import Project
-191:           </Button>
-192:           <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>
-193:             New Project
-194:           </Button>
-195:         </Space>
-196:       </div>
-197: 
-198:       {}
-199:       {projects.length === 0 ? (
-200:         <Empty description="No projects yet" image={Empty.PRESENTED_IMAGE_SIMPLE}>
-201:           <Space direction="vertical">
-202:             <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>
-203:               Create Your First Project
-204:             </Button>
-205:             <Button icon={<ImportOutlined />} onClick={() => setShowImportModal(true)}>
-206:               Import Existing Project
-207:             </Button>
-208:           </Space>
-209:         </Empty>
-210:       ) : (
-211:         <div
-212:           style={{
-213:             display: "grid",
-214:             gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))",
-215:             gap: "20px",
-216:           }}
-217:         >
-218:           {projects.map((project) => (
-219:             <Card
-220:               key={project.project_id}
-221:               hoverable
-222:               actions={[
-223:                 <Button
-224:                   type="link"
-225:                   icon={<FolderOpenOutlined />}
-226:                   onClick={() => handleOpenProject(project.project_id || project.projectId || "")}
-227:                   style={{ color: "#1890ff", width: "90%" }}
-228:                 >
-229:                   Open
-230:                 </Button>,
-231:                 <Button
-232:                   type="link"
-233:                   icon={<EditOutlined />}
-234:                   style={{ color: "#1890ff", width: "90%" }}
-235:                   onClick={() => handleOpenEditModal(project)}
-236:                 >
-237:                   Edit
-238:                 </Button>,
-239:                 <Button
-240:                   type="link"
-241:                   danger
-242:                   icon={<DeleteOutlined />}
-243:                   style={{ width: "90%" }}
-244:                   onClick={() => handleDeleteProject(project)}
-245:                 >
-246:                   Delete
-247:                 </Button>,
-248:               ]}
-249:             >
-250:               <Card.Meta
-251:                 title={
-252:                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-253:                     <span>{project.name}</span>
-254:                     <Tag color={getStatusColor(project.status)} style={{ margin: 0 }}>
-255:                       {project.status}
-256:                     </Tag>
-257:                   </div>
-258:                 }
-259:                 description={
-260:                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-261:                     <Tooltip title={project.description || "No description provided"}>
-262:                       <div
-263:                         style={{
-264:                           color: "#666",
-265:                           fontSize: "14px",
-266:                           whiteSpace: "nowrap",
-267:                           overflow: "hidden",
-268:                           textOverflow: "ellipsis",
-269:                           cursor: "help",
-270:                         }}
-271:                       >
-272:                         {project.description || "No description provided"}
-273:                       </div>
-274:                     </Tooltip>
-275:                     <div style={{ fontSize: "12px", color: "#999", minWidth: 0 }}>
-276:                       <Tooltip title={project.workspace_path || project.workspacePath || "No path"}>
-277:                         <span
-278:                           style={{
-279:                             display: "flex",
-280:                             alignItems: "center",
-281:                             maxWidth: "100%",
-282:                             overflow: "hidden",
-283:                             textOverflow: "ellipsis",
-284:                             whiteSpace: "nowrap",
-285:                           }}
-286:                         >
-287:                           <FolderOpenOutlined style={{ marginRight: "4px", flexShrink: 0 }} />
-288:                           {getDisplayPath(project.workspace_path || project.workspacePath)}
-289:                         </span>
-290:                       </Tooltip>
-291:                     </div>
-292:                     <div style={{ display: "flex", gap: "16px", fontSize: "12px", color: "#999" }}>
-293:                       <span>
-294:                         <CheckCircleOutlined style={{ marginRight: "4px" }} />
-295:                         {project.metadata?.session_count || 0} sessions
-296:                       </span>
-297:                       <span>
-298:                         <ClockCircleOutlined style={{ marginRight: "4px" }} />
-299:                         Last opened: {formatDate(project.last_opened_at)}
-300:                       </span>
-301:                     </div>
-302:                     {project.metadata?.technology_stack?.length > 0 && (
-303:                       <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-304:                         {project.metadata.technology_stack.slice(0, 4).map((tech, idx) => (
-305:                           <Tag key={idx} color="blue">
-306:                             {tech}
-307:                           </Tag>
-308:                         ))}
-309:                         {project.metadata.technology_stack.length > 4 && (
-310:                           <Tag color="default">+{project.metadata.technology_stack.length - 4}</Tag>
-311:                         )}
-312:                       </div>
-313:                     )}
-314:                   </div>
-315:                 }
-316:               />
-317:             </Card>
-318:           ))}
-319:         </div>
-320:       )}
-321: 
-322:       {}
-323:       <CreateProjectModal
-324:         open={showCreateModal}
-325:         onClose={() => setShowCreateModal(false)}
-326:         onSuccess={handleProjectCreated}
-327:       />
-328: 
-329:       <EditProjectModal
-330:         open={showEditModal}
-331:         onClose={() => {
-332:           setShowEditModal(false);
-333:           setSelectedProject(null);
-334:         }}
-335:         onSuccess={loadProjects}
-336:         project={selectedProject}
-337:       />
-338: 
-339:       <ImportProjectModal
-340:         open={showImportModal}
-341:         onClose={() => setShowImportModal(false)}
-342:         onSuccess={handleProjectImported}
-343:       />
-344:     </div>
-345:   );
-346: };
-347: 
-348: export default ProjectsPanel;
+1: getStageTypeColor
+2: ⋮----
+3: (stage.stage_id)
 ```
 
-### crates/cowork-gui/src/components/config/AgentConfigForm.tsx (712 lines)
+### crates/cowork-gui/src/components/config/IntegrationConfig.tsx (3 lines)
 
 ```
-1: import React, { useState, useEffect } from 'react';
+1: getTypeColor
+2: ⋮----
+3: (integration.integration_type)
+```
+
+### crates/cowork-gui/src/components/config/SkillManager.tsx (237 lines)
+
+```
+1: import React, { useState } from "react";
 2: import {
-3:   Card,
-4:   List,
-5:   Button,
-6:   Space,
-7:   Typography,
-8:   Tag,
-9:   Modal,
-10:   Form,
-11:   Input,
-12:   Select,
-13:   Switch,
-14:   Slider,
-15:   message,
-16:   Popconfirm,
-17:   Empty,
-18:   Drawer,
-19:   Descriptions,
-20:   Divider,
-21:   Tabs,
-22:   InputNumber,
-23:   Alert,
-24:   Tooltip,
-25: } from 'antd';
-26: import {
-27:   PlusOutlined,
-28:   EditOutlined,
-29:   DeleteOutlined,
-30:   ExportOutlined,
-31:   ImportOutlined,
-32:   RobotOutlined,
-33:   ToolOutlined,
-34:   CodeOutlined,
-35:   SettingOutlined,
-36:   InfoCircleOutlined,
-37:   FolderOpenOutlined,
-38: } from '@ant-design/icons';
-39: import { useConfigStore } from '../../stores/configStore';
-40: import type { AgentDefinition, ToolReference, AgentType, ModelConfig, BuiltinInstruction, InstructionType, ToolInfo } from '../../types/config';
-41: import { open } from '@tauri-apps/plugin-dialog';
-42: 
-43: const { Title, Text, Paragraph } = Typography;
-44: const { TextArea } = Input;
-45: 
-46: const AgentConfigForm: React.FC = () => {
-47:   const {
-48:     agents,
-49:     skills,
-50:     selectedAgent,
-51:     selectAgent,
-52:     saveAgent,
-53:     deleteAgent,
-54:     validateAgent,
-55:     exportConfig,
-56:     importConfig,
-57:     getBuiltinInstructions,
-58:     availableTools,
-59:     loadAvailableTools,
-60:     getToolsByCategory,
-61:   } = useConfigStore();
-62: 
-63:   const [editModalVisible, setEditModalVisible] = useState(false);
-64:   const [editingAgent, setEditingAgent] = useState<AgentDefinition | null>(null);
-65:   const [detailDrawerVisible, setDetailDrawerVisible] = useState(false);
-66:   const [importModalVisible, setImportModalVisible] = useState(false);
-67:   const [importJson, setImportJson] = useState('');
-68:   const [form] = Form.useForm();
-69:   
-70:   
-71:   const [builtinInstructions, setBuiltinInstructions] = useState<BuiltinInstruction[]>([]);
-72:   const [instructionType, setInstructionType] = useState<InstructionType>('builtin');
-73:   const [selectedBuiltinId, setSelectedBuiltinId] = useState<string>('');
-74:   const [instructionFilePath, setInstructionFilePath] = useState<string>('');
-75:   const [instructionInlineContent, setInstructionInlineContent] = useState<string>('');
-76:   
-77:   
-78:   useEffect(() => {
-79:     getBuiltinInstructions().then(setBuiltinInstructions);
-80:     loadAvailableTools();  
-81:   }, [getBuiltinInstructions, loadAvailableTools]);
-82: 
-83:   const handleCreate = () => {
-84:     setEditingAgent(null);
-85:     form.resetFields();
-86:     form.setFieldsValue({
-87:       id: `agent-${Date.now()}`,
-88:       name: '',
-89:       description: '',
-90:       agent_type: 'simple',
-91:       instruction: '',
-92:       tools: [],
-93:       skills: [],
-94:       model: {},
-95:       include_contents: 'none',
-96:       tags: [],
-97:     });
-98:     
-99:     setInstructionType('builtin');
-100:     setSelectedBuiltinId('');
-101:     setInstructionFilePath('');
-102:     setInstructionInlineContent('');
-103:     setEditModalVisible(true);
-104:   };
-105: 
-106:   
-107:   const parseInstruction = (instruction: string): { type: InstructionType; builtinId: string; filePath: string; content: string } => {
-108:     if (instruction.startsWith('builtin://')) {
-109:       return {
-110:         type: 'builtin',
-111:         builtinId: instruction.substring('builtin://'.length),
-112:         filePath: '',
-113:         content: '',
-114:       };
-115:     } else if (instruction.startsWith('file://')) {
-116:       return {
-117:         type: 'file',
-118:         builtinId: '',
-119:         filePath: instruction.substring('file://'.length),
-120:         content: '',
-121:       };
-122:     } else if (instruction.startsWith('inline://')) {
-123:       return {
-124:         type: 'inline',
-125:         builtinId: '',
-126:         filePath: '',
-127:         content: instruction.substring('inline://'.length),
-128:       };
-129:     } else {
-130:       
-131:       
-132:       const matchingBuiltin = builtinInstructions.find(bi => bi.id === instruction);
-133:       if (matchingBuiltin) {
-134:         return {
-135:           type: 'builtin',
-136:           builtinId: instruction,
-137:           filePath: '',
-138:           content: '',
-139:         };
-140:       }
-141:       
-142:       return {
-143:         type: 'inline',
-144:         builtinId: '',
-145:         filePath: '',
-146:         content: instruction,
-147:       };
-148:     }
-149:   };
-150: 
-151:   const handleEdit = (agent: AgentDefinition) => {
-152:     setEditingAgent(agent);
-153:     
-154:     const toolIds = agent.tools.map(t => t.tool_id);
-155:     form.setFieldsValue({
-156:       ...agent,
-157:       agent_type: typeof agent.agent_type === 'string' ? agent.agent_type : 'loop',
-158:       tools: toolIds,
-159:     });
-160:     
-161:     
-162:     const parsed = parseInstruction(agent.instruction);
-163:     setInstructionType(parsed.type);
-164:     setSelectedBuiltinId(parsed.builtinId);
-165:     setInstructionFilePath(parsed.filePath);
-166:     
-167:     
-168:     if (parsed.type === 'inline' && parsed.content) {
-169:       setInstructionInlineContent(parsed.content);
-170:     } else if (parsed.type === 'builtin' && parsed.builtinId) {
-171:       const builtin = builtinInstructions.find(bi => bi.id === parsed.builtinId);
-172:       setInstructionInlineContent(builtin?.content || '');
-173:     } else {
-174:       setInstructionInlineContent(parsed.content);
-175:     }
-176:     
-177:     setEditModalVisible(true);
-178:     selectAgent(agent.id);
-179:   };
-180: 
-181:   const handleView = (agent: AgentDefinition) => {
-182:     selectAgent(agent.id);
-183:     setDetailDrawerVisible(true);
-184:   };
-185: 
-186:   const handleDelete = async (id: string) => {
-187:     try {
-188:       await deleteAgent(id);
-189:       message.success('Agent deleted successfully');
-190:     } catch (error) {
-191:       message.error('Failed to delete agent');
-192:     }
-193:   };
-194: 
-195:   const handleSave = async () => {
-196:     try {
-197:       const values = await form.validateFields();
-198:       
-199:       
-200:       const tools: ToolReference[] = (values.tools || []).map((toolId: string) => ({
-201:         tool_id: toolId,
-202:       }));
-203:       
-204:       
-205:       let instruction = '';
-206:       switch (instructionType) {
-207:         case 'builtin':
-208:           instruction = `builtin:
-209:           beak;
-210:         case 'file':
-211:           instruction = `file:
-212:           beak;
-213:         case 'inline':
-214:           instruction = `inline:
-215:           beak;
-216:       }
-217:       
-218:       const agent: AgentDefinition = {
-219:         ...editingAgent,
-220:         ...values,
-221:         instruction,
-222:         tools,
-223:         metadata: {},
-224:       };
-225: 
-226:       const validation = await validateAgent(agent);
-227:       if (!validation.valid) {
-228:         const errors = validation.issues.map(i => i.message).join(', ');
-229:         message.error(`Validation failed: ${errors}`);
-230:         return;
-231:       }
-232: 
-233:       await saveAgent(agent);
-234:       message.success('Agent saved successfully');
-235:       setEditModalVisible(false);
-236:     } catch (error) {
-237:       message.error('Failed to save agent');
-238:     }
-239:   };
-240: 
-241:   const handleExport = async (id: string) => {
-242:     try {
-243:       const json = await exportConfig('agent', id);
-244:       navigator.clipboard.writeText(json);
-245:       message.success('Agent exported to clipboard');
-246:     } catch (error) {
-247:       message.error('Failed to export agent');
-248:     }
-249:   };
-250: 
-251:   const handleImport = async () => {
-252:     try {
-253:       await importConfig('agent', importJson);
-254:       message.success('Agent imported successfully');
-255:       setImportModalVisible(false);
-256:       setImportJson('');
-257:     } catch (error) {
-258:       message.error('Failed to import agent');
-259:     }
-260:   };
-261: 
-262:   const selectedAgentData = selectedAgent ? agents[selectedAgent] : null;
-263: 
-264:   const getAgentTypeTag = (type: AgentType) => {
-265:     if (typeof type === 'string') {
-266:       return <Tag color="blue">{type}</Tag>;
-267:     }
-268:     return <Tag color="purple">loop ({(type as { loop: { max_iterations?: number } }).loop?.max_iterations || 'unlimited'})</Tag>;
-269:   };
-270: 
-271:   
-272:   const handleSelectInstructionFile = async () => {
-273:     try {
-274:       const selected = await open({
-275:         multiple: false,
-276:         filters: [{ name: 'Markdown', extensions: ['md', 'txt'] }],
-277:       });
-278:       if (selected && typeof selected === 'string') {
-279:         setInstructionFilePath(selected);
-280:       }
-281:     } catch (error) {
-282:       console.error('Failed to select file:', error);
-283:     }
-284:   };
-285: 
-286:   
-287:   const handleBuiltinChange = (builtinId: string) => {
-288:     setSelectedBuiltinId(builtinId);
-289:     const builtin = builtinInstructions.find(bi => bi.id === builtinId);
-290:     if (builtin) {
-291:       setInstructionInlineContent(builtin.content);
-292:     }
-293:   };
-294: 
-295:   
-296:   const handleInstructionTypeChange = (type: InstructionType) => {
-297:     setInstructionType(type);
-298:     
-299:     if (type === 'inline' && selectedBuiltinId) {
-300:       const builtin = builtinInstructions.find(bi => bi.id === selectedBuiltinId);
-301:       if (builtin) {
-302:         setInstructionInlineContent(builtin.content);
-303:       }
-304:     }
-305:   };
-306: 
-307:   const availableSkills = Object.keys(skills);
-308: 
-309:   return (
-310:     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-311:       <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-312:         <Title level={5} style={{ margin: 0 }}>Agent Definitions</Title>
-313:         <Space>
-314:           <Button icon={<ImportOutlined />} onClick={() => setImportModalVisible(true)}>
-315:             Import
-316:           </Button>
-317:           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-318:             New Agent
-319:           </Button>
-320:         </Space>
-321:       </div>
-322: 
-323:       {Object.keys(agents).length === 0 ? (
-324:         <Empty description="No agents defined" style={{ marginTop: '40px' }} />
-325:       ) : (
-326:         <List
-327:           style={{ flex: 1, overflow: 'auto', padding: '0 16px' }}
-328:           dataSource={Object.values(agents).sort((a, b) => a.name.localeCompare(b.name))}
-329:           renderItem={(agent) => (
-330:             <List.Item
-331:               actions={[
-332:                 <Button
-333:                   key="view"
-334:                   type="link"
-335:                   size="small"
-336:                   icon={<RobotOutlined />}
-337:                   onClick={() => handleView(agent)}
-338:                 >
-339:                   View
-340:                 </Button>,
-341:                 <Button
-342:                   key="edit"
-343:                   type="link"
-344:                   size="small"
-345:                   icon={<EditOutlined />}
-346:                   onClick={() => handleEdit(agent)}
-347:                 >
-348:                   Edit
-349:                 </Button>,
-350:                 <Button
-351:                   key="export"
-352:                   type="link"
-353:                   size="small"
-354:                   icon={<ExportOutlined />}
-355:                   onClick={() => handleExport(agent.id)}
-356:                 >
-357:                   Export
-358:                 </Button>,
-359:                 <Popconfirm
-360:                   key="delete"
-361:                   title="Delete this agent?"
-362:                   onConfirm={() => handleDelete(agent.id)}
-363:                 >
-364:                   <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-365:                     Delete
-366:                   </Button>
-367:                 </Popconfirm>,
-368:               ]}
-369:             >
-370:               <List.Item.Meta
-371:                 title={
-372:                   <Space>
-373:                     {agent.name}
-374:                     {agent.version && <Tag>{agent.version}</Tag>}
-375:                     {getAgentTypeTag(agent.agent_type)}
-376:                   </Space>
-377:                 }
-378:                 description={
-379:                   <Space direction="vertical" size="small">
-380:                     <Text type="secondary">{agent.description || 'No description'}</Text>
-381:                     <Space size={4}>
-382:                       {agent.tools.slice(0, 5).map((t, i) => (
-383:                         <Tag key={i} color="blue" style={{ fontSize: '11px' }}>{t.tool_id}</Tag>
-384:                       ))}
-385:                       {agent.tools.length > 5 && <Tag>+{agent.tools.length - 5}</Tag>}
-386:                     </Space>
-387:                   </Space>
-388:                 }
-389:               />
-390:             </List.Item>
-391:           )}
-392:         />
-393:       )}
-394: 
-395:       {}
-396:       <Modal
-397:         title={editingAgent ? 'Edit Agent' : 'Create Agent'}
-398:         open={editModalVisible}
-399:         onCancel={() => setEditModalVisible(false)}
-400:         onOk={handleSave}
-401:         width={800}
-402:         okText="Save"
-403:       >
-404:         <Form form={form} layout="vertical">
-405:           <Tabs
-406:             items={[
-407:               {
-408:                 key: 'basic',
-409:                 label: 'Basic',
-410:                 children: (
-411:                   <>
-412:                     <Form.Item name="id" label="ID" rules={[{ required: true }]}>
-413:                       <Input disabled={!!editingAgent} />
-414:                     </Form.Item>
-415:                     <Form.Item name="name" label="Name" rules={[{ required: true }]}>
-416:                       <Input />
-417:                     </Form.Item>
-418:                     <Form.Item name="description" label="Description">
-419:                       <TextArea rows={2} />
-420:                     </Form.Item>
-421:                     <Form.Item name="version" label="Version">
-422:                       <Input placeholder="e.g., 1.0.0" />
-423:                     </Form.Item>
-424:                     <Form.Item name="agent_type" label="Agent Type">
-425:                       <Select>
-426:                         <Select.Option value="simple">Simple (Single Execution)</Select.Option>
-427:                         <Select.Option value="loop">Loop (Actor-Critic)</Select.Option>
-428:                       </Select>
-429:                     </Form.Item>
-430:                   </>
-431:                 ),
-432:               },
-433:               {
-434:                 key: 'instruction',
-435:                 label: 'Instruction',
-436:                 children: (
-437:                   <div style={{ maxWidth: 700 }}>
-438:                     <Form.Item label="Instruction Type">
-439:                       <Select 
-440:                         value={instructionType} 
-441:                         onChange={handleInstructionTypeChange}
-442:                         style={{ width: '100%' }}
-443:                       >
-444:                         <Select.Option value="builtin">
-445:                           <Space>
-446:                             <Tag color="blue">Built-in</Tag>
-447:                             <span>Use a predefined instruction template</span>
-448:                           </Space>
-449:                         </Select.Option>
-450:                         <Select.Option value="file">
-451:                           <Space>
-452:                             <Tag color="green">File</Tag>
-453:                             <span>Load instruction from a file</span>
-454:                           </Space>
-455:                         </Select.Option>
-456:                         <Select.Option value="inline">
-457:                           <Space>
-458:                             <Tag color="purple">Inline</Tag>
-459:                             <span>Write custom instruction content</span>
-460:                           </Space>
-461:                         </Select.Option>
-462:                       </Select>
-463:                     </Form.Item>
-464:                     
-465:                     {instructionType === 'builtin' && (
-466:                       <>
-467:                         <Form.Item 
-468:                           label="Built-in Instruction"
-469:                           required
-470:                           validateStatus={!selectedBuiltinId && 'error'}
-471:                           help={!selectedBuiltinId && 'Please select a built-in instruction'}
-472:                         >
-473:                           <Select
-474:                             value={selectedBuiltinId || undefined}
-475:                             onChange={handleBuiltinChange}
-476:                             placeholder="Select a built-in instruction..."
-477:                             showSearch
-478:                             optionFilterProp="label"
-479:                             style={{ width: '100%' }}
-480:                             listHeight={300}
-481:                           >
-482:                             {(builtinInstructions || []).map(bi => (
-483:                               <Select.Option 
-484:                                 key={bi.id} 
-485:                                 value={bi.id}
-486:                                 label={bi.name}
-487:                               >
-488:                                 <div style={{ padding: '4px 0' }}>
-489:                                   <Text strong>{bi.name}</Text>
-490:                                   <b />
-491:                                   <Text type="secondary" style={{ fontSize: 12 }}>
-492:                                     {bi.description}
-493:                                   </Text>
-494:                                 </div>
-495:                               </Select.Option>
-496:                             ))}
-497:                           </Select>
-498:                         </Form.Item>
-499:                         
-500:                         {selectedBuiltinId && (
-501:                           <div style={{ marginBottom: 16 }}>
-502:                             <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>
-503:                               Instruction Preview:
-504:                             </Text>
-505:                             <div
-506:                               style={{
-507:                                 background: '#fafafa',
-508:                                 border: '1px solid #d9d9d9',
-509:                                 borderRadius: 6,
-510:                                 padding: 12,
-511:                                 maxHeight: 200,
-512:                                 overflow: 'auto',
-513:                                 fontSize: 12,
-514:                                 whiteSpace: 'pre-wrap',
-515:                                 fontFamily: 'monospace',
-516:                               }}
-517:                             >
-518:                               {(builtinInstructions || []).find(bi => bi.id === selectedBuiltinId)?.content || ''}
-519:                             </div>
-520:                           </div>
-521:                         )}
-522:                       </>
-523:                     )}
-524:                     
-525:                     {instructionType === 'file' && (
-526:                       <>
-527:                         <Form.Item 
-528:                           label="Instruction File"
-529:                           required
-530:                           validateStatus={!instructionFilePath && 'error'}
-531:                           help={!instructionFilePath && 'Please select or enter a file path'}
-532:                         >
-533:                           <Space.Compact style={{ width: '100%' }}>
-534:                             <Input
-535:                               value={instructionFilePath}
-536:                               onChange={(e) => setInstructionFilePath(e.target.value)}
-537:                               placeholder="./prompts/my_instruction.md"
-538:                               style={{ flex: 1 }}
-539:                             />
-540:                             <Button 
-541:                               icon={<FolderOpenOutlined />} 
-542:                               onClick={handleSelectInstructionFile}
-543:                             >
-544:                               Browse
-545:                             </Button>
-546:                           </Space.Compact>
-547:                         </Form.Item>
-548:                         <Text type="secondary" style={{ fontSize: 12 }}>
-549:                           Select a markdown (.md) or text (.txt) file containing the instruction
-550:                         </Text>
-551:                       </>
-552:                     )}
-553:                     
-554:                     {instructionType === 'inline' && (
-555:                       <>
-556:                         <Form.Item 
-557:                           label="Instruction Content"
-558:                           required
-559:                           validateStatus={!instructionInlineContent?.trim() && 'error'}
-560:                           help={!instructionInlineContent?.trim() && 'Please enter instruction content'}
-561:                         >
-562:                           <TextArea
-563:                             rows={12}
-564:                             value={instructionInlineContent}
-565:                             onChange={(e) => setInstructionInlineContent(e.target.value)}
-566:                             placeholder="Enter your custom instruction here..."
-567:                             style={{ fontFamily: 'monospace' }}
-568:                           />
-569:                         </Form.Item>
-570:                         <Space>
-571:                           <Text type="secondary" style={{ fontSize: 12 }}>
-572:                             Tip: Select a built-in instruction first, then switch to Inline mode to customize it.
-573:                           </Text>
-574:                         </Space>
-575:                       </>
-576:                     )}
-577:                   </div>
-578:                 ),
-579:               },
-580:               {
-581:                 key: 'tools',
-582:                 label: 'Tools',
-583:                 children: (
-584:                   <>
-585:                     <Form.Item name="tools" label="Available Tools">
-586:                       <Select 
-587:                         mode="multiple" 
-588:                         placeholder="Select tools"
-589:                         optionFilterProp="label"
-590:                         showSearch
-591:                         listHeight={400}
-592:                       >
-593:                         {Object.entries(getToolsByCategory()).map(([category, tools]) => (
-594:                           <Select.OptGroup key={category} label={category}>
-595:                             {tools.map(tool => (
-596:                               <Select.Option 
-597:                                 key={tool.id} 
-598:                                 value={tool.id}
-599:                                 label={tool.name}
-600:                               >
-601:                                 <Tooltip title={tool.description}>
-602:                                   <span>{tool.name}</span>
-603:                                 </Tooltip>
-604:                               </Select.Option>
-605:                             ))}
-606:                           </Select.OptGroup>
-607:                         ))}
-608:                       </Select>
-609:                     </Form.Item>
-610:                     <Form.Item name="skills" label="Skills">
-611:                       <Select mode="multiple" placeholder="Select skills">
-612:                         {availableSkills.map(skill => (
-613:                           <Select.Option key={skill} value={skill}>{skill}</Select.Option>
-614:                         ))}
-615:                       </Select>
-616:                     </Form.Item>
-617:                   </>
-618:                 ),
-619:               },
-620:               {
-621:                 key: 'advanced',
-622:                 label: 'Advanced',
-623:                 children: (
-624:                   <>
-625:                     <Form.Item name="include_contents" label="Include Contents Mode">
-626:                       <Select>
-627:                         <Select.Option value="none">None</Select.Option>
-628:                         <Select.Option value="all">All</Select.Option>
-629:                         <Select.Option value="selected">Selected</Select.Option>
-630:                       </Select>
-631:                     </Form.Item>
-632:                     <Form.Item name="tags" label="Tags">
-633:                       <Select mode="tags" placeholder="Add tags" />
-634:                     </Form.Item>
-635:                   </>
-636:                 ),
-637:               },
-638:             ]}
-639:           />
-640:         </Form>
-641:       </Modal>
-642: 
-643:       {}
-644:       <Drawer
-645:         title={selectedAgentData?.name || 'Agent Details'}
-646:         placement="right"
-647:         width={500}
-648:         onClose={() => setDetailDrawerVisible(false)}
-649:         open={detailDrawerVisible}
-650:       >
-651:         {selectedAgentData && (
-652:           <Space direction="vertical" style={{ width: '100%' }} size="large">
-653:             <Descriptions column={1} bordered size="small">
-654:               <Descriptions.Item label="ID">{selectedAgentData.id}</Descriptions.Item>
-655:               <Descriptions.Item label="Version">{selectedAgentData.version || '-'}</Descriptions.Item>
-656:               <Descriptions.Item label="Type">
-657:                 {getAgentTypeTag(selectedAgentData.agent_type)}
-658:               </Descriptions.Item>
-659:               <Descriptions.Item label="Description">
-660:                 {selectedAgentData.description || '-'}
-661:               </Descriptions.Item>
-662:             </Descriptions>
-663: 
-664:             <Title level={5}>Tools ({selectedAgentData.tools?.length || 0})</Title>
-665:             <Space wrap>
-666:               {selectedAgentData.tools?.map((tool, i) => (
-667:                 <Tag key={i} color="blue">{tool.tool_id}</Tag>
-668:               ))}
-669:             </Space>
-670: 
-671:             {(selectedAgentData.skills?.length || 0) > 0 && (
-672:               <>
-673:                 <Title level={5}>Skills ({selectedAgentData.skills?.length || 0})</Title>
-674:                 <Space wrap>
-675:                   {selectedAgentData.skills?.map((skill, i) => (
-676:                     <Tag key={i} color="purple">{skill}</Tag>
-677:                   ))}
-678:                 </Space>
-679:               </>
-680:             )}
-681: 
-682:             <Title level={5}>Instruction</Title>
-683:             <Paragraph
-684:               ellipsis={{ rows: 5, expandable: true, symbol: 'more' }}
-685:               style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}
-686:             >
-687:               {selectedAgentData.instruction}
-688:             </Paragraph>
-689:           </Space>
-690:         )}
-691:       </Drawer>
-692: 
-693:       {}
-694:       <Modal
-695:         title="Import Agent"
-696:         open={importModalVisible}
-697:         onCancel={() => setImportModalVisible(false)}
-698:         onOk={handleImport}
-699:         okText="Import"
-700:       >
-701:         <TextArea
-702:           rows={10}
-703:           placeholder="Paste agent JSON here..."
-704:           value={importJson}
-705:           onChange={(e) => setImportJson(e.target.value)}
-706:         />
-707:       </Modal>
-708:     </div>
-709:   );
-710: };
-711: 
-712: export default AgentConfigForm;
+3:   List,
+4:   Button,
+5:   Space,
+6:   Typography,
+7:   Tag,
+8:   message,
+9:   Popconfirm,
+10:   Empty,
+11:   Drawer,
+12:   Descriptions,
+13:   Card,
+14:   Badge,
+15: } from "antd";
+16: import {
+17:   PlusOutlined,
+18:   DeleteOutlined,
+19:   ThunderboltOutlined,
+20:   FolderOpenOutlined,
+21:   InfoCircleOutlined,
+22:   TagOutlined,
+23: } from "@ant-design/icons";
+24: import { open } from "@tauri-apps/plugin-dialog";
+25: import { useConfigStore } from "../../stores/configStore";
+26: import type { SkillInfo } from "../../types/config";
+27: 
+28: const { Title, Text, Paragraph } = Typography;
+29: 
+30: const SkillManager: React.FC = () => {
+31:   const { skills, selectedSkill, selectSkill, installSkill, uninstallSkill } =
+32:     useConfigStore();
+33: 
+34:   const [detailDrawerVisible, setDetailDrawerVisible] = useState(false);
+35:   const [installing, setInstalling] = useState(false);
+36: 
+37:   const handleSelectFolder = async () => {
+38:     const selected = await open({
+39:       directory: true,
+40:       multiple: false,
+41:       title: "Select Skill Directory (contains Skill.md)",
+42:     });
+43: 
+44:     if (selected) {
+45:       await handleInstall(selected as string);
+46:     }
+47:   };
+48: 
+49:   const handleInstall = async (skillPath: string) => {
+50:     setInstalling(true);
+51:     try {
+52:       await installSkill(skillPath);
+53:       message.success("Skill installed successfully");
+54:     } catch (error) {
+55:       message.error("Failed to install skill");
+56:     } finally {
+57:       setInstalling(false);
+58:     }
+59:   };
+60: 
+61:   const handleView = (skill: SkillInfo) => {
+62:     selectSkill(skill.name);
+63:     setDetailDrawerVisible(true);
+64:   };
+65: 
+66:   const handleUninstall = async (name: string) => {
+67:     try {
+68:       await uninstallSkill(name);
+69:       message.success("Skill uninstalled successfully");
+70:     } catch (error) {
+71:       message.error("Failed to uninstall skill");
+72:     }
+73:   };
+74: 
+75:   const selectedSkillData = selectedSkill
+76:     ? skills.find((s) => s.name === selectedSkill)
+77:     : null;
+78: 
+79:   return (
+80:     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+81:       <div
+82:         style={{
+83:           padding: "16px",
+84:           display: "flex",
+85:           justifyContent: "space-between",
+86:           alignItems: "center",
+87:         }}
+88:       >
+89:         <Title level={5} style={{ margin: 0 }}>
+90:           Skill Manager
+91:           <Badge count={skills.length} style={{ marginLeft: 8 }} />
+92:         </Title>
+93:         <Button
+94:           type="primary"
+95:           icon={<PlusOutlined />}
+96:           onClick={handleSelectFolder}
+97:           loading={installing}
+98:         >
+99:           Install Skill
+100:         </Button>
+101:       </div>
+102: 
+103:       {skills.length === 0 ? (
+104:         <Empty
+105:           description={
+106:             <Space orientation="vertical" size="small">
+107:               <Text>No skills installed</Text>
+108:               <Text type="secondary">
+109:                 Install skills to extend agent capabilities
+110:               </Text>
+111:             </Space>
+112:           }
+113:           style={{ marginTop: "40px" }}
+114:         />
+115:       ) : (
+116:         <div style={{ flex: 1, overflow: "auto", padding: "0 16px" }}>
+117:           <Card size="small" style={{ marginBottom: 16 }}>
+118:             <List
+119:               dataSource={skills.sort((a, b) => a.name.localeCompare(b.name))}
+120:               renderItem={(skill) => (
+121:                 <List.Item
+122:                   actions={[
+123:                     <Button
+124:                       key="view"
+125:                       type="link"
+126:                       size="small"
+127:                       icon={<InfoCircleOutlined />}
+128:                       onClick={() => handleView(skill)}
+129:                     >
+130:                       Details
+131:                     </Button>,
+132:                     <Popconfirm
+133:                       key="uninstall"
+134:                       title="Uninstall this skill?"
+135:                       onConfirm={() => handleUninstall(skill.name)}
+136:                     >
+137:                       <Button
+138:                         type="link"
+139:                         size="small"
+140:                         danger
+141:                         icon={<DeleteOutlined />}
+142:                       >
+143:                         Uninstall
+144:                       </Button>
+145:                     </Popconfirm>,
+146:                   ]}
+147:                 >
+148:                   <List.Item.Meta
+149:                     avatar={
+150:                       <ThunderboltOutlined
+151:                         style={{ fontSize: 24, color: "#1890ff" }}
+152:                       />
+153:                     }
+154:                     title={
+155:                       <Space>
+156:                         <Text strong>{skill.name}</Text>
+157:                       </Space>
+158:                     }
+159:                     description={
+160:                       <Space orientation="vertical" size="small">
+161:                         <Text type="secondary">{skill.description}</Text>
+162:                         <Space size={4}>
+163:                           {skill.tags.slice(0, 3).map((tag, i) => (
+164:                             <Tag key={i} color="blue">
+165:                               {tag}
+166:                             </Tag>
+167:                           ))}
+168:                           {skill.tags.length > 3 && (
+169:                             <Tag>+{skill.tags.length - 3}</Tag>
+170:                           )}
+171:                         </Space>
+172:                       </Space>
+173:                     }
+174:                   />
+175:                 </List.Item>
+176:               )}
+177:             />
+178:           </Card>
+179:         </div>
+180:       )}
+181: 
+182:       {}
+183:       <Drawer
+184:         title={selectedSkillData?.name || "Skill Details"}
+185:         placement="right"
+186:         width={600}
+187:         onClose={() => setDetailDrawerVisible(false)}
+188:         open={detailDrawerVisible}
+189:       >
+190:         {selectedSkillData && (
+191:           <Space orientation="vertical" style={{ width: "100%" }} size="large">
+192:             <Descriptions column={1} bordered size="small">
+193:               <Descriptions.Item label="ID">
+194:                 {selectedSkillData.id}
+195:               </Descriptions.Item>
+196:               <Descriptions.Item label="Name">
+197:                 {selectedSkillData.name}
+198:               </Descriptions.Item>
+199:               <Descriptions.Item label="Description">
+200:                 {selectedSkillData.description}
+201:               </Descriptions.Item>
+202:             </Descriptions>
+203: 
+204:             <Title level={5}>
+205:               <TagOutlined style={{ marginRight: 8 }} />
+206:               Tags
+207:             </Title>
+208:             <Space wrap>
+209:               {selectedSkillData.tags.length > 0 ? (
+210:                 selectedSkillData.tags.map((tag, i) => (
+211:                   <Tag key={i} color="blue">
+212:                     {tag}
+213:                   </Tag>
+214:                 ))
+215:               ) : (
+216:                 <Text type="secondary">No tags</Text>
+217:               )}
+218:             </Space>
+219: 
+220:             <Title level={5}>Skill Instructions</Title>
+221:             {selectedSkillData.body ? (
+222:               <Card size="small" style={{ maxHeight: 400, overflow: "auto" }}>
+223:                 <Paragraph style={{ whiteSpace: "pre-wrap", marginBottom: 0 }}>
+224:                   {selectedSkillData.body}
+225:                 </Paragraph>
+226:               </Card>
+227:             ) : (
+228:               <Text type="secondary">No instructions defined</Text>
+229:             )}
+230:           </Space>
+231:         )}
+232:       </Drawer>
+233:     </div>
+234:   );
+235: };
+236: 
+237: export default SkillManager;
 ```
 
 ### crates/cowork-gui/src/components/projects/ImportProjectModal.tsx (37 lines)
@@ -22780,101 +22639,643 @@ LICENSE
 3: export { default as ImportProjectModal } from './ImportProjectModal';
 ```
 
-### crates/cowork-gui/src/hooks/useIterationActions.ts (92 lines)
+### crates/cowork-gui/src/hooks/useChatInput.ts (162 lines)
 
 ```
-1: function useIterationActions() {
+1: function useChatInput() {
+2: 	
+3: 	const updateCurrentIterationStatus = useProjectStore(s => s.updateCurrentIterationStatus);
+4: 
+5: 	
+6: 	const agentState = useAgentStore(
+7: 		useShallow(s => ({
+8: 			inputRequest: s.inputRequest,
+9: 			addMessage: s.addMessage,
+10: 			setMessages: s.setMessages,
+11: 			setInputRequest: s.setInputRequest,
+12: 			submitInput: s.submitInput,
+13: 		}))
+14: 	);
+15: 	const { inputRequest, addMessage, setMessages, setInputRequest, submitInput } = agentState;
+16: 
+17: 	
+18: 	const uiActions = useUIStore(
+19: 		useShallow(s => ({
+20: 			setActiveView: s.setActiveView,
+21: 			setActiveArtifactTab: s.setActiveArtifactTab,
+22: 			triggerCodeRefresh: s.triggerCodeRefresh,
+23: 			triggerArtifactsRefresh: s.triggerArtifactsRefresh,
+24: 		}))
+25: 	);
+26: 	const { setActiveView, setActiveArtifactTab, triggerCodeRefresh, triggerArtifactsRefresh } = uiActions;
+27: 
+28: 	
+29: 	const handleSendUserMessage = useCallback(
+30: 		async (userInput: string, setUserInput: (input: string) => void) => {
+31: 			if (!userInput.trim()) return;
+32: 			const msgContent = userInput;
+33: 			addMessage({
+34: 				type: 'user',
+35: 				content: msgContent,
+36: 				timestamp: new Date().toISOString()
+37: 			} as ChatMessage);
+38: 
+39: 			if (inputRequest) {
+40: 				await submitInput(msgContent, 'text');
+41: 			}
+42: 			setUserInput('');
+43: 		},
+44: 		[inputRequest, addMessage, submitInput]
+45: 	);
+46: 
+47: 	
+48: 	const handleSelectOption = useCallback(
+49: 		async (option: InputOption, userInput: string, setUserInput: (input: string) => void) => {
+50: 			if (!inputRequest) return;
+51: 
+52: 			if (option.id === 'view_artifact' && inputRequest.isArtifactConfirmation) {
+53: 				const artifactTypeToTab: Record<string, string> = {
+54: 					idea: 'idea',
+55: 					requirements: 'requirements',
+56: 					design: 'design',
+57: 					plan: 'plan',
+58: 					code: 'code'
+59: 				};
+60: 				const targetTab = artifactTypeToTab[inputRequest.artifactType || ''] || 'idea';
+61: 				setActiveArtifactTab(targetTab);
+62: 
+63: 				if (inputRequest.artifactType === 'code') {
+64: 					setActiveView('code');
+65: 					triggerCodeRefresh();
+66: 				} else {
+67: 					setActiveView('artifacts');
+68: 					triggerArtifactsRefresh();
+69: 				}
+70: 				return;
+71: 			}
+72: 
+73: 			if (option.id === 'feedback' && inputRequest.isArtifactConfirmation) {
+74: 				setInputRequest({
+75: 					...inputRequest,
+76: 					isFeedbackMode: true,
+77: 					feedbackPrompt: 'Please enter your feedback:'
+78: 				});
+79: 				setUserInput('');
+80: 				return;
+81: 			}
+82: 
+83: 			addMessage({
+84: 				type: 'user',
+85: 				content: option.label,
+86: 				timestamp: new Date().toISOString()
+87: 			} as ChatMessage);
+88: 			await submitInput(option.id, 'selection');
+89: 
+90: 			
+91: 			if (option.id === 'yes') {
+92: 				updateCurrentIterationStatus('Running');
+93: 			}
+94: 
+95: 			setUserInput('');
+96: 		},
+97: 		[
+98: 			inputRequest,
+99: 			addMessage,
+100: 			submitInput,
+101: 			setActiveView,
+102: 			setActiveArtifactTab,
+103: 			triggerCodeRefresh,
+104: 			triggerArtifactsRefresh,
+105: 			setInputRequest,
+106: 			updateCurrentIterationStatus
+107: 		]
+108: 	);
+109: 
+110: 	
+111: 	const handleSubmitFeedback = useCallback(
+112: 		async (userInput: string, setUserInput: (input: string) => void, updateCurrentIterationStatus: (status: string) => void) => {
+113: 			if (!inputRequest || !userInput.trim()) return;
+114: 			const feedback = userInput.trim();
+115: 			addMessage({
+116: 				type: 'agent',
+117: 				content: '📝 Feedback received. Regenerating...',
+118: 				agentName: 'System',
+119: 				timestamp: new Date().toISOString()
+120: 			} as ChatMessage);
+121: 			addMessage({
+122: 				type: 'user',
+123: 				content: `💬 Feedback:\n${feedback}`,
+124: 				timestamp: new Date().toISOString()
+125: 			} as ChatMessage);
+126: 			await submitInput(feedback, 'text');
+127: 			updateCurrentIterationStatus('Running');
+128: 			setUserInput('');
+129: 		},
+130: 		[inputRequest, addMessage, submitInput]
+131: 	);
+132: 
+133: 	
+134: 	const handleToggleThinking = useCallback(
+135: 		(index: number) => {
+136: 			setMessages((prev) =>
+137: 				prev.map((m, i) =>
+138: 					i === index && m.type === 'thinking'
+139: 						? ({ ...m, isExpanded: !(m as ThinkingMessage).isExpanded } as ChatMessage)
+140: 						: m
+141: 				)
+142: 			);
+143: 		},
+144: 		[setMessages]
+145: 	);
+146: 
+147: 	
+148: 	const handleCancelFeedback = useCallback(() => {
+149: 		if (inputRequest) {
+150: 			setInputRequest({ ...inputRequest, isFeedbackMode: false });
+151: 		}
+152: 	}, [inputRequest, setInputRequest]);
+153: 
+154: 	return {
+155: 		inputRequest,
+156: 		handleSendUserMessage,
+157: 		handleSelectOption,
+158: 		handleSubmitFeedback,
+159: 		handleToggleThinking,
+160: 		handleCancelFeedback
+161: 	};
+162: }
+```
+
+### crates/cowork-gui/src/hooks/usePMAgent.ts (201 lines)
+
+```
+1: function usePMAgent() {
 2: 	const { message } = AntApp.useApp();
 3: 
 4: 	
-5: 	const { currentIteration, setCurrentIteration, setIsExecuting } = useProjectStore();
-6: 
-7: 	
-8: 	const { setProcessing } = useAgentStore();
+5: 	const projectActions = useProjectStore(
+6: 		useShallow(s => ({ currentIteration: s.currentIteration, loadProject: s.loadProject, setCurrentIteration: s.setCurrentIteration }))
+7: 	);
+8: 	const { currentIteration, loadProject, setCurrentIteration } = projectActions;
 9: 
 10: 	
-11: 	const { activeView, setActiveView } = useUIStore();
-12: 
-13: 	
-14: 	const handleSelectIteration = useCallback(
-15: 		async (iterationId: string) => {
-16: 			try {
-17: 				const { currentIteration, isExecuting } = useProjectStore.getState();
-18: 				const fullIteration = await API.iteration.get(iterationId);
-19: 				
-20: 				if (isExecuting && currentIteration?.id === iterationId) {
-21: 					setCurrentIteration({ ...fullIteration, status: currentIteration.status });
-22: 				} else {
-23: 					setCurrentIteration(fullIteration);
-24: 				}
-25: 				setActiveView('chat');
-26: 			} catch (error) {
-27: 				console.error('Failed to load iteration:', error);
-28: 				message.error('Failed to load iteration: ' + error);
-29: 			}
-30: 		},
-31: 		[setCurrentIteration, setActiveView, message]
-32: 	);
-33: 
-34: 	
-35: 	const handleExecuteIteration = useCallback(async () => {
-36: 		if (!currentIteration) return;
-37: 		try {
-38: 			setProcessing(true);
-39: 			await API.iteration.execute(currentIteration.id);
-40: 			message.info('Iteration execution started');
-41: 		} catch (error) {
-42: 			message.error('Failed to execute iteration: ' + error);
-43: 			setProcessing(false);
-44: 		}
-45: 	}, [currentIteration, setProcessing, message]);
-46: 
-47: 	
-48: 	const handleOpenProjectFolder = useCallback(async () => {
-49: 		try {
-50: 			await API.util.openInFileManager('.');
-51: 		} catch (error) {
-52: 			message.error('Failed to open project folder');
-53: 		}
-54: 	}, [message]);
-55: 
-56: 	
-57: 	const handleOpenIterationFolder = useCallback(async (iterationId: string) => {
-58: 		try {
-59: 			await API.util.openInFileManager(iterationId);
-60: 		} catch (error) {
-61: 			message.error('Failed to open iteration folder: ' + error);
-62: 		}
-63: 	}, [message]);
+11: 	const agentActions = useAgentStore(
+12: 		useShallow(s => ({ setMessages: s.setMessages, clearPMMessages: s.clearPMMessages, setPmProcessing: s.setPmProcessing, sendPMMessage: s.sendPMMessage }))
+13: 	);
+14: 	const { setMessages, clearPMMessages, setPmProcessing, sendPMMessage } = agentActions;
+15: 
+16: 	
+17: 	const uiActions = useUIStore(
+18: 		useShallow(s => ({ setActiveView: s.setActiveView, setActiveArtifactTab: s.setActiveArtifactTab }))
+19: 	);
+20: 	const { setActiveView, setActiveArtifactTab } = uiActions;
+21: 
+22: 	
+23: 	const buildPMFeedback = useCallback(
+24: 		(msgs: (ChatMessage & { type: 'user' | 'pm_agent' })[], targetStage: string): string => {
+25: 			console.log(
+26: 				'[PM] buildPMFeedback called with',
+27: 				msgs.length,
+28: 				'messages, targetStage:',
+29: 				targetStage
+30: 			);
+31: 
+32: 			const userMessages = msgs
+33: 				.filter((msg) => msg.type === 'user')
+34: 				.map((msg) => (msg as { content: string }).content)
+35: 				.filter((content) => content && content.trim());
+36: 
+37: 			if (userMessages.length === 0) return '';
+38: 
+39: 			const result = userMessages.join('\n\n');
+40: 			console.log('[PM] buildPMFeedback result length:', result.length);
+41: 			return result;
+42: 		},
+43: 		[]
+44: 	);
+45: 
+46: 	
+47: 	const handlePMAction = useCallback(
+48: 		async (action: PMAction, pmMessages: (ChatMessage & { type: 'user' | 'pm_agent' })[]) => {
+49: 			if (!currentIteration) return;
+50: 
+51: 			switch (action.action_type) {
+52: 				case 'pm_start_app':
+53: 					setActiveView('run');
+54: 					message.info('Starting application...');
+55: 					try {
+56: 						const isRunning = await invoke<boolean>('check_project_status', {
+57: 							iterationId: currentIteration.id
+58: 						});
+59: 						if (isRunning) {
+60: 							message.info('Application is already running');
+61: 							return;
+62: 						}
+63: 					} catch {}
 64: 
-65: 	
-66: 	const handleCommandSelect = useCallback(
-67: 		(commandId: string) => {
-68: 			const viewMap: Record<string, string> = {
-69: 				'view-iterations': 'iterations',
-70: 				'view-chat': 'chat',
-71: 				'view-artifacts': 'artifacts',
-72: 				'view-code': 'code',
-73: 				'view-run': 'run',
-74: 				'view-memory': 'execution-memory',
-75: 				'view-projects': 'projects',
-76: 				'view-settings': 'settings'
-77: 			};
-78: 			if (viewMap[commandId]) {
-79: 				setActiveView(viewMap[commandId] as typeof activeView);
-80: 			}
-81: 		},
-82: 		[setActiveView]
-83: 	);
-84: 
-85: 	return {
-86: 		handleSelectIteration,
-87: 		handleExecuteIteration,
-88: 		handleOpenProjectFolder,
-89: 		handleOpenIterationFolder,
-90: 		handleCommandSelect
-91: 	};
-92: }
+65: 					try {
+66: 						await invoke('start_iteration_project', { iterationId: currentIteration.id });
+67: 					} catch (err) {
+68: 						message.error('Failed to start app: ' + err);
+69: 					}
+70: 					beak;
+71: 
+72: 				case 'pm_open_folder':
+73: 					try {
+74: 						await invoke('open_in_file_manager', { path: `workspace_${currentIteration.id}` });
+75: 					} catch (err) {
+76: 						message.error('Failed to open folder: ' + err);
+77: 					}
+78: 					beak;
+79: 
+80: 				case 'pm_view_knowledge':
+81: 					setActiveView('project-knowledge');
+82: 					beak;
+83: 
+84: 				case 'pm_view_artifacts':
+85: 					setActiveView('artifacts');
+86: 					setActiveArtifactTab('design');
+87: 					beak;
+88: 
+89: 				case 'pm_view_code':
+90: 					setActiveView('code');
+91: 					beak;
+92: 
+93: 				case 'pm_goto_stage':
+94: 					if (action.target_stage) {
+95: 						console.log('[PM] pm_goto_stage action received, target_stage:', action.target_stage);
+96: 						const feedbackText = buildPMFeedback(pmMessages, action.target_stage);
+97: 						console.log(
+98: 							'[PM] buildPMFeedback result:',
+99: 							feedbackText
+100: 								? `${feedbackText.length} chars: ${feedbackText.substring(0, 100)}...`
+101: 								: 'empty'
+102: 						);
+103: 						Modal.confirm({
+104: 							title: 'Confirm Stage Return',
+105: 							content: `Return to ${action.target_stage} stage? Your PM Chat conversation will be passed as feedback to the agent.`,
+106: 							onOk: async () => {
+107: 								try {
+108: 									console.log(
+109: 										'[PM] User confirmed, calling API.pm.restart with feedback:',
+110: 										feedbackText ? `${feedbackText.length} chars` : 'none'
+111: 									);
+112: 									clearPMMessages();
+113: 									await API.pm.restart(
+114: 										currentIteration.id,
+115: 										action.target_stage!,
+116: 										feedbackText.length > 0 ? feedbackText : undefined
+117: 									);
+118: 									message.success(`Restarted from ${action.target_stage}`);
+119: 									loadProject();
+120: 								} catch (err) {
+121: 									message.error('Failed: ' + err);
+122: 								}
+123: 							}
+124: 						});
+125: 					}
+126: 					beak;
+127: 
+128: 				case 'pm_create_iteration':
+129: 					if (action.iteration_id) {
+130: 						Modal.confirm({
+131: 							title: '启动新迭代',
+132: 							content: `是否启动新迭代「${action.title || 'Untitled'}」？`,
+133: 							onOk: async () => {
+134: 								try {
+135: 									clearPMMessages();
+136: 									setMessages([]);
+137: 									await loadProject();
+138: 									const newIteration = await API.iteration.get(action.iteration_id!);
+139: 									setCurrentIteration(newIteration);
+140: 									await API.iteration.execute(action.iteration_id!);
+141: 									message.success('新迭代已启动');
+142: 									setActiveView('chat');
+143: 								} catch (err) {
+144: 									message.error('启动失败: ' + err);
+145: 								}
+146: 							}
+147: 						});
+148: 					}
+149: 					beak;
+150: 
+151: 				default:
+152: 					console.log('Unknown PM action:', action);
+153: 			}
+154: 		},
+155: 		[
+156: 			currentIteration,
+157: 			loadProject,
+158: 			setActiveView,
+159: 			setActiveArtifactTab,
+160: 			clearPMMessages,
+161: 			setMessages,
+162: 			setCurrentIteration,
+163: 			buildPMFeedback,
+164: 			message
+165: 		]
+166: 	);
+167: 
+168: 	
+169: 	const handlePMSendMessage = useCallback(
+170: 		async (userInput: string, setUserInput: (input: string) => void) => {
+171: 			console.log(
+172: 				'[usePMAgent] handlePMSendMessage called, userInput:',
+173: 				userInput,
+174: 				'currentIteration:',
+175: 				currentIteration?.id
+176: 			);
+177: 			if (!userInput.trim() || !currentIteration) {
+178: 				console.log('[usePMAgent] handlePMSendMessage early return: no input or no iteration');
+179: 				return;
+180: 			}
+181: 			const userMessage = userInput.trim();
+182: 			setUserInput('');
+183: 			setPmProcessing(true);
+184: 
+185: 			try {
+186: 				await sendPMMessage(currentIteration.id, userMessage);
+187: 			} catch (error) {
+188: 				message.error('Failed to process message: ' + error);
+189: 			} finally {
+190: 				setPmProcessing(false);
+191: 			}
+192: 		},
+193: 		[currentIteration, sendPMMessage, setPmProcessing, message]
+194: 	);
+195: 
+196: 	return {
+197: 		buildPMFeedback,
+198: 		handlePMAction,
+199: 		handlePMSendMessage
+200: 	};
+201: }
+```
+
+### crates/cowork-gui/src/main.tsx (85 lines)
+
+```
+1: import { createRoot } from 'react-dom/client';
+2: import { ConfigProvider, theme, App as AntApp } from 'antd';
+3: import App from './App';
+4: import './styles.css';
+5: 
+6: 
+7: 
+8: const lightTheme = {
+9:   algorithm: theme.defaultAlgorithm,
+10:   token: {
+11:     colorPrimary: '#2563eb',
+12:     colorPrimaryHover: '#1d4ed8',
+13:     colorPrimaryActive: '#1e40af',
+14:     colorBgBase: '#ffffff',
+15:     colorBgContainer: '#f8fafc',
+16:     colorBgElevated: '#f1f5f9',
+17:     colorBgLayout: '#f8fafc',
+18:     colorBorder: '#e2e8f0',
+19:     colorBorderSecondary: '#f1f5f9',
+20:     colorText: '#1e293b',
+21:     colorTextSecondary: '#64748b',
+22:     colorTextTertiary: '#94a3b8',
+23:     borderRadius: 8,
+24:     borderRadiusLG: 12,
+25:     borderRadiusSM: 6,
+26:     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+27:     boxShadowSecondary: '0 4px 12px rgba(0, 0, 0, 0.08)',
+28:     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+29:     padding: 16,
+30:     paddingLG: 24,
+31:     paddingSM: 12,
+32:   },
+33:   components: {
+34:     Layout: {
+35:       headerBg: '#ffffff',
+36:       siderBg: '#f8fafc',
+37:       bodyBg: '#ffffff',
+38:     },
+39:     Menu: {
+40:       itemBg: 'transparent',
+41:       itemSelectedBg: '#dbeafe',
+42:       itemColor: '#64748b',
+43:       itemSelectedColor: '#2563eb',
+44:       itemHoverBg: '#f1f5f9',
+45:       itemHoverColor: '#1e293b',
+46:     },
+47:     Button: {
+48:       borderRadius: 8,
+49:       boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+50:     },
+51:     Input: {
+52:       borderRadius: 10,
+53:       activeShadow: '0 0 0 3px rgba(37, 99, 235, 0.1)',
+54:     },
+55:     Card: {
+56:       borderRadius: 12,
+57:       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+58:     },
+59:     Tabs: {
+60:       cardBg: '#f8fafc',
+61:       itemColor: '#64748b',
+62:       itemSelectedColor: '#2563eb',
+63:     },
+64:     Tag: {
+65:       borderRadius: 6,
+66:     },
+67:     Alert: {
+68:       borderRadius: 10,
+69:     },
+70:     Modal: {
+71:       borderRadius: 16,
+72:     },
+73:     Dropdown: {
+74:       borderRadius: 12,
+75:     },
+76:   },
+77: };
+78: 
+79: createRoot(document.getElementById('root')!).render(
+80:   <ConfigProvider theme={lightTheme}>
+81:     <AntApp>
+82:       <App />
+83:     </AntApp>
+84:   </ConfigProvider>
+85: );
+```
+
+### crates/cowork-gui/src/stores/agentStore.ts (117 lines)
+
+```
+1: ThinkingMessage
+2: ⋮----
+3: {
+4:   type: 'thinking';
+5:   content: string;
+6:   agentName: string;
+7:   stageName?: string;
+8:   isStreaming?: boolean;
+9:   isExpanded: boolean;
+10:   timestamp: string;
+11: }
+12: ⋮----
+13: ChatMessage
+14: ⋮----
+15: {
+16:   type: string;
+17:   content: string;
+18:   agentName?: string;
+19:   stageName?: string;
+20:   level?: string;
+21:   isStreaming?: boolean;
+22:   isExpanded?: boolean;
+23:   timestamp: string;
+24:   toolName?: string;
+25:   arguments?: Record<string, unknown>;
+26:   result?: string;
+27:   success?: boolean;
+28:   actions?: PMAction[];
+29: }
+30: ⋮----
+31: UserMessage
+32: ⋮----
+33: {
+34:   type: 'user';
+35:   content: string;
+36:   timestamp: string;
+37: }
+38: ⋮----
+39: PMAgentMessage
+40: ⋮----
+41: {
+42:   type: 'pm_agent';
+43:   content: string;
+44:   actions?: PMAction[];
+45:   timestamp: string;
+46: }
+47: ⋮----
+48: PMAction
+49: ⋮----
+50: {
+51:   action_type: 'pm_goto_stage' | 'pm_create_iteration' | 'pm_start_app' | 'pm_open_folder' | 'pm_view_knowledge' | 'pm_view_artifacts' | 'pm_view_code';
+52:   target_stage?: string;
+53:   iteration_id?: string;
+54:   title?: string;
+55:   description?: string;
+56:   label: string;
+57: }
+58: ⋮----
+59: InputRequest
+60: ⋮----
+61: {
+62:   requestId: string;
+63:   prompt: string;
+64:   options: InputOption[];
+65:   isArtifactConfirmation?: boolean;
+66:   artifactType?: string;
+67:   isFeedbackMode?: boolean;
+68:   feedbackPrompt?: string;
+69: }
+70: ⋮----
+71: InputOption
+72: ⋮----
+73: {
+74:   id: string;
+75:   label: string;
+76:   description?: string;
+77: }
+78: ⋮----
+79: ChatMode
+80: ⋮----
+81: 'disabled' | 'pipeline' | 'pm_agent'
+82: ⋮----
+83: AgentState
+84: ⋮----
+85: {
+86:   messages: ChatMessage[];
+87:   pmMessages: (UserMessage | PMAgentMessage)[];
+88:   isProcessing: boolean;
+89:   currentAgent: string | null;
+90:   currentStage: string | null;
+91:   inputRequest: InputRequest | null;
+92:   chatMode: ChatMode;
+93:   pmProcessing: boolean;
+94: 
+95:   addMessage: (message: ChatMessage) => void;
+96:   setMessages: (messages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
+97:   
+98:   appendLastMessageContent: (chunk: string, opts?: { isLast?: boolean; agentName?: string; msgType?: string }) => void;
+99:   clearMessages: () => void;
+100: 
+101:   addPMMessage: (message: UserMessage | PMAgentMessage) => void;
+102:   setPMMessages: (messages: (UserMessage | PMAgentMessage)[] | ((prev: (UserMessage | PMAgentMessage)[]) => (UserMessage | PMAgentMessage)[])) => void;
+103:   
+104:   appendLastPMMessageContent: (chunk: string, opts?: { isLast?: boolean }) => void;
+105:   clearPMMessages: () => void;
+106: 
+107:   setProcessing: (isProcessing: boolean) => void;
+108:   setCurrentAgent: (agent: string | null) => void;
+109:   setCurrentStage: (stage: string | null) => void;
+110:   setInputRequest: (request: InputRequest | null) => void;
+111:   setChatMode: (mode: ChatMode) => void;
+112:   setPmProcessing: (processing: boolean) => void;
+113: 
+114:   submitInput: (response: string, responseType: string) => Promise<void>;
+115:   sendPMMessage: (iterationId: string, message: string) => Promise<void>;
+116:   loadPMWelcomeMessage: (iterationId: string) => Promise<void>;
+117: }
+```
+
+### crates/cowork-gui/src/stores/configStore.ts (49 lines)
+
+```
+1: ConfigState
+2: ⋮----
+3: {
+4:   loading: boolean;
+5:   error: string | null;
+6:   selectedFlow: string | null;
+7:   selectedAgent: string | null;
+8:   selectedStage: string | null;
+9:   selectedSkill: string | null;  
+10:   selectedIntegration: string | null;
+11:   availableTools: ToolInfo[];  
+12: 
+13:   
+14:   loadConfigs: () => Promise<void>;
+15:   resetConfigs: () => Promise<void>;
+16:   selectFlow: (id: string | null) => void;
+17:   selectAgent: (id: string | null) => void;
+18:   selectStage: (id: string | null) => void;
+19:   selectSkill: (name: string | null) => void;
+20:   selectIntegration: (id: string | null) => void;
+21: 
+22:   
+23:   saveAgent: (agent: AgentDefinition) => Promise<void>;
+24:   deleteAgent: (id: string) => Promise<void>;
+25:   saveStage: (stage: StageDefinition) => Promise<void>;
+26:   deleteStage: (id: string) => Promise<void>;
+27:   saveFlow: (flow: FlowDefinition) => Promise<void>;
+28:   deleteFlow: (id: string) => Promise<void>;
+29:   setDefaultFlow: (id: string) => Promise<void>;
+30:   installSkill: (skillPath: string) => Promise<void>;
+31:   uninstallSkill: (name: string) => Promise<void>;
+32:   saveIntegration: (integration: IntegrationDefinition) => Promise<void>;
+33:   deleteIntegration: (id: string) => Promise<void>;
+34: 
+35:   
+36:   validateAgent: (agent: AgentDefinition) => Promise<ValidationResult>;
+37:   validateFlow: (flow: FlowDefinition) => Promise<ValidationResult>;
+38: 
+39:   
+40:   exportConfig: (type: 'agent' | 'stage' | 'flow', id: string) => Promise<string>;
+41:   importConfig: (type: 'agent' | 'stage' | 'flow', jsonData: string) => Promise<void>;
+42: 
+43:   
+44:   getBuiltinInstructions: () => Promise<BuiltinInstruction[]>;
+45:   
+46:   
+47:   loadAvailableTools: () => Promise<void>;
+48:   getToolsByCategory: () => Record<string, ToolInfo[]>;
+49: }
 ```
 
 ### crates/cowork-gui/src/stores/projectStore.ts (58 lines)
@@ -22940,365 +23341,377 @@ LICENSE
 58: }
 ```
 
-### crates/cowork-gui/src/styles/components.css (356 lines)
+### crates/cowork-gui/src/styles/components.css (368 lines)
 
 ```
 1: .artifact-content {
 2:   padding: 24px;
 3:   background: var(--bg-container);
 4:   color: var(--text-primary);
-5:   height: 100%;
-6:   overflow-y: auto;
-7: }
-8: 
-9: .artifact-content h3 {
-10:   color: var(--text-primary);
-11:   margin-bottom: 16px;
-12:   font-size: 18px;
-13: }
-14: 
+5:   flex: 1;
+6:   min-height: 0;
+7:   overflow: auto;
+8: }
+9: 
+10: .artifact-content h3 {
+11:   color: var(--text-primary);
+12:   margin-bottom: 16px;
+13:   font-size: 18px;
+14: }
 15: 
-16: .markdown-content {
-17:   color: var(--text-primary);
-18:   font-size: 14px;
-19:   line-height: 1.8;
-20: }
-21: 
+16: 
+17: .markdown-content {
+18:   color: var(--text-primary);
+19:   font-size: 14px;
+20:   line-height: 1.8;
+21: }
 22: 
-23: .markdown-content h1,
-24: .markdown-content h2,
-25: .markdown-content h3,
-26: .markdown-content h4,
-27: .markdown-content h5,
-28: .markdown-content h6 {
-29:   color: var(--text-primary);
-30:   margin-top: 28px;
-31:   margin-bottom: 12px;
-32:   font-weight: 600;
-33:   line-height: 1.35;
-34: }
-35: 
-36: .markdown-content h1 { font-size: 1.5em; }
-37: .markdown-content h2 {
-38:   font-size: 1.25em;
-39:   border-bottom: 1px solid var(--border-light);
-40:   padding-bottom: 8px;
-41: }
-42: .markdown-content h3 { font-size: 1.15em; }
-43: .markdown-content h4 { font-size: 1.05em; }
-44: 
+23: 
+24: .markdown-content h1,
+25: .markdown-content h2,
+26: .markdown-content h3,
+27: .markdown-content h4,
+28: .markdown-content h5,
+29: .markdown-content h6 {
+30:   color: var(--text-primary);
+31:   margin-top: 28px;
+32:   margin-bottom: 12px;
+33:   font-weight: 600;
+34:   line-height: 1.35;
+35: }
+36: 
+37: .markdown-content h1 { font-size: 1.5em; }
+38: .markdown-content h2 {
+39:   font-size: 1.25em;
+40:   border-bottom: 1px solid var(--border-light);
+41:   padding-bottom: 8px;
+42: }
+43: .markdown-content h3 { font-size: 1.15em; }
+44: .markdown-content h4 { font-size: 1.05em; }
 45: 
-46: .markdown-content > :first-child,
-47: .markdown-content > h1:first-child,
-48: .markdown-content > h2:first-child,
-49: .markdown-content > h3:first-child,
-50: .markdown-content > h4:first-child {
-51:   margin-top: 0;
-52: }
-53: 
+46: 
+47: .markdown-content > :first-child,
+48: .markdown-content > h1:first-child,
+49: .markdown-content > h2:first-child,
+50: .markdown-content > h3:first-child,
+51: .markdown-content > h4:first-child {
+52:   margin-top: 0;
+53: }
 54: 
-55: .markdown-content p {
-56:   margin-bottom: 14px;
-57: }
-58: 
-59: .markdown-content p:last-child {
-60:   margin-bottom: 0;
-61: }
-62: 
+55: 
+56: .markdown-content p {
+57:   margin-bottom: 14px;
+58: }
+59: 
+60: .markdown-content p:last-child {
+61:   margin-bottom: 0;
+62: }
 63: 
-64: .markdown-content strong {
-65:   color: var(--text-primary);
-66:   font-weight: 600;
-67: }
-68: 
-69: .markdown-content em {
-70:   color: var(--text-secondary);
-71: }
-72: 
+64: 
+65: .markdown-content strong {
+66:   color: var(--text-primary);
+67:   font-weight: 600;
+68: }
+69: 
+70: .markdown-content em {
+71:   color: var(--text-secondary);
+72: }
 73: 
-74: .markdown-content code:not(pre code) {
-75:   background: var(--bg-elevated);
-76:   color: var(--primary);
-77:   padding: 2px 7px;
-78:   border-radius: 4px;
-79:   font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
-80:   font-size: 0.88em;
-81:   border: 1px solid var(--border-light);
-82: }
-83: 
+74: 
+75: .markdown-content code:not(pre code) {
+76:   background: var(--bg-elevated);
+77:   color: var(--primary);
+78:   padding: 2px 7px;
+79:   border-radius: 4px;
+80:   font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+81:   font-size: 0.88em;
+82:   border: 1px solid var(--border-light);
+83: }
 84: 
-85: .markdown-content ul,
-86: .markdown-content ol {
-87:   margin: 16px 0;
-88:   padding-left: 26px;
-89: }
-90: 
-91: .markdown-content li {
-92:   margin-bottom: 8px;
-93:   line-height: 1.75;
-94: }
-95: 
-96: .markdown-content li:last-child {
-97:   margin-bottom: 0;
-98: }
-99: 
-100: .markdown-content ul li::marker {
-101:   color: var(--primary);
-102:   font-weight: 500;
-103: }
-104: 
-105: .markdown-content ol li::marker {
-106:   color: var(--primary);
-107:   font-weight: 600;
-108: }
-109: 
+85: 
+86: .markdown-content ul,
+87: .markdown-content ol {
+88:   margin: 16px 0;
+89:   padding-left: 26px;
+90: }
+91: 
+92: .markdown-content li {
+93:   margin-bottom: 8px;
+94:   line-height: 1.75;
+95: }
+96: 
+97: .markdown-content li:last-child {
+98:   margin-bottom: 0;
+99: }
+100: 
+101: .markdown-content ul li::marker {
+102:   color: var(--primary);
+103:   font-weight: 500;
+104: }
+105: 
+106: .markdown-content ol li::marker {
+107:   color: var(--primary);
+108:   font-weight: 600;
+109: }
 110: 
-111: .markdown-content li > ul,
-112: .markdown-content li > ol {
-113:   margin: 6px 0;
-114: }
-115: 
+111: 
+112: .markdown-content li > ul,
+113: .markdown-content li > ol {
+114:   margin: 6px 0;
+115: }
 116: 
-117: .markdown-content blockquote {
-118:   border-left: 3px solid var(--primary);
-119:   padding: 10px 18px;
-120:   margin: 16px 0;
-121:   background: var(--bg-elevated);
-122:   border-radius: 0 8px 8px 0;
-123:   color: var(--text-secondary);
-124:   line-height: 1.7;
-125: }
-126: 
-127: .markdown-content blockquote p {
-128:   margin: 0;
-129: }
-130: 
+117: 
+118: .markdown-content blockquote {
+119:   border-left: 3px solid var(--primary);
+120:   padding: 10px 18px;
+121:   margin: 16px 0;
+122:   background: var(--bg-elevated);
+123:   border-radius: 0 8px 8px 0;
+124:   color: var(--text-secondary);
+125:   line-height: 1.7;
+126: }
+127: 
+128: .markdown-content blockquote p {
+129:   margin: 0;
+130: }
 131: 
-132: .markdown-content a {
-133:   color: var(--primary);
-134:   text-decoration: none;
-135:   border-bottom: 1px solid transparent;
-136:   transition: all 0.15s;
-137: }
-138: 
-139: .markdown-content a:hover {
-140:   border-bottom-color: var(--primary);
-141: }
-142: 
+132: 
+133: .markdown-content a {
+134:   color: var(--primary);
+135:   text-decoration: none;
+136:   border-bottom: 1px solid transparent;
+137:   transition: all 0.15s;
+138: }
+139: 
+140: .markdown-content a:hover {
+141:   border-bottom-color: var(--primary);
+142: }
 143: 
-144: .markdown-content table {
-145:   width: 100%;
-146:   border-collapse: collapse;
-147:   margin: 16px 0;
-148:   font-size: 13px;
-149:   border: 1px solid var(--border-color);
-150:   border-radius: 8px;
-151:   overflow: hidden;
-152: }
-153: 
-154: .markdown-content th {
-155:   background: var(--bg-elevated);
-156:   color: var(--text-primary);
-157:   font-weight: 600;
-158:   text-align: left;
-159:   padding: 10px 14px;
-160:   border-bottom: 1px solid var(--border-color);
-161:   font-size: 12px;
-162: }
-163: 
-164: .markdown-content td {
-165:   padding: 9px 14px;
-166:   border-bottom: 1px solid var(--border-light);
-167: }
-168: 
-169: .markdown-content tr:last-child td {
-170:   border-bottom: none;
-171: }
-172: 
-173: .markdown-content tr:hover td {
-174:   background: var(--bg-container);
-175: }
-176: 
+144: 
+145: .markdown-content table {
+146:   width: 100%;
+147:   border-collapse: collapse;
+148:   margin: 16px 0;
+149:   font-size: 13px;
+150:   border: 1px solid var(--border-color);
+151:   border-radius: 8px;
+152:   overflow: hidden;
+153: }
+154: 
+155: .markdown-content th {
+156:   background: var(--bg-elevated);
+157:   color: var(--text-primary);
+158:   font-weight: 600;
+159:   text-align: left;
+160:   padding: 10px 14px;
+161:   border-bottom: 1px solid var(--border-color);
+162:   font-size: 12px;
+163: }
+164: 
+165: .markdown-content td {
+166:   padding: 9px 14px;
+167:   border-bottom: 1px solid var(--border-light);
+168: }
+169: 
+170: .markdown-content tr:last-child td {
+171:   border-bottom: none;
+172: }
+173: 
+174: .markdown-content tr:hover td {
+175:   background: var(--bg-container);
+176: }
 177: 
-178: .markdown-content hr {
-179:   border: none;
-180:   border-top: 1px solid var(--border-light);
-181:   margin: 24px 0;
-182: }
-183: 
+178: 
+179: .markdown-content hr {
+180:   border: none;
+181:   border-top: 1px solid var(--border-light);
+182:   margin: 24px 0;
+183: }
 184: 
-185: .markdown-content img {
-186:   max-width: 100%;
-187:   border-radius: 8px;
-188:   margin: 16px 0;
-189: }
-190: 
+185: 
+186: .markdown-content img {
+187:   max-width: 100%;
+188:   border-radius: 8px;
+189:   margin: 16px 0;
+190: }
 191: 
-192: .markdown-content pre {
-193:   margin: 16px 0;
-194:   border-radius: 8px;
-195:   overflow: hidden;
-196:   border: 1px solid var(--border-color);
-197:   background: #1e293b;
-198:   padding: 14px 16px;
-199: }
-200: 
-201: .markdown-content pre code {
-202:   background: transparent !important;
-203:   border: none !important;
-204:   padding: 0 !important;
-205:   color: #e2e8f0 !important;
-206:   font-size: 13px;
-207:   line-height: 1.65;
-208: }
-209: 
-210: .artifacts-tabs {
-211:   height: 100%;
-212:   display: flex;
-213:   flex-direction: column;
-214: }
-215: 
-216: .artifacts-tabs .ant-tabs-content-holder {
-217:   flex: 1;
-218:   overflow: hidden;
-219:   display: flex;
-220:   flex-direction: column;
+192: 
+193: .markdown-content pre {
+194:   margin: 16px 0;
+195:   border-radius: 8px;
+196:   overflow: hidden;
+197:   border: 1px solid var(--border-color);
+198:   background: #1e293b;
+199:   padding: 14px 16px;
+200: }
+201: 
+202: .markdown-content pre code {
+203:   background: transparent !important;
+204:   border: none !important;
+205:   padding: 0 !important;
+206:   color: #e2e8f0 !important;
+207:   font-size: 13px;
+208:   line-height: 1.65;
+209: }
+210: 
+211: .artifacts-tabs {
+212:   height: 100%;
+213:   display: flex;
+214:   flex-direction: column;
+215:   min-height: 0;
+216: }
+217: 
+218: .artifacts-tabs > .ant-tabs-nav {
+219:   margin-bottom: 0;
+220:   flex-shrink: 0;
 221: }
 222: 
-223: .artifacts-tabs .ant-tabs-content {
+223: .artifacts-tabs .ant-tabs-content-holder {
 224:   flex: 1;
-225:   overflow: auto;
-226: }
-227: 
-228: .artifacts-tabs .ant-tabs-tabpane {
-229:   height: 100%;
-230:   overflow: auto;
-231: }
-232: 
-233: 
-234: .code-editor-tabs {
-235:   height: 100%;
-236:   display: flex;
-237:   flex-direction: column;
-238: }
-239: 
-240: .code-editor-tabs .ant-tabs-content {
-241:   flex: 1;
-242:   overflow: hidden;
-243:   display: flex;
-244:   flex-direction: column;
-245: }
-246: 
-247: .code-editor-tabs .ant-tabs-content-holder {
-248:   flex: 1;
-249:   overflow: hidden;
-250:   display: flex;
-251:   flex-direction: column;
-252: }
-253: 
-254: .code-editor-tabs .ant-tabs-tabpane {
-255:   height: 100% !important;
-256:   overflow: hidden !important;
-257:   display: none !important;
-258: }
-259: 
-260: .code-editor-tabs .ant-tabs-tabpane-active {
-261:   display: flex !important;
-262:   flex-direction: column !important;
-263: }
-264: 
-265: .code-editor-tabs .ant-tabs-tabpane > div {
-266:   height: 100% !important;
-267:   display: flex !important;
-268:   flex-direction: column !important;
-269:   position: relative;
+225:   overflow: hidden;
+226:   display: flex;
+227:   flex-direction: column;
+228:   min-height: 0;
+229: }
+230: 
+231: .artifacts-tabs .ant-tabs-content {
+232:   height: 100%;
+233:   overflow: hidden;
+234: }
+235: 
+236: .artifacts-tabs .ant-tabs-tabpane {
+237:   height: 100%;
+238:   overflow: hidden;
+239: }
+240: 
+241: .artifacts-tabs .ant-tabs-tabpane > div {
+242:   height: 100%;
+243: }
+244: 
+245: 
+246: .code-editor-tabs {
+247:   height: 100%;
+248:   display: flex;
+249:   flex-direction: column;
+250: }
+251: 
+252: .code-editor-tabs .ant-tabs-content {
+253:   flex: 1;
+254:   overflow: hidden;
+255:   display: flex;
+256:   flex-direction: column;
+257: }
+258: 
+259: .code-editor-tabs .ant-tabs-content-holder {
+260:   flex: 1;
+261:   overflow: hidden;
+262:   display: flex;
+263:   flex-direction: column;
+264: }
+265: 
+266: .code-editor-tabs .ant-tabs-tabpane {
+267:   height: 100% !important;
+268:   overflow: hidden !important;
+269:   display: none !important;
 270: }
 271: 
-272: .code-editor-tabs .ant-tabs-tabpane > div > div {
-273:   flex: 1;
-274:   overflow: hidden;
-275:   position: relative;
-276: }
-277: 
-278: .code-editor-tabs .monaco-editor {
-279:   height: 100% !important;
-280: }
-281: 
-282: 
-283: .react-json-view {
-284:   background: var(--bg-container) !important;
-285:   padding: 20px;
-286:   border-radius: 12px;
-287:   border: 1px solid var(--border-color);
-288:   font-size: 14px;
-289:   line-height: 1.8;
-290: }
-291: 
-292: .react-json-view .string-key {
-293:   color: var(--primary) !important;
-294:   font-weight: 600;
-295: }
-296: 
-297: .react-json-view .object-key {
-298:   color: var(--primary) !important;
-299:   font-weight: 600;
-300: }
-301: 
-302: .react-json-view .string-value {
-303:   color: #059669 !important;
-304: }
-305: 
-306: .react-json-view .variable-value {
-307:   color: #059669 !important;
-308: }
-309: 
-310: .react-json-view .number-value {
-311:   color: #2563eb !important;
+272: .code-editor-tabs .ant-tabs-tabpane-active {
+273:   display: flex !important;
+274:   flex-direction: column !important;
+275: }
+276: 
+277: .code-editor-tabs .ant-tabs-tabpane > div {
+278:   height: 100% !important;
+279:   display: flex !important;
+280:   flex-direction: column !important;
+281:   position: relative;
+282: }
+283: 
+284: .code-editor-tabs .ant-tabs-tabpane > div > div {
+285:   flex: 1;
+286:   overflow: hidden;
+287:   position: relative;
+288: }
+289: 
+290: .code-editor-tabs .monaco-editor {
+291:   height: 100% !important;
+292: }
+293: 
+294: 
+295: .react-json-view {
+296:   background: var(--bg-container) !important;
+297:   padding: 20px;
+298:   border-radius: 12px;
+299:   border: 1px solid var(--border-color);
+300:   font-size: 14px;
+301:   line-height: 1.8;
+302: }
+303: 
+304: .react-json-view .string-key {
+305:   color: var(--primary) !important;
+306:   font-weight: 600;
+307: }
+308: 
+309: .react-json-view .object-key {
+310:   color: var(--primary) !important;
+311:   font-weight: 600;
 312: }
 313: 
-314: .react-json-view .boolean-value {
-315:   color: #d97706 !important;
-316:   font-weight: 500;
-317: }
-318: 
-319: .react-json-view .null-value {
-320:   color: #dc2626 !important;
-321:   font-weight: 500;
-322: }
-323: 
-324: .react-json-view .array-key {
-325:   color: var(--primary) !important;
-326:   font-weight: 600;
-327: }
-328: 
-329: .react-json-view .string-literal {
-330:   color: #059669 !important;
-331: }
-332: 
-333: .react-json-view .object-name {
-334:   color: var(--primary) !important;
-335:   font-weight: 600;
-336: }
-337: 
-338: .react-json-view .array-name {
-339:   color: var(--primary) !important;
-340:   font-weight: 600;
-341: }
-342: 
-343: .react-json-view .br-row,
-344: .react-json-view .bracket {
-345:   color: var(--text-tertiary) !important;
-346: }
-347: 
-348: .react-json-view .colon {
-349:   color: var(--text-tertiary) !important;
-350: }
-351: 
-352: .react-json-view .arrow-icon,
-353: .react-json-view .expanded-icon,
-354: .react-json-view .collapsed-icon {
-355:   fill: var(--primary) !important;
-356: }
+314: .react-json-view .string-value {
+315:   color: #059669 !important;
+316: }
+317: 
+318: .react-json-view .variable-value {
+319:   color: #059669 !important;
+320: }
+321: 
+322: .react-json-view .number-value {
+323:   color: #2563eb !important;
+324: }
+325: 
+326: .react-json-view .boolean-value {
+327:   color: #d97706 !important;
+328:   font-weight: 500;
+329: }
+330: 
+331: .react-json-view .null-value {
+332:   color: #dc2626 !important;
+333:   font-weight: 500;
+334: }
+335: 
+336: .react-json-view .array-key {
+337:   color: var(--primary) !important;
+338:   font-weight: 600;
+339: }
+340: 
+341: .react-json-view .string-literal {
+342:   color: #059669 !important;
+343: }
+344: 
+345: .react-json-view .object-name {
+346:   color: var(--primary) !important;
+347:   font-weight: 600;
+348: }
+349: 
+350: .react-json-view .array-name {
+351:   color: var(--primary) !important;
+352:   font-weight: 600;
+353: }
+354: 
+355: .react-json-view .br-row,
+356: .react-json-view .bracket {
+357:   color: var(--text-tertiary) !important;
+358: }
+359: 
+360: .react-json-view .colon {
+361:   color: var(--text-tertiary) !important;
+362: }
+363: 
+364: .react-json-view .arrow-icon,
+365: .react-json-view .expanded-icon,
+366: .react-json-view .collapsed-icon {
+367:   fill: var(--primary) !important;
+368: }
 ```
 
 ### crates/cowork-gui/src/styles/markdown.css (212 lines)
@@ -23533,6 +23946,148 @@ LICENSE
 10: @import 'highlight.js/styles/github.css';
 ```
 
+### crates/cowork-gui/src/types/index.ts (73 lines)
+
+```
+1: export type {
+2:   IterationInfo,
+3:   IterationStatus,
+4:   InheritanceMode,
+5:   CreateIterationRequest,
+6:   StageDef,
+7: } from './iteration';
+8: 
+9: 
+10: export type {
+11:   ProjectMetadata,
+12:   ProjectData,
+13:   ProjectStatus,
+14:   ProjectInfo,
+15:   CreateProjectRequest,
+16:   UpdateProjectRequest,
+17:   CreateProjectResponse,
+18: } from './project';
+19: 
+20: 
+21: export type {
+22:   ThinkingMessage,
+23:   AgentMessage,
+24:   UserMessage,
+25:   PMAgentMessage,
+26:   ToolCallMessage,
+27:   ToolResultMessage,
+28:   ChatMessage,
+29:   ChatMode,
+30:   PMAction,
+31:   InputOption,
+32:   InputRequest,
+33: } from './agent';
+34: 
+35: 
+36: export type {
+37:   Knowledge,
+38:   KnowledgeListResult,
+39: } from './knowledge';
+40: 
+41: 
+42: export type {
+43:   AgentType,
+44:   ModelConfig,
+45:   ToolReference,
+46:   IncludeContentsMode,
+47:   AgentDefinition,
+48:   StageType,
+49:   HookPoint,
+50:   HookConfig,
+51:   ArtifactConfig,
+52:   StageRetryConfig,
+53:   StageDefinition,
+54:   MemoryScope,
+55:   
+56:   InheritanceConfig,
+57:   FlowConfig,
+58:   StageOverrides,
+59:   StageReference,
+60:   GlobalHookConfig,
+61:   FlowDefinition,
+62:   SkillInfo,
+63:   IntegrationType,
+64:   AuthType,
+65:   CredentialSource,
+66:   AuthConfig,
+67:   ConnectionConfig,
+68:   IntegrationEvent,
+69:   IntegrationDefinition,
+70:   ValidationIssue,
+71:   ValidationResult,
+72:   ConfigRegistryState,
+73: } from './config';
+```
+
+### crates/cowork-gui/src/utils/markdown.ts (59 lines)
+
+```
+1: import remarkGfm from 'remark-gfm';
+2: import rehypeHighlight from 'rehype-highlight';
+3: import rehypeRaw from 'rehype-raw';
+4: import type { PluggableList } from 'unified';
+5: import type { LanguageFn } from 'lowlight';
+6: 
+7: import rust from 'highlight.js/lib/languages/rust';
+8: import typescript from 'highlight.js/lib/languages/typescript';
+9: import javascript from 'highlight.js/lib/languages/javascript';
+10: import json from 'highlight.js/lib/languages/json';
+11: import bash from 'highlight.js/lib/languages/bash';
+12: import shell from 'highlight.js/lib/languages/shell';
+13: import python from 'highlight.js/lib/languages/python';
+14: import yaml from 'highlight.js/lib/languages/yaml';
+15: import ini from 'highlight.js/lib/languages/ini';
+16: import markdown from 'highlight.js/lib/languages/markdown';
+17: import xml from 'highlight.js/lib/languages/xml';
+18: import css from 'highlight.js/lib/languages/css';
+19: import sql from 'highlight.js/lib/languages/sql';
+20: import go from 'highlight.js/lib/languages/go';
+21: import java from 'highlight.js/lib/languages/java';
+22: import plaintext from 'highlight.js/lib/languages/plaintext';
+23: import dockerfile from 'highlight.js/lib/languages/dockerfile';
+24: import makefile from 'highlight.js/lib/languages/makefile';
+25: import diff from 'highlight.js/lib/languages/diff';
+26: 
+27: 
+28: 
+29: const languages: Record<string, LanguageFn> = {
+30:   rust,
+31:   typescript,
+32:   javascript,
+33:   json,
+34:   bash,
+35:   shell,
+36:   python,
+37:   yaml,
+38:   ini, 
+39:   markdown,
+40:   xml, 
+41:   css,
+42:   sql,
+43:   go,
+44:   java,
+45:   plaintext,
+46:   dockerfile,
+47:   makefile,
+48:   diff,
+49: };
+50: 
+51: 
+52: export const remarkPlugins: PluggableList = [remarkGfm];
+53: 
+54: 
+55: 
+56: export const fullRehypePlugins: PluggableList = [
+57:   [rehypeHighlight, { languages }],
+58:   rehypeRaw,
+59: ];
+```
+
 ### crates/cowork-gui/src-tauri/src/commands/path_utils.rs (59 lines)
 
 ```
@@ -23734,51 +24289,6 @@ LICENSE
 9: get_system_locale
 10: ⋮----
 11: ()
-```
-
-### crates/cowork-gui/vite.config.js (40 lines)
-
-```
-1: import { defineConfig } from "vite";
-2: import react from "@vitejs/plugin-react";
-3: import path from "path";
-4: 
-5: export default defineConfig({
-6:   plugins: [react()],
-7:   resolve: {
-8:     alias: {
-9:       "@": path.resolve(__dirname, "src"),
-10:     },
-11:   },
-12:   server: {
-13:     port: 15173,
-14:   },
-15:   build: {
-16:     rollupOptions: {
-17:       output: {
-18:         manualChunks: {
-19:           
-20:           "vendor-react": ["react", "react-dom"],
-21:           
-22:           "vendor-antd": ["antd", "@ant-design/icons"],
-23:           
-24:           "vendor-monaco": ["@monaco-editor/react", "monaco-editor"],
-25:           
-26:           "vendor-markdown": [
-27:             "react-markdown",
-28:             "remark-gfm",
-29:             "rehype-highlight",
-30:             "rehype-raw",
-31:           ],
-32:           
-33:           "vendor-zustand": ["zustand"],
-34:         },
-35:       },
-36:     },
-37:     
-38:     chunkSizeWarningLimit: 1536,
-39:   },
-40: });
 ```
 
 ### litho.docs/en/4.Deep-Exploration/Domain Logic.md (491 lines)
@@ -27231,6 +27741,81 @@ LICENSE
 232: ()
 ```
 
+### crates/cowork-core/src/config_definition/validator.rs (70 lines)
+
+```
+1: ValidationResult
+2: ⋮----
+3: {
+4:     pub is_valid: bool,
+5:     pub errors: Vec<String>,
+6:     pub warnings: Vec<String>,
+7: }
+8: ⋮----
+9: ValidationResult
+10: ⋮----
+11: {
+12:     pub fn new() -> Self {
+13:         Self {
+14:             is_valid: true,
+15:             errors: Vec::new(),
+16:             warnings: Vec::new(),
+17:         }
+18:     }
+19:     
+20:     pub fn error(&mut self, message: impl Into<String>) {
+21:         self.errors.push(message.into());
+22:         self.is_valid = false;
+23:     }
+24:     
+25:     pub fn warning(&mut self, message: impl Into<String>) {
+26:         self.warnings.push(message.into());
+27:     }
+28:     
+29:     pub fn merge(&mut self, other: ValidationResult) {
+30:         if !other.is_valid {
+31:             self.is_valid = false;
+32:         }
+33:         self.errors.extend(other.errors);
+34:         self.warnings.extend(other.warnings);
+35:     }
+36: }
+37: ⋮----
+38: ConfigValidator
+39: ⋮----
+40: {
+41:     registry: &'a ConfigRegistry,
+42: }
+43: ⋮----
+44: new
+45: ⋮----
+46: (registry: &'a ConfigRegistry)
+47: ⋮----
+48: validate_all
+49: ⋮----
+50: (&self)
+51: ⋮----
+52: validate_agent
+53: ⋮----
+54: (&self, agent: &AgentDefinition)
+55: ⋮----
+56: validate_stage
+57: ⋮----
+58: (&self, stage: &StageDefinition)
+59: ⋮----
+60: validate_flow
+61: ⋮----
+62: (&self, flow: &FlowDefinition)
+63: ⋮----
+64: validate_integration
+65: ⋮----
+66: (&self, integration: &IntegrationDefinition)
+67: ⋮----
+68: test_validate_agent
+69: ⋮----
+70: ()
+```
+
 ### crates/cowork-core/src/domain/memory.rs (377 lines)
 
 ```
@@ -30550,6 +31135,234 @@ LICENSE
 624: )
 ````
 
+### crates/cowork-core/src/skills/manager.rs (198 lines)
+
+```
+1: SkillManagerConfig
+2: ⋮----
+3: {
+4:     
+5:     pub root_path: PathBuf,
+6:     
+7:     pub selection_policy: SelectionPolicy,
+8:     
+9:     pub max_injected_chars: usize,
+10: }
+11: ⋮----
+12: SkillManagerConfig
+13: ⋮----
+14: {
+15:     fn default() -> Self {
+16:         Self {
+17:             root_path: PathBuf::from("."),
+18:             selection_policy: SelectionPolicy::default(),
+19:             max_injected_chars: 2000,
+20:         }
+21:     }
+22: }
+23: ⋮----
+24: SkillManagerConfig
+25: ⋮----
+26: {
+27:     
+28:     pub fn new(root_path: impl Into<PathBuf>) -> Self {
+29:         Self {
+30:             root_path: root_path.into(),
+31:             ..Default::default()
+32:         }
+33:     }
+34: 
+35:     
+36:     pub fn with_policy(mut self, policy: SelectionPolicy) -> Self {
+37:         self.selection_policy = policy;
+38:         self
+39:     }
+40: 
+41:     
+42:     pub fn with_max_injected_chars(mut self, max: usize) -> Self {
+43:         self.max_injected_chars = max;
+44:         self
+45:     }
+46: }
+47: ⋮----
+48: SkillManager
+49: ⋮----
+50: {
+51:     config: SkillManagerConfig,
+52:     index: SkillIndex,
+53: }
+54: ⋮----
+55: SkillManager
+56: ⋮----
+57: {
+58:     
+59:     pub fn new(config: SkillManagerConfig) -> Result<Self> {
+60:         let index = load_skill_index(&config.root_path)
+61:             .map_err(|e| anyhow::anyhow!("Failed to load skill index: {}", e))?;
+62: 
+63:         tracing::info!(
+64:             "SkillManager initialized with {} skills from {:?}",
+65:             index.len(),
+66:             config.root_path
+67:         );
+68: 
+69:         Ok(Self { config, index })
+70:     }
+71: 
+72:     
+73:     pub fn for_project(project_path: impl AsRef<Path>) -> Result<Self> {
+74:         let config = SkillManagerConfig::new(project_path.as_ref());
+75:         Self::new(config)
+76:     }
+77: 
+78:     
+79:     pub fn index(&self) -> &SkillIndex {
+80:         &self.index
+81:     }
+82: 
+83:     
+84:     pub fn list_skills(&self) -> &[SkillDocument] {
+85:         self.index.skills()
+86:     }
+87: 
+88:     
+89:     pub fn skill_count(&self) -> usize {
+90:         self.index.len()
+91:     }
+92: 
+93:     
+94:     pub fn is_empty(&self) -> bool {
+95:         self.index.is_empty()
+96:     }
+97: 
+98:     
+99:     pub fn find_skill(&self, name: &str) -> Option<&SkillDocument> {
+100:         self.index.skills().iter().find(|s| s.name == name)
+101:     }
+102: 
+103:     
+104:     pub fn find_skill_by_id(&self, id: &str) -> Option<&SkillDocument> {
+105:         self.index.skills().iter().find(|s| s.id == id)
+106:     }
+107: 
+108:     
+109:     pub fn select(&self, query: &str) -> Vec<SkillMatch> {
+110:         select_skills(&self.index, query, &self.config.selection_policy)
+111:     }
+112: 
+113:     
+114:     pub fn select_best(&self, query: &str) -> Option<SkillMatch> {
+115:         self.select(query).into_iter().next()
+116:     }
+117: 
+118:     
+119:     pub fn select_with_policy(&self, query: &str, policy: &SelectionPolicy) -> Vec<SkillMatch> {
+120:         select_skills(&self.index, query, policy)
+121:     }
+122: 
+123:     
+124:     pub fn get_summaries(&self) -> Vec<adk_skill::SkillSummary> {
+125:         self.index.summaries()
+126:     }
+127: 
+128:     
+129:     pub fn reload(&mut self) -> Result<()> {
+130:         self.index = load_skill_index(&self.config.root_path)
+131:             .map_err(|e| anyhow::anyhow!("Failed to reload skill index: {}", e))?;
+132: 
+133:         tracing::info!(
+134:             "SkillManager reloaded with {} skills",
+135:             self.index.len()
+136:         );
+137: 
+138:         Ok(())
+139:     }
+140: 
+141:     
+142:     
+143:     
+144:     pub fn install_skill_from_dir(&self, source_dir: &Path) -> Result<String> {
+145:         
+146:         let skill_md_path = source_dir.join("SKILL.md");
+147:         if !skill_md_path.exists() {
+148:             anyhow::bail!("Source directory does not contain SKILL.md: {:?}", source_dir);
+149:         }
+150: 
+151:         let content = std::fs::read_to_string(&skill_md_path)
+152:             .with_context(|| format!("Failed to read {:?}", skill_md_path))?;
+153: 
+154:         
+155:         let parsed = adk_skill::parse_skill_markdown(&skill_md_path, &content)
+156:             .map_err(|e| anyhow::anyhow!("Failed to parse SKILL.md: {}", e))?;
+157: 
+158:         let skill_name = parsed.name.clone();
+159: 
+160:         
+161:         let target_dir = self.config.root_path.join(".skills").join(&skill_name);
+162:         std::fs::create_dir_all(&target_dir)
+163:             .with_context(|| format!("Failed to create target directory: {:?}", target_dir))?;
+164: 
+165:         
+166:         copy_dir_all(source_dir, &target_dir)?;
+167: 
+168:         tracing::info!("Installed skill '{}' to {:?}", skill_name, target_dir);
+169: 
+170:         Ok(skill_name)
+171:     }
+172: 
+173:     
+174:     pub fn skills_directory(&self) -> PathBuf {
+175:         self.config.root_path.join(".skills")
+176:     }
+177: 
+178:     
+179:     pub fn has_skill(&self, name: &str) -> bool {
+180:         self.index.skills().iter().any(|s| s.name == name)
+181:     }
+182: }
+183: ⋮----
+184: copy_dir_all
+185: ⋮----
+186: (src: &Path, dst: &Path)
+187: ⋮----
+188: test_skill_manager_empty
+189: ⋮----
+190: ()
+191: ⋮----
+192: test_skill_manager_with_skill
+193: ⋮----
+194: ()
+195: ⋮----
+196: test_skill_selection
+197: ⋮----
+198: ()
+```
+
+### crates/cowork-core/src/skills/mod.rs (20 lines)
+
+```
+1: mod manager;
+2: 
+3: pub use manager::{SkillManager, SkillManagerConfig};
+4: 
+5: 
+6: pub use adk_skill::{
+7:     
+8:     SkillDocument, SkillIndex, SkillSummary, SkillMatch,
+9:     
+10:     SelectionPolicy,
+11:     
+12:     SkillInjector, SkillInjectorConfig,
+13:     apply_skill_injection, select_skill_prompt_block,
+14:     
+15:     load_skill_index, parse_skill_markdown, parse_instruction_markdown,
+16:     
+17:     discover_skill_files, discover_instruction_files,
+18:     
+19:     SkillError, SkillResult,
+20: };
+```
+
 ### crates/cowork-core/src/tech_stack.rs (121 lines)
 
 ```
@@ -30787,51 +31600,6 @@ LICENSE
 13: </html>
 ```
 
-### crates/cowork-gui/src/components/CodeEditor.tsx (40 lines)
-
-```
-1: FileTreeNode
-2: ⋮----
-3: {
-4:   name: string;
-5:   path: string;
-6:   is_dir: boolean;
-7:   children?: FileTreeNode[];
-8:   is_expanded?: boolean;
-9:   language?: string;
-10: }
-11: ⋮----
-12: FlatFileTreeNode
-13: ⋮----
-14: {
-15:   depth: number;
-16:   key: string;
-17: }
-18: ⋮----
-19: FileReadResult
-20: ⋮----
-21: {
-22:   content: string;
-23:   is_partial: boolean;
-24:   offset: number;
-25:   total_size: number;
-26: }
-27: ⋮----
-28: FormatResult
-29: ⋮----
-30: {
-31:   success: boolean;
-32:   formatted_files: string[];
-33: }
-34: ⋮----
-35: CodeEditorProps
-36: ⋮----
-37: {
-38:   iterationId: string;
-39:   refreshTrigger?: number;
-40: }
-```
-
 ### crates/cowork-gui/src/components/CommandPalette.tsx (18 lines)
 
 ```
@@ -30855,52 +31623,6 @@ LICENSE
 18: }
 ```
 
-### crates/cowork-gui/src/components/KnowledgePanel.tsx (41 lines)
-
-```
-1: Knowledge
-2: ⋮----
-3: {
-4:   iteration_id: string;
-5:   title: string;
-6:   idea_summary?: string;
-7:   design_summary?: string;
-8:   plan_summary?: string;
-9:   code_structure?: string;
-10:   created_at: string;
-11:   tech_stack?: string[];
-12:   key_decisions?: string[];
-13:   key_patterns?: string[];
-14:   known_issues?: string[];
-15: }
-16: ⋮----
-17: KnowledgeListResult
-18: ⋮----
-19: {
-20:   knowledge_list: Knowledge[];
-21: }
-22: ⋮----
-23: IterationInfo
-24: ⋮----
-25: {
-26:   id: string;
-27:   number: number;
-28:   title: string;
-29:   description: string;
-30:   status: string;
-31:   current_stage: string | null;
-32:   created_at: string;
-33: }
-34: ⋮----
-35: KnowledgePanelProps
-36: ⋮----
-37: {
-38:   currentSession?: string;
-39:   currentIterationId?: string | null;
-40:   refreshTrigger?: number;
-41: }
-```
-
 ### crates/cowork-gui/src/components/PreviewPanel.tsx (12 lines)
 
 ```
@@ -30916,47 +31638,6 @@ LICENSE
 10: {
 11:   iterationId: string;
 12: }
-```
-
-### crates/cowork-gui/src/components/RunnerPanel.tsx (36 lines)
-
-```
-1: LogEntry
-2: ⋮----
-3: {
-4:   type: string;
-5:   content: string;
-6:   timestamp: Date;
-7: }
-8: ⋮----
-9: ProjectRuntimeInfo
-10: ⋮----
-11: {
-12:   has_frontend: boolean;
-13:   has_backend: boolean;
-14:   preview_url?: string;
-15:   frontend_port?: number;
-16:   backend_port?: number;
-17:   start_command?: string;
-18: }
-19: ⋮----
-20: RunResult
-21: ⋮----
-22: {
-23:   process_id?: number;
-24:   frontend_pid?: number;
-25:   backend_pid?: number;
-26:   frontend_url?: string;
-27:   backend_url?: string;
-28:   command?: string;
-29:   is_fullstack?: boolean;
-30: }
-31: ⋮----
-32: RunnerPanelProps
-33: ⋮----
-34: {
-35:   iterationId: string;
-36: }
 ```
 
 ### crates/cowork-gui/src/components/chat/index.ts (3 lines)
@@ -31013,22 +31694,6 @@ LICENSE
 1: ConfigTab
 2: ⋮----
 3: 'flows' | 'agents' | 'skills' | 'integrations'
-```
-
-### crates/cowork-gui/src/components/config/FlowConfigPanel.tsx (3 lines)
-
-```
-1: getStageTypeColor
-2: ⋮----
-3: (stage.stage_id)
-```
-
-### crates/cowork-gui/src/components/config/IntegrationConfig.tsx (3 lines)
-
-```
-1: getTypeColor
-2: ⋮----
-3: (integration.integration_type)
 ```
 
 ### crates/cowork-gui/src/components/config/index.ts (5 lines)
@@ -31221,167 +31886,6 @@ LICENSE
 21:   
 22:   return { ref };
 23: }
-```
-
-### crates/cowork-gui/src/hooks/useChatInput.ts (156 lines)
-
-```
-1: function useChatInput() {
-2: 	
-3: 	const { updateCurrentIterationStatus } = useProjectStore();
-4: 
-5: 	
-6: 	const {
-7: 		inputRequest,
-8: 		addMessage,
-9: 		setMessages,
-10: 		setInputRequest,
-11: 		submitInput
-12: 	} = useAgentStore();
-13: 
-14: 	
-15: 	const {
-16: 		setActiveView,
-17: 		setActiveArtifactTab,
-18: 		triggerCodeRefresh,
-19: 		triggerArtifactsRefresh
-20: 	} = useUIStore();
-21: 
-22: 	
-23: 	const handleSendUserMessage = useCallback(
-24: 		async (userInput: string, setUserInput: (input: string) => void) => {
-25: 			if (!userInput.trim()) return;
-26: 			const msgContent = userInput;
-27: 			addMessage({
-28: 				type: 'user',
-29: 				content: msgContent,
-30: 				timestamp: new Date().toISOString()
-31: 			} as ChatMessage);
-32: 
-33: 			if (inputRequest) {
-34: 				await submitInput(msgContent, 'text');
-35: 			}
-36: 			setUserInput('');
-37: 		},
-38: 		[inputRequest, addMessage, submitInput]
-39: 	);
-40: 
-41: 	
-42: 	const handleSelectOption = useCallback(
-43: 		async (option: InputOption, userInput: string, setUserInput: (input: string) => void) => {
-44: 			if (!inputRequest) return;
-45: 
-46: 			if (option.id === 'view_artifact' && inputRequest.isArtifactConfirmation) {
-47: 				const artifactTypeToTab: Record<string, string> = {
-48: 					idea: 'idea',
-49: 					requirements: 'requirements',
-50: 					design: 'design',
-51: 					plan: 'plan',
-52: 					code: 'code'
-53: 				};
-54: 				const targetTab = artifactTypeToTab[inputRequest.artifactType || ''] || 'idea';
-55: 				setActiveArtifactTab(targetTab);
-56: 
-57: 				if (inputRequest.artifactType === 'code') {
-58: 					setActiveView('code');
-59: 					triggerCodeRefresh();
-60: 				} else {
-61: 					setActiveView('artifacts');
-62: 					triggerArtifactsRefresh();
-63: 				}
-64: 				return;
-65: 			}
-66: 
-67: 			if (option.id === 'feedback' && inputRequest.isArtifactConfirmation) {
-68: 				setInputRequest({
-69: 					...inputRequest,
-70: 					isFeedbackMode: true,
-71: 					feedbackPrompt: 'Please enter your feedback:'
-72: 				});
-73: 				setUserInput('');
-74: 				return;
-75: 			}
-76: 
-77: 			addMessage({
-78: 				type: 'user',
-79: 				content: option.label,
-80: 				timestamp: new Date().toISOString()
-81: 			} as ChatMessage);
-82: 			await submitInput(option.id, 'selection');
-83: 
-84: 			
-85: 			if (option.id === 'yes') {
-86: 				updateCurrentIterationStatus('Running');
-87: 			}
-88: 
-89: 			setUserInput('');
-90: 		},
-91: 		[
-92: 			inputRequest,
-93: 			addMessage,
-94: 			submitInput,
-95: 			setActiveView,
-96: 			setActiveArtifactTab,
-97: 			triggerCodeRefresh,
-98: 			triggerArtifactsRefresh,
-99: 			setInputRequest,
-100: 			updateCurrentIterationStatus
-101: 		]
-102: 	);
-103: 
-104: 	
-105: 	const handleSubmitFeedback = useCallback(
-106: 		async (userInput: string, setUserInput: (input: string) => void, updateCurrentIterationStatus: (status: string) => void) => {
-107: 			if (!inputRequest || !userInput.trim()) return;
-108: 			const feedback = userInput.trim();
-109: 			addMessage({
-110: 				type: 'agent',
-111: 				content: '📝 Feedback received. Regenerating...',
-112: 				agentName: 'System',
-113: 				timestamp: new Date().toISOString()
-114: 			} as ChatMessage);
-115: 			addMessage({
-116: 				type: 'user',
-117: 				content: `💬 Feedback:\n${feedback}`,
-118: 				timestamp: new Date().toISOString()
-119: 			} as ChatMessage);
-120: 			await submitInput(feedback, 'text');
-121: 			updateCurrentIterationStatus('Running');
-122: 			setUserInput('');
-123: 		},
-124: 		[inputRequest, addMessage, submitInput]
-125: 	);
-126: 
-127: 	
-128: 	const handleToggleThinking = useCallback(
-129: 		(index: number) => {
-130: 			setMessages((prev) =>
-131: 				prev.map((m, i) =>
-132: 					i === index && m.type === 'thinking'
-133: 						? ({ ...m, isExpanded: !(m as ThinkingMessage).isExpanded } as ChatMessage)
-134: 						: m
-135: 				)
-136: 			);
-137: 		},
-138: 		[setMessages]
-139: 	);
-140: 
-141: 	
-142: 	const handleCancelFeedback = useCallback(() => {
-143: 		if (inputRequest) {
-144: 			setInputRequest({ ...inputRequest, isFeedbackMode: false });
-145: 		}
-146: 	}, [inputRequest, setInputRequest]);
-147: 
-148: 	return {
-149: 		inputRequest,
-150: 		handleSendUserMessage,
-151: 		handleSelectOption,
-152: 		handleSubmitFeedback,
-153: 		handleToggleThinking,
-154: 		handleCancelFeedback
-155: 	};
-156: }
 ```
 
 ### crates/cowork-gui/src/hooks/useIterationEvents.ts (71 lines)
@@ -31603,203 +32107,6 @@ LICENSE
 18: }
 ```
 
-### crates/cowork-gui/src/hooks/usePMAgent.ts (192 lines)
-
-```
-1: function usePMAgent() {
-2: 	const { message } = AntApp.useApp();
-3: 
-4: 	
-5: 	const { currentIteration, loadProject, setCurrentIteration } = useProjectStore();
-6: 
-7: 	
-8: 	const { setMessages, clearPMMessages, setPmProcessing, sendPMMessage } = useAgentStore();
-9: 
-10: 	
-11: 	const { setActiveView, setActiveArtifactTab } = useUIStore();
-12: 
-13: 	
-14: 	const buildPMFeedback = useCallback(
-15: 		(msgs: (ChatMessage & { type: 'user' | 'pm_agent' })[], targetStage: string): string => {
-16: 			console.log(
-17: 				'[PM] buildPMFeedback called with',
-18: 				msgs.length,
-19: 				'messages, targetStage:',
-20: 				targetStage
-21: 			);
-22: 
-23: 			const userMessages = msgs
-24: 				.filter((msg) => msg.type === 'user')
-25: 				.map((msg) => (msg as { content: string }).content)
-26: 				.filter((content) => content && content.trim());
-27: 
-28: 			if (userMessages.length === 0) return '';
-29: 
-30: 			const result = userMessages.join('\n\n');
-31: 			console.log('[PM] buildPMFeedback result length:', result.length);
-32: 			return result;
-33: 		},
-34: 		[]
-35: 	);
-36: 
-37: 	
-38: 	const handlePMAction = useCallback(
-39: 		async (action: PMAction, pmMessages: (ChatMessage & { type: 'user' | 'pm_agent' })[]) => {
-40: 			if (!currentIteration) return;
-41: 
-42: 			switch (action.action_type) {
-43: 				case 'pm_start_app':
-44: 					setActiveView('run');
-45: 					message.info('Starting application...');
-46: 					try {
-47: 						const isRunning = await invoke<boolean>('check_project_status', {
-48: 							iterationId: currentIteration.id
-49: 						});
-50: 						if (isRunning) {
-51: 							message.info('Application is already running');
-52: 							return;
-53: 						}
-54: 					} catch {}
-55: 
-56: 					try {
-57: 						await invoke('start_iteration_project', { iterationId: currentIteration.id });
-58: 					} catch (err) {
-59: 						message.error('Failed to start app: ' + err);
-60: 					}
-61: 					beak;
-62: 
-63: 				case 'pm_open_folder':
-64: 					try {
-65: 						await invoke('open_in_file_manager', { path: `workspace_${currentIteration.id}` });
-66: 					} catch (err) {
-67: 						message.error('Failed to open folder: ' + err);
-68: 					}
-69: 					beak;
-70: 
-71: 				case 'pm_view_knowledge':
-72: 					setActiveView('project-knowledge');
-73: 					beak;
-74: 
-75: 				case 'pm_view_artifacts':
-76: 					setActiveView('artifacts');
-77: 					setActiveArtifactTab('design');
-78: 					beak;
-79: 
-80: 				case 'pm_view_code':
-81: 					setActiveView('code');
-82: 					beak;
-83: 
-84: 				case 'pm_goto_stage':
-85: 					if (action.target_stage) {
-86: 						console.log('[PM] pm_goto_stage action received, target_stage:', action.target_stage);
-87: 						const feedbackText = buildPMFeedback(pmMessages, action.target_stage);
-88: 						console.log(
-89: 							'[PM] buildPMFeedback result:',
-90: 							feedbackText
-91: 								? `${feedbackText.length} chars: ${feedbackText.substring(0, 100)}...`
-92: 								: 'empty'
-93: 						);
-94: 						Modal.confirm({
-95: 							title: 'Confirm Stage Return',
-96: 							content: `Return to ${action.target_stage} stage? Your PM Chat conversation will be passed as feedback to the agent.`,
-97: 							onOk: async () => {
-98: 								try {
-99: 									console.log(
-100: 										'[PM] User confirmed, calling API.pm.restart with feedback:',
-101: 										feedbackText ? `${feedbackText.length} chars` : 'none'
-102: 									);
-103: 									clearPMMessages();
-104: 									await API.pm.restart(
-105: 										currentIteration.id,
-106: 										action.target_stage!,
-107: 										feedbackText.length > 0 ? feedbackText : undefined
-108: 									);
-109: 									message.success(`Restarted from ${action.target_stage}`);
-110: 									loadProject();
-111: 								} catch (err) {
-112: 									message.error('Failed: ' + err);
-113: 								}
-114: 							}
-115: 						});
-116: 					}
-117: 					beak;
-118: 
-119: 				case 'pm_create_iteration':
-120: 					if (action.iteration_id) {
-121: 						Modal.confirm({
-122: 							title: '启动新迭代',
-123: 							content: `是否启动新迭代「${action.title || 'Untitled'}」？`,
-124: 							onOk: async () => {
-125: 								try {
-126: 									clearPMMessages();
-127: 									setMessages([]);
-128: 									await loadProject();
-129: 									const newIteration = await API.iteration.get(action.iteration_id!);
-130: 									setCurrentIteration(newIteration);
-131: 									await API.iteration.execute(action.iteration_id!);
-132: 									message.success('新迭代已启动');
-133: 									setActiveView('chat');
-134: 								} catch (err) {
-135: 									message.error('启动失败: ' + err);
-136: 								}
-137: 							}
-138: 						});
-139: 					}
-140: 					beak;
-141: 
-142: 				default:
-143: 					console.log('Unknown PM action:', action);
-144: 			}
-145: 		},
-146: 		[
-147: 			currentIteration,
-148: 			loadProject,
-149: 			setActiveView,
-150: 			setActiveArtifactTab,
-151: 			clearPMMessages,
-152: 			setMessages,
-153: 			setCurrentIteration,
-154: 			buildPMFeedback,
-155: 			message
-156: 		]
-157: 	);
-158: 
-159: 	
-160: 	const handlePMSendMessage = useCallback(
-161: 		async (userInput: string, setUserInput: (input: string) => void) => {
-162: 			console.log(
-163: 				'[usePMAgent] handlePMSendMessage called, userInput:',
-164: 				userInput,
-165: 				'currentIteration:',
-166: 				currentIteration?.id
-167: 			);
-168: 			if (!userInput.trim() || !currentIteration) {
-169: 				console.log('[usePMAgent] handlePMSendMessage early return: no input or no iteration');
-170: 				return;
-171: 			}
-172: 			const userMessage = userInput.trim();
-173: 			setUserInput('');
-174: 			setPmProcessing(true);
-175: 
-176: 			try {
-177: 				await sendPMMessage(currentIteration.id, userMessage);
-178: 			} catch (error) {
-179: 				message.error('Failed to process message: ' + error);
-180: 			} finally {
-181: 				setPmProcessing(false);
-182: 			}
-183: 		},
-184: 		[currentIteration, sendPMMessage, setPmProcessing, message]
-185: 	);
-186: 
-187: 	return {
-188: 		buildPMFeedback,
-189: 		handlePMAction,
-190: 		handlePMSendMessage
-191: 	};
-192: }
-```
-
 ### crates/cowork-gui/src/hooks/useProjectEvents.ts (25 lines)
 
 ```
@@ -31953,215 +32260,6 @@ LICENSE
 40:     };
 41:   }, []);
 42: }
-```
-
-### crates/cowork-gui/src/main.tsx (86 lines)
-
-```
-1: import React from 'react';
-2: import ReactDOM from 'react-dom/client';
-3: import { ConfigProvider, theme, App as AntApp } from 'antd';
-4: import App from './App';
-5: import './styles.css';
-6: 
-7: const lightTheme = {
-8:   algorithm: theme.defaultAlgorithm,
-9:   token: {
-10:     colorPrimary: '#2563eb',
-11:     colorPrimaryHover: '#1d4ed8',
-12:     colorPrimaryActive: '#1e40af',
-13:     colorBgBase: '#ffffff',
-14:     colorBgContainer: '#f8fafc',
-15:     colorBgElevated: '#f1f5f9',
-16:     colorBgLayout: '#f8fafc',
-17:     colorBorder: '#e2e8f0',
-18:     colorBorderSecondary: '#f1f5f9',
-19:     colorText: '#1e293b',
-20:     colorTextSecondary: '#64748b',
-21:     colorTextTertiary: '#94a3b8',
-22:     borderRadius: 8,
-23:     borderRadiusLG: 12,
-24:     borderRadiusSM: 6,
-25:     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-26:     boxShadowSecondary: '0 4px 12px rgba(0, 0, 0, 0.08)',
-27:     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-28:     padding: 16,
-29:     paddingLG: 24,
-30:     paddingSM: 12,
-31:   },
-32:   components: {
-33:     Layout: {
-34:       headerBg: '#ffffff',
-35:       siderBg: '#f8fafc',
-36:       bodyBg: '#ffffff',
-37:     },
-38:     Menu: {
-39:       itemBg: 'transparent',
-40:       itemSelectedBg: '#dbeafe',
-41:       itemColor: '#64748b',
-42:       itemSelectedColor: '#2563eb',
-43:       itemHoverBg: '#f1f5f9',
-44:       itemHoverColor: '#1e293b',
-45:     },
-46:     Button: {
-47:       borderRadius: 8,
-48:       boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-49:     },
-50:     Input: {
-51:       borderRadius: 10,
-52:       activeShadow: '0 0 0 3px rgba(37, 99, 235, 0.1)',
-53:     },
-54:     Card: {
-55:       borderRadius: 12,
-56:       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-57:     },
-58:     Tabs: {
-59:       cardBg: '#f8fafc',
-60:       itemColor: '#64748b',
-61:       itemSelectedColor: '#2563eb',
-62:     },
-63:     Tag: {
-64:       borderRadius: 6,
-65:     },
-66:     Alert: {
-67:       borderRadius: 10,
-68:     },
-69:     Modal: {
-70:       borderRadius: 16,
-71:     },
-72:     Dropdown: {
-73:       borderRadius: 12,
-74:     },
-75:   },
-76: };
-77: 
-78: ReactDOM.createRoot(document.getElementById('root')!).render(
-79:   <React.StrictMode>
-80:     <ConfigProvider theme={lightTheme}>
-81:       <AntApp>
-82:         <App />
-83:       </AntApp>
-84:     </ConfigProvider>
-85:   </React.StrictMode>
-86: );
-```
-
-### crates/cowork-gui/src/stores/agentStore.ts (113 lines)
-
-```
-1: ThinkingMessage
-2: ⋮----
-3: {
-4:   type: 'thinking';
-5:   content: string;
-6:   agentName: string;
-7:   stageName?: string;
-8:   isStreaming?: boolean;
-9:   isExpanded: boolean;
-10:   timestamp: string;
-11: }
-12: ⋮----
-13: ChatMessage
-14: ⋮----
-15: {
-16:   type: string;
-17:   content: string;
-18:   agentName?: string;
-19:   stageName?: string;
-20:   level?: string;
-21:   isStreaming?: boolean;
-22:   isExpanded?: boolean;
-23:   timestamp: string;
-24:   toolName?: string;
-25:   arguments?: Record<string, unknown>;
-26:   result?: string;
-27:   success?: boolean;
-28:   actions?: PMAction[];
-29: }
-30: ⋮----
-31: UserMessage
-32: ⋮----
-33: {
-34:   type: 'user';
-35:   content: string;
-36:   timestamp: string;
-37: }
-38: ⋮----
-39: PMAgentMessage
-40: ⋮----
-41: {
-42:   type: 'pm_agent';
-43:   content: string;
-44:   actions?: PMAction[];
-45:   timestamp: string;
-46: }
-47: ⋮----
-48: PMAction
-49: ⋮----
-50: {
-51:   action_type: 'pm_goto_stage' | 'pm_create_iteration' | 'pm_start_app' | 'pm_open_folder' | 'pm_view_knowledge' | 'pm_view_artifacts' | 'pm_view_code';
-52:   target_stage?: string;
-53:   iteration_id?: string;
-54:   title?: string;
-55:   description?: string;
-56:   label: string;
-57: }
-58: ⋮----
-59: InputRequest
-60: ⋮----
-61: {
-62:   requestId: string;
-63:   prompt: string;
-64:   options: InputOption[];
-65:   isArtifactConfirmation?: boolean;
-66:   artifactType?: string;
-67:   isFeedbackMode?: boolean;
-68:   feedbackPrompt?: string;
-69: }
-70: ⋮----
-71: InputOption
-72: ⋮----
-73: {
-74:   id: string;
-75:   label: string;
-76:   description?: string;
-77: }
-78: ⋮----
-79: ChatMode
-80: ⋮----
-81: 'disabled' | 'pipeline' | 'pm_agent'
-82: ⋮----
-83: AgentState
-84: ⋮----
-85: {
-86:   messages: ChatMessage[];
-87:   pmMessages: (UserMessage | PMAgentMessage)[];
-88:   isProcessing: boolean;
-89:   currentAgent: string | null;
-90:   currentStage: string | null;
-91:   inputRequest: InputRequest | null;
-92:   chatMode: ChatMode;
-93:   pmProcessing: boolean;
-94:   
-95:   addMessage: (message: ChatMessage) => void;
-96:   setMessages: (messages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
-97:   clearMessages: () => void;
-98:   
-99:   addPMMessage: (message: UserMessage | PMAgentMessage) => void;
-100:   setPMMessages: (messages: (UserMessage | PMAgentMessage)[] | ((prev: (UserMessage | PMAgentMessage)[]) => (UserMessage | PMAgentMessage)[])) => void;
-101:   clearPMMessages: () => void;
-102:   
-103:   setProcessing: (isProcessing: boolean) => void;
-104:   setCurrentAgent: (agent: string | null) => void;
-105:   setCurrentStage: (stage: string | null) => void;
-106:   setInputRequest: (request: InputRequest | null) => void;
-107:   setChatMode: (mode: ChatMode) => void;
-108:   setPmProcessing: (processing: boolean) => void;
-109:   
-110:   submitInput: (response: string, responseType: string) => Promise<void>;
-111:   sendPMMessage: (iterationId: string, message: string) => Promise<void>;
-112:   loadPMWelcomeMessage: (iterationId: string) => Promise<void>;
-113: }
 ```
 
 ### crates/cowork-gui/src/stores/index.ts (8 lines)

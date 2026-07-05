@@ -280,10 +280,11 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 					if (agent_name === 'PM Agent') {
 						if (is_last && !content) {
 							// 收尾：把末尾 PM 消息的 isStreaming 关掉
+							// 关键：必须显式置 isStreaming: false，否则 PM action 按钮永远不渲染
 							agentActions.setPMMessages((prev) => {
 								const lastMsg = prev[prev.length - 1];
 								if (lastMsg?.type === 'pm_agent') {
-									return [...prev.slice(0, -1), { ...lastMsg } as PMAgentMessage];
+									return [...prev.slice(0, -1), { ...lastMsg, isStreaming: false } as PMAgentMessage];
 								}
 								return prev;
 							});
@@ -364,7 +365,10 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 								...prev.slice(0, -1),
 								{
 									...lastMsg,
-									actions: [...((lastMsg as PMAgentMessage).actions || []), ...actions]
+									actions: [...((lastMsg as PMAgentMessage).actions || []), ...actions],
+									// 关键：actions 来到时消息已结束，必须显式置 isStreaming: false
+									// 否则 PMAgentMessageItem 中的 !isStreaming 检查会阻止按钮渲染
+									isStreaming: false,
 								} as PMAgentMessage
 							];
 						}

@@ -26,7 +26,7 @@
 
 .ant-menu-item {
   color: var(--text-secondary) !important;
-  border-radius: 8px !important;
+  border-radius: 4px !important;
   margin: 4px 12px !important;
   padding-left: 16px !important;
   transition: all 0.2s ease !important;
@@ -148,7 +148,7 @@
   background: var(--bg-container) !important;
   border-color: var(--border-color) !important;
   color: var(--text-primary) !important;
-  border-radius: 8px !important;
+  border-radius: 4px !important;
 }
 
 .ant-select:not(.ant-select-customize-input) .ant-select-selector:hover {
@@ -170,7 +170,7 @@
 }
 
 .ant-dropdown-menu-item {
-  border-radius: 8px !important;
+  border-radius: 4px !important;
   color: var(--text-primary) !important;
 }
 
@@ -189,14 +189,43 @@
 /* Modal */
 .ant-modal-content {
   background: var(--bg-base) !important;
-  border-radius: 16px !important;
+  border-radius: 4px !important;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15) !important;
+  border: 1px solid var(--border-color);
 }
 
 .ant-modal-header {
   background: var(--bg-base) !important;
-  border-bottom-color: var(--border-color) !important;
-  border-radius: 16px 16px 0 0 !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  border-radius: 4px 4px 0 0 !important;
+  padding: 16px 20px !important;
+  margin-bottom: 0 !important;
+}
+
+.ant-modal-title {
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+  font-size: 15px !important;
+}
+
+.ant-modal-body {
+  padding: 20px !important;
+  color: var(--text-primary);
+}
+
+.ant-modal-footer {
+  border-top: 1px solid var(--border-light) !important;
+  padding: 12px 20px !important;
+  background: var(--bg-base) !important;
+  border-radius: 0 0 4px 4px !important;
+}
+
+.ant-modal-close-icon {
+  color: var(--text-tertiary) !important;
+}
+
+.ant-modal-close:hover .ant-modal-close-icon {
+  color: var(--text-primary) !important;
 }
 
 /* Tag */

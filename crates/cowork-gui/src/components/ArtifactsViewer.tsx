@@ -1,14 +1,34 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import ReactMarkdown from 'react-markdown';
 import { remarkPlugins, fullRehypePlugins } from '@/utils/markdown';
-import { App, Tabs, Spin, Alert, Empty, Button, Space, Tooltip } from 'antd';
-import { FileTextOutlined, ProjectOutlined, DatabaseOutlined, BuildOutlined, CheckCircleOutlined, FileMarkdownOutlined, FolderOpenOutlined, ReloadOutlined } from '@ant-design/icons';
+import { App, Tabs, Empty, Button, Space, Tooltip } from 'antd';
+import { FileTextOutlined, ProjectOutlined, BuildOutlined, CheckCircleOutlined, FileMarkdownOutlined, FolderOpenOutlined, ReloadOutlined } from '@ant-design/icons';
 
-// P1: JsonView 体积较大（~70KB raw），仅在用户切到 JSON 视图时才需要加载。
-// 用 React.lazy 拆成独立 chunk，避免在仅查看 markdown 文档时也被一起加载。
-// 同时复用类型，避免破坏后续 JsonView 的 props 类型推断。
-const JsonView = lazy(() => import('react-json-view'));
+// Native JSON renderer — avoids react-json-view's React 19 incompatibility (white-screen crash).
+const renderJson = (data: unknown) => {
+  let text: string;
+  try {
+    text = JSON.stringify(data, null, 2);
+  } catch {
+    text = String(data);
+  }
+  return (
+    <pre className="artifact-json-view" style={{
+      margin: 0,
+      padding: '14px 16px',
+      background: '#1e293b',
+      color: '#e2e8f0',
+      borderRadius: 6,
+      fontSize: 13,
+      lineHeight: 1.6,
+      fontFamily: "'JetBrains Mono', 'Consolas', 'Monaco', monospace",
+      overflow: 'auto',
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-word',
+    }}>{text}</pre>
+  );
+};
 
 interface ArtifactsData {
   iteration_id?: string;
@@ -165,7 +185,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
               <Button size="small" icon={<FolderOpenOutlined />} onClick={handleOpenArtifactsFolder}>Open Folder</Button>
             </Tooltip>
           </div>
-          <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
+          <div className="artifact-content markdown-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
             <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.idea}</ReactMarkdown>
           </div>
         </div>
@@ -185,7 +205,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
               <Button size="small" icon={<FolderOpenOutlined />} onClick={handleOpenArtifactsFolder}>Open Folder</Button>
             </Tooltip>
           </div>
-          <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
+          <div className="artifact-content markdown-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
             <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.requirements}</ReactMarkdown>
           </div>
         </div>
@@ -215,17 +235,13 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
               )}
             </Space>
           </div>
-          <div className="artifact-content" style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+          <div className="artifact-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
             {artifacts.design_raw || designViewMode === 'doc' ? (
               <div className="markdown-content">
                 <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{designContent}</ReactMarkdown>
               </div>
             ) : (
-              <div style={{ overflow: 'auto', maxHeight: '100%' }}>
-                <Suspense fallback={<Spin />}>
-                  <JsonView src={artifacts.design as object} theme="monokai" displayObjectSize={false} enableClipboard={false} indentWidth={2} collapsed={false} quotesOnKeys={false} sortKeys={false} />
-                </Suspense>
-              </div>
+              renderJson(artifacts.design)
             )}
           </div>
         </div>
@@ -255,17 +271,13 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
               )}
             </Space>
           </div>
-          <div className="artifact-content" style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+          <div className="artifact-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
             {artifacts.plan_raw || planViewMode === 'doc' ? (
               <div className="markdown-content">
                 <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{planContent}</ReactMarkdown>
               </div>
             ) : (
-              <div style={{ overflow: 'auto', maxHeight: '100%' }}>
-                <Suspense fallback={<Spin />}>
-                  <JsonView src={artifacts.plan as object} theme="monokai" displayObjectSize={false} enableClipboard={false} indentWidth={2} collapsed={false} quotesOnKeys={false} sortKeys={false} />
-                </Suspense>
-              </div>
+              renderJson(artifacts.plan)
             )}
           </div>
         </div>
@@ -285,12 +297,8 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
               <Button size="small" icon={<FolderOpenOutlined />} onClick={handleOpenWorkspaceFolder}>Open Folder</Button>
             </Tooltip>
           </div>
-          <div className="artifact-content" style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
-            <div style={{ overflow: 'auto', maxHeight: '100%' }}>
-              <Suspense fallback={<Spin />}>
-                <JsonView src={artifacts.code_files as unknown as object} theme="monokai" displayObjectSize={false} enableClipboard={false} indentWidth={2} collapsed={false} quotesOnKeys={false} sortKeys={false} />
-              </Suspense>
-            </div>
+          <div className="artifact-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+            {renderJson(artifacts.code_files)}
           </div>
         </div>
       ) : null,
@@ -309,7 +317,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
               <Button size="small" icon={<FolderOpenOutlined />} onClick={handleOpenArtifactsFolder}>Open Folder</Button>
             </Tooltip>
           </div>
-          <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
+          <div className="artifact-content markdown-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
             <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.check_report}</ReactMarkdown>
           </div>
         </div>
@@ -329,7 +337,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
               <Button size="small" icon={<FolderOpenOutlined />} onClick={handleOpenArtifactsFolder}>Open Folder</Button>
             </Tooltip>
           </div>
-          <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
+          <div className="artifact-content markdown-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
             <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.delivery_report}</ReactMarkdown>
           </div>
         </div>

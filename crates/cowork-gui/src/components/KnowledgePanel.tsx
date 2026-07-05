@@ -206,8 +206,8 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
           ) : currentIterationInfo ? (
             // Current iteration is selected but has no knowledge - show generate option
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div style={{ padding: "12px", backgroundColor: "#e6f7ff", borderRadius: "8px", border: "1px solid #91d5ff", marginBottom: "8px" }}>
-                <Text style={{ color: "#1890ff" }}>Current iteration has no knowledge. Generate knowledge for it:</Text>
+              <div style={{ padding: "12px", background: "var(--info-light)", borderRadius: "6px", border: "1px solid var(--border-light)", borderLeft: "3px solid var(--info)", marginBottom: "8px" }}>
+                <Text style={{ color: "var(--primary)" }}>Current iteration has no knowledge. Generate knowledge for it:</Text>
               </div>
               <Card size="small" hoverable>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
@@ -241,8 +241,8 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
           ) : iterations.length > 0 ? (
             // No current iteration selected - show all completed iterations
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div style={{ padding: "12px", backgroundColor: "#f6ffed", borderRadius: "8px", border: "1px solid #b7eb8f", marginBottom: "8px" }}>
-                <Text style={{ color: "#52c41a" }}>No knowledge found. You can generate knowledge for completed iterations:</Text>
+              <div style={{ padding: "12px", background: "var(--success-light)", borderRadius: "6px", border: "1px solid var(--border-light)", borderLeft: "3px solid var(--success)", marginBottom: "8px" }}>
+                <Text style={{ color: "var(--success)" }}>No knowledge found. You can generate knowledge for completed iterations:</Text>
               </div>
               {iterations.map((iteration) => (
                 <Card key={iteration.id} size="small" hoverable>
@@ -318,7 +318,7 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
       <Modal
         title={
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <BookOutlined style={{ fontSize: "18px", color: "#1890ff" }} />
+            <BookOutlined style={{ fontSize: "18px", color: "var(--primary)" }} />
             <span style={{ fontSize: "16px", fontWeight: 600 }}>{selectedKnowledge?.title}</span>
             <Tag color="geekblue">{selectedKnowledge?.iteration_id?.slice(0, 8)}</Tag>
           </div>
@@ -328,7 +328,7 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
         footer={null}
         width={900}
         style={{ top: "5vh" }}
-        styles={{ body: { padding: "24px", maxHeight: "75vh", overflow: "auto" } }}
+        styles={{ body: { padding: "20px", maxHeight: "75vh", overflow: "auto" } }}
       >
         {selectedKnowledge && (
           <Tabs
@@ -339,41 +339,41 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
                 label: <span><FileTextOutlined /> Summary</span>,
                 children: (
                   <div style={{ padding: "12px 0" }}>
-                    <Space orientation="vertical" style={{ width: "100%" }} size="large">
+                    <Space orientation="vertical" style={{ width: "100%" }} size="middle">
                       {selectedKnowledge.idea_summary && (
-                        <div style={{ padding: "16px", backgroundColor: "#f6ffed", borderRadius: "8px", border: "1px solid #b7eb8f" }}>
+                        <div style={{ padding: "16px", background: "var(--bg-elevated)", borderRadius: "6px", border: "1px solid var(--border-light)", borderLeft: "3px solid var(--success)" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                            <RocketOutlined style={{ color: "#52c41a", fontSize: "16px" }} />
-                            <Title level={5} style={{ margin: 0, color: "#52c41a" }}>Idea Summary</Title>
+                            <RocketOutlined style={{ color: "var(--success)", fontSize: "16px" }} />
+                            <Title level={5} style={{ margin: 0, color: "var(--success)" }}>Idea Summary</Title>
                           </div>
-                          <Paragraph style={{ margin: 0, lineHeight: "1.8", color: "#333" }}>{selectedKnowledge.idea_summary}</Paragraph>
+                          <Paragraph style={{ margin: 0, lineHeight: "1.8", color: "var(--text-primary)" }}>{selectedKnowledge.idea_summary}</Paragraph>
                         </div>
                       )}
                       {selectedKnowledge.design_summary && (
-                        <div style={{ padding: "16px", backgroundColor: "#f9f0ff", borderRadius: "8px", border: "1px solid #d3adf7" }}>
+                        <div style={{ padding: "16px", background: "var(--bg-elevated)", borderRadius: "6px", border: "1px solid var(--border-light)", borderLeft: "3px solid #722ed1" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
                             <EyeOutlined style={{ color: "#722ed1", fontSize: "16px" }} />
                             <Title level={5} style={{ margin: 0, color: "#722ed1" }}>Design Summary</Title>
                           </div>
-                          <Paragraph style={{ margin: 0, lineHeight: "1.8", color: "#333" }}>{selectedKnowledge.design_summary}</Paragraph>
+                          <Paragraph style={{ margin: 0, lineHeight: "1.8", color: "var(--text-primary)" }}>{selectedKnowledge.design_summary}</Paragraph>
                         </div>
                       )}
                       {selectedKnowledge.plan_summary && (
-                        <div style={{ padding: "16px", backgroundColor: "#fff7e6", borderRadius: "8px", border: "1px solid #ffd591" }}>
+                        <div style={{ padding: "16px", background: "var(--bg-elevated)", borderRadius: "6px", border: "1px solid var(--border-light)", borderLeft: "3px solid var(--warning)" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                            <FileTextOutlined style={{ color: "#fa8c16", fontSize: "16px" }} />
-                            <Title level={5} style={{ margin: 0, color: "#fa8c16" }}>Plan Summary</Title>
+                            <FileTextOutlined style={{ color: "var(--warning)", fontSize: "16px" }} />
+                            <Title level={5} style={{ margin: 0, color: "var(--warning)" }}>Plan Summary</Title>
                           </div>
-                          <Paragraph style={{ margin: 0, lineHeight: "1.8", color: "#333" }}>{selectedKnowledge.plan_summary}</Paragraph>
+                          <Paragraph style={{ margin: 0, lineHeight: "1.8", color: "var(--text-primary)" }}>{selectedKnowledge.plan_summary}</Paragraph>
                         </div>
                       )}
                       {selectedKnowledge.code_structure && (
-                        <div style={{ padding: "16px", backgroundColor: "#e6f7ff", borderRadius: "8px", border: "1px solid #91d5ff" }}>
+                        <div style={{ padding: "16px", background: "var(--bg-elevated)", borderRadius: "6px", border: "1px solid var(--border-light)", borderLeft: "3px solid var(--primary)" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                            <CodeOutlined style={{ color: "#1890ff", fontSize: "16px" }} />
-                            <Title level={5} style={{ margin: 0, color: "#1890ff" }}>Code Structure</Title>
+                            <CodeOutlined style={{ color: "var(--primary)", fontSize: "16px" }} />
+                            <Title level={5} style={{ margin: 0, color: "var(--primary)" }}>Code Structure</Title>
                           </div>
-                          <Paragraph style={{ margin: 0, lineHeight: "1.8", color: "#333", whiteSpace: "pre-wrap" }}>{selectedKnowledge.code_structure}</Paragraph>
+                          <Paragraph style={{ margin: 0, lineHeight: "1.8", color: "var(--text-primary)", whiteSpace: "pre-wrap" }}>{selectedKnowledge.code_structure}</Paragraph>
                         </div>
                       )}
                     </Space>
@@ -386,7 +386,7 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
                 children: (
                   <div style={{ padding: "12px 0" }}>
                     {selectedKnowledge.tech_stack?.length > 0 ? (
-                      <div style={{ padding: "16px", backgroundColor: "#f5f5f5", borderRadius: "8px" }}>
+                      <div style={{ padding: "16px", background: "var(--bg-elevated)", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                         <Text strong style={{ display: "block", marginBottom: "12px", fontSize: "14px" }}>Tech Stack</Text>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                           {selectedKnowledge.tech_stack.map((tech, idx) => <Tag key={`tech-${idx}`} color="blue" style={{ padding: "4px 12px", fontSize: "13px" }}>{tech}</Tag>)}
@@ -402,7 +402,7 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
                 children: (
                   <div style={{ padding: "12px 0" }}>
                     {selectedKnowledge.key_decisions?.length > 0 ? (
-                      <Timeline style={{ marginTop: "12px" }} items={selectedKnowledge.key_decisions.map((decision) => ({ children: <div style={{ padding: "12px", backgroundColor: "#fff", borderRadius: "6px", border: "1px solid #e8e8e8" }}><Paragraph style={{ margin: 0, lineHeight: "1.8", color: "#333" }}>{decision}</Paragraph></div> }))} />
+                      <Timeline style={{ marginTop: "12px" }} items={selectedKnowledge.key_decisions.map((decision) => ({ children: <div style={{ padding: "12px", background: "var(--bg-base)", borderRadius: "6px", border: "1px solid var(--border-color)" }}><Paragraph style={{ margin: 0, lineHeight: "1.8", color: "var(--text-primary)" }}>{decision}</Paragraph></div> }))} />
                     ) : <Empty description="No key decisions recorded" />}
                   </div>
                 ),
@@ -415,8 +415,8 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
                     {selectedKnowledge.key_patterns?.length > 0 ? (
                       <Space orientation="vertical" style={{ width: "100%" }} size="middle">
                         {selectedKnowledge.key_patterns.map((pattern, idx) => (
-                          <div key={`pattern-${idx}`} style={{ padding: "16px", backgroundColor: "#f9f0ff", borderRadius: "8px", border: "1px solid #d3adf7" }}>
-                            <Paragraph style={{ margin: 0, lineHeight: "1.8", color: "#333" }}>{pattern}</Paragraph>
+                          <div key={`pattern-${idx}`} style={{ padding: "16px", background: "var(--bg-elevated)", borderRadius: "6px", border: "1px solid var(--border-light)", borderLeft: "3px solid #722ed1" }}>
+                            <Paragraph style={{ margin: 0, lineHeight: "1.8", color: "var(--text-primary)" }}>{pattern}</Paragraph>
                           </div>
                         ))}
                       </Space>
@@ -432,10 +432,10 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
                     {selectedKnowledge.known_issues?.length > 0 ? (
                       <Space orientation="vertical" style={{ width: "100%" }} size="middle">
                         {selectedKnowledge.known_issues.map((issue, idx) => (
-                          <div key={`issue-${idx}`} style={{ padding: "16px", backgroundColor: "#fff2f0", borderRadius: "8px", border: "1px solid #ffccc7" }}>
+                          <div key={`issue-${idx}`} style={{ padding: "16px", background: "var(--bg-elevated)", borderRadius: "6px", border: "1px solid var(--border-light)", borderLeft: "3px solid var(--error)" }}>
                             <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-                              <CloseCircleOutlined style={{ color: "#ff4d4f", marginTop: "6px" }} />
-                              <Paragraph style={{ margin: 0, lineHeight: "1.8", color: "#333", flex: 1 }}>{issue}</Paragraph>
+                              <CloseCircleOutlined style={{ color: "var(--error)", marginTop: "6px" }} />
+                              <Paragraph style={{ margin: 0, lineHeight: "1.8", color: "var(--text-primary)", flex: 1 }}>{issue}</Paragraph>
                             </div>
                           </div>
                         ))}

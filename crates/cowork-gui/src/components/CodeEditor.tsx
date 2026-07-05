@@ -304,20 +304,59 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
     return (
       <div style={{ textAlign: 'center', padding: '40px' }}>
         <Spin size="large" />
-        <div style={{ marginTop: '16px', color: '#999' }}>Loading files...</div>
+        <div style={{ marginTop: '16px', color: 'var(--text-secondary)' }}>Loading files...</div>
       </div>
     );
   }
 
   if (error) {
+    const isMissingWorkspace = error.toLowerCase().includes('workspace not found')
+      || error.toLowerCase().includes('iteration directory not found');
     return (
-      <Alert
-        message="Error loading files"
-        description={error}
-        type="error"
-        showIcon
-        action={<button onClick={loadFileTree}>Retry</button>}
-      />
+      <div style={{ padding: '40px', height: '100%', overflow: 'auto' }}>
+        <Alert
+          message={isMissingWorkspace ? 'No code workspace yet' : 'Error loading files'}
+          description={
+            isMissingWorkspace ? (
+              <>
+                <div style={{ marginBottom: 8 }}>
+                  The code workspace for this iteration does not exist yet.
+                </div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+                  Run the iteration through the <strong>Coding</strong> stage to generate code files.
+                  Use the <strong>Collaborate</strong> tab to start or continue the iteration.
+                </div>
+              </>
+            ) : error
+          }
+          type={isMissingWorkspace ? 'info' : 'error'}
+          showIcon
+          action={<Button size="small" onClick={loadFileTree}>Retry</Button>}
+        />
+      </div>
+    );
+  }
+
+  // Detect empty workspace (root with no children)
+  const isEmptyWorkspace = !fileTree
+    || (!fileTree.children || fileTree.children.length === 0);
+
+  if (isEmptyWorkspace) {
+    return (
+      <div style={{ padding: '40px', height: '100%', overflow: 'auto' }}>
+        <Empty
+          description={
+            <span>
+              <div style={{ marginBottom: 8 }}>No code files in this workspace yet.</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+                Code files appear here after the Coding stage runs.
+              </div>
+            </span>
+          }
+        >
+          <Button icon={<ReloadOutlined />} onClick={loadFileTree}>Refresh</Button>
+        </Empty>
+      </div>
     );
   }
 

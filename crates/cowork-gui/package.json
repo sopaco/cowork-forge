@@ -19,7 +19,6 @@
     "antd": "^6.5.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-json-view": "^1.21.3",
     "react-markdown": "^10.1.0",
     "react-window": "^1.8.11",
     "rehype-highlight": "^7.0.2",
