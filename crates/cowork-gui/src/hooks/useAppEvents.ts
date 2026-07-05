@@ -346,15 +346,20 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 				}),
 
 				// Input request event
-				listen('input_request', async (event) => {
-					const [requestId, prompt, options] = event.payload as [string, string, InputOption[]];
-					updateCurrentIterationStatus('Paused');
+			listen('input_request', async (event) => {
+				const [requestId, prompt, options] = event.payload as [string, string, InputOption[]];
+				updateCurrentIterationStatus('Paused');
 
-					const artifactMatch = prompt.match(/\[ARTIFACT_TYPE:(\w+)\]$/);
-					if (artifactMatch) {
-						const artifactType = artifactMatch[1];
-						const cleanPrompt = prompt.replace(/\[ARTIFACT_TYPE:\w+\]$/, '').trim();
+				const artifactMatch = prompt.match(/\[ARTIFACT_TYPE:(\w+)\]$/);
+				if (artifactMatch) {
+					const artifactType = artifactMatch[1];
+					const cleanPrompt = prompt.replace(/\[ARTIFACT_TYPE:\w+\]$/, '').trim();
 
+					// Best-effort iteration refresh — must NOT block the confirmation
+					// dialog. If these API calls throw, we still need to surface the
+					// confirmation to the user so the pipeline can advance (otherwise
+					// the user is stuck at "Code Agent (External) Stage: Coding").
+					try {
 						await loadIterations();
 						const latestIterations = useProjectStore.getState().iterations;
 						if (latestIterations && latestIterations.length > 0) {
@@ -362,19 +367,22 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 							const fullIteration = await API.iteration.get(latestIteration.id);
 							setCurrentIteration(fullIteration);
 						}
-
-						setInputRequest({
-							requestId,
-							prompt: cleanPrompt,
-							options,
-							isArtifactConfirmation: true,
-							artifactType
-						});
-					} else {
-						setInputRequest({ requestId, prompt, options });
+					} catch (err) {
+						console.error('[App] Failed to refresh iteration before confirmation:', err);
 					}
-					setUserInput('');
-				}),
+
+					setInputRequest({
+						requestId,
+						prompt: cleanPrompt,
+						options,
+						isArtifactConfirmation: true,
+						artifactType
+					});
+				} else {
+					setInputRequest({ requestId, prompt, options });
+				}
+				setUserInput('');
+			}),
 
 				// Project events
 				listen('project_loaded', async () => {

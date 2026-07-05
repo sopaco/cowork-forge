@@ -133,7 +133,10 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
         )}
       </div>
 
-      {/* Processing Indicator */}
+      {/* Processing Indicator (hidden when a confirmation dialog is pending,
+          so the user clearly sees the Input Required block instead of the
+          "Code Agent (External) Stage: Coding" spinner that caused reports of
+          the pipeline appearing "stuck" after the agent had finished) */}
       {mode === 'pm_agent' ? (
         pmProcessing && (
           <div className="chat-processing-bar" style={{ background: 'var(--success-light)', color: 'var(--success)', borderBottomColor: 'var(--success)' }}>
@@ -142,7 +145,7 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
           </div>
         )
       ) : (
-        isProcessing && currentAgent && (
+        isProcessing && currentAgent && !inputRequest && (
           <div className="chat-processing-bar">
             <Spin size="small" />
             <span>{currentAgent}</span>
