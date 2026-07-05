@@ -124,7 +124,6 @@ crates/
       interaction/
         cli.rs
         mod.rs
-        tauri.rs
       llm/
         mod.rs
         rate_limiter.rs
@@ -339,562 +338,570 @@ LICENSE
 
 ## Files
 
-### crates/cowork-core/src/pipeline/stage_executor.rs (553 lines)
+### crates/cowork-core/src/pipeline/stage_executor.rs (561 lines)
 
 ```
-1: get_save_tool_name
+1: check_event_for_goto_stage
 2: ⋮----
-3: (stage_name: &str)
+3: (event: &Event)
 4: ⋮----
-5: get_artifact_filename
+5: get_save_tool_name
 6: ⋮----
 7: (stage_name: &str)
 8: ⋮----
-9: get_display_name
+9: get_artifact_filename
 10: ⋮----
-11: (agent_name: &str)
+11: (stage_name: &str)
 12: ⋮----
-13: execute_stage_with_instruction
+13: get_display_name
 14: ⋮----
-15: (
-16:     ctx: &PipelineContext,
-17:     interaction: Arc<dyn InteractiveBackend>,
-18:     stage_name: &str,
-19:     instruction: &str,
-20:     feedback: Option<&str>,
-21: )
+15: (agent_name: &str)
+16: ⋮----
+17: check_pending_critic_feedback
+18: ⋮----
+19: (stage_name: &str)
+20: ⋮----
+21: execute_stage_with_instruction
 22: ⋮----
-23: execute_stage_with_instruction_and_context
-24: ⋮----
-25: (
-26:     ctx: &PipelineContext,
-27:     interaction: Arc<dyn InteractiveBackend>,
-28:     stage_name: &str,
-29:     _instruction: &str,
-30:     feedback: Option<&str>,
-31:     extra_context: Option<&str>,
-32: )
-33: ⋮----
-34: get_truncated_message
-35: ⋮----
-36: ()
-37: ⋮----
-38: truncate_content
-39: ⋮----
-40: (content: &str, max_chars: usize)
+23: (
+24:     ctx: &PipelineContext,
+25:     interaction: Arc<dyn InteractiveBackend>,
+26:     stage_name: &str,
+27:     instruction: &str,
+28:     feedback: Option<&str>,
+29: )
+30: ⋮----
+31: execute_stage_with_instruction_and_context
+32: ⋮----
+33: (
+34:     ctx: &PipelineContext,
+35:     interaction: Arc<dyn InteractiveBackend>,
+36:     stage_name: &str,
+37:     _instruction: &str,
+38:     feedback: Option<&str>,
+39:     extra_context: Option<&str>,
+40: )
 41: ⋮----
-42: format_artifact_block
+42: get_truncated_message
 43: ⋮----
-44: (label: &str, content: &str, load_tool: &str)
+44: ()
 45: ⋮----
-46: load_artifact_content
+46: truncate_content
 47: ⋮----
-48: (ctx: &PipelineContext, artifact_name: &str)
+48: (content: &str, max_chars: usize)
 49: ⋮----
-50: build_prompt
+50: format_artifact_block
 51: ⋮----
-52: (
-53:     ctx: &PipelineContext,
-54:     stage_name: &str,
-55:     feedback: Option<&str>,
-56:     extra_context: Option<&str>,
-57: )
-58: ⋮----
-59: SimpleInvocationContext
-60: ⋮----
-61: {
-62:     invocation_id: String,
-63:     agent_name: String,
-64:     user_id: String,
-65:     app_name: String,
-66:     session_id: String,
-67:     branch: String,
-68:     user_content: Content,
-69:     agent: Arc<dyn adk_core::Agent>,
-70:     memory: Option<Arc<dyn adk_core::Memory>>,
-71:     session: Box<dyn adk_core::Session>,
-72:     run_config: adk_core::RunConfig,
-73:     ended: std::sync::atomic::AtomicBool,
-74:     artifacts: Option<Arc<dyn adk_core::Artifacts>>,
-75: }
-76: ⋮----
-77: SimpleInvocationContext
-78: ⋮----
-79: {
-80:     pub fn new(ctx: &PipelineContext, content: &Content, agent: Arc<dyn adk_core::Agent>) -> Self {
-81:         Self {
-82:             invocation_id: uuid::Uuid::new_v4().to_string(),
-83:             agent_name: agent.name().to_string(),
-84:             user_id: "default_user".to_string(),
-85:             app_name: "cowork_forge".to_string(),
-86:             session_id: ctx.iteration.id.clone(),
-87:             branch: "main".to_string(),
-88:             user_content: content.clone(),
-89:             agent,
-90:             // Memory and Artifacts are ALSO available through dedicated tools
-91:             // (QueryMemoryTool, LoadArtifactTool, etc.). We wire them into the
-92:             // InvocationContext so that framework callbacks, plugins, or future
-93:             // agents that rely on ctx.memory() / ctx.artifacts() work correctly.
-94:             memory: Some(Arc::new(SimpleMemory::new(&ctx.iteration.id))),
-95:             session: Box::new(SimpleSession::new(&ctx.iteration.id, content.clone())),
-96:             run_config: adk_core::RunConfig {
-97:                 streaming_mode: adk_core::StreamingMode::SSE,
-98:                 ..adk_core::RunConfig::default()
-99:             },
-100:             ended: std::sync::atomic::AtomicBool::new(false),
-101:             artifacts: Some(Arc::new(SimpleArtifacts::new(&ctx.iteration.id))),
-102:         }
-103:     }
-104: }
-105: ⋮----
-106: SimpleInvocationContext
-107: ⋮----
-108: {
-109:     fn clone(&self) -> Self {
-110:         Self {
-111:             invocation_id: self.invocation_id.clone(),
-112:             agent_name: self.agent_name.clone(),
-113:             user_id: self.user_id.clone(),
-114:             app_name: self.app_name.clone(),
-115:             session_id: self.session_id.clone(),
-116:             branch: self.branch.clone(),
-117:             user_content: self.user_content.clone(),
-118:             agent: self.agent.clone(),
-119:             memory: self.memory.clone(),
-120:             // session can't be cloned, create a new one
-121:             session: Box::new(SimpleSession::new(
-122:                 &self.session_id,
-123:                 self.user_content.clone(),
-124:             )),
-125:             run_config: self.run_config.clone(),
-126:             ended: std::sync::atomic::AtomicBool::new(
-127:                 self.ended.load(std::sync::atomic::Ordering::SeqCst),
-128:             ),
-129:             artifacts: self.artifacts.clone(),
-130:         }
-131:     }
-132: }
-133: ⋮----
-134: SimpleInvocationContext
-135: ⋮----
-136: {
-137:     fn agent(&self) -> Arc<dyn adk_core::Agent> {
-138:         self.agent.clone()
+52: (label: &str, content: &str, load_tool: &str)
+53: ⋮----
+54: load_artifact_content
+55: ⋮----
+56: (ctx: &PipelineContext, artifact_name: &str)
+57: ⋮----
+58: build_prompt
+59: ⋮----
+60: (
+61:     ctx: &PipelineContext,
+62:     stage_name: &str,
+63:     feedback: Option<&str>,
+64:     extra_context: Option<&str>,
+65: )
+66: ⋮----
+67: SimpleInvocationContext
+68: ⋮----
+69: {
+70:     invocation_id: String,
+71:     agent_name: String,
+72:     user_id: String,
+73:     app_name: String,
+74:     session_id: String,
+75:     branch: String,
+76:     user_content: Content,
+77:     agent: Arc<dyn adk_core::Agent>,
+78:     memory: Option<Arc<dyn adk_core::Memory>>,
+79:     session: Box<dyn adk_core::Session>,
+80:     run_config: adk_core::RunConfig,
+81:     ended: std::sync::atomic::AtomicBool,
+82:     artifacts: Option<Arc<dyn adk_core::Artifacts>>,
+83: }
+84: ⋮----
+85: SimpleInvocationContext
+86: ⋮----
+87: {
+88:     pub fn new(ctx: &PipelineContext, content: &Content, agent: Arc<dyn adk_core::Agent>) -> Self {
+89:         Self {
+90:             invocation_id: uuid::Uuid::new_v4().to_string(),
+91:             agent_name: agent.name().to_string(),
+92:             user_id: "default_user".to_string(),
+93:             app_name: "cowork_forge".to_string(),
+94:             session_id: ctx.iteration.id.clone(),
+95:             branch: "main".to_string(),
+96:             user_content: content.clone(),
+97:             agent,
+98:             // Memory and Artifacts are ALSO available through dedicated tools
+99:             // (QueryMemoryTool, LoadArtifactTool, etc.). We wire them into the
+100:             // InvocationContext so that framework callbacks, plugins, or future
+101:             // agents that rely on ctx.memory() / ctx.artifacts() work correctly.
+102:             memory: Some(Arc::new(SimpleMemory::new(&ctx.iteration.id))),
+103:             session: Box::new(SimpleSession::new(&ctx.iteration.id, content.clone())),
+104:             run_config: adk_core::RunConfig {
+105:                 streaming_mode: adk_core::StreamingMode::SSE,
+106:                 ..adk_core::RunConfig::default()
+107:             },
+108:             ended: std::sync::atomic::AtomicBool::new(false),
+109:             artifacts: Some(Arc::new(SimpleArtifacts::new(&ctx.iteration.id))),
+110:         }
+111:     }
+112: }
+113: ⋮----
+114: SimpleInvocationContext
+115: ⋮----
+116: {
+117:     fn clone(&self) -> Self {
+118:         Self {
+119:             invocation_id: self.invocation_id.clone(),
+120:             agent_name: self.agent_name.clone(),
+121:             user_id: self.user_id.clone(),
+122:             app_name: self.app_name.clone(),
+123:             session_id: self.session_id.clone(),
+124:             branch: self.branch.clone(),
+125:             user_content: self.user_content.clone(),
+126:             agent: self.agent.clone(),
+127:             memory: self.memory.clone(),
+128:             // session can't be cloned, create a new one
+129:             session: Box::new(SimpleSession::new(
+130:                 &self.session_id,
+131:                 self.user_content.clone(),
+132:             )),
+133:             run_config: self.run_config.clone(),
+134:             ended: std::sync::atomic::AtomicBool::new(
+135:                 self.ended.load(std::sync::atomic::Ordering::SeqCst),
+136:             ),
+137:             artifacts: self.artifacts.clone(),
+138:         }
 139:     }
-140: 
-141:     fn memory(&self) -> Option<Arc<dyn adk_core::Memory>> {
-142:         self.memory.clone()
-143:     }
-144: 
-145:     fn session(&self) -> &dyn adk_core::Session {
-146:         self.session.as_ref()
+140: }
+141: ⋮----
+142: SimpleInvocationContext
+143: ⋮----
+144: {
+145:     fn agent(&self) -> Arc<dyn adk_core::Agent> {
+146:         self.agent.clone()
 147:     }
 148: 
-149:     fn run_config(&self) -> &adk_core::RunConfig {
-150:         &self.run_config
+149:     fn memory(&self) -> Option<Arc<dyn adk_core::Memory>> {
+150:         self.memory.clone()
 151:     }
 152: 
-153:     fn end_invocation(&self) {
-154:         self.ended.store(true, std::sync::atomic::Ordering::SeqCst);
+153:     fn session(&self) -> &dyn adk_core::Session {
+154:         self.session.as_ref()
 155:     }
 156: 
-157:     fn ended(&self) -> bool {
-158:         self.ended.load(std::sync::atomic::Ordering::SeqCst)
+157:     fn run_config(&self) -> &adk_core::RunConfig {
+158:         &self.run_config
 159:     }
-160: }
-161: ⋮----
-162: SimpleInvocationContext
-163: ⋮----
-164: {
-165:     fn artifacts(&self) -> Option<Arc<dyn adk_core::Artifacts>> {
-166:         self.artifacts.clone()
+160: 
+161:     fn end_invocation(&self) {
+162:         self.ended.store(true, std::sync::atomic::Ordering::SeqCst);
+163:     }
+164: 
+165:     fn ended(&self) -> bool {
+166:         self.ended.load(std::sync::atomic::Ordering::SeqCst)
 167:     }
 168: }
 169: ⋮----
 170: SimpleInvocationContext
 171: ⋮----
 172: {
-173:     fn invocation_id(&self) -> &str {
-174:         &self.invocation_id
+173:     fn artifacts(&self) -> Option<Arc<dyn adk_core::Artifacts>> {
+174:         self.artifacts.clone()
 175:     }
-176: 
-177:     fn agent_name(&self) -> &str {
-178:         &self.agent_name
-179:     }
-180: 
-181:     fn user_id(&self) -> &str {
-182:         &self.user_id
+176: }
+177: ⋮----
+178: SimpleInvocationContext
+179: ⋮----
+180: {
+181:     fn invocation_id(&self) -> &str {
+182:         &self.invocation_id
 183:     }
 184: 
-185:     fn app_name(&self) -> &str {
-186:         &self.app_name
+185:     fn agent_name(&self) -> &str {
+186:         &self.agent_name
 187:     }
 188: 
-189:     fn session_id(&self) -> &str {
-190:         &self.session_id
+189:     fn user_id(&self) -> &str {
+190:         &self.user_id
 191:     }
 192: 
-193:     fn banch(&self) -> &str {
-194:         &self.banch
+193:     fn app_name(&self) -> &str {
+194:         &self.app_name
 195:     }
 196: 
-197:     fn user_content(&self) -> &Content {
-198:         &self.user_content
+197:     fn session_id(&self) -> &str {
+198:         &self.session_id
 199:     }
-200: }
-201: ⋮----
-202: SimpleSession
-203: ⋮----
-204: {
-205:     session_id: String,
-206:     app_name: String,
-207:     user_id: String,
-208:     simple_state: SimpleState,
-209:     messages: std::sync::Mutex<Vec<Content>>,
-210:     history_path: std::path::PathBuf,
-211: }
-212: ⋮----
-213: SimpleSession
-214: ⋮----
-215: {
-216:     fn new(session_id: &str, initial_message: Content) -> Self {
-217:         let history_path = crate::persistence::get_cowork_dir()
-218:             .map(|dir| dir.join("iterations").join(session_id).join("session_history.jsonl"))
-219:             .unwrap_or_else(|_| {
-220:                 std::path::PathBuf::from(".cowork-v2")
-221:                     .join("iterations")
-222:                     .join(session_id)
-223:                     .join("session_history.jsonl")
-224:             });
-225: 
-226:         
-227:         let mut messages = Vec::new();
-228:         if let Some(parent) = history_path.parent() {
-229:             let _ = std::fs::create_dir_all(parent);
-230:         }
-231:         if history_path.exists()
-232:             && let Ok(contents) = std::fs::read_to_string(&history_path)
-233:         {
-234:             for line in contents.lines() {
-235:                 if line.trim().is_empty() {
-236:                     continue;
-237:                 }
-238:                 if let Ok(content) = serde_json::from_str::<Content>(line) {
-239:                     messages.push(content);
-240:                 }
-241:             }
-242:         }
-243: 
-244:         
-245:         
-246:         
-247:         messages.push(initial_message.clone());
-248: 
-249:         Self {
-250:             session_id: session_id.to_string(),
-251:             app_name: "cowork_forge".to_string(),
-252:             user_id: "default_user".to_string(),
-253:             simple_state: SimpleState::new(),
-254:             messages: std::sync::Mutex::new(messages),
-255:             history_path,
-256:         }
-257:     }
-258: 
-259:     fn append_message_to_file(
-260:         path: &std::path::PathBuf,
-261:         content: &Content,
-262:     ) -> anyhow::Result<()> {
-263:         let line = serde_json::to_string(content)?;
-264:         use std::io::Write;
-265:         let mut file = std::fs::OpenOptions::new()
-266:             .create(true)
-267:             .append(true)
-268:             .open(path)?;
-269:         writeln!(file, "{}", line)?;
-270:         Ok(())
-271:     }
-272: }
-273: ⋮----
-274: SimpleSession
-275: ⋮----
-276: {
-277:     fn id(&self) -> &str {
-278:         &self.session_id
+200: 
+201:     fn banch(&self) -> &str {
+202:         &self.banch
+203:     }
+204: 
+205:     fn user_content(&self) -> &Content {
+206:         &self.user_content
+207:     }
+208: }
+209: ⋮----
+210: SimpleSession
+211: ⋮----
+212: {
+213:     session_id: String,
+214:     app_name: String,
+215:     user_id: String,
+216:     simple_state: SimpleState,
+217:     messages: std::sync::Mutex<Vec<Content>>,
+218:     history_path: std::path::PathBuf,
+219: }
+220: ⋮----
+221: SimpleSession
+222: ⋮----
+223: {
+224:     fn new(session_id: &str, initial_message: Content) -> Self {
+225:         let history_path = crate::persistence::get_cowork_dir()
+226:             .map(|dir| dir.join("iterations").join(session_id).join("session_history.jsonl"))
+227:             .unwrap_or_else(|_| {
+228:                 std::path::PathBuf::from(".cowork-v2")
+229:                     .join("iterations")
+230:                     .join(session_id)
+231:                     .join("session_history.jsonl")
+232:             });
+233: 
+234:         
+235:         let mut messages = Vec::new();
+236:         if let Some(parent) = history_path.parent() {
+237:             let _ = std::fs::create_dir_all(parent);
+238:         }
+239:         if history_path.exists()
+240:             && let Ok(contents) = std::fs::read_to_string(&history_path)
+241:         {
+242:             for line in contents.lines() {
+243:                 if line.trim().is_empty() {
+244:                     continue;
+245:                 }
+246:                 if let Ok(content) = serde_json::from_str::<Content>(line) {
+247:                     messages.push(content);
+248:                 }
+249:             }
+250:         }
+251: 
+252:         
+253:         
+254:         
+255:         messages.push(initial_message.clone());
+256: 
+257:         Self {
+258:             session_id: session_id.to_string(),
+259:             app_name: "cowork_forge".to_string(),
+260:             user_id: "default_user".to_string(),
+261:             simple_state: SimpleState::new(),
+262:             messages: std::sync::Mutex::new(messages),
+263:             history_path,
+264:         }
+265:     }
+266: 
+267:     fn append_message_to_file(
+268:         path: &std::path::PathBuf,
+269:         content: &Content,
+270:     ) -> anyhow::Result<()> {
+271:         let line = serde_json::to_string(content)?;
+272:         use std::io::Write;
+273:         let mut file = std::fs::OpenOptions::new()
+274:             .create(true)
+275:             .append(true)
+276:             .open(path)?;
+277:         writeln!(file, "{}", line)?;
+278:         Ok(())
 279:     }
-280: 
-281:     fn app_name(&self) -> &str {
-282:         &self.app_name
-283:     }
-284: 
-285:     fn user_id(&self) -> &str {
-286:         &self.user_id
+280: }
+281: ⋮----
+282: SimpleSession
+283: ⋮----
+284: {
+285:     fn id(&self) -> &str {
+286:         &self.session_id
 287:     }
 288: 
-289:     fn state(&self) -> &dyn adk_core::State {
-290:         &self.simple_state
+289:     fn app_name(&self) -> &str {
+290:         &self.app_name
 291:     }
 292: 
-293:     fn conversation_history(&self) -> Vec<Content> {
-294:         self.messages.lock().map(|m| m.clone()).unwrap_or_default()
+293:     fn user_id(&self) -> &str {
+294:         &self.user_id
 295:     }
 296: 
-297:     fn append_to_history(&self, content: Content) {
-298:         if let Ok(mut messages) = self.messages.lock() {
-299:             messages.push(content.clone());
-300:         }
-301:         if let Err(e) = Self::append_message_to_file(&self.history_path, &content) {
-302:             tracing::warn!("Failed to persist session history: {}", e);
-303:         }
-304:     }
-305: }
-306: ⋮----
-307: SimpleArtifacts
-308: ⋮----
-309: {
-310:     artifacts_dir: std::path::PathBuf,
-311: }
-312: ⋮----
-313: SimpleArtifacts
+297:     fn state(&self) -> &dyn adk_core::State {
+298:         &self.simple_state
+299:     }
+300: 
+301:     fn conversation_history(&self) -> Vec<Content> {
+302:         self.messages.lock().map(|m| m.clone()).unwrap_or_default()
+303:     }
+304: 
+305:     fn append_to_history(&self, content: Content) {
+306:         if let Ok(mut messages) = self.messages.lock() {
+307:             messages.push(content.clone());
+308:         }
+309:         if let Err(e) = Self::append_message_to_file(&self.history_path, &content) {
+310:             tracing::warn!("Failed to persist session history: {}", e);
+311:         }
+312:     }
+313: }
 314: ⋮----
-315: {
-316:     fn new(iteration_id: &str) -> Self {
-317:         let artifacts_dir = crate::persistence::get_cowork_dir()
-318:             .map(|dir| dir.join("iterations").join(iteration_id).join("artifacts"))
-319:             .unwrap_or_else(|_| {
-320:                 std::path::PathBuf::from(".cowork-v2")
-321:                     .join("iterations")
-322:                     .join(iteration_id)
-323:                     .join("artifacts")
-324:             });
-325:         let _ = std::fs::create_dir_all(&artifacts_dir);
-326:         Self { artifacts_dir }
-327:     }
-328: 
-329:     fn safe_name(name: &str) -> Option<String> {
-330:         let sanitized: String = name
-331:             .chars()
-332:             .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
-333:             .collect();
-334:         if sanitized.is_empty() || sanitized != name {
-335:             None
-336:         } else {
-337:             Some(sanitized)
-338:         }
-339:     }
-340: 
-341:     fn path_for(&self, name: &str) -> Option<std::path::PathBuf> {
-342:         Self::safe_name(name).map(|n| self.artifacts_dir.join(n))
-343:     }
-344: }
-345: ⋮----
-346: SimpleArtifacts
-347: ⋮----
-348: {
-349:     async fn save(&self, name: &str, data: &adk_core::Part) -> adk_core::Result<i64> {
-350:         let path = self.path_for(name).ok_or_else(|| {
-351:             adk_core::AdkError::tool(format!("Invalid artifact name: {}", name))
-352:         })?;
-353: 
-354:         match data {
-355:             adk_core::Part::Text { text } => {
-356:                 std::fs::write(&path, text).map_err(|e| {
-357:                     adk_core::AdkError::tool(format!("Failed to write artifact {}: {}", name, e))
-358:                 })?;
-359:             }
-360:             adk_core::Part::InlineData { mime_type, data } => {
-361:                 let ext = match mime_type.as_str() {
-362:                     "text/markdown" | "text/plain" => "txt",
-363:                     "application/json" => "json",
-364:                     "image/png" => "png",
-365:                     "image/jpeg" => "jpg",
-366:                     _ => "bin",
-367:                 };
-368:                 let path = path.with_extension(ext);
-369:                 std::fs::write(&path, data).map_err(|e| {
-370:                     adk_core::AdkError::tool(format!("Failed to write artifact {}: {}", name, e))
-371:                 })?;
-372:             }
-373:             adk_core::Part::FileData { file_uri, .. } => {
-374:                 
-375:                 return Err(adk_core::AdkError::tool(format!(
-376:                     "Cannot save FileData artifact with URI: {}",
-377:                     file_uri
-378:                 )));
-379:             }
-380:             _ => {
-381:                 return Err(adk_core::AdkError::tool(
-382:                     "Unsupported artifact part type".to_string(),
-383:                 ));
-384:             }
-385:         }
-386:         Ok(1)
-387:     }
-388: 
-389:     async fn load(&self, name: &str) -> adk_core::Result<adk_core::Part> {
-390:         let path = self.path_for(name).ok_or_else(|| {
-391:             adk_core::AdkError::tool(format!("Invalid artifact name: {}", name))
-392:         })?;
-393: 
-394:         let data = std::fs::read(&path).map_err(|e| {
-395:             adk_core::AdkError::tool(format!("Failed to read artifact {}: {}", name, e))
-396:         })?;
-397: 
-398:         
-399:         if let Ok(text) = String::from_utf8(data.clone()) {
-400:             Ok(adk_core::Part::Text { text })
-401:         } else {
-402:             let mime_type = match path.extension().and_then(|e| e.to_str()) {
-403:                 Some("png") => "image/png",
-404:                 Some("jpg") | Some("jpeg") => "image/jpeg",
-405:                 _ => "application/octet-stream",
-406:             }
-407:             .to_string();
-408:             Ok(adk_core::Part::InlineData { mime_type, data })
-409:         }
-410:     }
-411: 
-412:     async fn list(&self) -> adk_core::Result<Vec<String>> {
-413:         let mut names = Vec::new();
-414:         if self.artifacts_dir.exists() {
-415:             for entry in std::fs::read_dir(&self.artifacts_dir).map_err(|e| {
-416:                 adk_core::AdkError::tool(format!("Failed to list artifacts: {}", e))
-417:             })? {
-418:                 let entry = entry.map_err(|e| adk_core::AdkError::tool(format!("Failed to read artifact entry: {}", e)))?;
-419:                 if entry.file_type().map(|t| t.is_file()).unwrap_or(false)
-420:                     && let Some(name) = entry.file_name().to_str()
-421:                 {
-422:                     names.push(name.to_string());
-423:                 }
-424:             }
-425:         }
-426:         Ok(names)
-427:     }
-428: }
-429: ⋮----
-430: SimpleMemory
-431: ⋮----
-432: {
-433:     iteration_id: String,
-434: }
-435: ⋮----
-436: SimpleMemory
+315: SimpleArtifacts
+316: ⋮----
+317: {
+318:     artifacts_dir: std::path::PathBuf,
+319: }
+320: ⋮----
+321: SimpleArtifacts
+322: ⋮----
+323: {
+324:     fn new(iteration_id: &str) -> Self {
+325:         let artifacts_dir = crate::persistence::get_cowork_dir()
+326:             .map(|dir| dir.join("iterations").join(iteration_id).join("artifacts"))
+327:             .unwrap_or_else(|_| {
+328:                 std::path::PathBuf::from(".cowork-v2")
+329:                     .join("iterations")
+330:                     .join(iteration_id)
+331:                     .join("artifacts")
+332:             });
+333:         let _ = std::fs::create_dir_all(&artifacts_dir);
+334:         Self { artifacts_dir }
+335:     }
+336: 
+337:     fn safe_name(name: &str) -> Option<String> {
+338:         let sanitized: String = name
+339:             .chars()
+340:             .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
+341:             .collect();
+342:         if sanitized.is_empty() || sanitized != name {
+343:             None
+344:         } else {
+345:             Some(sanitized)
+346:         }
+347:     }
+348: 
+349:     fn path_for(&self, name: &str) -> Option<std::path::PathBuf> {
+350:         Self::safe_name(name).map(|n| self.artifacts_dir.join(n))
+351:     }
+352: }
+353: ⋮----
+354: SimpleArtifacts
+355: ⋮----
+356: {
+357:     async fn save(&self, name: &str, data: &adk_core::Part) -> adk_core::Result<i64> {
+358:         let path = self.path_for(name).ok_or_else(|| {
+359:             adk_core::AdkError::tool(format!("Invalid artifact name: {}", name))
+360:         })?;
+361: 
+362:         match data {
+363:             adk_core::Part::Text { text } => {
+364:                 std::fs::write(&path, text).map_err(|e| {
+365:                     adk_core::AdkError::tool(format!("Failed to write artifact {}: {}", name, e))
+366:                 })?;
+367:             }
+368:             adk_core::Part::InlineData { mime_type, data } => {
+369:                 let ext = match mime_type.as_str() {
+370:                     "text/markdown" | "text/plain" => "txt",
+371:                     "application/json" => "json",
+372:                     "image/png" => "png",
+373:                     "image/jpeg" => "jpg",
+374:                     _ => "bin",
+375:                 };
+376:                 let path = path.with_extension(ext);
+377:                 std::fs::write(&path, data).map_err(|e| {
+378:                     adk_core::AdkError::tool(format!("Failed to write artifact {}: {}", name, e))
+379:                 })?;
+380:             }
+381:             adk_core::Part::FileData { file_uri, .. } => {
+382:                 
+383:                 return Err(adk_core::AdkError::tool(format!(
+384:                     "Cannot save FileData artifact with URI: {}",
+385:                     file_uri
+386:                 )));
+387:             }
+388:             _ => {
+389:                 return Err(adk_core::AdkError::tool(
+390:                     "Unsupported artifact part type".to_string(),
+391:                 ));
+392:             }
+393:         }
+394:         Ok(1)
+395:     }
+396: 
+397:     async fn load(&self, name: &str) -> adk_core::Result<adk_core::Part> {
+398:         let path = self.path_for(name).ok_or_else(|| {
+399:             adk_core::AdkError::tool(format!("Invalid artifact name: {}", name))
+400:         })?;
+401: 
+402:         let data = std::fs::read(&path).map_err(|e| {
+403:             adk_core::AdkError::tool(format!("Failed to read artifact {}: {}", name, e))
+404:         })?;
+405: 
+406:         
+407:         if let Ok(text) = String::from_utf8(data.clone()) {
+408:             Ok(adk_core::Part::Text { text })
+409:         } else {
+410:             let mime_type = match path.extension().and_then(|e| e.to_str()) {
+411:                 Some("png") => "image/png",
+412:                 Some("jpg") | Some("jpeg") => "image/jpeg",
+413:                 _ => "application/octet-stream",
+414:             }
+415:             .to_string();
+416:             Ok(adk_core::Part::InlineData { mime_type, data })
+417:         }
+418:     }
+419: 
+420:     async fn list(&self) -> adk_core::Result<Vec<String>> {
+421:         let mut names = Vec::new();
+422:         if self.artifacts_dir.exists() {
+423:             for entry in std::fs::read_dir(&self.artifacts_dir).map_err(|e| {
+424:                 adk_core::AdkError::tool(format!("Failed to list artifacts: {}", e))
+425:             })? {
+426:                 let entry = entry.map_err(|e| adk_core::AdkError::tool(format!("Failed to read artifact entry: {}", e)))?;
+427:                 if entry.file_type().map(|t| t.is_file()).unwrap_or(false)
+428:                     && let Some(name) = entry.file_name().to_str()
+429:                 {
+430:                     names.push(name.to_string());
+431:                 }
+432:             }
+433:         }
+434:         Ok(names)
+435:     }
+436: }
 437: ⋮----
-438: {
-439:     fn new(iteration_id: &str) -> Self {
-440:         Self {
-441:             iteration_id: iteration_id.to_string(),
-442:         }
-443:     }
-444: }
+438: SimpleMemory
+439: ⋮----
+440: {
+441:     iteration_id: String,
+442: }
+443: ⋮----
+444: SimpleMemory
 445: ⋮----
-446: SimpleMemory
-447: ⋮----
-448: {
-449:     async fn search(&self, query: &str) -> adk_core::Result<Vec<adk_core::MemoryEntry>> {
-450:         let store = crate::persistence::MemoryStore::new();
-451:         let memory_query = crate::domain::MemoryQuery {
-452:             scope: crate::domain::MemoryScope::Smart,
-453:             query_type: crate::domain::MemoryQueryType::All,
-454:             keywords: query.split_whitespace().map(|s| s.to_string()).collect(),
-455:             limit: Some(20),
-456:         };
-457: 
-458:         let result = store.query(&memory_query, Some(&self.iteration_id)).map_err(|e| {
-459:             adk_core::AdkError::memory(format!("Failed to query memory: {}", e))
-460:         })?;
-461: 
-462:         let mut entries = Vec::new();
-463:         for decision in result.decisions {
-464:             let decision_text = format!(
-465:                 "Decision: {}\nContext: {}\nOutcome: {}\nConsequences: {}",
-466:                 decision.title,
-467:                 decision.context,
-468:                 decision.decision,
-469:                 if decision.consequences.is_empty() {
-470:                     "None recorded".to_string()
-471:                 } else {
-472:                     decision.consequences.join(", ")
-473:                 }
-474:             );
-475:             entries.push(adk_core::MemoryEntry {
-476:                 content: adk_core::Content::new("model").with_text(decision_text),
-477:                 author: "project".to_string(),
-478:             });
-479:         }
-480:         for pattern in result.patterns {
-481:             let pattern_text = format!(
-482:                 "Pattern: {}\nDescription: {}\nUsage: {}\nTags: {}",
-483:                 pattern.name,
-484:                 pattern.description,
-485:                 if pattern.usage.is_empty() {
-486:                     "Not specified".to_string()
-487:                 } else {
-488:                     pattern.usage.join(", ")
-489:                 },
-490:                 if pattern.tags.is_empty() {
-491:                     "None".to_string()
-492:                 } else {
-493:                     pattern.tags.join(", ")
-494:                 }
-495:             );
-496:             entries.push(adk_core::MemoryEntry {
-497:                 content: adk_core::Content::new("model").with_text(pattern_text),
-498:                 author: "project".to_string(),
-499:             });
-500:         }
-501:         for insight in result.insights {
-502:             entries.push(adk_core::MemoryEntry {
-503:                 content: adk_core::Content::new("model").with_text(insight.content),
-504:                 author: insight.stage,
-505:             });
-506:         }
-507:         Ok(entries)
-508:     }
-509: }
-510: ⋮----
-511: SimpleState
-512: ⋮----
-513: {
-514:     data: std::collections::HashMap<String, serde_json::Value>,
-515: }
-516: ⋮----
-517: SimpleState
+446: {
+447:     fn new(iteration_id: &str) -> Self {
+448:         Self {
+449:             iteration_id: iteration_id.to_string(),
+450:         }
+451:     }
+452: }
+453: ⋮----
+454: SimpleMemory
+455: ⋮----
+456: {
+457:     async fn search(&self, query: &str) -> adk_core::Result<Vec<adk_core::MemoryEntry>> {
+458:         let store = crate::persistence::MemoryStore::new();
+459:         let memory_query = crate::domain::MemoryQuery {
+460:             scope: crate::domain::MemoryScope::Smart,
+461:             query_type: crate::domain::MemoryQueryType::All,
+462:             keywords: query.split_whitespace().map(|s| s.to_string()).collect(),
+463:             limit: Some(20),
+464:         };
+465: 
+466:         let result = store.query(&memory_query, Some(&self.iteration_id)).map_err(|e| {
+467:             adk_core::AdkError::memory(format!("Failed to query memory: {}", e))
+468:         })?;
+469: 
+470:         let mut entries = Vec::new();
+471:         for decision in result.decisions {
+472:             let decision_text = format!(
+473:                 "Decision: {}\nContext: {}\nOutcome: {}\nConsequences: {}",
+474:                 decision.title,
+475:                 decision.context,
+476:                 decision.decision,
+477:                 if decision.consequences.is_empty() {
+478:                     "None recorded".to_string()
+479:                 } else {
+480:                     decision.consequences.join(", ")
+481:                 }
+482:             );
+483:             entries.push(adk_core::MemoryEntry {
+484:                 content: adk_core::Content::new("model").with_text(decision_text),
+485:                 author: "project".to_string(),
+486:             });
+487:         }
+488:         for pattern in result.patterns {
+489:             let pattern_text = format!(
+490:                 "Pattern: {}\nDescription: {}\nUsage: {}\nTags: {}",
+491:                 pattern.name,
+492:                 pattern.description,
+493:                 if pattern.usage.is_empty() {
+494:                     "Not specified".to_string()
+495:                 } else {
+496:                     pattern.usage.join(", ")
+497:                 },
+498:                 if pattern.tags.is_empty() {
+499:                     "None".to_string()
+500:                 } else {
+501:                     pattern.tags.join(", ")
+502:                 }
+503:             );
+504:             entries.push(adk_core::MemoryEntry {
+505:                 content: adk_core::Content::new("model").with_text(pattern_text),
+506:                 author: "project".to_string(),
+507:             });
+508:         }
+509:         for insight in result.insights {
+510:             entries.push(adk_core::MemoryEntry {
+511:                 content: adk_core::Content::new("model").with_text(insight.content),
+512:                 author: insight.stage,
+513:             });
+514:         }
+515:         Ok(entries)
+516:     }
+517: }
 518: ⋮----
-519: {
-520:     fn new() -> Self {
-521:         Self {
-522:             data: std::collections::HashMap::new(),
-523:         }
-524:     }
-525: }
+519: SimpleState
+520: ⋮----
+521: {
+522:     data: std::collections::HashMap<String, serde_json::Value>,
+523: }
+524: ⋮----
+525: SimpleState
 526: ⋮----
-527: SimpleState
-528: ⋮----
-529: {
-530:     fn get(&self, key: &str) -> Option<serde_json::Value> {
-531:         self.data.get(key).cloned()
+527: {
+528:     fn new() -> Self {
+529:         Self {
+530:             data: std::collections::HashMap::new(),
+531:         }
 532:     }
-533: 
-534:     fn set(&mut self, key: String, value: serde_json::Value) {
-535:         self.data.insert(key, value);
-536:     }
-537: 
-538:     fn all(&self) -> std::collections::HashMap<String, serde_json::Value> {
-539:         self.data.clone()
+533: }
+534: ⋮----
+535: SimpleState
+536: ⋮----
+537: {
+538:     fn get(&self, key: &str) -> Option<serde_json::Value> {
+539:         self.data.get(key).cloned()
 540:     }
-541: }
-542: ⋮----
-543: extract_text_from_content
-544: ⋮----
-545: (content: &Content)
-546: ⋮----
-547: extract_text_from_event
-548: ⋮----
-549: (event: &Event)
+541: 
+542:     fn set(&mut self, key: String, value: serde_json::Value) {
+543:         self.data.insert(key, value);
+544:     }
+545: 
+546:     fn all(&self) -> std::collections::HashMap<String, serde_json::Value> {
+547:         self.data.clone()
+548:     }
+549: }
 550: ⋮----
-551: validate_artifact_content
+551: extract_text_from_content
 552: ⋮----
-553: (stage_name: &str, content: &str)
+553: (content: &Content)
+554: ⋮----
+555: extract_text_from_event
+556: ⋮----
+557: (event: &Event)
+558: ⋮----
+559: validate_artifact_content
+560: ⋮----
+561: (stage_name: &str, content: &str)
 ```
 
 ### crates/cowork-gui/src-tauri/src/lib.rs (285 lines)
@@ -1568,45 +1575,6 @@ LICENSE
 109: pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 ```
 
-### crates/cowork-gui/src/components/chat/MessageList.tsx (34 lines)
-
-```
-1: ToolCallMessage
-2: ⋮----
-3: {
-4:   toolName: string;
-5:   arguments: Record<string, unknown>;
-6:   agentName: string;
-7: }
-8: ⋮----
-9: ToolResultMessage
-10: ⋮----
-11: {
-12:   toolName: string;
-13:   result: string;
-14:   success: boolean;
-15:   agentName: string;
-16: }
-17: ⋮----
-18: PMAgentMessage
-19: ⋮----
-20: {
-21:   actions?: PMAction[];
-22: }
-23: ⋮----
-24: MessageListProps
-25: ⋮----
-26: {
-27:   messages: ChatMessage[];
-28:   pmMessages?: (ChatMessage & { type: 'user' | 'pm_agent' })[];
-29:   mode: 'pipeline' | 'pm_agent';
-30:   isProcessing: boolean;
-31:   currentAgent: string | null;
-32:   onToggleThinking: (index: number) => void;
-33:   onActionClick?: (action: PMAction) => void;
-34: }
-```
-
 ### Cargo.toml (53 lines)
 
 ```
@@ -1665,6 +1633,145 @@ LICENSE
 53: agent-client-protocol = "0.9"
 ```
 
+### crates/cowork-core/src/agents/mod.rs (134 lines)
+
+```
+1: create_idea_agent
+2: ⋮----
+3: (model: Arc<dyn Llm>)
+4: ⋮----
+5: create_idea_agent_with_id
+6: ⋮----
+7: (model: Arc<dyn Llm>, iteration_id: String)
+8: ⋮----
+9: create_prd_loop
+10: ⋮----
+11: (model: Arc<dyn Llm>)
+12: ⋮----
+13: create_prd_loop_with_id
+14: ⋮----
+15: (model: Arc<dyn Llm>, iteration_id: String)
+16: ⋮----
+17: create_design_loop
+18: ⋮----
+19: (model: Arc<dyn Llm>)
+20: ⋮----
+21: create_design_loop_with_id
+22: ⋮----
+23: (model: Arc<dyn Llm>, iteration_id: String)
+24: ⋮----
+25: create_plan_loop
+26: ⋮----
+27: (model: Arc<dyn Llm>)
+28: ⋮----
+29: create_plan_loop_with_id
+30: ⋮----
+31: (model: Arc<dyn Llm>, iteration_id: String)
+32: ⋮----
+33: create_coding_loop
+34: ⋮----
+35: (model: Arc<dyn Llm>)
+36: ⋮----
+37: create_coding_loop_with_id
+38: ⋮----
+39: (model: Arc<dyn Llm>, iteration_id: String)
+40: ⋮----
+41: create_check_agent
+42: ⋮----
+43: (model: Arc<dyn Llm>)
+44: ⋮----
+45: create_check_agent_with_id
+46: ⋮----
+47: (model: Arc<dyn Llm>, iteration_id: String)
+48: ⋮----
+49: create_delivery_agent
+50: ⋮----
+51: (model: Arc<dyn Llm>)
+52: ⋮----
+53: create_delivery_agent_with_id
+54: ⋮----
+55: (model: Arc<dyn Llm>, iteration_id: String)
+56: ⋮----
+57: create_summary_agent
+58: ⋮----
+59: (model: Arc<dyn Llm>, iteration_id: String, iteration_number: u32)
+60: ⋮----
+61: create_knowledge_generation_agent
+62: ⋮----
+63: (
+64:     model: Arc<dyn Llm>,
+65:     iteration_id: String,
+66:     iteration_number: u32,
+67:     base_iteration_id: Option<String>
+68: )
+69: ⋮----
+70: create_project_manager_agent
+71: ⋮----
+72: (model: Arc<dyn Llm>, iteration_id: String)
+73: ⋮----
+74: load_artifacts_summary_for_pm
+75: ⋮----
+76: (iteration_store: &IterationStore, iteration_id: &str)
+77: ⋮----
+78: PMAgentResult
+79: ⋮----
+80: {
+81:     
+82:     pub message: String,
+83:     
+84:     pub actions: Vec<PMAgentAction>,
+85:     
+86:     pub parts: Vec<adk_core::Part>,
+87: }
+88: ⋮----
+89: PMAgentAction
+90: ⋮----
+91: {
+92:     
+93:     #[serde(rename = "pm_goto_stage")]
+94:     GotoStage {
+95:         target_stage: String,
+96:         reason: String,
+97:     },
+98:     
+99:     #[serde(rename = "pm_create_iteration")]
+100:     CreateIteration {
+101:         iteration_id: String,
+102:         title: String,
+103:         description: String,
+104:         inheritance: String,
+105:     },
+106: }
+107: ⋮----
+108: PMAgentStreamCallback
+109: ⋮----
+110: {
+111:     
+112:     async fn on_text_chunk(&self, text: &str, is_first: bool, is_last: bool);
+113:     
+114:     async fn on_tool_call(&self, tool_name: &str, args: &serde_json::Value);
+115: }
+116: ⋮----
+117: execute_pm_agent_message_streaming
+118: ⋮----
+119: (
+120:     model: Arc<dyn Llm>,
+121:     iteration_id: String,
+122:     message: String,
+123:     history: Vec<serde_json::Value>,
+124:     stream_callback: Option<Arc<dyn PMAgentStreamCallback>>,
+125: )
+126: ⋮----
+127: execute_pm_agent_message
+128: ⋮----
+129: (
+130:     model: Arc<dyn Llm>,
+131:     iteration_id: String,
+132:     message: String,
+133:     history: Vec<serde_json::Value>,
+134: )
+```
+
 ### crates/cowork-gui/src/components/chat/InputArea.tsx (14 lines)
 
 ```
@@ -1682,6 +1789,45 @@ LICENSE
 12:   disabled?: boolean;
 13:   mode: 'pipeline' | 'pm_agent';
 14: }
+```
+
+### crates/cowork-gui/src/components/chat/MessageList.tsx (34 lines)
+
+```
+1: ToolCallMessage
+2: ⋮----
+3: {
+4:   toolName: string;
+5:   arguments: Record<string, unknown>;
+6:   agentName: string;
+7: }
+8: ⋮----
+9: ToolResultMessage
+10: ⋮----
+11: {
+12:   toolName: string;
+13:   result: string;
+14:   success: boolean;
+15:   agentName: string;
+16: }
+17: ⋮----
+18: PMAgentMessage
+19: ⋮----
+20: {
+21:   actions?: PMAction[];
+22: }
+23: ⋮----
+24: MessageListProps
+25: ⋮----
+26: {
+27:   messages: ChatMessage[];
+28:   pmMessages?: (ChatMessage & { type: 'user' | 'pm_agent' })[];
+29:   mode: 'pipeline' | 'pm_agent';
+30:   isProcessing: boolean;
+31:   currentAgent: string | null;
+32:   onToggleThinking: (index: number) => void;
+33:   onActionClick?: (action: PMAction) => void;
+34: }
 ```
 
 ### litho.docs/en/1.Overview.md (296 lines)
@@ -2299,143 +2445,786 @@ LICENSE
 309: }
 ```
 
-### crates/cowork-core/src/agents/mod.rs (134 lines)
+### crates/cowork-core/src/instructions/check.rs (93 lines)
+
+````
+1: pub const CHECK_AGENT_INSTRUCTION: &str = r##"
+2: # Your Role
+3: You are Check Agent. Validate the project by reading README.md, executing its specified commands, and verifying the build works.
+4: 
+5: # Non-Negotiable Rules
+6: 1. **Build failures MUST return to Coding**: If compilation/build fails, call `goto_stage("coding", <detailed error with fix suggestions>)`. Do NOT save_check_report and do NOT let broken code proceed.
+7: 2. **All checks passing MUST save report**: When everything passes, call `save_check_report(<content>)` to record results.
+8: 3. **Always end with a tool call**: You MUST call either `save_check_report()` (success) or `goto_stage()` (failure). Never end with plain text.
+9: 
+10: # Workflow
+11: 
+12: ## Step 0: Validate Project Structure (FIRST)
+13: Use `list_files(".")` and verify required files exist based on project type:
+14: 
+15: | Project Type | Required Files |
+16: |---|---|
+17: | Web (React/Vue/Vite) | package.json, index.html, src/main.js(x)/ts(x), build config (vite.config.*) |
+18: | Node.js CLI/Backend | package.json (with "bin" if CLI), src/index.js or index.js |
+19: | Rust | Cargo.toml, src/main.rs or src/lib.rs |
+20: | Python | requirements.txt or pyproject.toml, main.py or src/__init__.py |
+21: 
+22: If ANY required file is missing → immediately `goto_stage("coding", "Missing required files: <list>")`. STOP.
+23: 
+24: ## Step 1: Read README.md
+25: Call `read_file("README.md")`. If README.md is missing → `goto_stage("coding", "Missing README.md. Coding stage must generate it.")`. STOP.
+26: 
+27: ## Step 2: Extract & Execute Commands
+28: Extract from README the commands for:
+29: - Dependency installation (npm install / pip install -r requirements.txt / cargo build / etc.)
+30: - Build (npm run build / cargo build --release / etc.)
+31: - For static HTML projects without build commands: just verify key files exist.
+32: 
+33: Execute them sequentially using `run_command(command, description)`.
+34: 
+35: ## Step 3: Analyze Results & Decide
+36: 
+37: ### ALL CHECKS PASS → save_check_report:
+38: ```
+39: save_check_report("# Check Report\n\n## Results\n- Structure: ✅\n- Dependencies: ✅\n- Build: ✅\n\n## Conclusion\n项目构建成功，可以正常运行。")
+40: ```
+41: 
+42: ### BUILD/COMPILATION FAILS → goto_stage:
+43: Analyze errors (file, line, error code, message) and provide concrete fix suggestions:
+44: ```
+45: goto_stage("coding", "构建失败：<error summary>
+46: 
+47: ## 错误列表
+48: ### 错误1: <file>:<line>
+49: - 类型: <error code>
+50: - 描述: <error message>
+51: - 修复建议: <specific fix>
+52: 
+53: 请修复以上编译错误后重新执行。")
+54: ```
+55: 
+56: ### DEPENDENCY INSTALL FAILS → goto_stage:
+57: Report which dependency failed and why (not found, version conflict, etc.) with fix suggestions.
+58: 
+59: ### STRUCTURE INCOMPLETE → goto_stage:
+60: List missing files and what they should contain.
+61: 
+62: # Tools
+63: - `list_files(path)` — verify project structure
+64: - `read_file(path)` — read README.md
+65: - `run_command(command, description, timeout?)` — run install/build commands
+66: - `get_plan()` — check task status (optional)
+67: - `goto_stage(stage, reason)` — return to Coding with detailed feedback
+68: - `save_check_report(content)` — save passing report
+69: 
+70: # Quick Examples
+71: 
+72: **Static HTML (no build)**:
+73: ```
+74: list_files(".") → index.html, style.css, script.js exist
+75: read_file("README.md") → confirms static site
+76: save_check_report("# Check Report\n\n## Project Type\n静态网页\n\n## Files\n- index.html ✅\n- style.css ✅\n- script.js ✅\n\n## Conclusion\nAll files present.")
+77: ```
+78: 
+79: **Build success**:
+80: ```
+81: list_files(".") → structure OK
+82: read_file("README.md") → npm install && npm run build
+83: run_command("npm install", "Install deps") → success
+84: run_command("npm run build", "Build") → success
+85: save_check_report("# Check Report\n\n## Results\n- Dependencies: ✅\n- Build: ✅\n\n## Conclusion\n项目构建成功。")
+86: ```
+87: 
+88: **Build failure**:
+89: ```
+90: run_command("npm run build", "Build") → fails with TS errors
+91: goto_stage("coding", "构建失败：TypeScript编译错误\n\n### src/services/auth.ts:15:2\n- TS2305: Module has no exported member 'User'\n- 修复建议: 在 types.ts 中添加并导出 User 接口")
+92: ```
+93: "##;
+````
+
+### crates/cowork-core/src/pipeline/executor/mod.rs (643 lines)
 
 ```
-1: create_idea_agent
+1: IterationExecutor
 2: ⋮----
-3: (model: Arc<dyn Llm>)
-4: ⋮----
-5: create_idea_agent_with_id
-6: ⋮----
-7: (model: Arc<dyn Llm>, iteration_id: String)
+3: {
+4:     project_store: ProjectStore,
+5:     iteration_store: IterationStore,
+6:     interaction: Arc<dyn InteractiveBackend>,
+7: }
 8: ⋮----
-9: create_prd_loop
+9: IterationExecutor
 10: ⋮----
-11: (model: Arc<dyn Llm>)
+11: {
+12:     pub fn new(interaction: Arc<dyn InteractiveBackend>) -> Self {
+13:         Self {
+14:             project_store: ProjectStore::new(),
+15:             iteration_store: IterationStore::new(),
+16:             interaction,
+17:         }
+18:     }
+19: 
+20:     
+21:     pub fn create_genesis_iteration(
+22:         &self,
+23:         project: &mut Project,
+24:         title: impl Into<String>,
+25:         description: impl Into<String>,
+26:     ) -> anyhow::Result<crate::domain::Iteration> {
+27:         let iteration = crate::domain::Iteration::create_genesis(project, title.into(), description.into());
+28: 
+29:         self.iteration_store.save(&iteration)?;
+30:         self.project_store
+31:             .add_iteration(project, iteration.to_summary())?;
+32: 
+33:         Ok(iteration)
+34:     }
+35: 
+36:     
+37:     
+38:     
+39:     
+40:     
+41:     
+42:     pub fn create_evolution_iteration(
+43:         &self,
+44:         project: &mut Project,
+45:         title: impl Into<String>,
+46:         description: impl Into<String>,
+47:         base_iteration_id: impl Into<String>,
+48:         inheritance: crate::domain::InheritanceMode,
+49:     ) -> anyhow::Result<crate::domain::Iteration> {
+50:         let iteration = crate::domain::Iteration::create_evolution(
+51:             project,
+52:             title.into(),
+53:             description.into(),
+54:             base_iteration_id.into(),
+55:             inheritance,
+56:         );
+57: 
+58:         self.iteration_store.save(&iteration)?;
+59:         self.project_store
+60:             .add_iteration(project, iteration.to_summary())?;
+61: 
+62:         Ok(iteration)
+63:     }
+64: 
+65:     
+66:     pub async fn execute(
+67:         &self,
+68:         project: &mut Project,
+69:         iteration_id: &str,
+70:         resume_stage: Option<String>,
+71:         model: Option<Arc<dyn adk_core::Llm>>,
+72:     ) -> anyhow::Result<()> {
+73:         let mut iteration = self.iteration_store.load(iteration_id)?;
+74: 
+75:         let model = match model {
+76:             Some(m) => m,
+77:             None => {
+78:                 let llm_config = load_config()?;
+79:                 create_llm_client(&llm_config.llm)?
+80:             }
+81:         };
+82:         set_execution_llm(model.clone());
+83: 
+84:         let result = self.execute_inner(project, &mut iteration, resume_stage, model).await;
+85:         
+86:         clear_execution_llm();
+87:         result
+88:     }
+89: 
+90:     async fn execute_inner(
+91:         &self,
+92:         project: &mut Project,
+93:         iteration: &mut crate::domain::Iteration,
+94:         resume_stage: Option<String>,
+95:         _model: Arc<dyn adk_core::Llm>,
+96:     ) -> anyhow::Result<()> {
+97: 
+98:         
+99:         let workspace = workspace::prepare_workspace(
+100:             &self.iteration_store,
+101:             &self.interaction,
+102:             &iteration,
+103:         ).await?;
+104: 
+105:         
+106:         let start_stage = if let Some(stage) = resume_stage {
+107:             stage
+108:         } else if let Some(ref current) = iteration.current_stage {
+109:             current.clone()
+110:         } else {
+111:             iteration.determine_start_stage()
+112:         };
+113: 
+114:         let stages = get_stages_from_flow(&start_stage);
+115:         let flow_config = get_flow_config();
+116: 
+117:         println!(
+118:             "[Executor] Using Flow config: stop_on_failure={}, memory_scope={:?}",
+119:             flow_config.stop_on_failure, flow_config.memory_scope
+120:         );
+121: 
+122:         
+123:         iteration.start();
+124:         self.iteration_store.save(&iteration)?;
+125:         self.project_store
+126:             .set_current_iteration(project, iteration.id.clone())?;
+127: 
+128:         
+129:         let memory_store = crate::persistence::MemoryStore::new();
+130:         if let Err(e) = memory_store.ensure_iteration_memory(&iteration.id) {
+131:             println!("[Executor] Warning: Failed to create iteration memory: {}", e);
+132:         }
+133: 
+134:         println!(
+135:             "[Executor] Iteration '{}' started, will execute {} stages starting from '{}'",
+136:             iteration.title,
+137:             stages.len(),
+138:             start_stage
+139:         );
+140: 
+141:         self.interaction
+142:             .show_message_with_context(
+143:                 crate::interaction::MessageLevel::Info,
+144:                 format!(
+145:                     "Starting iteration '{}' from stage '{}'",
+146:                     iteration.title, start_stage
+147:                 ),
+148:                 MessageContext::new("Pipeline Controller"),
+149:             )
+150:             .await;
+151: 
+152:         
+153:         if iteration.base_iteration_id.is_some() {
+154:             if let Err(e) = knowledge::inject_project_knowledge(&self.iteration_store, &iteration).await {
+155:                 println!("[Executor] Warning: Failed to inject project knowledge: {}", e);
+156:             }
+157:         }
+158: 
+159:         println!("[Executor] Starting stage execution loop...");
+160:         self.execute_stages_from(project, iteration, stages, workspace, flow_config, 0).await
+161:     }
+162: 
+163:     
+164:     
+165:     
+166:     
+167:     
+168:     async fn execute_stages_from(
+169:         &self,
+170:         project: &mut Project,
+171:         iteration: &mut crate::domain::Iteration,
+172:         stages: Vec<Box<dyn crate::pipeline::Stage>>,
+173:         workspace: std::path::PathBuf,
+174:         flow_config: crate::config_definition::flow_definition::FlowConfig,
+175:         goto_depth: u32,
+176:     ) -> anyhow::Result<()> {
+177:         const MAX_STAGE_RETRIES: u32 = 3;
+178:         const RETRY_DELAY_MS: u64 = 5000;
+179:         const MAX_FEEDBACK_LOOPS: u32 = 5;
+180:         const MAX_GOTO_DEPTH: u32 = 10;
+181:         
+182:         let total_stages = stages.len();
+183:         let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
+184:         
+185:         crate::persistence::set_iteration_id(iteration.id.clone());
+186: 
+187:         for (stage_idx, stage) in stages.into_iter().enumerate() {
+188:             let stage_name = stage.name().to_string();
+189:             let stage_num = stage_idx + 1;
+190: 
+191:             iteration.set_stage(&stage_name);
+192:             self.iteration_store.save(&iteration)?;
+193: 
+194:             println!("[Executor] Stage updated: {} (iteration: {})", stage_name, iteration.id);
+195: 
+196:             self.interaction
+197:                 .show_message_with_context(
+198:                     crate::interaction::MessageLevel::Info,
+199:                     format!(
+200:                         "🚀 [{}/{}] Starting stage: {}",
+201:                         stage_num,
+202:                         total_stages,
+203:                         stage.description()
+204:                     ),
+205:                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+206:                 )
+207:                 .await;
+208: 
+209:             let mut last_error = None;
+210:             let mut success = false;
+211: 
+212:             for attempt in 0..MAX_STAGE_RETRIES {
+213:                 if attempt > 0 {
+214:                     println!(
+215:                         "[Executor] Retrying stage '{}' (attempt {}/{})",
+216:                         stage_name, attempt + 1, MAX_STAGE_RETRIES
+217:                     );
+218:                     self.interaction
+219:                         .show_message_with_context(
+220:                             crate::interaction::MessageLevel::Warning,
+221:                             format!(
+222:                                 "Retrying stage '{}' (attempt {}/{})",
+223:                                 stage_name, attempt + 1, MAX_STAGE_RETRIES
+224:                             ),
+225:                             MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+226:                         )
+227:                         .await;
+228:                     tokio::time::sleep(tokio::time::Duration::from_millis(RETRY_DELAY_MS)).await;
+229:                 }
+230: 
+231:                 
+232:                 let mut current_feedback: Option<String> = None;
+233:                 let mut feedback_loop_count: u32 = 0;
+234: 
+235:                 if let Ok(feedback_history) = crate::persistence::load_feedback_history() {
+236:                     if let Some(fb) = feedback_history
+237:                         .feedbacks
+238:                         .iter()
+239:                         .filter(|f| f.stage == stage_name)
+240:                         .max_by_key(|f| f.timestamp)
+241:                     {
+242:                         tracing::info!("[Executor] Found stored feedback for stage '{}': {}",
+243:                             stage_name, fb.details.chars().take(100).collect::<String>());
+244:                         current_feedback = Some(fb.details.clone());
+245:                         
+246:                         
+247:                         if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
+248:                             eprintln!("[Warning] Failed to clear consumed feedback for stage '{}': {}", stage_name, e);
+249:                         }
+250:                     }
+251:                 }
+252: 
+253:                 loop {
+254:                     let result = if let Some(ref feedback) = current_feedback {
+255:                         stage
+256:                             .execute_with_feedback(&ctx, self.interaction.clone(), feedback)
+257:                             .await
+258:                     } else {
+259:                         stage.execute(&ctx, self.interaction.clone()).await
+260:                     };
+261: 
+262:                     match result {
+263:                         StageResult::GotoStage(target_stage, reason) => {
+264:                             self.interaction
+265:                                 .show_message_with_context(
+266:                                     crate::interaction::MessageLevel::Warning,
+267:                                     format!(
+268:                                         "🔄 Stage jump requested: {} → {}\nReason: {}",
+269:                                         stage_name, target_stage, reason
+270:                                     ),
+271:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+272:                                 )
+273:                                 .await;
+274: 
+275:                             
+276:                             
+277:                             
+278: 
+279:                             if goto_depth >= MAX_GOTO_DEPTH {
+280:                                 anyhow::bail!(
+281:                                     "Maximum goto stage depth ({}) reached. Stage '{}' keeps requesting jumps to '{}'. Last reason: {}",
+282:                                     MAX_GOTO_DEPTH, stage_name, target_stage, reason
+283:                                 );
+284:                             }
+285: 
+286:                             iteration.set_stage(&target_stage);
+287:                             self.iteration_store.save(&iteration)?;
+288: 
+289:                             let new_stages = get_stages_from_flow(&target_stage);
+290: 
+291:                             self.interaction
+292:                                 .show_message_with_context(
+293:                                     crate::interaction::MessageLevel::Info,
+294:                                     format!(
+295:                                         "Restarting pipeline from '{}' stage with {} stages to execute (goto depth {}/{})",
+296:                                         target_stage,
+297:                                         new_stages.len(),
+298:                                         goto_depth + 1,
+299:                                         MAX_GOTO_DEPTH
+300:                                     ),
+301:                                     MessageContext::new("Pipeline Controller"),
+302:                                 )
+303:                                 .await;
+304: 
+305:                             return Box::pin(self.execute_stages_from(
+306:                                 project,
+307:                                 iteration,
+308:                                 new_stages,
+309:                                 workspace.clone(),
+310:                                 flow_config.clone(),
+311:                                 goto_depth + 1,
+312:                             )).await;
+313:                         }
+314:                         StageResult::Success(artifact_path) => {
+315:                             let artifact_exists = if let Some(ref path) = artifact_path {
+316:                                 std::path::Path::new(path).exists()
+317:                             } else {
+318:                                 workspace::check_artifact_exists(&stage_name, &workspace).await
+319:                             };
+320: 
+321:                             if !artifact_exists {
+322:                                 last_error = Some(format!("Artifacts not generated for stage '{}'", stage_name));
+323: 
+324:                                 self.interaction
+325:                                     .show_message_with_context(
+326:                                         crate::interaction::MessageLevel::Error,
+327:                                         format!("❌ Stage '{}' completed but artifacts not found. Will retry...", stage_name),
+328:                                         MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+329:                                     )
+330:                                     .await;
+331:                                 beak;
+332:                             }
+333: 
+334:                             if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
+335:                                 eprintln!("[Warning] Failed to clear feedback for stage '{}': {}", stage_name, e);
+336:                             }
+337: 
+338:                             iteration.complete_stage(&stage_name, artifact_path.clone());
+339:                             self.iteration_store.save(&iteration)?;
+340: 
+341:                             let progress_msg = if feedback_loop_count > 0 {
+342:                                 format!(
+343:                                     "✅ [{}/{}] Stage '{}' completed (revision {})",
+344:                                     stage_num, total_stages, stage_name, feedback_loop_count
+345:                                 )
+346:                             } else if attempt > 0 {
+347:                                 format!(
+348:                                     "✅ [{}/{}] Stage '{}' completed (after {} retries)",
+349:                                     stage_num, total_stages, stage_name, attempt
+350:                                 )
+351:                             } else {
+352:                                 format!("✅ [{}/{}] Stage '{}' completed", stage_num, total_stages, stage_name)
+353:                             };
+354: 
+355:                             self.interaction
+356:                                 .show_message_with_context(
+357:                                     crate::interaction::MessageLevel::Success,
+358:                                     progress_msg,
+359:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+360:                                 )
+361:                                 .await;
+362: 
+363:                             if is_critical_stage(&stage_name) {
+364:                                 iteration.pause();
+365:                                 self.iteration_store.save(&iteration)?;
+366: 
+367:                                 let artifact_type = match stage_name.as_str() {
+368:                                     "idea" => "idea",
+369:                                     "prd" => "requirements",
+370:                                     "design" => "design",
+371:                                     "plan" => "plan",
+372:                                     "coding" => "code",
+373:                                     _ => "artifacts",
+374:                                 };
+375: 
+376:                                 let action = self.interaction
+377:                                     .request_confirmation_with_feedback(
+378:                                         &format!(
+379:                                             "Stage '{}' completed. Please review the generated {} document.{}",
+380:                                             stage_name,
+381:                                             stage_name.to_uppercase(),
+382:                                             if feedback_loop_count > 0 {
+383:                                                 format!(" (Revision {})", feedback_loop_count)
+384:                                             } else {
+385:                                                 String::new()
+386:                                             }
+387:                                         ), 
+388:                                         artifact_type
+389:                                     )
+390:                                     .await;
+391: 
+392:                                 match action {
+393:                                     ConfirmationAction::Continue => {
+394:                                         iteration.resume();
+395:                                         self.iteration_store.save(&iteration)?;
+396:                                         success = true;
+397:                                         beak;
+398:                                     }
+399:                                     ConfirmationAction::ViewArtifact => {
+400:                                         current_feedback = None;
+401:                                         continue;
+402:                                     }
+403:                                     ConfirmationAction::ProvideFeedback(feedback) => {
+404:                                         if feedback_loop_count >= MAX_FEEDBACK_LOOPS {
+405:                                             self.interaction
+406:                                                 .show_message_with_context(
+407:                                                     crate::interaction::MessageLevel::Warning,
+408:                                                     format!("Maximum revision attempts ({}) reached. Proceeding...", MAX_FEEDBACK_LOOPS),
+409:                                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+410:                                                 )
+411:                                                 .await;
+412:                                             iteration.resume();
+413:                                             self.iteration_store.save(&iteration)?;
+414:                                             success = true;
+415:                                             beak;
+416:                                         }
+417: 
+418:                                         feedback_loop_count += 1;
+419:                                         current_feedback = Some(feedback);
+420:                                         self.interaction
+421:                                             .show_message_with_context(
+422:                                                 crate::interaction::MessageLevel::Info,
+423:                                                 format!("Revising stage '{}' based on feedback...", stage_name),
+424:                                                 MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+425:                                             )
+426:                                             .await;
+427:                                         continue;
+428:                                     }
+429:                                     ConfirmationAction::Cancel => {
+430:                                         iteration.pause();
+431:                                         self.iteration_store.save(&iteration)?;
+432:                                         return Err(anyhow::anyhow!("User cancelled at stage '{}'", stage_name));
+433:                                     }
+434:                                 }
+435:                             } else {
+436:                                 success = true;
+437:                                 beak;
+438:                             }
+439:                         }
+440:                         StageResult::Failed(e) => {
+441:                             last_error = Some(e.clone());
+442:                             eprintln!("[Executor] Stage '{}' failed: {}", stage_name, e);
+443:                             self.interaction
+444:                                 .show_message_with_context(
+445:                                     crate::interaction::MessageLevel::Error,
+446:                                     format!("❌ Stage '{}' failed: {}", stage_name, e),
+447:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+448:                                 )
+449:                                 .await;
+450:                             beak;
+451:                         }
+452:                         StageResult::Paused => {
+453:                             iteration.pause();
+454:                             self.iteration_store.save(&iteration)?;
+455:                             self.interaction
+456:                                 .show_message_with_context(
+457:                                     crate::interaction::MessageLevel::Info,
+458:                                     format!("⏸️ Stage '{}' paused by user", stage_name),
+459:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+460:                                 )
+461:                                 .await;
+462:                             return Ok(());
+463:                         }
+464:                         StageResult::NeedsRevision(e) => {
+465:                             last_error = Some(e.clone());
+466:                             self.interaction
+467:                                 .show_message_with_context(
+468:                                     crate::interaction::MessageLevel::Warning,
+469:                                     format!("🔄 Stage '{}' needs revision: {}", stage_name, e),
+470:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+471:                                 )
+472:                                 .await;
+473:                             beak;
+474:                         }
+475:                     }
+476:                 }
+477: 
+478:                 if success {
+479:                     beak;
+480:                 }
+481:             }
+482: 
+483:             if !success {
+484:                 if flow_config.stop_on_failure {
+485:                     iteration.fail();
+486:                     self.iteration_store.save(&iteration)?;
+487: 
+488:                     return Err(anyhow::anyhow!(
+489:                         "Stage '{}' failed after {} retries: {}",
+490:                         stage_name,
+491:                         MAX_STAGE_RETRIES,
+492:                         last_error.unwrap_or_else(|| "Unknown error".to_string())
+493:                     ));
+494:                 } else {
+495:                     self.interaction
+496:                         .show_message_with_context(
+497:                             crate::interaction::MessageLevel::Warning,
+498:                             format!("Skipping failed stage '{}' and continuing...", stage_name),
+499:                             MessageContext::new("Pipeline Controller").with_stage(&stage_name),
+500:                         )
+501:                         .await;
+502:                 }
+503:             }
+504:         }
+505: 
+506:         
+507:         iteration.complete();
+508:         self.iteration_store.save(&iteration)?;
+509: 
+510:         
+511:         if let Err(e) = crate::persistence::MemoryStore::new().promote_insights_to_decisions(&iteration.id) {
+512:             println!("[Executor] Warning: Failed to promote insights: {}", e);
+513:         }
+514: 
+515:         project.current_iteration_id = Some(iteration.id.clone());
+516:         self.project_store.save(project)?;
+517: 
+518:         self.interaction
+519:             .show_message_with_context(
+520:                 crate::interaction::MessageLevel::Success,
+521:                 format!("Iteration '{}' completed successfully!", iteration.title),
+522:                 MessageContext::new("Pipeline Controller"),
+523:             )
+524:             .await;
+525: 
+526:         Ok(())
+527:     }
+528: 
+529:     
+530:     pub async fn continue_iteration(
+531:         &self,
+532:         project: &mut Project,
+533:         iteration_id: &str,
+534:         model: Option<Arc<dyn adk_core::Llm>>,
+535:     ) -> anyhow::Result<()> {
+536:         let mut iteration = self.iteration_store.load(iteration_id)?;
+537: 
+538:         println!(
+539:             "[Executor] Continuing iteration '{}' (status: {:?}, current_stage: {:?})",
+540:             iteration_id, iteration.status, iteration.current_stage
+541:         );
+542: 
+543:         if iteration.status != IterationStatus::Paused {
+544:             return Err(anyhow::anyhow!("Iteration is not paused"));
+545:         }
+546: 
+547:         let resume_stage = iteration.current_stage.clone();
+548:         println!("[Executor] Resuming from stage: {:?}", resume_stage);
+549: 
+550:         iteration.resume();
+551:         self.iteration_store.save(&iteration)?;
+552: 
+553:         self.interaction
+554:             .show_message_with_context(
+555:                 crate::interaction::MessageLevel::Info,
+556:                 format!(
+557:                     "Iteration '{}' resumed from stage: {}",
+558:                     iteration_id,
+559:                     resume_stage.as_ref().unwrap_or(&"unknown".to_string())
+560:                 ),
+561:                 MessageContext::new("Pipeline Controller")
+562:                     .with_stage(resume_stage.as_deref().unwrap_or("unknown")),
+563:             )
+564:             .await;
+565: 
+566:         self.execute(project, iteration_id, resume_stage, model).await
+567:     }
+568: 
+569:     
+570:     pub async fn retry_iteration(
+571:         &self,
+572:         project: &mut Project,
+573:         iteration_id: &str,
+574:         model: Option<Arc<dyn adk_core::Llm>>,
+575:     ) -> anyhow::Result<()> {
+576:         let mut iteration = self.iteration_store.load(iteration_id)?;
+577: 
+578:         println!(
+579:             "[Executor] Retrying failed iteration '{}' (status: {:?}, current_stage: {:?})",
+580:             iteration_id, iteration.status, iteration.current_stage
+581:         );
+582: 
+583:         if iteration.status != IterationStatus::Failed {
+584:             return Err(anyhow::anyhow!("Iteration is not failed"));
+585:         }
+586: 
+587:         let retry_stage = if let Some(ref current) = iteration.current_stage {
+588:             current.clone()
+589:         } else {
+590:             println!("[Executor] No current_stage found, defaulting to 'check' for retry");
+591:             "check".to_string()
+592:         };
+593: 
+594:         iteration.resume();
+595:         self.iteration_store.save(&iteration)?;
+596: 
+597:         self.interaction
+598:             .show_message_with_context(
+599:                 crate::interaction::MessageLevel::Info,
+600:                 format!("Retrying iteration '{}' from stage: {}", iteration_id, retry_stage),
+601:                 MessageContext::new("Pipeline Controller").with_stage(&retry_stage),
+602:             )
+603:             .await;
+604: 
+605:         self.execute(project, iteration_id, Some(retry_stage), model).await
+606:     }
+607: 
+608:     
+609:     
+610:     
+611: 
+612:     
+613:     pub async fn generate_document_summaries(
+614:         &self,
+615:         iteration: &crate::domain::Iteration,
+616:         model: Arc<dyn adk_core::Llm>,
+617:     ) -> anyhow::Result<()> {
+618:         knowledge::generate_document_summaries(&self.iteration_store, iteration, model).await
+619:     }
+620: 
+621:     
+622:     pub async fn generate_iteration_knowledge(
+623:         &self,
+624:         iteration: &crate::domain::Iteration,
+625:         model: Arc<dyn adk_core::Llm>,
+626:     ) -> anyhow::Result<()> {
+627:         knowledge::generate_iteration_knowledge(&self.iteration_store, iteration, model).await
+628:     }
+629: 
+630:     
+631:     pub async fn inject_project_knowledge(&self, iteration: &crate::domain::Iteration) -> anyhow::Result<()> {
+632:         knowledge::inject_project_knowledge(&self.iteration_store, iteration).await
+633:     }
+634: 
+635:     
+636:     pub async fn regenerate_iteration_knowledge(
+637:         &self,
+638:         iteration_id: &str,
+639:         model: Arc<dyn adk_core::Llm>,
+640:     ) -> anyhow::Result<()> {
+641:         knowledge::regenerate_iteration_knowledge(&self.iteration_store, iteration_id, model).await
+642:     }
+643: }
+```
+
+### crates/cowork-core/src/tools/mod.rs (31 lines)
+
+```
+1: set_current_agent_name
+2: ⋮----
+3: (name: &str)
+4: ⋮----
+5: get_current_agent_name
+6: ⋮----
+7: ()
+8: ⋮----
+9: get_required_string_param
+10: ⋮----
+11: (args: &'a Value, key: &str)
 12: ⋮----
-13: create_prd_loop_with_id
+13: get_optional_string_param
 14: ⋮----
-15: (model: Arc<dyn Llm>, iteration_id: String)
+15: (args: &Value, key: &str)
 16: ⋮----
-17: create_design_loop
+17: get_required_array_param
 18: ⋮----
-19: (model: Arc<dyn Llm>)
+19: (args: &'a Value, key: &str)
 20: ⋮----
-21: create_design_loop_with_id
+21: set_tool_notify_callback
 22: ⋮----
-23: (model: Arc<dyn Llm>, iteration_id: String)
+23: (callback: F)
 24: ⋮----
-25: create_plan_loop
+25: notify_tool_call
 26: ⋮----
-27: (model: Arc<dyn Llm>)
+27: (tool_name: &str, args: &Value)
 28: ⋮----
-29: create_plan_loop_with_id
+29: notify_tool_result
 30: ⋮----
-31: (model: Arc<dyn Llm>, iteration_id: String)
-32: ⋮----
-33: create_coding_loop
-34: ⋮----
-35: (model: Arc<dyn Llm>)
-36: ⋮----
-37: create_coding_loop_with_id
-38: ⋮----
-39: (model: Arc<dyn Llm>, iteration_id: String)
-40: ⋮----
-41: create_check_agent
-42: ⋮----
-43: (model: Arc<dyn Llm>)
-44: ⋮----
-45: create_check_agent_with_id
-46: ⋮----
-47: (model: Arc<dyn Llm>, iteration_id: String)
-48: ⋮----
-49: create_delivery_agent
-50: ⋮----
-51: (model: Arc<dyn Llm>)
-52: ⋮----
-53: create_delivery_agent_with_id
-54: ⋮----
-55: (model: Arc<dyn Llm>, iteration_id: String)
-56: ⋮----
-57: create_summary_agent
-58: ⋮----
-59: (model: Arc<dyn Llm>, iteration_id: String, iteration_number: u32)
-60: ⋮----
-61: create_knowledge_generation_agent
-62: ⋮----
-63: (
-64:     model: Arc<dyn Llm>,
-65:     iteration_id: String,
-66:     iteration_number: u32,
-67:     base_iteration_id: Option<String>
-68: )
-69: ⋮----
-70: create_project_manager_agent
-71: ⋮----
-72: (model: Arc<dyn Llm>, iteration_id: String)
-73: ⋮----
-74: load_artifacts_summary_for_pm
-75: ⋮----
-76: (iteration_store: &IterationStore, iteration_id: &str)
-77: ⋮----
-78: PMAgentResult
-79: ⋮----
-80: {
-81:     
-82:     pub message: String,
-83:     
-84:     pub actions: Vec<PMAgentAction>,
-85:     
-86:     pub parts: Vec<adk_core::Part>,
-87: }
-88: ⋮----
-89: PMAgentAction
-90: ⋮----
-91: {
-92:     
-93:     #[serde(rename = "pm_goto_stage")]
-94:     GotoStage {
-95:         target_stage: String,
-96:         reason: String,
-97:     },
-98:     
-99:     #[serde(rename = "pm_create_iteration")]
-100:     CreateIteration {
-101:         iteration_id: String,
-102:         title: String,
-103:         description: String,
-104:         inheritance: String,
-105:     },
-106: }
-107: ⋮----
-108: PMAgentStreamCallback
-109: ⋮----
-110: {
-111:     
-112:     async fn on_text_chunk(&self, text: &str, is_first: bool, is_last: bool);
-113:     
-114:     async fn on_tool_call(&self, tool_name: &str, args: &serde_json::Value);
-115: }
-116: ⋮----
-117: execute_pm_agent_message_streaming
-118: ⋮----
-119: (
-120:     model: Arc<dyn Llm>,
-121:     iteration_id: String,
-122:     message: String,
-123:     history: Vec<serde_json::Value>,
-124:     stream_callback: Option<Arc<dyn PMAgentStreamCallback>>,
-125: )
-126: ⋮----
-127: execute_pm_agent_message
-128: ⋮----
-129: (
-130:     model: Arc<dyn Llm>,
-131:     iteration_id: String,
-132:     message: String,
-133:     history: Vec<serde_json::Value>,
-134: )
+31: (tool_name: &str, result: &Result<Value, AdkError>)
 ```
 
 ### crates/cowork-gui/src/components/chat/ChatPanel.tsx (24 lines)
@@ -3526,1048 +4315,6 @@ LICENSE
 319: ()
 ```
 
-### crates/cowork-core/src/instructions/check.rs (413 lines)
-
-````
-1: pub const CHECK_AGENT_INSTRUCTION: &str = r##"
-2: # Your Role
-3: You are Check Agent. Read README.md and autonomously execute the commands it specifies to verify the project.
-4: 
-5: # 🚨🚨🚨 CRITICAL RULE - BUILD FAILURES MUST RETURN TO CODING 🚨🚨🚨
-6: **This is the MOST IMPORTANT rule - violating this will cause broken code to be deployed!**
-7: 
-8: ## If TypeScript/Build Command FAILS with compilation errors:
-9: 1. ❌ DO NOT just save check_report and let pipeline continue
-10: 2. ❌ DO NOT proceed to Delivery stage
-11: 3. ✅ You MUST call `goto_stage("coding", <detailed error message>)` to fix the errors
-12: 4. ✅ The build MUST pass before pipeline can proceed
-13: 
-14: ## Example - TypeScript Compilation Error (MANDATORY goto_stage):
-15: ```
-16: 1. execute_shell_command("npm run build", "Build project")
-17:    → status: "failed", stderr: 
-18:      "src/services/performance-service.ts:12:2 - error TS2305: Module has no exported member 'ToolDefinition'"
-19: 
-20: 2. ❌ WRONG: 
-21:    save_check_report("Build failed with 3 errors")
-22:    // Then do nothing - pipeline continues with broken code!
-23: 
-24: 3. ✅ CORRECT:
-25:    goto_stage("coding", "构建失败：TypeScript编译错误，共3个错误：
-26: 
-27:    错误1: src/services/performance-service.ts:12:2
-28:    - 错误类型: TS2305
-29:    - 错误描述: Module '../types/metrics.js' has no exported member 'ToolDefinition'
-30:    - 修复建议: 在 metrics.ts 中添加 ToolDefinition 类型导出，或从 plugin-impl.ts 导入该类型
-31: 
-32:    错误2: src/decorators/performance-monitor.ts:73:4
-33:    - 错误类型: TS2722
-34:    - 错误描述: Cannot invoke an object which is possibly 'undefined'
-35:    - 修复建议: 添加类型守卫或非空断言
-36: 
-37:    请修复这些 TypeScript 编译错误后重新执行。")
-38:    // Pipeline returns to Coding stage to fix the errors
-39: ```
-40: 
-41: # ⚠️ CRITICAL REQUIREMENT - YOU MUST CALL save_check_report()
-42: **This is the MOST IMPORTANT requirement - without this tool call, your work will be LOST!**
-43: 
-44: ## ⚠️ MANDATORY WORKFLOW - YOU MUST FOLLOW THIS EXACTLY:
-45: 
-46: ### When ALL checks PASS (dependencies installed, build succeeded):
-47: ```
-48: 1. Install dependencies: execute_shell_command("bun install" or "npm install")
-49: 2. Build project: execute_shell_command("bun run build" or "npm run build")
-50: 3. Verify dist/ output exists
-51: 4. ✅ MUST call: save_check_report("# Check Report\n\n## Results\n- Dependencies: ✅\n- Build: ✅\n\n## Conclusion\n项目构建成功，可以正常运行。")
-52: 5. STOP - Do NOT continue without calling save_check_report()
-53: ```
-54: 
-55: ### When BUILD FAILS (TypeScript/compilation errors):
-56: ```
-57: 1. Try to build: execute_shell_command("bun run build" or "npm run build")
-58: 2. If build fails with errors:
-59: 3. ✅ MUST call: goto_stage("coding", "构建失败：TypeScript编译错误...")
-60: 4. STOP - Do NOT call save_check_report() when build fails
-61: ```
-62: 
-63: ### When PROJECT STRUCTURE is incomplete:
-64: ```
-65: 1. Check files with list_files(".")
-66: 2. If essential files missing (package.json, src/, etc.):
-67: 3. ✅ MUST call: goto_stage("coding", "项目结构不完整...")
-68: 4. STOP - Do NOT call save_check_report() when structure is broken
-69: ```
-70: 
-71: ## ⚠️ DO NOT END WITHOUT A TOOL CALL!
-72: - ❌ WRONG: Output text and end without calling any tool
-73: - ❌ WRONG: Say "Check completed" without calling save_check_report() or goto_stage()
-74: - ✅ CORRECT: Always end with either `save_check_report()` OR `goto_stage()`
-75: 
-76: # 🚨🚨🚨 CRITICAL RULE - BUILD FAILURES MUST RETURN TO CODING 🚨🚨🚨
-77: **This is a critical rule - violating this will cause broken code to be deployed!**
-78: - **Read README.md**: Check stage starts by reading the project README.md
-79: - **Extract commands**: Analyze README to find environment setup, dependency installation, and build/run commands
-80: - **Execute autonomously**: Run these commands using execute_shell_command tool
-81: - **Make decisions**: Based on command execution results, either approve the project or return to Coding stage with specific feedback
-82: 
-83: # ⚠️ CRITICAL: PROJECT STRUCTURE VALIDATION (NEW - FIRST PRIORITY)
-84: **BEFORE checking README or running commands, you MUST verify project file structure:**
-85: 
-86: ## Step 0: Validate Essential Files (NEW - MANDATORY FIRST STEP)
-87: **This MUST be done BEFORE reading README.md:**
-88: 
-89: 1. Use `list_files(".")` to see all project files
-90: 2. **CRITICAL CHECKS** - Verify these files exist based on project type:
-91: 
-92: ### For Web/Frontend Projects (React/Vue/Vanilla):
-93: **REQUIRED FILES:**
-94: - [ ] `package.json` - MUST exist and contain dependencies
-95: - [ ] Entry HTML (`index.html`) - MUST exist
-96: - [ ] Build config (`vite.config.js` or similar) - should exist
-97: - [ ] Main entry script (`src/main.js` or `src/main.jsx`) - MUST exist
-98: - [ ] `.gitignore` - should exist
-99: 
-100: **IF ANY REQUIRED FILE IS MISSING:**
-101: ```
-102: goto_stage("coding", "检查失败：项目结构不完整。缺少必需文件：
-103: - [list missing files here]
-104: 
-105: 这是一个Web项目，必须包含：
-106: 1. package.json（包含依赖和scripts）
-107: 2. index.html（入口HTML文件）
-108: 3. src/main.jsx 或 src/main.js（主入口脚本）
-109: 4. vite.config.js 或其他构建配置文件
-110: 
-111: 请在Coding阶段补充这些缺失的文件。")
-112: ```
-113: 
-114: ### For Node.js Tool/Backend:
-115: **REQUIRED FILES:**
-116: - [ ] `package.json` - MUST exist with "bin" entry (for CLI tools)
-117: - [ ] Main entry (`src/index.js` or `index.js`) - MUST exist
-118: 
-119: ### For Rust Projects:
-120: **REQUIRED FILES:**
-121: - [ ] `Cargo.toml` - MUST exist
-122: - [ ] `src/main.rs` or `src/lib.rs` - MUST exist
-123: 
-124: ### For Python Projects:
-125: **REQUIRED FILES:**
-126: - [ ] `requirements.txt` or `pyproject.toml` - MUST exist
-127: - [ ] Main entry (`main.py` or `src/__init__.py`) - MUST exist
-128: 
-129: 3. **IF STRUCTURE IS INCOMPLETE**:
-130:    - **IMMEDIATELY** call `goto_stage("coding", <detailed error message>)`
-131:    - DO NOT proceed to README check
-132:    - DO NOT try to run any commands
-133:    - Provide specific list of missing files in the error message
-134: 
-135: 4. **ONLY IF STRUCTURE IS COMPLETE**:
-136:    - Proceed to Step 1 (Read README.md)
-137: 
-138: # Workflow - AI 驱动的检查
-139: 
-140: ## Step 1: 读取 README.md (After Step 0 validation passes)
-141: 1. 使用 `read_file("README.md")` 读取项目使用说明
-142: 2. 如果 README.md 不存在：
-143:    - 使用 `goto_stage("coding", "检查失败：缺少 README.md 文件。请在 Coding 阶段生成 README.md，包含环境要求、依赖安装、运行命令等完整说明。")`
-144:    - STOP
-145: 
-146: ## Step 2: 分析 README 内容
-147: 分析 README 中的内容，提取关键信息：
-148: - **环境要求**：需要哪些软件或环境（如 Node.js、Python、Rust 版本）
-149: - **依赖安装命令**：如何安装项目依赖（如 `npm install`, `pip install`, `cargo build`）
-150: - **运行/构建命令**：如何启动或构建项目
-151: - **项目类型**：判断是静态网页、Node.js 项目、Rust 项目还是 Python 项目
-152: 
-153: ## Step 3: 执行检查命令（自主决策）
-154: 根据 README 内容，**自主决定执行哪些检查命令**：
-155: 
-156: ### 如果 README 有"依赖安装"部分：
-157: - 使用 `execute_shell_command(command, description)` 执行安装命令
-158: - 例如：`execute_shell_command("npm install", "Install Node.js dependencies")`
-159: - 例如：`execute_shell_command("pip install -r requirements.txt", "Install Python dependencies")`
-160: - 例如：`execute_shell_command("cargo build", "Build Rust project and download dependencies")`
-161: 
-162: ### 如果 README 有"构建命令"部分：
-163: - 使用 `execute_shell_command(command, description)` 执行构建命令
-164: - 例如：`execute_shell_command("npm run build", "Build production bundle")`
-165: - 例如：`execute_shell_command("cargo build --release", "Build release version")`
-166: 
-167: ### 如果是静态 HTML 项目（无构建命令）：
-168: - 使用 `list_files(".")` 验证关键文件存在
-169: - 检查 index.html, style.css, script.js 等文件
-170: 
-171: ## Step 4: 分析结果并决策
-172: 
-173: ### 成功场景（ALL checks PASS）：
-174: 如果所有命令执行成功：
-175: ```
-176: ✅ 检查通过：
-177: - 依赖安装成功
-178: - 构建成功
-179: - 所有必需文件存在
-180: 项目可以正常运行。
-181: ```
-182: **⚠️ CRITICAL: 你必须立即调用 `save_check_report(content)` 保存报告！**
-183: **不要只输出文本 - 必须调用工具！**
-184: 
-185: ### 🚨 失败场景（BUILD FAILURE）：
-186: **如果构建命令失败（TypeScript/编译错误），你 MUST 调用 goto_stage，不能只是保存报告！**
-187: 
-188: ```
-189: ❌ 检查失败：
-190: - 具体错误信息（包含文件名、行号、错误类型）
-191: - 失败的命令
-192: - 修复建议
-193: ```
-194: 
-195: **关键：构建失败时的正确处理顺序：**
-196: 1. 分析错误信息，提取：文件路径、行号、错误类型、错误描述
-197: 2. 调用 `goto_stage("coding", <详细的错误信息和修复建议>)`
-198: 3. **不要**单独调用 `save_check_report`（goto_stage 会处理状态转换）
-199: 4. Pipeline 将返回 Coding 阶段修复错误
-200: 
-201: ## Step 5: 保存检查报告（MANDATORY - CRITICAL!）
-202: **这是强制步骤，必须在完成检查后执行！你不能跳过这一步！**
-203: 
-204: ### 如果检查全部通过：
-205: **必须调用 `save_check_report(content)` 保存报告：**
-206: ```
-207: save_check_report("# Check Report
-208: 
-209: ## 项目信息
-210: - 项目类型: [Web/Node.js/Rust/Python/静态HTML]
-211: - 检查时间: [timestamp]
-212: 
-213: ## 检查结果
-214: - 项目结构验证: ✅
-215: - 依赖安装: ✅
-216: - 构建验证: ✅
-217: - 文件完整性: ✅
-218: 
-219: ## 详细说明
-220: [具体的检查过程和结果描述]
-221: 
-222: ## 结论
-223: ✅ 检查通过，项目构建成功，可以正常运行。
-224: ")
-225: ```
-226: 
-227: ### 如果构建失败：
-228: **必须调用 `goto_stage("coding", <错误信息>)` 返回 Coding 阶段修复：**
-229: ```
-230: goto_stage("coding", "构建失败：[详细错误信息和修复建议]")
-231: ```
-232: 
-233: **⚠️ 注意**：如果不调用 `save_check_report()` 或 `goto_stage()`，Check 阶段将无法完成！
-234: 
-235: # Tools
-236: - read_file(path) ← 读取 README.md
-237: - execute_shell_command(command, description, timeout?) ← 执行 README 中的命令
-238: - list_files(path) ← 验证文件存在性
-239: - get_plan() ← 查看任务状态
-240: - goto_stage(stage, reason) ← 返回修复建议
-241: - save_check_report(content) ← **MANDATORY** 保存检查报告（必须在完成检查后调用）
-242: 
-243: # Example 0 - 项目结构验证失败（新增示例）
-244: ```
-245: 0. list_files(".")
-246:    → 只返回：README.md, src/App.jsx, src/components/Button.jsx
-247:    → 缺少：package.json, index.html, vite.config.js, src/main.jsx
-248: 
-249: 1. 分析：这是Web项目但缺少关键文件
-250: 
-251: 2. goto_stage("coding", "检查失败：项目结构不完整。
-252: 
-253: 缺少以下必需文件：
-254: - package.json（依赖管理文件）
-255: - index.html（入口HTML文件）
-256: - vite.config.js（构建配置）
-257: - src/main.jsx（主入口脚本）
-258: 
-259: 这是一个React Web项目，必须包含完整的项目结构。请补充这些文件：
-260: 1. package.json - 包含react、vite等依赖和dev/build脚本
-261: 2. index.html - 包含<div id='root'>和script标签
-262: 3. vite.config.js - 配置React插件
-263: 4. src/main.jsx - ReactDOM.render入口代码")
-264: ```
-265: 
-266: # Example 1 - 成功检查（Node.js 项目）
-267: ```
-268: 1. read_file("README.md")
-269:    → 内容显示需要 `npm install` 和 `npm run build`
-270: 
-271: 2. execute_shell_command("npm install", "Install dependencies")
-272:    → status: "success", stdout: "added 123 packages"
-273: 
-274: 3. execute_shell_command("npm run build", "Build project")
-275:    → status: "success", stdout: "built in 2.3s"
-276: 
-277: 4. save_check_report("# Check Report\n\n## Results\n- Dependencies: ✅ Installed\n- Build: ✅ Success\n\n## Conclusion\n项目可以正常运行。")
-278:    → status: "success"
-279: 
-280: 5. "✅ 检查通过：依赖安装成功，构建成功，项目可以正常运行。"
-281: ```
-282: 
-283: # Example 2 - 检查失败（缺少 package.json）
-284: ```
-285: 1. read_file("README.md")
-286:    → 内容显示需要 `npm install` 和 `npm run build`
-287: 
-288: 2. execute_shell_command("npm install", "Install dependencies")
-289:    → status: "failed", stderr: "ENOENT: no such file or package.json"
-290: 
-291: 3. 分析：缺少 package.json 文件
-292: 
-293: 4. goto_stage("coding", "检查失败：缺少 package.json 文件。README 要求执行 'npm install'，但项目根目录下没有 package.json。请在 Coding 阶段生成 package.json 文件并配置正确的依赖。")
-294: ```
-295: 
-296: # Example 3 - 静态 HTML 项目
-297: ```
-298: 1. read_file("README.md")
-299:    → 内容是静态网页，无需安装依赖，只需在浏览器中打开 index.html
-300: 
-301: 2. list_files(".")
-302:    → 找到 index.html, style.css, script.js
-303: 
-304: 3. save_check_report("# Check Report\n\n## Project Type\n静态网页项目\n\n## Files Verified\n- index.html ✅\n- style.css ✅\n- script.js ✅\n\n## Conclusion\n所有必需文件存在，可以直接在浏览器中打开 index.html。")
-305:    → status: "success"
-306: 
-307: 4. "✅ 检查通过：静态网页项目，所有必需文件存在，可以直接在浏览器中打开 index.html。"
-308: ```
-309: 
-310: # Example 4 - 依赖安装失败
-311: ```
-312: 1. read_file("README.md")
-313:    → 内容显示需要 `pip install -r requirements.txt`
-314: 
-315: 2. execute_shell_command("pip install -r requirements.txt", "Install Python dependencies")
-316:    → status: "failed", stderr: "ERROR: Could not find a version that satisfies the requirement missing-package==1.0.0"
-317: 
-318: 3. 分析：requirements.txt 中有不存在的依赖
-319: 
-320: 4. goto_stage("coding", "检查失败：依赖安装失败。错误信息：'ERROR: Could not find a version that satisfies the requirement missing-package==1.0.0'。请检查 requirements.txt 中的依赖名称和版本是否正确，移除不存在的依赖包。")
-321: ```
-322: 
-323: # Example 5 - 构建失败（TypeScript 编译错误）⭐ IMPORTANT
-324: ```
-325: 1. read_file("README.md")
-326:    → 内容显示需要 `npm install` 和 `npm run build`
-327: 
-328: 2. execute_shell_command("npm install", "Install dependencies")
-329:    → status: "success"
-330: 
-331: 3. execute_shell_command("npm run build", "Build project")
-332:    → status: "failed", stderr: 
-333:      "src/services/performance-service.ts:12:2 - error TS2305: Module has no exported member 'ToolDefinition'
-334:       src/decorators/performance-monitor.ts:73:4 - error TS2722: Cannot invoke an object which is possibly 'undefined'
-335:       src/services/performance-service.ts:54:3 - error TS2722: Cannot invoke an object which is possibly 'undefined'"
-336: 
-337: 4. 分析：TypeScript 类型定义问题，共有 3 个编译错误
-338: 
-339: 5. ❌ WRONG - 只保存报告，pipeline 继续执行（会导致 broken code 被 deploy）:
-340:    save_check_report("# Check Report\n\n## Results\n- Build: ❌ Failed\n\n## Errors\n[...]")
-341:    // Pipeline continues to Delivery with broken code!
-342: 
-343: 6. ✅ CORRECT - 调用 goto_stage 返回 Coding 修复:
-344:    goto_stage("coding", "构建失败：TypeScript 编译错误，共 3 个错误需要修复：
-345: 
-346:    ## 错误列表
-347: 
-348:    ### 错误 1: src/services/performance-service.ts:12:2
-349:    - 类型: TS2305 - Module has no exported member 'ToolDefinition'
-350:    - 原因: 从 '../types/metrics.js' 导入 ToolDefinition，但该模块未导出此类型
-351:    - 修复: 在 src/types/metrics.ts 中添加 ToolDefinition 类型定义并导出
-352: 
-353:    ### 错误 2: src/decorators/performance-monitor.ts:73:4
-354:    - 类型: TS2722 - Cannot invoke an object which is possibly 'undefined'
-355:    - 原因: 返回值可能为 undefined，但被直接返回
-356:    - 修复: 添加类型守卫检查 result !== undefined
-357: 
-358:    ### 错误 3: src/services/performance-service.ts:54:3
-359:    - 类型: TS2722 - Cannot invoke an object which is possibly 'undefined'
-360:    - 原因: 同错误 2
-361:    - 修复: 添加适当的类型守卫
-362: 
-363:    请在 Coding 阶段修复这些 TypeScript 类型错误。")
-364: 
-365:    // Pipeline 返回 Coding 阶段，修复后再重新执行 Check
-366: ```
-367: 
-368: # Example 6 - TypeScript 类型错误（Evolution 迭代常见问题）⭐
-369: ```
-370: 场景：在已有项目基础上新增功能（Evolution 迭代），但新代码引用了不存在的类型
-371: 
-372: 1. execute_shell_command("bun run build", "Build project")
-373:    → status: "failed", stderr:
-374:      "error TS2305: Module '../types/metrics.js' has no exported member 'ToolDefinition'"
-375: 
-376: 2. 分析：这是 Evolution 迭代，新代码导入的类型在基础迭代的类型文件中不存在
-377: 
-378: 3. ✅ CORRECT:
-379:    goto_stage("coding", "构建失败：类型导入错误
-380: 
-381:    错误: src/services/performance-service.ts 第 12 行
-382:    - 尝试从 '../types/metrics.js' 导入 'ToolDefinition'
-383:    - 但该类型未在 metrics.ts 中定义/导出
-384: 
-385:    这是 Evolution 迭代的常见问题。请检查：
-386:    1. 使用 list_files('.') 查看现有项目结构
-387:    2. 使用 read_file() 检查 metrics.ts 的内容
-388:    3. 确认 ToolDefinition 是否已在其他地方定义（如 plugin-impl.ts）
-389:    4. 选项 A: 在 metrics.ts 中添加并导出 ToolDefinition 类型
-390:    5. 选项 B: 从定义该类型的文件导入
-391: 
-392:    建议优先使用选项 A，将共享类型集中管理。")
-393: ```
-394: 
-395: # 核心原则
-396: - **项目结构验证优先**：在执行任何命令前，先验证必需文件是否存在
-397: - **README 是执行的依据**：AI 根据 README 自主决定如何检查，不依赖硬编码的规则
-398: - **灵活适应不同项目类型**：支持 Web、Node.js、Rust、Python 等多种项目类型
-399: - **提供具体的修复建议**：失败时不仅报告错误，还提供明确的修复方向和缺失文件清单
-400: - **自主决策**：AI 根据项目实际情况决定执行哪些检查命令
-401: 
-402: **REMEMBER: 
-403: 1. **ALWAYS start with Step 0: Validate project structure using list_files()**
-404: 2. If structure incomplete, immediately goto_stage("coding") with detailed file list
-405: 3. Only after structure validation passes, proceed to Step 1: read_file("README.md")
-406: 4. Extract commands from README and execute them
-407: 5. Analyze results and provide specific feedback if failed
-408: 6. For static projects, verify file existence is sufficient
-409: 7. **🚨 CRITICAL: If BUILD FAILS (TypeScript/compilation errors), you MUST call goto_stage("coding", ...) - NEVER let broken code proceed to Delivery**
-410: 8. **🚨 CRITICAL: If ALL CHECKS PASS, you MUST call save_check_report(content) - your work is LOST without this tool call**
-411: 9. **⚠️ NEVER end without calling either save_check_report() OR goto_stage()**
-412: "##
-413: ;
-````
-
-### crates/cowork-core/src/pipeline/executor/mod.rs (619 lines)
-
-```
-1: IterationExecutor
-2: ⋮----
-3: {
-4:     project_store: ProjectStore,
-5:     iteration_store: IterationStore,
-6:     interaction: Arc<dyn InteractiveBackend>,
-7: }
-8: ⋮----
-9: IterationExecutor
-10: ⋮----
-11: {
-12:     pub fn new(interaction: Arc<dyn InteractiveBackend>) -> Self {
-13:         Self {
-14:             project_store: ProjectStore::new(),
-15:             iteration_store: IterationStore::new(),
-16:             interaction,
-17:         }
-18:     }
-19: 
-20:     
-21:     pub fn create_genesis_iteration(
-22:         &self,
-23:         project: &mut Project,
-24:         title: impl Into<String>,
-25:         description: impl Into<String>,
-26:     ) -> anyhow::Result<crate::domain::Iteration> {
-27:         let iteration = crate::domain::Iteration::create_genesis(project, title.into(), description.into());
-28: 
-29:         self.iteration_store.save(&iteration)?;
-30:         self.project_store
-31:             .add_iteration(project, iteration.to_summary())?;
-32: 
-33:         Ok(iteration)
-34:     }
-35: 
-36:     
-37:     
-38:     
-39:     
-40:     
-41:     
-42:     pub fn create_evolution_iteration(
-43:         &self,
-44:         project: &mut Project,
-45:         title: impl Into<String>,
-46:         description: impl Into<String>,
-47:         base_iteration_id: impl Into<String>,
-48:         inheritance: crate::domain::InheritanceMode,
-49:     ) -> anyhow::Result<crate::domain::Iteration> {
-50:         let iteration = crate::domain::Iteration::create_evolution(
-51:             project,
-52:             title.into(),
-53:             description.into(),
-54:             base_iteration_id.into(),
-55:             inheritance,
-56:         );
-57: 
-58:         self.iteration_store.save(&iteration)?;
-59:         self.project_store
-60:             .add_iteration(project, iteration.to_summary())?;
-61: 
-62:         Ok(iteration)
-63:     }
-64: 
-65:     
-66:     pub async fn execute(
-67:         &self,
-68:         project: &mut Project,
-69:         iteration_id: &str,
-70:         resume_stage: Option<String>,
-71:         _model: Option<Arc<dyn adk_core::Llm>>,
-72:     ) -> anyhow::Result<()> {
-73:         let mut iteration = self.iteration_store.load(iteration_id)?;
-74: 
-75:         
-76:         let workspace = workspace::prepare_workspace(
-77:             &self.iteration_store,
-78:             &self.interaction,
-79:             &iteration,
-80:         ).await?;
-81: 
-82:         
-83:         let start_stage = if let Some(stage) = resume_stage {
-84:             stage
-85:         } else if let Some(ref current) = iteration.current_stage {
-86:             current.clone()
-87:         } else {
-88:             iteration.determine_start_stage()
-89:         };
-90: 
-91:         let stages = get_stages_from_flow(&start_stage);
-92:         let flow_config = get_flow_config();
-93: 
-94:         println!(
-95:             "[Executor] Using Flow config: stop_on_failure={}, memory_scope={:?}",
-96:             flow_config.stop_on_failure, flow_config.memory_scope
-97:         );
-98: 
-99:         
-100:         iteration.start();
-101:         self.iteration_store.save(&iteration)?;
-102:         self.project_store
-103:             .set_current_iteration(project, iteration_id.to_string())?;
-104: 
-105:         
-106:         let memory_store = crate::persistence::MemoryStore::new();
-107:         if let Err(e) = memory_store.ensure_iteration_memory(iteration_id) {
-108:             println!("[Executor] Warning: Failed to create iteration memory: {}", e);
-109:         }
-110: 
-111:         println!(
-112:             "[Executor] Iteration '{}' started, will execute {} stages starting from '{}'",
-113:             iteration.title,
-114:             stages.len(),
-115:             start_stage
-116:         );
-117: 
-118:         self.interaction
-119:             .show_message_with_context(
-120:                 crate::interaction::MessageLevel::Info,
-121:                 format!(
-122:                     "Starting iteration '{}' from stage '{}'",
-123:                     iteration.title, start_stage
-124:                 ),
-125:                 MessageContext::new("Pipeline Controller"),
-126:             )
-127:             .await;
-128: 
-129:         
-130:         if iteration.base_iteration_id.is_some() {
-131:             if let Err(e) = knowledge::inject_project_knowledge(&self.iteration_store, &iteration).await {
-132:                 println!("[Executor] Warning: Failed to inject project knowledge: {}", e);
-133:             }
-134:         }
-135: 
-136:         println!("[Executor] Starting stage execution loop...");
-137:         self.execute_stages_from(project, &mut iteration, stages, workspace, flow_config, 0).await
-138:     }
-139: 
-140:     
-141:     
-142:     
-143:     
-144:     
-145:     async fn execute_stages_from(
-146:         &self,
-147:         project: &mut Project,
-148:         iteration: &mut crate::domain::Iteration,
-149:         stages: Vec<Box<dyn crate::pipeline::Stage>>,
-150:         workspace: std::path::PathBuf,
-151:         flow_config: crate::config_definition::flow_definition::FlowConfig,
-152:         goto_depth: u32,
-153:     ) -> anyhow::Result<()> {
-154:         const MAX_STAGE_RETRIES: u32 = 3;
-155:         const RETRY_DELAY_MS: u64 = 5000;
-156:         const MAX_FEEDBACK_LOOPS: u32 = 5;
-157:         const MAX_GOTO_DEPTH: u32 = 10;
-158:         
-159:         let total_stages = stages.len();
-160:         let ctx = PipelineContext::new(project.clone(), iteration.clone(), workspace.clone());
-161:         
-162:         crate::persistence::set_iteration_id(iteration.id.clone());
-163: 
-164:         for (stage_idx, stage) in stages.into_iter().enumerate() {
-165:             let stage_name = stage.name().to_string();
-166:             let stage_num = stage_idx + 1;
-167: 
-168:             iteration.set_stage(&stage_name);
-169:             self.iteration_store.save(&iteration)?;
-170: 
-171:             println!("[Executor] Stage updated: {} (iteration: {})", stage_name, iteration.id);
-172: 
-173:             self.interaction
-174:                 .show_message_with_context(
-175:                     crate::interaction::MessageLevel::Info,
-176:                     format!(
-177:                         "🚀 [{}/{}] Starting stage: {}",
-178:                         stage_num,
-179:                         total_stages,
-180:                         stage.description()
-181:                     ),
-182:                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-183:                 )
-184:                 .await;
-185: 
-186:             let mut last_error = None;
-187:             let mut success = false;
-188: 
-189:             for attempt in 0..MAX_STAGE_RETRIES {
-190:                 if attempt > 0 {
-191:                     println!(
-192:                         "[Executor] Retrying stage '{}' (attempt {}/{})",
-193:                         stage_name, attempt + 1, MAX_STAGE_RETRIES
-194:                     );
-195:                     self.interaction
-196:                         .show_message_with_context(
-197:                             crate::interaction::MessageLevel::Warning,
-198:                             format!(
-199:                                 "Retrying stage '{}' (attempt {}/{})",
-200:                                 stage_name, attempt + 1, MAX_STAGE_RETRIES
-201:                             ),
-202:                             MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-203:                         )
-204:                         .await;
-205:                     tokio::time::sleep(tokio::time::Duration::from_millis(RETRY_DELAY_MS)).await;
-206:                 }
-207: 
-208:                 
-209:                 let mut current_feedback: Option<String> = None;
-210:                 let mut feedback_loop_count: u32 = 0;
-211: 
-212:                 if let Ok(feedback_history) = crate::persistence::load_feedback_history() {
-213:                     if let Some(fb) = feedback_history
-214:                         .feedbacks
-215:                         .iter()
-216:                         .filter(|f| f.stage == stage_name)
-217:                         .max_by_key(|f| f.timestamp)
-218:                     {
-219:                         tracing::info!("[Executor] Found stored feedback for stage '{}': {}",
-220:                             stage_name, fb.details.chars().take(100).collect::<String>());
-221:                         current_feedback = Some(fb.details.clone());
-222:                         
-223:                         
-224:                         if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
-225:                             eprintln!("[Warning] Failed to clear consumed feedback for stage '{}': {}", stage_name, e);
-226:                         }
-227:                     }
-228:                 }
-229: 
-230:                 loop {
-231:                     let result = if let Some(ref feedback) = current_feedback {
-232:                         stage
-233:                             .execute_with_feedback(&ctx, self.interaction.clone(), feedback)
-234:                             .await
-235:                     } else {
-236:                         stage.execute(&ctx, self.interaction.clone()).await
-237:                     };
-238: 
-239:                     match result {
-240:                         StageResult::GotoStage(target_stage, reason) => {
-241:                             self.interaction
-242:                                 .show_message_with_context(
-243:                                     crate::interaction::MessageLevel::Warning,
-244:                                     format!(
-245:                                         "🔄 Stage jump requested: {} → {}\nReason: {}",
-246:                                         stage_name, target_stage, reason
-247:                                     ),
-248:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-249:                                 )
-250:                                 .await;
-251: 
-252:                             
-253:                             
-254:                             
-255: 
-256:                             if goto_depth >= MAX_GOTO_DEPTH {
-257:                                 anyhow::bail!(
-258:                                     "Maximum goto stage depth ({}) reached. Stage '{}' keeps requesting jumps to '{}'. Last reason: {}",
-259:                                     MAX_GOTO_DEPTH, stage_name, target_stage, reason
-260:                                 );
-261:                             }
-262: 
-263:                             iteration.set_stage(&target_stage);
-264:                             self.iteration_store.save(&iteration)?;
-265: 
-266:                             let new_stages = get_stages_from_flow(&target_stage);
-267: 
-268:                             self.interaction
-269:                                 .show_message_with_context(
-270:                                     crate::interaction::MessageLevel::Info,
-271:                                     format!(
-272:                                         "Restarting pipeline from '{}' stage with {} stages to execute (goto depth {}/{})",
-273:                                         target_stage,
-274:                                         new_stages.len(),
-275:                                         goto_depth + 1,
-276:                                         MAX_GOTO_DEPTH
-277:                                     ),
-278:                                     MessageContext::new("Pipeline Controller"),
-279:                                 )
-280:                                 .await;
-281: 
-282:                             return Box::pin(self.execute_stages_from(
-283:                                 project,
-284:                                 iteration,
-285:                                 new_stages,
-286:                                 workspace.clone(),
-287:                                 flow_config.clone(),
-288:                                 goto_depth + 1,
-289:                             )).await;
-290:                         }
-291:                         StageResult::Success(artifact_path) => {
-292:                             let artifact_exists = if let Some(ref path) = artifact_path {
-293:                                 std::path::Path::new(path).exists()
-294:                             } else {
-295:                                 workspace::check_artifact_exists(&stage_name, &workspace).await
-296:                             };
-297: 
-298:                             if !artifact_exists {
-299:                                 last_error = Some(format!("Artifacts not generated for stage '{}'", stage_name));
-300: 
-301:                                 self.interaction
-302:                                     .show_message_with_context(
-303:                                         crate::interaction::MessageLevel::Error,
-304:                                         format!("❌ Stage '{}' completed but artifacts not found. Will retry...", stage_name),
-305:                                         MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-306:                                     )
-307:                                     .await;
-308:                                 beak;
-309:                             }
-310: 
-311:                             if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
-312:                                 eprintln!("[Warning] Failed to clear feedback for stage '{}': {}", stage_name, e);
-313:                             }
-314: 
-315:                             iteration.complete_stage(&stage_name, artifact_path.clone());
-316:                             self.iteration_store.save(&iteration)?;
-317: 
-318:                             let progress_msg = if feedback_loop_count > 0 {
-319:                                 format!(
-320:                                     "✅ [{}/{}] Stage '{}' completed (revision {})",
-321:                                     stage_num, total_stages, stage_name, feedback_loop_count
-322:                                 )
-323:                             } else if attempt > 0 {
-324:                                 format!(
-325:                                     "✅ [{}/{}] Stage '{}' completed (after {} retries)",
-326:                                     stage_num, total_stages, stage_name, attempt
-327:                                 )
-328:                             } else {
-329:                                 format!("✅ [{}/{}] Stage '{}' completed", stage_num, total_stages, stage_name)
-330:                             };
-331: 
-332:                             self.interaction
-333:                                 .show_message_with_context(
-334:                                     crate::interaction::MessageLevel::Success,
-335:                                     progress_msg,
-336:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-337:                                 )
-338:                                 .await;
-339: 
-340:                             if is_critical_stage(&stage_name) {
-341:                                 iteration.pause();
-342:                                 self.iteration_store.save(&iteration)?;
-343: 
-344:                                 let artifact_type = match stage_name.as_str() {
-345:                                     "idea" => "idea",
-346:                                     "prd" => "requirements",
-347:                                     "design" => "design",
-348:                                     "plan" => "plan",
-349:                                     "coding" => "code",
-350:                                     _ => "artifacts",
-351:                                 };
-352: 
-353:                                 let action = self.interaction
-354:                                     .request_confirmation_with_feedback(
-355:                                         &format!(
-356:                                             "Stage '{}' completed. Please review the generated {} document.{}",
-357:                                             stage_name,
-358:                                             stage_name.to_uppercase(),
-359:                                             if feedback_loop_count > 0 {
-360:                                                 format!(" (Revision {})", feedback_loop_count)
-361:                                             } else {
-362:                                                 String::new()
-363:                                             }
-364:                                         ), 
-365:                                         artifact_type
-366:                                     )
-367:                                     .await;
-368: 
-369:                                 match action {
-370:                                     ConfirmationAction::Continue => {
-371:                                         iteration.resume();
-372:                                         self.iteration_store.save(&iteration)?;
-373:                                         success = true;
-374:                                         beak;
-375:                                     }
-376:                                     ConfirmationAction::ViewArtifact => {
-377:                                         current_feedback = None;
-378:                                         continue;
-379:                                     }
-380:                                     ConfirmationAction::ProvideFeedback(feedback) => {
-381:                                         if feedback_loop_count >= MAX_FEEDBACK_LOOPS {
-382:                                             self.interaction
-383:                                                 .show_message_with_context(
-384:                                                     crate::interaction::MessageLevel::Warning,
-385:                                                     format!("Maximum revision attempts ({}) reached. Proceeding...", MAX_FEEDBACK_LOOPS),
-386:                                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-387:                                                 )
-388:                                                 .await;
-389:                                             iteration.resume();
-390:                                             self.iteration_store.save(&iteration)?;
-391:                                             success = true;
-392:                                             beak;
-393:                                         }
-394: 
-395:                                         feedback_loop_count += 1;
-396:                                         current_feedback = Some(feedback);
-397:                                         self.interaction
-398:                                             .show_message_with_context(
-399:                                                 crate::interaction::MessageLevel::Info,
-400:                                                 format!("Revising stage '{}' based on feedback...", stage_name),
-401:                                                 MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-402:                                             )
-403:                                             .await;
-404:                                         continue;
-405:                                     }
-406:                                     ConfirmationAction::Cancel => {
-407:                                         iteration.pause();
-408:                                         self.iteration_store.save(&iteration)?;
-409:                                         return Err(anyhow::anyhow!("User cancelled at stage '{}'", stage_name));
-410:                                     }
-411:                                 }
-412:                             } else {
-413:                                 success = true;
-414:                                 beak;
-415:                             }
-416:                         }
-417:                         StageResult::Failed(e) => {
-418:                             last_error = Some(e.clone());
-419:                             eprintln!("[Executor] Stage '{}' failed: {}", stage_name, e);
-420:                             self.interaction
-421:                                 .show_message_with_context(
-422:                                     crate::interaction::MessageLevel::Error,
-423:                                     format!("❌ Stage '{}' failed: {}", stage_name, e),
-424:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-425:                                 )
-426:                                 .await;
-427:                             beak;
-428:                         }
-429:                         StageResult::Paused => {
-430:                             iteration.pause();
-431:                             self.iteration_store.save(&iteration)?;
-432:                             self.interaction
-433:                                 .show_message_with_context(
-434:                                     crate::interaction::MessageLevel::Info,
-435:                                     format!("⏸️ Stage '{}' paused by user", stage_name),
-436:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-437:                                 )
-438:                                 .await;
-439:                             return Ok(());
-440:                         }
-441:                         StageResult::NeedsRevision(e) => {
-442:                             last_error = Some(e.clone());
-443:                             self.interaction
-444:                                 .show_message_with_context(
-445:                                     crate::interaction::MessageLevel::Warning,
-446:                                     format!("🔄 Stage '{}' needs revision: {}", stage_name, e),
-447:                                     MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-448:                                 )
-449:                                 .await;
-450:                             beak;
-451:                         }
-452:                     }
-453:                 }
-454: 
-455:                 if success {
-456:                     beak;
-457:                 }
-458:             }
-459: 
-460:             if !success {
-461:                 if flow_config.stop_on_failure {
-462:                     iteration.fail();
-463:                     self.iteration_store.save(&iteration)?;
-464: 
-465:                     return Err(anyhow::anyhow!(
-466:                         "Stage '{}' failed after {} retries: {}",
-467:                         stage_name,
-468:                         MAX_STAGE_RETRIES,
-469:                         last_error.unwrap_or_else(|| "Unknown error".to_string())
-470:                     ));
-471:                 } else {
-472:                     self.interaction
-473:                         .show_message_with_context(
-474:                             crate::interaction::MessageLevel::Warning,
-475:                             format!("Skipping failed stage '{}' and continuing...", stage_name),
-476:                             MessageContext::new("Pipeline Controller").with_stage(&stage_name),
-477:                         )
-478:                         .await;
-479:                 }
-480:             }
-481:         }
-482: 
-483:         
-484:         iteration.complete();
-485:         self.iteration_store.save(&iteration)?;
-486: 
-487:         
-488:         if let Err(e) = crate::persistence::MemoryStore::new().promote_insights_to_decisions(&iteration.id) {
-489:             println!("[Executor] Warning: Failed to promote insights: {}", e);
-490:         }
-491: 
-492:         project.current_iteration_id = Some(iteration.id.clone());
-493:         self.project_store.save(project)?;
-494: 
-495:         self.interaction
-496:             .show_message_with_context(
-497:                 crate::interaction::MessageLevel::Success,
-498:                 format!("Iteration '{}' completed successfully!", iteration.title),
-499:                 MessageContext::new("Pipeline Controller"),
-500:             )
-501:             .await;
-502: 
-503:         Ok(())
-504:     }
-505: 
-506:     
-507:     pub async fn continue_iteration(
-508:         &self,
-509:         project: &mut Project,
-510:         iteration_id: &str,
-511:         model: Option<Arc<dyn adk_core::Llm>>,
-512:     ) -> anyhow::Result<()> {
-513:         let mut iteration = self.iteration_store.load(iteration_id)?;
-514: 
-515:         println!(
-516:             "[Executor] Continuing iteration '{}' (status: {:?}, current_stage: {:?})",
-517:             iteration_id, iteration.status, iteration.current_stage
-518:         );
-519: 
-520:         if iteration.status != IterationStatus::Paused {
-521:             return Err(anyhow::anyhow!("Iteration is not paused"));
-522:         }
-523: 
-524:         let resume_stage = iteration.current_stage.clone();
-525:         println!("[Executor] Resuming from stage: {:?}", resume_stage);
-526: 
-527:         iteration.resume();
-528:         self.iteration_store.save(&iteration)?;
-529: 
-530:         self.interaction
-531:             .show_message_with_context(
-532:                 crate::interaction::MessageLevel::Info,
-533:                 format!(
-534:                     "Iteration '{}' resumed from stage: {}",
-535:                     iteration_id,
-536:                     resume_stage.as_ref().unwrap_or(&"unknown".to_string())
-537:                 ),
-538:                 MessageContext::new("Pipeline Controller")
-539:                     .with_stage(resume_stage.as_deref().unwrap_or("unknown")),
-540:             )
-541:             .await;
-542: 
-543:         self.execute(project, iteration_id, resume_stage, model).await
-544:     }
-545: 
-546:     
-547:     pub async fn retry_iteration(
-548:         &self,
-549:         project: &mut Project,
-550:         iteration_id: &str,
-551:     ) -> anyhow::Result<()> {
-552:         let mut iteration = self.iteration_store.load(iteration_id)?;
-553: 
-554:         println!(
-555:             "[Executor] Retrying failed iteration '{}' (status: {:?}, current_stage: {:?})",
-556:             iteration_id, iteration.status, iteration.current_stage
-557:         );
-558: 
-559:         if iteration.status != IterationStatus::Failed {
-560:             return Err(anyhow::anyhow!("Iteration is not failed"));
-561:         }
-562: 
-563:         let retry_stage = if let Some(ref current) = iteration.current_stage {
-564:             current.clone()
-565:         } else {
-566:             println!("[Executor] No current_stage found, defaulting to 'check' for retry");
-567:             "check".to_string()
-568:         };
-569: 
-570:         iteration.resume();
-571:         self.iteration_store.save(&iteration)?;
-572: 
-573:         self.interaction
-574:             .show_message_with_context(
-575:                 crate::interaction::MessageLevel::Info,
-576:                 format!("Retrying iteration '{}' from stage: {}", iteration_id, retry_stage),
-577:                 MessageContext::new("Pipeline Controller").with_stage(&retry_stage),
-578:             )
-579:             .await;
-580: 
-581:         self.execute(project, iteration_id, Some(retry_stage), None).await
-582:     }
-583: 
-584:     
-585:     
-586:     
-587: 
-588:     
-589:     pub async fn generate_document_summaries(
-590:         &self,
-591:         iteration: &crate::domain::Iteration,
-592:         model: Arc<dyn adk_core::Llm>,
-593:     ) -> anyhow::Result<()> {
-594:         knowledge::generate_document_summaries(&self.iteration_store, iteration, model).await
-595:     }
-596: 
-597:     
-598:     pub async fn generate_iteration_knowledge(
-599:         &self,
-600:         iteration: &crate::domain::Iteration,
-601:         model: Arc<dyn adk_core::Llm>,
-602:     ) -> anyhow::Result<()> {
-603:         knowledge::generate_iteration_knowledge(&self.iteration_store, iteration, model).await
-604:     }
-605: 
-606:     
-607:     pub async fn inject_project_knowledge(&self, iteration: &crate::domain::Iteration) -> anyhow::Result<()> {
-608:         knowledge::inject_project_knowledge(&self.iteration_store, iteration).await
-609:     }
-610: 
-611:     
-612:     pub async fn regenerate_iteration_knowledge(
-613:         &self,
-614:         iteration_id: &str,
-615:         model: Arc<dyn adk_core::Llm>,
-616:     ) -> anyhow::Result<()> {
-617:         knowledge::regenerate_iteration_knowledge(&self.iteration_store, iteration_id, model).await
-618:     }
-619: }
-```
-
 ### crates/cowork-core/src/pipeline/stages/coding.rs (277 lines)
 
 ```
@@ -5159,460 +4906,987 @@ LICENSE
 304: }
 ```
 
-### crates/cowork-core/src/tools/mod.rs (23 lines)
+### crates/cowork-core/src/tools/control_tools.rs (145 lines)
 
 ```
-1: get_required_string_param
-2: ⋮----
-3: (args: &'a Value, key: &str)
-4: ⋮----
-5: get_optional_string_param
-6: ⋮----
-7: (args: &Value, key: &str)
-8: ⋮----
-9: get_required_array_param
-10: ⋮----
-11: (args: &'a Value, key: &str)
-12: ⋮----
-13: set_tool_notify_callback
-14: ⋮----
-15: (callback: F)
-16: ⋮----
-17: notify_tool_call
-18: ⋮----
-19: (tool_name: &str, args: &Value)
-20: ⋮----
-21: notify_tool_result
-22: ⋮----
-23: (tool_name: &str, result: &Result<Value, AdkError>)
-```
-
-### crates/cowork-gui/src/App.tsx (413 lines)
-
-```
-1: import React, { useEffect, useRef, useState, useMemo, useCallback, Suspense, lazy } from 'react';
-2: import { Layout, Menu, Button, Empty, App as AntApp, Tag, Spin } from 'antd';
-3: import {
-4: 	FolderOutlined,
-5: 	FileTextOutlined,
-6: 	CodeOutlined,
-7: 	EyeOutlined,
-8: 	PlayCircleOutlined,
-9: 	ReloadOutlined,
-10: 	MessageOutlined,
-11: 	AppstoreOutlined,
-12: 	DatabaseOutlined,
-13: 	BranchesOutlined,
-14: 	CheckCircleOutlined,
-15: 	RocketOutlined,
-16: 	BookOutlined,
-17: 	SettingOutlined,
-18: 	ControlOutlined
-19: } from '@ant-design/icons';
-20: 
-21: import { useProjectStore, useAgentStore, useUIStore } from './stores';
-22: import { LoadingScreen, StatusBadge } from './components/common';
-23: import { useAppEvents, usePMAgent, useIterationActions, useChatInput } from './hooks';
-24: 
-25: import type { ChatMode, PMAction, PMAgentMessage, ChatMessage } from './stores';
-26: 
-27: 
-28: import ProjectsPanel from './components/ProjectsPanel';
-29: 
-30: 
-31: const ArtifactsViewer = lazy(() => import('./components/ArtifactsViewer'));
-32: const CodeEditor = lazy(() => import('./components/CodeEditor'));
-33: const RunnerPanel = lazy(() => import('./components/RunnerPanel'));
-34: const MemoryPanel = lazy(() => import('./components/MemoryPanel'));
-35: const KnowledgePanel = lazy(() => import('./components/KnowledgePanel'));
-36: const CommandPalette = lazy(() => import('./components/CommandPalette'));
-37: const IterationsPanel = lazy(() => import('./components/IterationsPanel'));
-38: const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
-39: 
-40: const ChatPanel = lazy(() => import('./components/chat').then(m => ({ default: m.ChatPanel })));
-41: 
-42: const AgentsSetupPanel = lazy(() => import('./components/config').then(m => ({ default: m.AgentsSetupPanel })));
-43: 
-44: const { Sider, Content, Header, Footer } = Layout;
-45: 
-46: function App() {
-47: 	
-48: 	const [userInput, setUserInput] = useState('');
-49: 	const messagesContainerRef = useRef<HTMLDivElement>(null);
-50: 	const pmMessagesContainerRef = useRef<HTMLDivElement>(null);
-51: 
-52: 	
-53: 	const project = useProjectStore(state => state.project);
-54: 	const iterations = useProjectStore(state => state.iterations);
-55: 	const currentIteration = useProjectStore(state => state.currentIteration);
-56: 	const loading = useProjectStore(state => state.loading);
-57: 	const loadProject = useProjectStore(state => state.loadProject);
-58: 	const setCurrentIteration = useProjectStore(state => state.setCurrentIteration);
-59: 	const updateCurrentIterationStatus = useProjectStore(state => state.updateCurrentIterationStatus);
-60: 
-61: 	
-62: 	const messages = useAgentStore(state => state.messages);
-63: 	const pmMessages = useAgentStore(state => state.pmMessages);
-64: 	const isProcessing = useAgentStore(state => state.isProcessing);
-65: 	const currentAgent = useAgentStore(state => state.currentAgent);
-66: 	const currentStage = useAgentStore(state => state.currentStage);
-67: 	const inputRequest = useAgentStore(state => state.inputRequest);
-68: 	const pmProcessing = useAgentStore(state => state.pmProcessing);
-69: 	const setInputRequest = useAgentStore(state => state.setInputRequest);
-70: 	const loadPMWelcomeMessage = useAgentStore(state => state.loadPMWelcomeMessage);
-71: 
-72: 	
-73: 	const activeView = useUIStore(state => state.activeView);
-74: 	const commandPaletteVisible = useUIStore(state => state.commandPaletteVisible);
-75: 	const activeArtifactTab = useUIStore(state => state.activeArtifactTab);
-76: 	const artifactsRefreshTrigger = useUIStore(state => state.artifactsRefreshTrigger);
-77: 	const codeRefreshTrigger = useUIStore(state => state.codeRefreshTrigger);
-78: 	const memoryRefreshTrigger = useUIStore(state => state.memoryRefreshTrigger);
-79: 	const knowledgeRefreshTrigger = useUIStore(state => state.knowledgeRefreshTrigger);
-80: 	const setActiveView = useUIStore(state => state.setActiveView);
-81: 	const setCommandPaletteVisible = useUIStore(state => state.setCommandPaletteVisible);
-82: 	const setActiveArtifactTab = useUIStore(state => state.setActiveArtifactTab);
-83: 
-84: 	
-85: 	useAppEvents(userInput, setUserInput);
-86: 	const { handlePMSendMessage, handlePMAction } = usePMAgent();
-87: 	const { handleSelectIteration, handleExecuteIteration, handleOpenProjectFolder, handleOpenIterationFolder, handleCommandSelect } = useIterationActions();
-88: 	const {
-89: 		inputRequest: chatInputRequest,
-90: 		handleSendUserMessage,
-91: 		handleSelectOption,
-92: 		handleSubmitFeedback,
-93: 		handleToggleThinking,
-94: 		handleCancelFeedback
-95: 	} = useChatInput();
-96: 
-97: 	
-98: 	const chatMode = useMemo<ChatMode>(() => {
-99: 		if (!currentIteration) return 'disabled';
-100: 		if (currentIteration.status === 'Completed') return 'pm_agent';
-101: 		if (isProcessing || currentIteration.status === 'Running') return 'pipeline';
-102: 		return 'pipeline';
-103: 	}, [currentIteration, isProcessing]);
-104: 
-105: 	
-106: 	useEffect(() => {
-107: 		if (chatMode === 'pm_agent' && currentIteration) {
-108: 			const pmMessages = useAgentStore.getState().pmMessages;
-109: 			if (pmMessages.length === 0) {
-110: 				loadPMWelcomeMessage(currentIteration.id);
-111: 			}
-112: 		}
-113: 	}, [chatMode, currentIteration?.id, loadPMWelcomeMessage]);
-114: 
-115: 	
-116: 	useEffect(() => {
-117: 		if (messagesContainerRef.current) {
-118: 			messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-119: 		}
-120: 	}, [messages]);
-121: 
-122: 	useEffect(() => {
-123: 		if (pmMessagesContainerRef.current && pmMessages.length > 0) {
-124: 			pmMessagesContainerRef.current.scrollTop = pmMessagesContainerRef.current.scrollHeight;
-125: 		}
-126: 	}, [pmMessages]);
-127: 
-128: 	
-129: 	const handleSend = useCallback(() => {
-130: 		if (chatMode === 'pm_agent') {
-131: 			handlePMSendMessage(userInput, setUserInput);
-132: 		} else {
-133: 			handleSendUserMessage(userInput, setUserInput);
-134: 		}
-135: 	}, [chatMode, userInput, handlePMSendMessage, handleSendUserMessage]);
-136: 
-137: 	const handleSelectOptionWrapper = useCallback((option: Parameters<typeof handleSelectOption>[0]) => {
-138: 		handleSelectOption(option, userInput, setUserInput);
-139: 	}, [handleSelectOption, userInput]);
-140: 
-141: 	const handleSubmitFeedbackWrapper = useCallback(() => {
-142: 		handleSubmitFeedback(userInput, setUserInput, updateCurrentIterationStatus);
-143: 	}, [handleSubmitFeedback, userInput, updateCurrentIterationStatus]);
-144: 
-145: 	const handlePMActionWrapper = useCallback((action: PMAction) => {
-146: 		handlePMAction(action, pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]);
-147: 	}, [handlePMAction, pmMessages]);
-148: 
-149: 	
-150: 	const loadingFallback = (
-151: 		<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-152: 			<Spin size="large" tip="Loading..." />
-153: 		</div>
-154: 	);
-155: 
-156: 	
-157: 	const renderContent = () => (
-158: 		<div style={{ height: '100%' }}>
-159: 			<div style={{ height: '100%', display: activeView === 'iterations' ? 'block' : 'none' }}>
-160: 				<Suspense fallback={loadingFallback}>
-161: 					<IterationsPanel
-162: 						key="iterations"
-163: 						onSelectIteration={handleSelectIteration}
-164: 						selectedIterationId={currentIteration?.id}
-165: 					/>
-166: 				</Suspense>
-167: 			</div>
-168: 
-169: 			<div style={{ height: '100%', display: activeView === 'projects' ? 'block' : 'none' }}>
-170: 				<ProjectsPanel key="projects" />
-171: 			</div>
-172: 
-173: 			<div style={{ height: '100%', display: activeView === 'artifacts' ? 'block' : 'none' }}>
-174: 				{currentIteration ? (
-175: 					<Suspense fallback={loadingFallback}>
-176: 						<ArtifactsViewer
-177: 							key={`artifacts-${currentIteration.id}`}
-178: 							iterationId={currentIteration.id}
-179: 							activeTab={activeArtifactTab}
-180: 							onTabChange={setActiveArtifactTab}
-181: 							refreshTrigger={artifactsRefreshTrigger}
-182: 						/>
-183: 					</Suspense>
-184: 				) : (
-185: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-186: 				)}
-187: 			</div>
-188: 
-189: 			<div style={{ height: '100%', display: activeView === 'code' ? 'block' : 'none' }}>
-190: 				{currentIteration ? (
-191: 					<Suspense fallback={loadingFallback}>
-192: 						<CodeEditor
-193: 							key={`code-${currentIteration.id}`}
-194: 							iterationId={currentIteration.id}
-195: 							refreshTrigger={codeRefreshTrigger}
-196: 						/>
-197: 					</Suspense>
-198: 				) : (
-199: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-200: 				)}
-201: 			</div>
-202: 
-203: 			<div style={{ height: '100%', display: activeView === 'run' ? 'block' : 'none' }}>
-204: 				{currentIteration ? (
-205: 					<Suspense fallback={loadingFallback}>
-206: 						<RunnerPanel key={`run-${currentIteration.id}`} iterationId={currentIteration.id} />
-207: 					</Suspense>
-208: 				) : (
-209: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-210: 				)}
-211: 			</div>
-212: 
-213: 			<div style={{ height: '100%', display: activeView === 'execution-memory' ? 'block' : 'none' }}>
-214: 				<Suspense fallback={loadingFallback}>
-215: 					<MemoryPanel
-216: 						key={`memory-${memoryRefreshTrigger}`}
-217: 						currentSession={currentIteration?.id}
-218: 						refreshTrigger={memoryRefreshTrigger}
-219: 					/>
-220: 				</Suspense>
-221: 			</div>
-222: 
-223: 			<div style={{ height: '100%', display: activeView === 'project-knowledge' ? 'block' : 'none' }}>
-224: 				<Suspense fallback={loadingFallback}>
-225: 					<KnowledgePanel
-226: 						key={`knowledge-${knowledgeRefreshTrigger}`}
-227: 						currentSession={project?.id}
-228: 						currentIterationId={currentIteration?.id}
-229: 						refreshTrigger={knowledgeRefreshTrigger}
-230: 					/>
-231: 				</Suspense>
-232: 			</div>
-233: 
-234: 			<div style={{ height: '100%', display: activeView === 'settings' ? 'block' : 'none', overflow: 'auto' }}>
-235: 				<Suspense fallback={loadingFallback}>
-236: 					<SettingsPanel />
-237: 				</Suspense>
-238: 			</div>
-239: 
-240: 			<div style={{ height: '100%', display: activeView === 'config' ? 'block' : 'none', overflow: 'auto' }}>
-241: 				<Suspense fallback={loadingFallback}>
-242: 					<AgentsSetupPanel />
-243: 				</Suspense>
-244: 			</div>
-245: 
-246: 			<div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
-247: 				{currentIteration ? (
-248: 					<Suspense fallback={loadingFallback}>
-249: 						<ChatPanel
-250: 							messages={messages}
-251: 							pmMessages={pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]}
-252: 							mode={chatMode}
-253: 							isProcessing={isProcessing}
-254: 							pmProcessing={pmProcessing}
-255: 							currentAgent={currentAgent}
-256: 							iterationTitle={currentIteration.title}
-257: 							iterationDescription={currentIteration.description}
-258: 							currentStage={currentStage}
-259: 							inputRequest={inputRequest}
-260: 							userInput={userInput}
-261: 							messagesContainerRef={messagesContainerRef as React.RefObject<HTMLDivElement>}
-262: 							pmMessagesContainerRef={pmMessagesContainerRef as React.RefObject<HTMLDivElement>}
-263: 							onUserInputChange={setUserInput}
-264: 							onSend={handleSend}
-265: 							onSelectOption={handleSelectOptionWrapper}
-266: 							onSubmitFeedback={handleSubmitFeedbackWrapper}
-267: 							onCancelFeedback={handleCancelFeedback}
-268: 							onToggleThinking={handleToggleThinking}
-269: 							onActionClick={handlePMActionWrapper}
-270: 						/>
-271: 					</Suspense>
-272: 				) : (
-273: 					<Empty description="Select an iteration to view chat" style={{ marginTop: '40px' }} />
-274: 				)}
-275: 			</div>
-276: 		</div>
-277: 	);
-278: 
-279: 	if (loading) {
-280: 		return <LoadingScreen />;
-281: 	}
-282: 
-283: 	return (
-284: 		<Layout style={{ minHeight: '100vh' }}>
-285: 			<Header
-286: 				style={{
-287: 					background: '#fff',
-288: 					borderBottom: '1px solid #e8e8e8',
-289: 					padding: '0 24px',
-290: 					display: 'flex',
-291: 					alignItems: 'center',
-292: 					justifyContent: 'space-between'
-293: 				}}
-294: 			>
-295: 				<div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-296: 					<h1 style={{ margin: 0, fontSize: '18px' }}>
-297: 						<RocketOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
-298: 						Cowork Forge
-299: 					</h1>
-300: 					{project && (
-301: 						<Tag color="blue" style={{ cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
-302: 							{project.name}
-303: 						</Tag>
-304: 					)}
-305: 				</div>
-306: 
-307: 				<div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-308: 					{currentIteration && (
-309: 						<>
-310: 							<StatusBadge status={currentIteration.status} />
-311: 							{(currentIteration.status === 'Draft' || currentIteration.status === 'Paused') && (
-312: 								<Button
-313: 									type="primary"
-314: 									icon={
-315: 										currentIteration.status === 'Draft' ? (
-316: 											<PlayCircleOutlined />
-317: 										) : (
-318: 											<ReloadOutlined />
-319: 										)
-320: 									}
-321: 									onClick={handleExecuteIteration}
-322: 									loading={isProcessing}
-323: 								>
-324: 									{currentIteration.status === 'Draft' ? 'Start Iteration' : 'Continue'}
-325: 								</Button>
-326: 							)}
-327: 						</>
-328: 					)}
-329: 				</div>
-330: 			</Header>
-331: 
-332: 			<Layout style={{ height: 'calc(100vh - 64px - 48px)' }}>
-333: 				<Sider width={200} style={{ background: '#fff', borderRight: '1px solid #e8e8e8' }}>
-334: 					<Menu
-335: 						mode="inline"
-336: 						selectedKeys={[activeView]}
-337: 						onClick={({ key }) => setActiveView(key as typeof activeView)}
-338: 						style={{ height: '100%', borderRight: 0 }}
-339: 						items={[
-340: 							{ key: 'projects', icon: <AppstoreOutlined />, label: 'Projects' },
-341: 							{ key: 'iterations', icon: <BranchesOutlined />, label: 'Iterations' },
-342: 							{ key: 'chat', icon: <MessageOutlined />, label: 'Collaborate' },
-343: 							{ key: 'artifacts', icon: <FileTextOutlined />, label: 'Artifacts' },
-344: 							{ key: 'code', icon: <CodeOutlined />, label: 'Code' },
-345: 							{ key: 'run', icon: <PlayCircleOutlined />, label: 'Run' },
-346: 							{ key: 'execution-memory', icon: <DatabaseOutlined />, label: 'Memory' },
-347: 							{ key: 'project-knowledge', icon: <BookOutlined />, label: 'Knowledge' },
-348: 							{ type: 'divider' },
-349: 							{ key: 'config', icon: <ControlOutlined />, label: 'Agents Setup' },
-350: 							{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' }
-351: 						]}
-352: 					/>
-353: 				</Sider>
-354: 
-355: 				<Content style={{ overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
-356: 					{renderContent()}
-357: 				</Content>
-358: 			</Layout>
-359: 
-360: 			<Footer
-361: 				style={{
-362: 					background: '#fff',
-363: 					borderTop: '1px solid #e8e8e8',
-364: 					padding: '12px 24px',
-365: 					display: 'flex',
-366: 					justifyContent: 'space-between',
-367: 					alignItems: 'center'
-368: 				}}
-369: 			>
-370: 				<div style={{ fontSize: '12px', color: '#888' }}>
-371: 					{project ? (
-372: 						<>
-373: 							<span style={{ marginRight: '16px', cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
-374: 								Project: <strong>{project.name}</strong>
-375: 							</span>
-376: 							<span
-377: 								style={{ cursor: currentIteration ? 'pointer' : 'default' }}
-378: 								onClick={() => currentIteration && handleOpenIterationFolder(currentIteration.id)}
-379: 								title={currentIteration ? `Click to open iteration folder: ${currentIteration.id}` : undefined}
-380: 							>
-381: 								Iterations: <strong>{iterations.length}</strong>
-382: 								{currentIteration && <span style={{ marginLeft: '4px', color: '#1890ff' }}>(#{currentIteration.number})</span>}
-383: 							</span>
-384: 						</>
-385: 					) : (
-386: 						'No project loaded'
-387: 					)}
-388: 				</div>
-389: 				<div style={{ fontSize: '12px', color: '#888' }}>
-390: 					{isProcessing ? (
-391: 						<span style={{ color: '#1890ff' }}>
-392: 							<Spin size="small" style={{ marginRight: '8px' }} />
-393: 							{currentAgent ? `${currentAgent} is working...` : 'Processing...'}
-394: 						</span>
-395: 					) : (
-396: 						<span style={{ color: '#52c41a' }}>
-397: 							<CheckCircleOutlined style={{ marginRight: '4px' }} />
-398: 							Ready
-399: 						</span>
-400: 					)}
-401: 				</div>
-402: 			</Footer>
-403: 
-404: 			<CommandPalette
-405: 				visible={commandPaletteVisible}
-406: 				onClose={() => setCommandPaletteVisible(false)}
-407: 				onCommandSelect={handleCommandSelect}
-408: 			/>
-409: 		</Layout>
-410: 	);
-411: }
-412: 
-413: export default App;
-```
-
-### crates/cowork-gui/src/components/common/MarkdownMessage.tsx (5 lines)
-
-```
-1: MarkdownMessageProps
+1: ProvideFeedbackTool
 2: ⋮----
 3: {
-4:   content: string;
-5: }
+4:     fn name(&self) -> &str {
+5:         "provide_feedback"
+6:     }
+7: 
+8:     fn description(&self) -> &str {
+9:         "Provide structured feedback to the Actor agent. \
+10:          This feedback will be visible to the Actor in the next iteration."
+11:     }
+12: 
+13:     fn parameters_schema(&self) -> Option<Value> {
+14:         Some(json!({
+15:             "type": "object",
+16:             "properties": {
+17:                 "stage": {
+18:                     "type": "string",
+19:                     "description": "The stage providing this feedback (e.g., 'idea', 'prd', 'design', 'plan', 'coding', 'check', 'delivery')",
+20:                     "enum": ["idea", "prd", "design", "plan", "coding", "check", "delivery"]
+21:                 },
+22:                 "feedback_type": {
+23:                     "type": "string",
+24:                     "enum": [
+25:                         "build_error",
+26:                         "quality_issue",
+27:                         "missing_requirement",
+28:                         "missing_artifact",
+29:                         "architecture_issue",
+30:                         "task_scope_issue",
+31:                         "suggestion"
+32:                     ],
+33:                 },
+34:                 "severity": {
+35:                     "type": "string",
+36:                     "enum": ["critical", "major", "minor"],
+37:                 },
+38:                 "details": {"type": "string"},
+39:                 "suggested_fix": {"type": "string"}
+40:             },
+41:             "required": ["stage", "feedback_type", "severity", "details"]
+42:         }))
+43:     }
+44: 
+45:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+46:         let stage = get_required_string_param(&args, "stage")?;
+47: 
+48:         let feedback_type = match get_required_string_param(&args, "feedback_type")? {
+49:             "build_error" => FeedbackType::BuildError,
+50:             "quality_issue" => FeedbackType::QualityIssue,
+51:             "missing_requirement" => FeedbackType::MissingRequirement,
+52:             "missing_artifact" => FeedbackType::MissingArtifact,
+53:             "architecture_issue" => FeedbackType::ArchitectureIssue,
+54:             "task_scope_issue" => FeedbackType::TaskScopeIssue,
+55:             _ => FeedbackType::Suggestion,
+56:         };
+57: 
+58:         let severity = match get_required_string_param(&args, "severity")? {
+59:             "critical" => Severity::Critical,
+60:             "major" => Severity::Major,
+61:             _ => Severity::Minor,
+62:         };
+63: 
+64:         let feedback = Feedback {
+65:             stage: stage.to_string(),  
+66:             feedback_type,
+67:             severity,
+68:             details: get_required_string_param(&args, "details")?.to_string(),
+69:             suggested_fix: args
+70:                 .get("suggested_fix")
+71:                 .and_then(|v| v.as_str())
+72:                 .map(String::from),
+73:             timestamp: chrono::Utc::now(),
+74:         };
+75: 
+76:         append_feedback(&feedback).map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
+77: 
+78:         Ok(json!({
+79:             "status": "feedback_recorded",
+80:             "message": "Feedback will be available to Actor in next iteration"
+81:         }))
+82:     }
+83: }
+84: ⋮----
+85: AskUserTool
+86: ⋮----
+87: {
+88:     fn name(&self) -> &str {
+89:         "ask_user"
+90:     }
+91: 
+92:     fn description(&self) -> &str {
+93:         "Ask the user for confirmation or input via CLI interface."
+94:     }
+95: 
+96:     fn parameters_schema(&self) -> Option<Value> {
+97:         Some(json!({
+98:             "type": "object",
+99:             "properties": {
+100:                 "question": {
+101:                     "type": "string",
+102:                     "description": "The question to ask the user"
+103:                 },
+104:                 "question_type": {
+105:                     "type": "string",
+106:                     "enum": ["yes_no", "text_input"],
+107:                     "description": "Type of question"
+108:                 }
+109:             },
+110:             "required": ["question", "question_type"]
+111:         }))
+112:     }
+113: 
+114:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+115:         let question = get_required_string_param(&args, "question")?;
+116:         let question_type = get_required_string_param(&args, "question_type")?;
+117: 
+118:         match question_type {
+119:             "yes_no" => {
+120:                 let answer = Confirm::new()
+121:                     .with_prompt(question)
+122:                     .default(false)
+123:                     .interact()
+124:                     .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
+125: 
+126:                 Ok(json!({
+127:                     "answer": answer,
+128:                     "answer_type": "boolean"
+129:                 }))
+130:             }
+131:             "text_input" => {
+132:                 let answer: String = Input::new()
+133:                     .with_prompt(question)
+134:                     .interact_text()
+135:                     .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
+136: 
+137:                 Ok(json!({
+138:                     "answer": answer,
+139:                     "answer_type": "text"
+140:                 }))
+141:             }
+142:             _ => Ok(json!({"error": "Invalid question type"})),
+143:         }
+144:     }
+145: }
+```
+
+### crates/cowork-core/src/tools/file_tools.rs (733 lines)
+
+```
+1: strip_unc_prefix
+2: ⋮----
+3: (path: &Path)
+4: ⋮----
+5: validate_path_security_within_workspace
+6: ⋮----
+7: (
+8:     path: &str,
+9:     workspace_dir: &Path,
+10: )
+11: ⋮----
+12: ListFilesTool
+13: ⋮----
+14: {
+15:     fn name(&self) -> &str {
+16:         "list_files"
+17:     }
+18: 
+19:     fn description(&self) -> &str {
+20:         "List files in a directory (recursively or non-recursively). \
+21:          SECURITY: Only works within current directory. \
+22:          Useful for understanding project structure."
+23:     }
+24: 
+25:     fn parameters_schema(&self) -> Option<Value> {
+26:         Some(json!({
+27:             "type": "object",
+28:             "properties": {
+29:                 "path": {
+30:                     "type": "string",
+31:                     "description": "Directory path to list (default: current directory). Must be relative path."
+32:                 },
+33:                 "recursive": {
+34:                     "type": "boolean",
+35:                     "description": "Whether to list files recursively (default: false)"
+36:                 },
+37:                 "max_depth": {
+38:                     "type": "integer",
+39:                     "description": "Maximum depth for recursive listing (default: 3)"
+40:                 }
+41:             }
+42:         }))
+43:     }
+44: 
+45:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+46:         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+47: 
+48:         
+49:         let iteration_id = get_iteration_id().ok_or_else(|| {
+50:             adk_core::AdkError::tool(
+51:                 "Iteration ID not set. Cannot list files without an active iteration.".to_string(),
+52:             )
+53:         })?;
+54: 
+55:         let iteration_store = IterationStore::new();
+56:         let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
+57:             adk_core::AdkError::tool(format!("Failed to get workspace path: {}", e))
+58:         })?;
+59: 
+60:         
+61:         fs::create_dir_all(&workspace_dir)
+62:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to create workspace: {}", e)))?;
+63: 
+64:         
+65:         
+66:         let path_str = path.trim();
+67:         let safe_path = if path_str == workspace_dir.display().to_string()
+68:             || path_str == workspace_dir.to_string_lossy().as_ref()
+69:         {
+70:             "."
+71:         } else if path_str.contains(".cowork-v2/iterations") && path_str.contains("workspace") {
+72:             
+73:             "."
+74:         } else {
+75:             path_str
+76:         };
+77: 
+78:         
+79:         let validated_path =
+80:             match validate_path_security_within_workspace(&safe_path, &workspace_dir) {
+81:                 Ok(p) => p,
+82:                 Err(e) => {
+83:                     return Ok(json!({
+84:                         "status": "security_error",
+85:                         "message": e
+86:                     }));
+87:                 }
+88:             };
+89: 
+90:         
+91:         let full_path = workspace_dir.join(&validated_path);
+92: 
+93:         let recursive = args
+94:             .get("recursive")
+95:             .and_then(|v| v.as_bool())
+96:             .unwrap_or(false);
+97: 
+98:         let max_depth = args.get("max_depth").and_then(|v| v.as_u64()).unwrap_or(3) as usize;
+99: 
+100:         if !full_path.exists() {
+101:             return Ok(json!({
+102:                 "status": "error",
+103:                 "message": format!("Path not found: {} (in workspace: {})", path, iteration_id)
+104:             }));
+105:         }
+106: 
+107:         let mut files = Vec::new();
+108:         let mut directories = Vec::new();
+109: 
+110:         if recursive {
+111:             
+112:             for entry in WalkDir::new(&full_path)
+113:                 .max_depth(max_depth)
+114:                 .follow_links(false)
+115:                 .into_iter()
+116:                 .filter_entry(|e| {
+117:                     
+118:                     if let Some(name) = e.file_name().to_str() {
+119:                         if name.starts_with('.') && name != "." {
+120:                             return false;
+121:                         }
+122:                     }
+123:                     true
+124:                 })
+125:                 .filter_map(|e| e.ok())
+126:             {
+127:                 
+128:                 
+129:                 let entry_path = entry.path();
+130:                 let entry_path_stripped = strip_unc_prefix(entry_path);
+131:                 let workspace_dir_stripped = strip_unc_prefix(&workspace_dir);
+132: 
+133:                 let rel = entry_path_stripped
+134:                     .strip_prefix(&workspace_dir_stripped)
+135:                     .unwrap_or(&entry_path_stripped);
+136:                 let rel_str = rel.to_string_lossy();
+137:                 let path_str = format!("./{}", rel_str.trim_start_matches("./"));
+138: 
+139:                 
+140:                 if should_ignore(&path_str) {
+141:                     continue;
+142:                 }
+143: 
+144:                 if entry.file_type().is_dir() {
+145:                     directories.push(path_str);
+146:                 } else {
+147:                     files.push(path_str);
+148:                 }
+149:             }
+150:         } else {
+151:             
+152:             let entries = fs::read_dir(&full_path).map_err(|e| {
+153:                 adk_core::AdkError::tool(format!("Failed to read directory: {}", e))
+154:             })?;
+155: 
+156:             for entry in entries {
+157:                 let entry = entry.map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
+158: 
+159:                 
+160:                 if let Some(name) = entry.file_name().to_str() {
+161:                     if name.starts_with('.') {
+162:                         continue;
+163:                     }
+164:                 }
+165: 
+166:                 let full = entry.path().to_path_buf();
+167:                 
+168:                 let full_stripped = strip_unc_prefix(&full);
+169:                 let workspace_dir_stripped = strip_unc_prefix(&workspace_dir);
+170: 
+171:                 let rel = full_stripped
+172:                     .strip_prefix(&workspace_dir_stripped)
+173:                     .unwrap_or(&full_stripped);
+174:                 let rel_str = rel.to_string_lossy();
+175:                 let path_str = format!("./{}", rel_str.trim_start_matches("./"));
+176: 
+177:                 if should_ignore(&path_str) {
+178:                     continue;
+179:                 }
+180: 
+181:                 if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+182:                     directories.push(path_str);
+183:                 } else {
+184:                     files.push(path_str);
+185:                 }
+186:             }
+187:         }
+188: 
+189:         Ok(json!({
+190:             "status": "success",
+191:             "path": path,
+192:             "files": files,
+193:             "directories": directories,
+194:             "total_files": files.len(),
+195:             "total_directories": directories.len(),
+196:             "workspace": workspace_dir.to_string_lossy().to_string()
+197:         }))
+198:     }
+199: }
+200: ⋮----
+201: should_ignore
+202: ⋮----
+203: (path: &str)
+204: ⋮----
+205: ReadFileTool
+206: ⋮----
+207: {
+208:     fn name(&self) -> &str {
+209:         "read_file"
+210:     }
+211: 
+212:     fn description(&self) -> &str {
+213:         "Read the contents of a file. \
+214:          SECURITY: Only works within current directory."
+215:     }
+216: 
+217:     fn parameters_schema(&self) -> Option<Value> {
+218:         Some(json!({
+219:             "type": "object",
+220:             "properties": {
+221:                 "path": {
+222:                     "type": "string",
+223:                     "description": "File path to read (must be relative path within current directory)"
+224:                 }
+225:             },
+226:             "required": ["path"]
+227:         }))
+228:     }
+229: 
+230:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+231:         let path = get_required_string_param(&args, "path")?;
+232: 
+233:         
+234:         let iteration_id = get_iteration_id().ok_or_else(|| {
+235:             adk_core::AdkError::tool(
+236:                 "Iteration ID not set. Cannot read files without an active iteration.".to_string(),
+237:             )
+238:         })?;
+239: 
+240:         let iteration_store = IterationStore::new();
+241:         let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
+242:             adk_core::AdkError::tool(format!("Failed to get workspace path: {}", e))
+243:         })?;
+244: 
+245:         
+246:         let safe_path = match validate_path_security_within_workspace(path, &workspace_dir) {
+247:             Ok(p) => p,
+248:             Err(e) => {
+249:                 return Ok(json!({
+250:                     "status": "security_error",
+251:                     "message": e
+252:                 }));
+253:             }
+254:         };
+255: 
+256:         
+257:         let full_path = workspace_dir.join(&safe_path);
+258: 
+259:         if !full_path.exists() {
+260:             return Ok(json!({
+261:                 "status": "error",
+262:                 "message": format!("File not found: {} (in workspace: {})", path, iteration_id)
+263:             }));
+264:         }
+265: 
+266:         match fs::read_to_string(&full_path) {
+267:             Ok(content) => Ok(json!({
+268:                 "status": "success",
+269:                 "path": path,
+270:                 "workspace_path": full_path.to_string_lossy().to_string(),
+271:                 "content": content,
+272:                 "workspace": workspace_dir.to_string_lossy().to_string()
+273:             })),
+274:             Err(e) => Ok(json!({
+275:                 "status": "error",
+276:                 "message": format!("Failed to read file: {}", e)
+277:             })),
+278:         }
+279:     }
+280: }
+281: ⋮----
+282: WriteFileTool
+283: ⋮----
+284: {
+285:     fn name(&self) -> &str {
+286:         "write_file"
+287:     }
+288: 
+289:     fn description(&self) -> &str {
+290:         "Write content to a file. Creates parent directories if needed. \
+291:          SECURITY: Only works within current directory. Absolute paths and .. are forbidden."
+292:     }
+293: 
+294:     fn parameters_schema(&self) -> Option<Value> {
+295:         Some(json!({
+296:             "type": "object",
+297:             "properties": {
+298:                 "path": {
+299:                     "type": "string",
+300:                     "description": "File path to write (must be relative path within current directory)"
+301:                 },
+302:                 "content": {
+303:                     "type": "string",
+304:                     "description": "Content to write"
+305:                 }
+306:             },
+307:             "required": ["path", "content"]
+308:         }))
+309:     }
+310: 
+311:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+312:         let path = get_required_string_param(&args, "path")?;
+313:         let content = get_required_string_param(&args, "content")?;
+314: 
+315:         
+316:         super::notify_tool_call("write_file", &json!({"path": path}));
+317: 
+318:         
+319:         let iteration_id = get_iteration_id().ok_or_else(|| {
+320:             adk_core::AdkError::tool(
+321:                 "Iteration ID not set. Cannot write files without an active iteration.".to_string(),
+322:             )
+323:         })?;
+324: 
+325:         let iteration_store = IterationStore::new();
+326:         let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
+327:             adk_core::AdkError::tool(format!("Failed to get workspace path: {}", e))
+328:         })?;
+329: 
+330:         
+331:         fs::create_dir_all(&workspace_dir)
+332:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to create workspace: {}", e)))?;
+333: 
+334:         
+335:         let safe_path = match validate_path_security_within_workspace(path, &workspace_dir) {
+336:             Ok(p) => p,
+337:             Err(e) => {
+338:                 super::notify_tool_result(
+339:                     "write_file",
+340:                     &Err(adk_core::AdkError::tool("security error".to_string())),
+341:                 );
+342:                 return Ok(json!({
+343:                     "status": "security_error",
+344:                     "message": e
+345:                 }));
+346:             }
+347:         };
+348: 
+349:         
+350:         let full_path = workspace_dir.join(&safe_path);
+351: 
+352:         
+353:         if let Some(parent) = full_path.parent() {
+354:             fs::create_dir_all(parent).map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
+355:         }
+356: 
+357:         let result = match fs::write(&full_path, content) {
+358:             Ok(_) => {
+359:                 
+360:                 println!(
+361:                     "📝 Writing file: {} ({} lines) [iteration: {}]",
+362:                     path,
+363:                     content.lines().count(),
+364:                     iteration_id
+365:                 );
+366:                 Ok(json!({
+367:                     "status": "success",
+368:                     "path": path,
+369:                     "workspace_path": full_path.to_string_lossy().to_string(),
+370:                     "lines_written": content.lines().count(),
+371:                     "workspace": workspace_dir.to_string_lossy().to_string()
+372:                 }))
+373:             }
+374:             Err(e) => Ok(json!({
+375:                 "status": "error",
+376:                 "message": format!("Failed to write file: {}", e)
+377:             })),
+378:         };
+379: 
+380:         
+381:         if result.is_ok() {
+382:             super::notify_tool_result("write_file", &Ok(json!({"status": "success"})));
+383:         } else {
+384:             super::notify_tool_result(
+385:                 "write_file",
+386:                 &Err(adk_core::AdkError::tool("error".to_string())),
+387:             );
+388:         }
+389: 
+390:         result
+391:     }
+392: }
+393: ⋮----
+394: is_blocking_service_command
+395: ⋮----
+396: (command: &str)
+397: ⋮----
+398: RunCommandTool
+399: ⋮----
+400: {
+401:     fn name(&self) -> &str {
+402:         "run_command"
+403:     }
+404: 
+405:     fn description(&self) -> &str {
+406:         "Execute a shell command and return the output. \
+407:          WARNING: This tool will REJECT commands that start long-running services \
+408:          (like http.server, npm dev, etc.) as they would block execution. \
+409:          Use this for: building, testing, linting - NOT for starting servers."
+410:     }
+411: 
+412:     fn parameters_schema(&self) -> Option<Value> {
+413:         Some(json!({
+414:             "type": "object",
+415:             "properties": {
+416:                 "command": {
+417:                     "type": "string",
+418:                     "description": "Shell command to execute (must not be a blocking service command)"
+419:                 }
+420:             },
+421:             "required": ["command"]
+422:         }))
+423:     }
+424: 
+425:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+426:         let command = get_required_string_param(&args, "command")?;
+427: 
+428:         
+429:         if is_blocking_service_command(command) {
+430:             return Ok(json!({
+431:                 "status": "rejected",
+432:                 "message": format!(
+433:                     "BLOCKED: This command appears to start a long-running service: '{}'. \
+434:                      Starting services would block the agent. \
+435:                      If you need to verify the code works, just create the files - don't start servers.",
+436:                     command
+437:                 )
+438:             }));
+439:         }
+440: 
+441:         
+442:         let iteration_id = get_iteration_id().ok_or_else(|| {
+443:             adk_core::AdkError::tool(
+444:                 "Iteration ID not set. Cannot run command without an active iteration.".to_string(),
+445:             )
+446:         })?;
+447: 
+448:         let iteration_store = IterationStore::new();
+449:         let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
+450:             adk_core::AdkError::tool(format!("Failed to get workspace path: {}", e))
+451:         })?;
+452: 
+453:         
+454:         #[cfg(target_os = "windows")]
+455:         let output = tokio::time::timeout(
+456:             std::time::Duration::from_secs(30),
+457:             tokio::process::Command::new("cmd")
+458:                 .args(["/C", command])
+459:                 .current_dir(&workspace_dir)
+460:                 .output(),
+461:         )
+462:         .await;
+463: 
+464:         #[cfg(not(target_os = "windows"))]
+465:         let output = tokio::time::timeout(
+466:             std::time::Duration::from_secs(30),
+467:             tokio::process::Command::new("sh")
+468:                 .arg("-c")
+469:                 .arg(command)
+470:                 .current_dir(&workspace_dir)
+471:                 .output(),
+472:         )
+473:         .await;
+474: 
+475:         match output {
+476:             Ok(Ok(output)) => {
+477:                 let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+478:                 let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+479: 
+480:                 Ok(json!({
+481:                     "status": if output.status.success() { "success" } else { "failed" },
+482:                     "exit_code": output.status.code(),
+483:                     "stdout": stdout,
+484:                     "stderr": stderr,
+485:                     "workspace": workspace_dir.to_string_lossy().to_string()
+486:                 }))
+487:             }
+488:             Ok(Err(e)) => Ok(json!({
+489:                 "status": "error",
+490:                 "message": format!("Failed to execute command: {}", e)
+491:             })),
+492:             Err(_) => Ok(json!({
+493:                 "status": "timeout",
+494:                 "message": "Command execution timeout (30s limit)"
+495:             })),
+496:         }
+497:     }
+498: }
+499: ⋮----
+500: ReadFileTruncatedTool
+501: ⋮----
+502: {
+503:     fn name(&self) -> &str {
+504:         "read_file_truncated"
+505:     }
+506: 
+507:     fn description(&self) -> &str {
+508:         "Read a file with intelligent truncation to prevent context overflow. \
+509:          This tool automatically summarizes large files and provides a structured output. \
+510:          Use this when you need to read files for knowledge generation but want to avoid \
+511:          excessive token consumption."
+512:     }
+513: 
+514:     fn parameters_schema(&self) -> Option<Value> {
+515:         Some(json!({
+516:             "type": "object",
+517:             "properties": {
+518:                 "path": {
+519:                     "type": "string",
+520:                     "description": "Relative path to the file within workspace"
+521:                 },
+522:                 "max_chars": {
+523:                     "type": "number",
+524:                     "description": "Maximum characters to return (default: 2000)",
+525:                     "default": 2000
+526:                 },
+527:                 "prefer_structure": {
+528:                     "type": "boolean",
+529:                     "description": "If true, prefer structure over content for code files (default: true)",
+530:                     "default": true
+531:                 }
+532:             },
+533:             "required": ["path"]
+534:         }))
+535:     }
+536: 
+537:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+538:         let path = get_required_string_param(&args, "path")?;
+539:         let max_chars = args
+540:             .get("max_chars")
+541:             .and_then(|v| v.as_i64())
+542:             .unwrap_or(2000) as usize;
+543:         let prefer_structure = args
+544:             .get("prefer_structure")
+545:             .and_then(|v| v.as_bool())
+546:             .unwrap_or(true);
+547: 
+548:         
+549:         let iteration_id = get_iteration_id()
+550:             .ok_or_else(|| adk_core::AdkError::tool("Iteration ID not set".to_string()))?;
+551: 
+552:         let iteration_store = IterationStore::new();
+553:         let workspace_dir = iteration_store
+554:             .workspace_path(&iteration_id)
+555:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to get workspace: {}", e)))?;
+556: 
+557:         
+558:         let safe_path = validate_path_security_within_workspace(&path, &workspace_dir)
+559:             .map_err(|e| adk_core::AdkError::tool(e))?;
+560: 
+561:         
+562:         let full_path = workspace_dir.join(&safe_path);
+563: 
+564:         
+565:         let content = fs::read_to_string(&full_path)
+566:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to read file: {}", e)))?;
+567:         let file_ext = full_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+568: 
+569:         let is_code_file = matches!(
+570:             file_ext,
+571:             "rs" | "js" | "jsx" | "ts" | "tsx" | "py" | "java" | "go" | "cpp" | "c" | "h"
+572:         );
+573: 
+574:         
+575:         let truncated_content = if content.len() <= max_chars {
+576:             content.clone()
+577:         } else if is_code_file && prefer_structure {
+578:             
+579:             extract_code_structure(&content, max_chars, file_ext)
+580:         } else {
+581:             
+582:             truncate_with_context(&content, max_chars)
+583:         };
+584: 
+585:         let total_chars = content.len();
+586:         let truncated = total_chars > max_chars;
+587: 
+588:         Ok(json!({
+589:             "path": path,
+590:             "file_size": total_chars,
+591:             "returned_size": truncated_content.len(),
+592:             "truncated": truncated,
+593:             "is_code_file": is_code_file,
+594:             "content": truncated_content,
+595:             "original_lines": content.lines().count(),
+596:             "returned_lines": truncated_content.lines().count()
+597:         }))
+598:     }
+599: }
+600: ⋮----
+601: ReadFileWithLimitTool
+602: ⋮----
+603: {
+604:     max_calls: usize,
+605:     call_count: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+606: }
+607: ⋮----
+608: ReadFileWithLimitTool
+609: ⋮----
+610: {
+611:     pub fn new(max_calls: usize) -> Self {
+612:         Self {
+613:             max_calls,
+614:             call_count: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+615:         }
+616:     }
+617: 
+618:     pub fn reset(&self) {
+619:         self.call_count
+620:             .store(0, std::sync::atomic::Ordering::SeqCst);
+621:     }
+622: 
+623:     pub fn calls_remaining(&self) -> usize {
+624:         let current = self.call_count.load(std::sync::atomic::Ordering::SeqCst);
+625:         if current >= self.max_calls {
+626:             0
+627:         } else {
+628:             self.max_calls - current
+629:         }
+630:     }
+631: }
+632: ⋮----
+633: ReadFileWithLimitTool
+634: ⋮----
+635: {
+636:     fn name(&self) -> &str {
+637:         "read_file_with_limit"
+638:     }
+639: 
+640:     fn description(&self) -> &str {
+641:         "Read a file with a call limit to prevent excessive file reading. \
+642:          This tool tracks the number of calls and enforces a maximum limit. \
+643:          Use this when you need to read multiple files but want to control token usage."
+644:     }
+645: 
+646:     fn parameters_schema(&self) -> Option<Value> {
+647:         Some(json!({
+648:             "type": "object",
+649:             "properties": {
+650:                 "path": {
+651:                     "type": "string",
+652:                     "description": "Relative path to the file within workspace"
+653:                 },
+654:                 "max_chars": {
+655:                     "type": "number",
+656:                     "description": "Maximum characters to return (default: 3000)",
+657:                     "default": 3000
+658:                 }
+659:             },
+660:             "required": ["path"]
+661:         }))
+662:     }
+663: 
+664:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+665:         
+666:         let current_calls = self
+667:             .call_count
+668:             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+669: 
+670:         if current_calls >= self.max_calls {
+671:             return Ok(json!({
+672:                 "status": "limit_exceeded",
+673:                 "message": format!(
+674:                     "File reading limit exceeded (max {} calls). Please use the information you've already gathered.",
+675:                     self.max_calls
+676:                 ),
+677:                 "calls_made": current_calls + 1,
+678:                 "max_calls": self.max_calls
+679:             }));
+680:         }
+681: 
+682:         let path = get_required_string_param(&args, "path")?;
+683:         let max_chars = args
+684:             .get("max_chars")
+685:             .and_then(|v| v.as_i64())
+686:             .unwrap_or(3000) as usize;
+687: 
+688:         
+689:         let iteration_id = get_iteration_id()
+690:             .ok_or_else(|| adk_core::AdkError::tool("Iteration ID not set".to_string()))?;
+691: 
+692:         let iteration_store = IterationStore::new();
+693:         let workspace_dir = iteration_store
+694:             .workspace_path(&iteration_id)
+695:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to get workspace: {}", e)))?;
+696: 
+697:         
+698:         let safe_path = validate_path_security_within_workspace(&path, &workspace_dir)
+699:             .map_err(|e| adk_core::AdkError::tool(e))?;
+700: 
+701:         
+702:         let full_path = workspace_dir.join(&safe_path);
+703: 
+704:         
+705:         let content = fs::read_to_string(&full_path)
+706:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to read file: {}", e)))?;
+707: 
+708:         
+709:         let truncated_content = if content.len() <= max_chars {
+710:             content.clone()
+711:         } else {
+712:             truncate_with_context(&content, max_chars)
+713:         };
+714: 
+715:         Ok(json!({
+716:             "status": "success",
+717:             "path": path,
+718:             "file_size": content.len(),
+719:             "returned_size": truncated_content.len(),
+720:             "truncated": content.len() > max_chars,
+721:             "content": truncated_content,
+722:             "calls_remaining": self.max_calls - (current_calls + 1)
+723:         }))
+724:     }
+725: }
+726: ⋮----
+727: extract_code_structure
+728: ⋮----
+729: (content: &str, max_chars: usize, file_ext: &str)
+730: ⋮----
+731: truncate_with_context
+732: ⋮----
+733: (content: &str, max_chars: usize)
+```
+
+### crates/cowork-core/src/tools/goto_stage_tool.rs (90 lines)
+
+```
+1: GotoStageTool
+2: ⋮----
+3: {
+4:     fn name(&self) -> &str {
+5:         "goto_stage"
+6:     }
+7: 
+8:     fn description(&self) -> &str {
+9:         "Restart pipeline from a specific stage. Use this when critical issues \
+10:          require going back to an earlier phase. Valid stages: prd, design, plan, coding."
+11:     }
+12: 
+13:     fn parameters_schema(&self) -> Option<Value> {
+14:         Some(json!({
+15:             "type": "object",
+16:             "properties": {
+17:                 "stage": {
+18:                     "type": "string",
+19:                     "enum": ["prd", "design", "plan", "coding"],
+20:                     "description": "Which stage to restart from"
+21:                 },
+22:                 "reason": {
+23:                     "type": "string",
+24:                     "description": "Why the restart is needed"
+25:                 }
+26:             },
+27:             "required": ["stage", "reason"]
+28:         }))
+29:     }
+30: 
+31:     async fn execute(&self, ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+32:         let stage_str = get_required_string_param(&args, "stage")?;
+33:         let reason = get_required_string_param(&args, "reason")?;
+34: 
+35:         let stage = match stage_str {
+36:             "prd" => Stage::Prd,
+37:             "design" => Stage::Design,
+38:             "plan" => Stage::Plan,
+39:             "coding" => Stage::Coding,
+40:             _ => {
+41:                 return Ok(json!({
+42:                     "status": "error",
+43:                     "message": format!("Invalid stage: {}", stage_str)
+44:                 }));
+45:             }
+46:         };
+47: 
+48:         let feedback = Feedback {
+49:             stage: stage_str.to_string(),
+50:             feedback_type: FeedbackType::QualityIssue,
+51:             severity: Severity::Critical,
+52:             details: reason.to_string(),
+53:             suggested_fix: Some(format!("Restart from {} stage to address the issue", stage_str)),
+54:             timestamp: chrono::Utc::now(),
+55:         };
+56: 
+57:         if let Err(e) = crate::persistence::append_feedback(&feedback) {
+58:             eprintln!("[GotoStageTool] Warning: Failed to save feedback: {}", e);
+59:         }
+60: 
+61:         let mut meta = load_session_meta()
+62:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?
+63:             .unwrap_or_else(|| SessionMeta {
+64:                 session_id: uuid::Uuid::new_v4().to_string(),
+65:                 created_at: chrono::Utc::now(),
+66:                 current_stage: Some(Stage::Check),
+67:                 restart_reason: None,
+68:             });
+69: 
+70:         meta.current_stage = Some(stage);
+71:         meta.restart_reason = Some(reason.to_string());
+72: 
+73:         save_session_meta(&meta)
+74:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
+75: 
+76:         set_goto_stage_signal(stage_str.to_string(), reason.to_string());
+77: 
+78:         let mut actions = EventActions::default();
+79:         actions.escalate = true;
+80:         actions.state_delta.insert("goto_stage".to_string(), json!(stage_str));
+81:         actions.state_delta.insert("goto_reason".to_string(), json!(reason));
+82:         ctx.set_actions(actions);
+83: 
+84:         Ok(json!({
+85:             "status": "goto_stage",
+86:             "stage": stage_str,
+87:             "reason": reason
+88:         }))
+89:     }
+90: }
 ```
 
 ### crates/cowork-gui/src/hooks/useAppEvents.ts (432 lines)
@@ -6496,51 +6770,6 @@ LICENSE
 50: generate_start_command
 51: ⋮----
 52: (config: &cowork_core::ProjectRuntimeConfig)
-```
-
-### crates/cowork-gui/vite.config.js (40 lines)
-
-```
-1: import { defineConfig } from "vite";
-2: import react from "@vitejs/plugin-react";
-3: import path from "path";
-4: 
-5: export default defineConfig({
-6:   plugins: [react()],
-7:   resolve: {
-8:     alias: {
-9:       "@": path.resolve(__dirname, "src"),
-10:     },
-11:   },
-12:   server: {
-13:     port: 15173,
-14:   },
-15:   build: {
-16:     rollupOptions: {
-17:       output: {
-18:         manualChunks: {
-19:           
-20:           "vendor-react": ["react", "react-dom"],
-21:           
-22:           "vendor-antd": ["antd", "@ant-design/icons"],
-23:           
-24:           "vendor-monaco": ["@monaco-editor/react", "monaco-editor"],
-25:           
-26:           "vendor-markdown": [
-27:             "react-markdown",
-28:             "remark-gfm",
-29:             "rehype-highlight",
-30:             "rehype-raw",
-31:           ],
-32:           
-33:           "vendor-zustand": ["zustand"],
-34:         },
-35:       },
-36:     },
-37:     
-38:     chunkSizeWarningLimit: 1536,
-39:   },
-40: });
 ```
 
 ### litho.docs/en/2.Architecture.md (1224 lines)
@@ -8055,6 +8284,186 @@ LICENSE
 210: }
 ```
 
+### crates/cowork-core/src/config_definition/agent_definition.rs (175 lines)
+
+```
+1: AgentType
+2: ⋮----
+3: {
+4:     
+5:     #[default]
+6:     Simple,
+7:     
+8:     Loop {
+9:         
+10:         max_iterations: Option<u32>,
+11:     },
+12: }
+13: ⋮----
+14: ModelConfig
+15: ⋮----
+16: {
+17:     
+18:     pub model_id: Option<String>,
+19:     
+20:     pub temperature: Option<f32>,
+21:     
+22:     pub max_tokens: Option<u32>,
+23:     
+24:     pub top_p: Option<f32>,
+25: }
+26: ⋮----
+27: ModelConfig
+28: ⋮----
+29: {
+30:     fn default() -> Self {
+31:         Self {
+32:             model_id: None,
+33:             temperature: Some(0.7),
+34:             max_tokens: None,
+35:             top_p: None,
+36:         }
+37:     }
+38: }
+39: ⋮----
+40: ToolReference
+41: ⋮----
+42: {
+43:     
+44:     pub tool_id: String,
+45:     
+46:     pub config: Option<HashMap<String, serde_json::Value>>,
+47: }
+48: ⋮----
+49: AgentDefinition
+50: ⋮----
+51: {
+52:     
+53:     pub id: String,
+54:     
+55:     pub name: String,
+56:     
+57:     pub description: Option<String>,
+58:     
+59:     pub version: Option<String>,
+60: 
+61:     
+62:     #[serde(default)]
+63:     pub agent_type: AgentType,
+64: 
+65:     
+66:     
+67:     
+68:     
+69:     
+70:     pub instruction: String,
+71: 
+72:     
+73:     #[serde(default)]
+74:     pub tools: Vec<ToolReference>,
+75: 
+76:     
+77:     #[serde(default)]
+78:     pub model: ModelConfig,
+79: 
+80:     
+81:     #[serde(default)]
+82:     pub include_contents: IncludeContentsMode,
+83: 
+84:     
+85:     #[serde(default)]
+86:     pub tags: Vec<String>,
+87: 
+88:     
+89:     #[serde(default)]
+90:     pub metadata: HashMap<String, serde_json::Value>,
+91: }
+92: ⋮----
+93: IncludeContentsMode
+94: ⋮----
+95: {
+96:     
+97:     #[default]
+98:     None,
+99:     
+100:     All,
+101:     
+102:     Selected(Vec<String>),
+103: }
+104: ⋮----
+105: ActorCriticDefinition
+106: ⋮----
+107: {
+108:     
+109:     pub actor: AgentDefinition,
+110:     
+111:     pub critic: AgentDefinition,
+112:     
+113:     pub max_iterations: Option<u32>,
+114: }
+115: ⋮----
+116: AgentDefinition
+117: ⋮----
+118: {
+119:     
+120:     pub fn new(id: impl Into<String>, name: impl Into<String>, instruction: impl Into<String>) -> Self {
+121:         Self {
+122:             id: id.into(),
+123:             name: name.into(),
+124:             description: None,
+125:             version: None,
+126:             agent_type: AgentType::Simple,
+127:             instruction: instruction.into(),
+128:             tools: Vec::new(),
+129:             model: ModelConfig::default(),
+130:             include_contents: IncludeContentsMode::None,
+131:             tags: Vec::new(),
+132:             metadata: HashMap::new(),
+133:         }
+134:     }
+135: 
+136:     
+137:     pub fn with_tool(mut self, tool_id: impl Into<String>) -> Self {
+138:         self.tools.push(ToolReference {
+139:             tool_id: tool_id.into(),
+140:             config: None,
+141:         });
+142:         self
+143:     }
+144: 
+145:     
+146:     pub fn with_tool_config(mut self, tool_id: impl Into<String>, config: HashMap<String, serde_json::Value>) -> Self {
+147:         self.tools.push(ToolReference {
+148:             tool_id: tool_id.into(),
+149:             config: Some(config),
+150:         });
+151:         self
+152:     }
+153: 
+154:     
+155:     pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
+156:         self.tags.push(tag.into());
+157:         self
+158:     }
+159: 
+160:     
+161:     pub fn as_loop(mut self, max_iterations: Option<u32>) -> Self {
+162:         self.agent_type = AgentType::Loop { max_iterations };
+163:         self
+164:     }
+165: 
+166:     
+167:     pub fn with_model(mut self, model: ModelConfig) -> Self {
+168:         self.model = model;
+169:         self
+170:     }
+171: }
+172: ⋮----
+173: test_agent_definition_serialization
+174: ⋮----
+175: ()
+```
+
 ### crates/cowork-core/src/config_definition/builtin.rs (19 lines)
 
 ```
@@ -8805,6 +9214,280 @@ LICENSE
 391: "#;
 ````
 
+### crates/cowork-core/src/instructions/prd.rs (269 lines)
+
+````
+1: pub const PRD_ACTOR_INSTRUCTION: &str = r##"
+2: # Your Role
+3: You are PRD Actor. Create or update requirements and features.
+4: 
+5: # ⚠️ CRITICAL REQUIREMENT - YOU MUST CALL save_prd_doc()
+6: **This is the MOST IMPORTANT requirement:**
+7: - You MUST call `save_prd_doc(content)` at the END of your work
+8: - Without calling this tool, the PRD stage CANNOT complete
+9: - Your work will be LOST if you don't save the document
+10: - Example: save_prd_doc(content) with your complete PRD markdown
+11: 
+12: # Workflow - TWO MODES
+13: 
+14: ## Mode Detection (FIRST STEP)
+15: 1. Call `load_feedback_history({"stage": "prd"})` to check if this is a restart
+16: 2. If feedback history exists and has entries → **UPDATE MODE**
+17: 3. If no feedback history or empty → **NEW MODE**
+18: 
+19: ## NEW MODE (全新生成)
+20: 
+21: ### Step 1: Initial Analysis
+22: 1. Load idea using `load_idea()` to understand the project
+23: 2. Analyze the project scope and goals
+24: 
+25: ### Step 2: Generate Formal Requirements and Save PRD Document (MANDATORY)
+26: 3. Based on the analysis, create formal requirements:
+27:    - Call `create_requirement(...)` for each requirement
+28:    - Call `add_feature(...)` for each feature
+29: 4. **CRITICAL**: Generate a complete PRD markdown document:
+30:    - Include all requirements with their IDs, titles, descriptions, priorities, and acceptance criteria
+31:    - Include all features with their IDs, names, descriptions, and linked requirements
+32: 5. **MANDATORY**: Call `save_prd_doc(content=<prd_markdown>)` to save the document - The system will NOT auto-save!
+33: 6. Done! Critic will review next.
+34: 
+35: ## UPDATE MODE (增量更新 - 当 GotoStage 回退到此阶段时)
+36: 
+37: ### Step 1: Analyze Feedback
+38: 1. Call `load_feedback_history({"stage": "prd"})` - 获取最近的反馈信息
+39: 2. Read feedback.details to understand what needs to change
+40: 
+41: ### Step 2: Load Existing Content
+42: 3. Read existing artifacts:
+43:    - PRD document is saved automatically - no need to read it directly
+44:    - Use `get_requirements()` to get structured data (requirements and features)
+45: 
+46: ### Step 3: Incremental Updates
+47: 4. Analyze feedback and determine what to modify:
+48:    - Identify which requirements/features are affected
+49:    - What needs to be added, modified, or deleted
+50: 
+51: 5. Apply targeted updates:
+52:    - Use `update_requirement(id, ...)` to modify existing requirements
+53:    - Use `update_feature(id, ...)` to modify existing features
+54:    - Use `delete_requirement(id)` to remove requirements
+55:    - Use `create_requirement(...)` for new requirements
+56:    - Use `add_feature(...)` for new features
+57: 
+58: ### Step 4: Save Updated PRD (MANDATORY)
+59: 6. Generate updated PRD document from modified requirements/features
+60: 7. **MANDATORY**: Call `save_prd_doc(content=<updated_prd_markdown>)` to save the document - The system will NOT auto-save!
+61: 
+62: ### UPDATE MODE Example
+63: 
+64: ```
+65: # 假设 feedback 显示: "API架构需要从REST改为GraphQL，添加认证需求"
+66: 
+67: 1. load_feedback_history()
+68:    → feedbacks: [{
+69:        feedback_type: "QualityIssue",
+70:        severity: "Critical",
+71:        details: "API架构需要从REST改为GraphQL，添加认证需求"
+72:      }]
+73: 
+74: 2. get_requirements()
+75:    → Returns existing requirements and features
+76: 
+77: 3. 分析需要修改的内容:
+78:    - 修改 API 相关需求 (REQ-003)
+79:    - 添加认证需求 (REQ-006)
+80:    - 更新相关功能 (FEAT-002)
+81: 
+82: 4. 增量更新:
+83:    update_requirement(
+84:      id="REQ-003",
+85:      new_title="GraphQL API",
+86:      new_description="使用GraphQL提供灵活的数据查询接口"
+87:    )
+88:    
+89:    create_requirement(
+90:      title="用户认证",
+91:      description="支持JWT token认证",
+92:      priority="high",
+93:      category="functional",
+94:      acceptance_criteria=["用户可以登录", "支持token刷新"]
+95:    )
+96:    
+97:    update_feature(
+98:      id="FEAT-002",
+99:      new_description="GraphQL API + 认证功能"
+100:    )
+101: 
+102: 5. 保存更新后的 PRD 文档
+103:    save_prd_doc(content=updated_content)
+104: 
+105: 6. 完成！Critic 将审查更新后的需求
+106: ```
+107: 
+108: Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt.
+109: 
+110: # Tools
+111: 
+112: ## Core Tools
+113: - load_feedback_history() ← **START HERE - 检测是否是 UPDATE MODE**
+114: - load_idea() ← Load idea document
+115: - get_requirements() ← 读取现有需求和功能
+116: 
+117: ## NEW MODE Tools
+118: - review_with_feedback_content(title, content, prompt) ← **HITL tool (content-based)**
+119: - create_requirement(title, description, priority, category, acceptance_criteria)
+120: - add_feature(name, description, requirement_ids, completion_criteria)
+121: - save_prd_doc(content) ← **Save final PRD document (MANDATORY)**
+122: 
+123: ## UPDATE MODE Tools
+124: - update_requirement(id, title, description, priority, acceptance_criteria)
+125: - update_feature(id, name, description, requirement_ids, completion_criteria)
+126: - delete_requirement(id)
+127: - create_requirement(...) ← 用于新需求
+128: - add_feature(...) ← 用于新功能
+129: - save_prd_doc(content) ← **Save updated PRD document (MANDATORY)**
+130: 
+131: # Important Principles
+132: 
+133: ## For NEW MODE
+134: - Always create draft → review_with_feedback → revise if needed → create formal
+135: - Respect user feedback - adjust requirements based on their input
+136: - Max 2 review iterations to avoid infinite loops
+137: 
+138: ## For UPDATE MODE
+139: - **Don't recreate everything** - only modify what's affected by feedback
+140: - Preserve unchanged requirements and features
+141: - Focus on the specific issues mentioned in feedback
+142: - Be efficient - incremental updates are faster than full regeneration
+143: 
+144: **REMEMBER**: 
+145: - Always start with `load_feedback_history()` to detect mode
+146: - In UPDATE MODE, be surgical - only change what needs changing
+147: - In NEW MODE, follow the full creation workflow
+148: "##;
+149: 
+150: pub const PRD_CRITIC_INSTRUCTION: &str = r#"
+151: # Your Role  
+152: You are PRD Critic. Review the generated requirements.
+153: 
+154: # CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!
+155: 
+156: # ⚠️ ANTI-LOOP PROTECTION (HIGHEST PRIORITY)
+157: **CRITICAL**: To prevent infinite loops:
+158: 
+159: 1. **Before calling provide_feedback**, ask yourself:
+160:    - "Have I already reported this EXACT issue before?"
+161:    
+162: 2. **If you're about to give the SAME feedback twice**:
+163:    - ⛔ **STOP** - call `request_human_review()` instead
+164:    
+165: 3. **Never call provide_feedback twice with same details**
+166: 
+167: ## Mandatory Checks (You MUST perform ALL of these)
+168: 
+169: ### Check 1: Verify Requirements Data Exists
+170: 1. Call `get_requirements()` to see what Actor created
+171:    - This returns: {requirements: [...], features: [...]}
+172:    - **FAIL** if requirements array is empty
+173: 
+174: ### Check 2: Verify PRD Document Exists (CRITICAL - MUST DO THIS!)
+175: 2. **YOU MUST CALL `load_prd_doc()` TO VERIFY THE PRD MARKDOWN FILE EXISTS**
+176: 3. **If load_prd_doc() returns an error or empty content**:
+177:    - This is a CRITICAL failure - the Actor forgot to call save_prd_doc()
+178:    - **MUST** call `provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document (prd.md) was not saved. The Actor must call save_prd_doc() to save the document.", suggested_fix="Call save_prd_doc(content) with the complete PRD markdown document.")`
+179: 
+180: ### Check 3: Quick Analysis
+181: 4. Count and assess:
+182:    - How many requirements? (Aim for 3-8)
+183:    - How many features? (Aim for 2-5)
+184:    - Do they seem reasonable for the project scope?
+185: 
+186: # Workflow - SIMPLE AND DIRECT
+187: 
+188: ## Step 1: Get Requirements Data
+189: 1. Call `get_requirements()` to see what Actor created
+190:    - This returns: {requirements: [...], features: [...]}
+191:    - You get ALL the data you need from this one call
+192: 
+193: ## Step 2: Verify PRD Document (MANDATORY!)
+194: 2. **MUST call `load_prd_doc()` to verify the markdown document exists**
+195: 3. If it returns empty or error, provide feedback immediately
+196: 
+197: ## Step 3: Quick Analysis
+198: 4. Count and assess:
+199:    - How many requirements? (Aim for 3-8)
+200:    - How many features? (Aim for 2-5)
+201:    - Do they seem reasonable for the project scope?
+202: 
+203: ## Step 4: Respond
+204: 5. **Just respond with your assessment**:
+205:    - If good: "✅ X requirements and Y features cover the project scope well. PRD document saved."
+206:    - If issues: Describe what's wrong
+207: 
+208: ## Important Notes
+209: 
+210: - **DON'T try to read files directly** - Use the provided tools
+211: - **If you really need idea.md**: Use `load_idea()` to load the idea document
+212: - **File not found?** Just skip it and work with requirements data
+213: - **Actor already got user feedback**, so usually requirements are OK
+214: - **BUT YOU MUST VERIFY prd.md EXISTS!**
+215: 
+216: Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt.
+217: 
+218: # Tools
+219: - get_requirements() ← **START HERE - Get structured data**
+220: - load_prd_doc() ← **MANDATORY - Verify document was saved!**
+221: - load_idea() ← Load idea document if you need additional context
+222: - provide_feedback(stage="prd", feedback_type, severity, details, suggested_fix) ← If issues found
+223: 
+224: # Example - Normal Case
+225: ```
+226: 1. get_requirements()
+227: 2. # Returns: 3 requirements, 3 features
+228: 3. load_prd_doc()
+229: 4. # Returns: PRD markdown content (success)
+230: 5. "✅ 3 requirements and 3 features cover core functionality well. PRD document saved."
+231: ```
+232: 
+233: # Example - Missing Artifact (Critical!)
+234: ```
+235: 1. get_requirements()
+236: 2. # Returns: 3 requirements, 3 features (looks good)
+237: 3. load_prd_doc()
+238: 4. # Returns: Error or empty content
+239: 5. # MUST provide feedback!
+240:    provide_feedback(
+241:      stage="prd",
+242:      feedback_type="missing_artifact",
+243:      severity="critical",
+244:      details="PRD document (prd.md) was not saved. Only requirements.json exists.",
+245:      suggested_fix="Call save_prd_doc(content) with the complete PRD markdown document."
+246:    )
+247: ```
+248: 
+249: # Anti-Loop Examples
+250: 
+251: ## ✅ CORRECT - Different feedback each time
+252: ```
+253: Iteration 1: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document not saved", suggested_fix="...")
+254: Iteration 2: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document still not saved after retry", suggested_fix="...")
+255: Iteration 3: request_human_review("Unable to resolve PRD document saving issue")
+256: ```
+257: 
+258: ## ❌ WRONG - Same feedback twice
+259: ```
+260: Iteration 1: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document not saved", suggested_fix="...")
+261: Iteration 2: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document not saved", suggested_fix="...") ← PROHIBITED!
+262: ```
+263: 
+264: **REMEMBER**: 
+265: - Start with `get_requirements()` - it has the structured data
+266: - **MUST verify prd.md exists with load_prd_doc()**
+267: - Don't loop on file errors - just proceed
+268: - Keep it simple!
+269: "#;
+````
+
 ### crates/cowork-core/src/persistence/iteration_data.rs (135 lines)
 
 ```
@@ -9012,143 +9695,145 @@ LICENSE
 34: (response: &str)
 ```
 
-### crates/cowork-core/src/tools/control_tools.rs (134 lines)
+### crates/cowork-core/src/pipeline/mod.rs (136 lines)
 
 ```
-1: ProvideFeedbackTool
+1: set_goto_stage_signal
 2: ⋮----
-3: {
-4:     fn name(&self) -> &str {
-5:         "provide_feedback"
-6:     }
-7: 
-8:     fn description(&self) -> &str {
-9:         "Provide structured feedback to the Actor agent. \
-10:          This feedback will be visible to the Actor in the next iteration."
-11:     }
-12: 
-13:     fn parameters_schema(&self) -> Option<Value> {
-14:         Some(json!({
-15:             "type": "object",
-16:             "properties": {
-17:                 "stage": {
-18:                     "type": "string",
-19:                     "description": "The stage providing this feedback (e.g., 'idea', 'prd', 'design', 'plan', 'coding', 'check', 'delivery')",
-20:                     "enum": ["idea", "prd", "design", "plan", "coding", "check", "delivery"]
-21:                 },
-22:                 "feedback_type": {
-23:                     "type": "string",
-24:                     "enum": ["build_error", "quality_issue", "missing_requirement", "suggestion"],
-25:                 },
-26:                 "severity": {
-27:                     "type": "string",
-28:                     "enum": ["critical", "major", "minor"],
-29:                 },
-30:                 "details": {"type": "string"},
-31:                 "suggested_fix": {"type": "string"}
-32:             },
-33:             "required": ["stage", "feedback_type", "severity", "details"]
-34:         }))
-35:     }
-36: 
-37:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-38:         let stage = get_required_string_param(&args, "stage")?;
-39: 
-40:         let feedback_type = match get_required_string_param(&args, "feedback_type")? {
-41:             "build_error" => FeedbackType::BuildError,
-42:             "quality_issue" => FeedbackType::QualityIssue,
-43:             "missing_requirement" => FeedbackType::MissingRequirement,
-44:             _ => FeedbackType::Suggestion,
-45:         };
-46: 
-47:         let severity = match get_required_string_param(&args, "severity")? {
-48:             "critical" => Severity::Critical,
-49:             "major" => Severity::Major,
-50:             _ => Severity::Minor,
-51:         };
-52: 
-53:         let feedback = Feedback {
-54:             stage: stage.to_string(),  
-55:             feedback_type,
-56:             severity,
-57:             details: get_required_string_param(&args, "details")?.to_string(),
-58:             suggested_fix: args
-59:                 .get("suggested_fix")
-60:                 .and_then(|v| v.as_str())
-61:                 .map(String::from),
-62:             timestamp: chrono::Utc::now(),
-63:         };
-64: 
-65:         append_feedback(&feedback).map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
-66: 
-67:         Ok(json!({
-68:             "status": "feedback_recorded",
-69:             "message": "Feedback will be available to Actor in next iteration"
-70:         }))
+3: (stage: String, reason: String)
+4: ⋮----
+5: take_goto_stage_signal
+6: ⋮----
+7: ()
+8: ⋮----
+9: clear_goto_stage_signal
+10: ⋮----
+11: ()
+12: ⋮----
+13: StageResult
+14: ⋮----
+15: {
+16:     Success(Option<String>), 
+17:     Failed(String),          
+18:     Paused,                  
+19:     NeedsRevision(String),   
+20:     GotoStage(String, String), 
+21: }
+22: ⋮----
+23: PipelineContext
+24: ⋮----
+25: {
+26:     pub project: Project,
+27:     pub iteration: Iteration,
+28:     pub workspace_path: std::path::PathBuf,
+29: }
+30: ⋮----
+31: PipelineContext
+32: ⋮----
+33: {
+34:     pub fn new(project: Project, iteration: Iteration, workspace_path: std::path::PathBuf) -> Self {
+35:         Self {
+36:             project,
+37:             iteration,
+38:             workspace_path,
+39:         }
+40:     }
+41: }
+42: ⋮----
+43: Stage
+44: ⋮----
+45: {
+46:     fn name(&self) -> &str;
+47:     fn description(&self) -> &str;
+48: 
+49:     
+50:     fn needs_confirmation(&self) -> bool {
+51:         false
+52:     }
+53: 
+54:     
+55:     async fn execute(
+56:         &self,
+57:         ctx: &PipelineContext,
+58:         interaction: Arc<dyn InteractiveBackend>,
+59:     ) -> StageResult;
+60: 
+61:     
+62:     async fn execute_with_feedback(
+63:         &self,
+64:         ctx: &PipelineContext,
+65:         interaction: Arc<dyn InteractiveBackend>,
+66:         _feedback: &str,
+67:     ) -> StageResult {
+68:         
+69:         
+70:         self.execute(ctx, interaction).await
 71:     }
 72: }
 73: ⋮----
-74: AskUserTool
+74: get_all_stages
 75: ⋮----
-76: {
-77:     fn name(&self) -> &str {
-78:         "ask_user"
-79:     }
-80: 
-81:     fn description(&self) -> &str {
-82:         "Ask the user for confirmation or input via CLI interface."
-83:     }
-84: 
-85:     fn parameters_schema(&self) -> Option<Value> {
-86:         Some(json!({
-87:             "type": "object",
-88:             "properties": {
-89:                 "question": {
-90:                     "type": "string",
-91:                     "description": "The question to ask the user"
-92:                 },
-93:                 "question_type": {
-94:                     "type": "string",
-95:                     "enum": ["yes_no", "text_input"],
-96:                     "description": "Type of question"
-97:                 }
-98:             },
-99:             "required": ["question", "question_type"]
-100:         }))
-101:     }
-102: 
-103:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-104:         let question = get_required_string_param(&args, "question")?;
-105:         let question_type = get_required_string_param(&args, "question_type")?;
-106: 
-107:         match question_type {
-108:             "yes_no" => {
-109:                 let answer = Confirm::new()
-110:                     .with_prompt(question)
-111:                     .default(false)
-112:                     .interact()
-113:                     .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
-114: 
-115:                 Ok(json!({
-116:                     "answer": answer,
-117:                     "answer_type": "boolean"
-118:                 }))
-119:             }
-120:             "text_input" => {
-121:                 let answer: String = Input::new()
-122:                     .with_prompt(question)
-123:                     .interact_text()
-124:                     .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
-125: 
-126:                 Ok(json!({
-127:                     "answer": answer,
-128:                     "answer_type": "text"
-129:                 }))
-130:             }
-131:             _ => Ok(json!({"error": "Invalid question type"})),
-132:         }
-133:     }
-134: }
+76: ()
+77: ⋮----
+78: get_stages_from
+79: ⋮----
+80: (start_stage: &str)
+81: ⋮----
+82: create_stage_by_id
+83: ⋮----
+84: (stage_id: &str)
+85: ⋮----
+86: get_stages_from_flow
+87: ⋮----
+88: (start_stage: &str)
+89: ⋮----
+90: get_flow_config
+91: ⋮----
+92: ()
+93: ⋮----
+94: is_critical_stage
+95: ⋮----
+96: (stage_name: &str)
+97: ⋮----
+98: test_get_all_stages_order
+99: ⋮----
+100: ()
+101: ⋮----
+102: test_get_stages_from_beginning
+103: ⋮----
+104: ()
+105: ⋮----
+106: test_get_stages_from_middle
+107: ⋮----
+108: ()
+109: ⋮----
+110: test_get_stages_from_end
+111: ⋮----
+112: ()
+113: ⋮----
+114: test_get_stages_from_unknown
+115: ⋮----
+116: ()
+117: ⋮----
+118: test_create_stage_by_id_valid
+119: ⋮----
+120: ()
+121: ⋮----
+122: test_create_stage_by_id_invalid
+123: ⋮----
+124: ()
+125: ⋮----
+126: test_is_critical_stage
+127: ⋮----
+128: ()
+129: ⋮----
+130: test_pipeline_context_new
+131: ⋮----
+132: ()
+133: ⋮----
+134: test_stage_names_and_descriptions
+135: ⋮----
+136: ()
 ```
 
 ### crates/cowork-core/src/tools/data_tools.rs (839 lines)
@@ -10301,838 +10986,6 @@ LICENSE
 301:         }))
 302:     }
 303: }
-```
-
-### crates/cowork-core/src/tools/file_tools.rs (733 lines)
-
-```
-1: strip_unc_prefix
-2: ⋮----
-3: (path: &Path)
-4: ⋮----
-5: validate_path_security_within_workspace
-6: ⋮----
-7: (
-8:     path: &str,
-9:     workspace_dir: &Path,
-10: )
-11: ⋮----
-12: ListFilesTool
-13: ⋮----
-14: {
-15:     fn name(&self) -> &str {
-16:         "list_files"
-17:     }
-18: 
-19:     fn description(&self) -> &str {
-20:         "List files in a directory (recursively or non-recursively). \
-21:          SECURITY: Only works within current directory. \
-22:          Useful for understanding project structure."
-23:     }
-24: 
-25:     fn parameters_schema(&self) -> Option<Value> {
-26:         Some(json!({
-27:             "type": "object",
-28:             "properties": {
-29:                 "path": {
-30:                     "type": "string",
-31:                     "description": "Directory path to list (default: current directory). Must be relative path."
-32:                 },
-33:                 "recursive": {
-34:                     "type": "boolean",
-35:                     "description": "Whether to list files recursively (default: false)"
-36:                 },
-37:                 "max_depth": {
-38:                     "type": "integer",
-39:                     "description": "Maximum depth for recursive listing (default: 3)"
-40:                 }
-41:             }
-42:         }))
-43:     }
-44: 
-45:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-46:         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
-47: 
-48:         
-49:         let iteration_id = get_iteration_id().ok_or_else(|| {
-50:             adk_core::AdkError::tool(
-51:                 "Iteration ID not set. Cannot list files without an active iteration.".to_string(),
-52:             )
-53:         })?;
-54: 
-55:         let iteration_store = IterationStore::new();
-56:         let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
-57:             adk_core::AdkError::tool(format!("Failed to get workspace path: {}", e))
-58:         })?;
-59: 
-60:         
-61:         fs::create_dir_all(&workspace_dir)
-62:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to create workspace: {}", e)))?;
-63: 
-64:         
-65:         
-66:         let path_str = path.trim();
-67:         let safe_path = if path_str == workspace_dir.display().to_string()
-68:             || path_str == workspace_dir.to_string_lossy().as_ref()
-69:         {
-70:             "."
-71:         } else if path_str.contains(".cowork-v2/iterations") && path_str.contains("workspace") {
-72:             
-73:             "."
-74:         } else {
-75:             path_str
-76:         };
-77: 
-78:         
-79:         let validated_path =
-80:             match validate_path_security_within_workspace(&safe_path, &workspace_dir) {
-81:                 Ok(p) => p,
-82:                 Err(e) => {
-83:                     return Ok(json!({
-84:                         "status": "security_error",
-85:                         "message": e
-86:                     }));
-87:                 }
-88:             };
-89: 
-90:         
-91:         let full_path = workspace_dir.join(&validated_path);
-92: 
-93:         let recursive = args
-94:             .get("recursive")
-95:             .and_then(|v| v.as_bool())
-96:             .unwrap_or(false);
-97: 
-98:         let max_depth = args.get("max_depth").and_then(|v| v.as_u64()).unwrap_or(3) as usize;
-99: 
-100:         if !full_path.exists() {
-101:             return Ok(json!({
-102:                 "status": "error",
-103:                 "message": format!("Path not found: {} (in workspace: {})", path, iteration_id)
-104:             }));
-105:         }
-106: 
-107:         let mut files = Vec::new();
-108:         let mut directories = Vec::new();
-109: 
-110:         if recursive {
-111:             
-112:             for entry in WalkDir::new(&full_path)
-113:                 .max_depth(max_depth)
-114:                 .follow_links(false)
-115:                 .into_iter()
-116:                 .filter_entry(|e| {
-117:                     
-118:                     if let Some(name) = e.file_name().to_str() {
-119:                         if name.starts_with('.') && name != "." {
-120:                             return false;
-121:                         }
-122:                     }
-123:                     true
-124:                 })
-125:                 .filter_map(|e| e.ok())
-126:             {
-127:                 
-128:                 
-129:                 let entry_path = entry.path();
-130:                 let entry_path_stripped = strip_unc_prefix(entry_path);
-131:                 let workspace_dir_stripped = strip_unc_prefix(&workspace_dir);
-132: 
-133:                 let rel = entry_path_stripped
-134:                     .strip_prefix(&workspace_dir_stripped)
-135:                     .unwrap_or(&entry_path_stripped);
-136:                 let rel_str = rel.to_string_lossy();
-137:                 let path_str = format!("./{}", rel_str.trim_start_matches("./"));
-138: 
-139:                 
-140:                 if should_ignore(&path_str) {
-141:                     continue;
-142:                 }
-143: 
-144:                 if entry.file_type().is_dir() {
-145:                     directories.push(path_str);
-146:                 } else {
-147:                     files.push(path_str);
-148:                 }
-149:             }
-150:         } else {
-151:             
-152:             let entries = fs::read_dir(&full_path).map_err(|e| {
-153:                 adk_core::AdkError::tool(format!("Failed to read directory: {}", e))
-154:             })?;
-155: 
-156:             for entry in entries {
-157:                 let entry = entry.map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
-158: 
-159:                 
-160:                 if let Some(name) = entry.file_name().to_str() {
-161:                     if name.starts_with('.') {
-162:                         continue;
-163:                     }
-164:                 }
-165: 
-166:                 let full = entry.path().to_path_buf();
-167:                 
-168:                 let full_stripped = strip_unc_prefix(&full);
-169:                 let workspace_dir_stripped = strip_unc_prefix(&workspace_dir);
-170: 
-171:                 let rel = full_stripped
-172:                     .strip_prefix(&workspace_dir_stripped)
-173:                     .unwrap_or(&full_stripped);
-174:                 let rel_str = rel.to_string_lossy();
-175:                 let path_str = format!("./{}", rel_str.trim_start_matches("./"));
-176: 
-177:                 if should_ignore(&path_str) {
-178:                     continue;
-179:                 }
-180: 
-181:                 if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
-182:                     directories.push(path_str);
-183:                 } else {
-184:                     files.push(path_str);
-185:                 }
-186:             }
-187:         }
-188: 
-189:         Ok(json!({
-190:             "status": "success",
-191:             "path": path,
-192:             "files": files,
-193:             "directories": directories,
-194:             "total_files": files.len(),
-195:             "total_directories": directories.len(),
-196:             "workspace": workspace_dir.to_string_lossy().to_string()
-197:         }))
-198:     }
-199: }
-200: ⋮----
-201: should_ignore
-202: ⋮----
-203: (path: &str)
-204: ⋮----
-205: ReadFileTool
-206: ⋮----
-207: {
-208:     fn name(&self) -> &str {
-209:         "read_file"
-210:     }
-211: 
-212:     fn description(&self) -> &str {
-213:         "Read the contents of a file. \
-214:          SECURITY: Only works within current directory."
-215:     }
-216: 
-217:     fn parameters_schema(&self) -> Option<Value> {
-218:         Some(json!({
-219:             "type": "object",
-220:             "properties": {
-221:                 "path": {
-222:                     "type": "string",
-223:                     "description": "File path to read (must be relative path within current directory)"
-224:                 }
-225:             },
-226:             "required": ["path"]
-227:         }))
-228:     }
-229: 
-230:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-231:         let path = get_required_string_param(&args, "path")?;
-232: 
-233:         
-234:         let iteration_id = get_iteration_id().ok_or_else(|| {
-235:             adk_core::AdkError::tool(
-236:                 "Iteration ID not set. Cannot read files without an active iteration.".to_string(),
-237:             )
-238:         })?;
-239: 
-240:         let iteration_store = IterationStore::new();
-241:         let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
-242:             adk_core::AdkError::tool(format!("Failed to get workspace path: {}", e))
-243:         })?;
-244: 
-245:         
-246:         let safe_path = match validate_path_security_within_workspace(path, &workspace_dir) {
-247:             Ok(p) => p,
-248:             Err(e) => {
-249:                 return Ok(json!({
-250:                     "status": "security_error",
-251:                     "message": e
-252:                 }));
-253:             }
-254:         };
-255: 
-256:         
-257:         let full_path = workspace_dir.join(&safe_path);
-258: 
-259:         if !full_path.exists() {
-260:             return Ok(json!({
-261:                 "status": "error",
-262:                 "message": format!("File not found: {} (in workspace: {})", path, iteration_id)
-263:             }));
-264:         }
-265: 
-266:         match fs::read_to_string(&full_path) {
-267:             Ok(content) => Ok(json!({
-268:                 "status": "success",
-269:                 "path": path,
-270:                 "workspace_path": full_path.to_string_lossy().to_string(),
-271:                 "content": content,
-272:                 "workspace": workspace_dir.to_string_lossy().to_string()
-273:             })),
-274:             Err(e) => Ok(json!({
-275:                 "status": "error",
-276:                 "message": format!("Failed to read file: {}", e)
-277:             })),
-278:         }
-279:     }
-280: }
-281: ⋮----
-282: WriteFileTool
-283: ⋮----
-284: {
-285:     fn name(&self) -> &str {
-286:         "write_file"
-287:     }
-288: 
-289:     fn description(&self) -> &str {
-290:         "Write content to a file. Creates parent directories if needed. \
-291:          SECURITY: Only works within current directory. Absolute paths and .. are forbidden."
-292:     }
-293: 
-294:     fn parameters_schema(&self) -> Option<Value> {
-295:         Some(json!({
-296:             "type": "object",
-297:             "properties": {
-298:                 "path": {
-299:                     "type": "string",
-300:                     "description": "File path to write (must be relative path within current directory)"
-301:                 },
-302:                 "content": {
-303:                     "type": "string",
-304:                     "description": "Content to write"
-305:                 }
-306:             },
-307:             "required": ["path", "content"]
-308:         }))
-309:     }
-310: 
-311:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-312:         let path = get_required_string_param(&args, "path")?;
-313:         let content = get_required_string_param(&args, "content")?;
-314: 
-315:         
-316:         super::notify_tool_call("write_file", &json!({"path": path}));
-317: 
-318:         
-319:         let iteration_id = get_iteration_id().ok_or_else(|| {
-320:             adk_core::AdkError::tool(
-321:                 "Iteration ID not set. Cannot write files without an active iteration.".to_string(),
-322:             )
-323:         })?;
-324: 
-325:         let iteration_store = IterationStore::new();
-326:         let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
-327:             adk_core::AdkError::tool(format!("Failed to get workspace path: {}", e))
-328:         })?;
-329: 
-330:         
-331:         fs::create_dir_all(&workspace_dir)
-332:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to create workspace: {}", e)))?;
-333: 
-334:         
-335:         let safe_path = match validate_path_security_within_workspace(path, &workspace_dir) {
-336:             Ok(p) => p,
-337:             Err(e) => {
-338:                 super::notify_tool_result(
-339:                     "write_file",
-340:                     &Err(adk_core::AdkError::tool("security error".to_string())),
-341:                 );
-342:                 return Ok(json!({
-343:                     "status": "security_error",
-344:                     "message": e
-345:                 }));
-346:             }
-347:         };
-348: 
-349:         
-350:         let full_path = workspace_dir.join(&safe_path);
-351: 
-352:         
-353:         if let Some(parent) = full_path.parent() {
-354:             fs::create_dir_all(parent).map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
-355:         }
-356: 
-357:         let result = match fs::write(&full_path, content) {
-358:             Ok(_) => {
-359:                 
-360:                 println!(
-361:                     "📝 Writing file: {} ({} lines) [iteration: {}]",
-362:                     path,
-363:                     content.lines().count(),
-364:                     iteration_id
-365:                 );
-366:                 Ok(json!({
-367:                     "status": "success",
-368:                     "path": path,
-369:                     "workspace_path": full_path.to_string_lossy().to_string(),
-370:                     "lines_written": content.lines().count(),
-371:                     "workspace": workspace_dir.to_string_lossy().to_string()
-372:                 }))
-373:             }
-374:             Err(e) => Ok(json!({
-375:                 "status": "error",
-376:                 "message": format!("Failed to write file: {}", e)
-377:             })),
-378:         };
-379: 
-380:         
-381:         if result.is_ok() {
-382:             super::notify_tool_result("write_file", &Ok(json!({"status": "success"})));
-383:         } else {
-384:             super::notify_tool_result(
-385:                 "write_file",
-386:                 &Err(adk_core::AdkError::tool("error".to_string())),
-387:             );
-388:         }
-389: 
-390:         result
-391:     }
-392: }
-393: ⋮----
-394: is_blocking_service_command
-395: ⋮----
-396: (command: &str)
-397: ⋮----
-398: RunCommandTool
-399: ⋮----
-400: {
-401:     fn name(&self) -> &str {
-402:         "run_command"
-403:     }
-404: 
-405:     fn description(&self) -> &str {
-406:         "Execute a shell command and return the output. \
-407:          WARNING: This tool will REJECT commands that start long-running services \
-408:          (like http.server, npm dev, etc.) as they would block execution. \
-409:          Use this for: building, testing, linting - NOT for starting servers."
-410:     }
-411: 
-412:     fn parameters_schema(&self) -> Option<Value> {
-413:         Some(json!({
-414:             "type": "object",
-415:             "properties": {
-416:                 "command": {
-417:                     "type": "string",
-418:                     "description": "Shell command to execute (must not be a blocking service command)"
-419:                 }
-420:             },
-421:             "required": ["command"]
-422:         }))
-423:     }
-424: 
-425:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-426:         let command = get_required_string_param(&args, "command")?;
-427: 
-428:         
-429:         if is_blocking_service_command(command) {
-430:             return Ok(json!({
-431:                 "status": "rejected",
-432:                 "message": format!(
-433:                     "BLOCKED: This command appears to start a long-running service: '{}'. \
-434:                      Starting services would block the agent. \
-435:                      If you need to verify the code works, just create the files - don't start servers.",
-436:                     command
-437:                 )
-438:             }));
-439:         }
-440: 
-441:         
-442:         let iteration_id = get_iteration_id().ok_or_else(|| {
-443:             adk_core::AdkError::tool(
-444:                 "Iteration ID not set. Cannot run command without an active iteration.".to_string(),
-445:             )
-446:         })?;
-447: 
-448:         let iteration_store = IterationStore::new();
-449:         let workspace_dir = iteration_store.workspace_path(&iteration_id).map_err(|e| {
-450:             adk_core::AdkError::tool(format!("Failed to get workspace path: {}", e))
-451:         })?;
-452: 
-453:         
-454:         #[cfg(target_os = "windows")]
-455:         let output = tokio::time::timeout(
-456:             std::time::Duration::from_secs(30),
-457:             tokio::process::Command::new("cmd")
-458:                 .args(["/C", command])
-459:                 .current_dir(&workspace_dir)
-460:                 .output(),
-461:         )
-462:         .await;
-463: 
-464:         #[cfg(not(target_os = "windows"))]
-465:         let output = tokio::time::timeout(
-466:             std::time::Duration::from_secs(30),
-467:             tokio::process::Command::new("sh")
-468:                 .arg("-c")
-469:                 .arg(command)
-470:                 .current_dir(&workspace_dir)
-471:                 .output(),
-472:         )
-473:         .await;
-474: 
-475:         match output {
-476:             Ok(Ok(output)) => {
-477:                 let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-478:                 let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-479: 
-480:                 Ok(json!({
-481:                     "status": if output.status.success() { "success" } else { "failed" },
-482:                     "exit_code": output.status.code(),
-483:                     "stdout": stdout,
-484:                     "stderr": stderr,
-485:                     "workspace": workspace_dir.to_string_lossy().to_string()
-486:                 }))
-487:             }
-488:             Ok(Err(e)) => Ok(json!({
-489:                 "status": "error",
-490:                 "message": format!("Failed to execute command: {}", e)
-491:             })),
-492:             Err(_) => Ok(json!({
-493:                 "status": "timeout",
-494:                 "message": "Command execution timeout (30s limit)"
-495:             })),
-496:         }
-497:     }
-498: }
-499: ⋮----
-500: ReadFileTruncatedTool
-501: ⋮----
-502: {
-503:     fn name(&self) -> &str {
-504:         "read_file_truncated"
-505:     }
-506: 
-507:     fn description(&self) -> &str {
-508:         "Read a file with intelligent truncation to prevent context overflow. \
-509:          This tool automatically summarizes large files and provides a structured output. \
-510:          Use this when you need to read files for knowledge generation but want to avoid \
-511:          excessive token consumption."
-512:     }
-513: 
-514:     fn parameters_schema(&self) -> Option<Value> {
-515:         Some(json!({
-516:             "type": "object",
-517:             "properties": {
-518:                 "path": {
-519:                     "type": "string",
-520:                     "description": "Relative path to the file within workspace"
-521:                 },
-522:                 "max_chars": {
-523:                     "type": "number",
-524:                     "description": "Maximum characters to return (default: 2000)",
-525:                     "default": 2000
-526:                 },
-527:                 "prefer_structure": {
-528:                     "type": "boolean",
-529:                     "description": "If true, prefer structure over content for code files (default: true)",
-530:                     "default": true
-531:                 }
-532:             },
-533:             "required": ["path"]
-534:         }))
-535:     }
-536: 
-537:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-538:         let path = get_required_string_param(&args, "path")?;
-539:         let max_chars = args
-540:             .get("max_chars")
-541:             .and_then(|v| v.as_i64())
-542:             .unwrap_or(2000) as usize;
-543:         let prefer_structure = args
-544:             .get("prefer_structure")
-545:             .and_then(|v| v.as_bool())
-546:             .unwrap_or(true);
-547: 
-548:         
-549:         let iteration_id = get_iteration_id()
-550:             .ok_or_else(|| adk_core::AdkError::tool("Iteration ID not set".to_string()))?;
-551: 
-552:         let iteration_store = IterationStore::new();
-553:         let workspace_dir = iteration_store
-554:             .workspace_path(&iteration_id)
-555:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to get workspace: {}", e)))?;
-556: 
-557:         
-558:         let safe_path = validate_path_security_within_workspace(&path, &workspace_dir)
-559:             .map_err(|e| adk_core::AdkError::tool(e))?;
-560: 
-561:         
-562:         let full_path = workspace_dir.join(&safe_path);
-563: 
-564:         
-565:         let content = fs::read_to_string(&full_path)
-566:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to read file: {}", e)))?;
-567:         let file_ext = full_path.extension().and_then(|e| e.to_str()).unwrap_or("");
-568: 
-569:         let is_code_file = matches!(
-570:             file_ext,
-571:             "rs" | "js" | "jsx" | "ts" | "tsx" | "py" | "java" | "go" | "cpp" | "c" | "h"
-572:         );
-573: 
-574:         
-575:         let truncated_content = if content.len() <= max_chars {
-576:             content.clone()
-577:         } else if is_code_file && prefer_structure {
-578:             
-579:             extract_code_structure(&content, max_chars, file_ext)
-580:         } else {
-581:             
-582:             truncate_with_context(&content, max_chars)
-583:         };
-584: 
-585:         let total_chars = content.len();
-586:         let truncated = total_chars > max_chars;
-587: 
-588:         Ok(json!({
-589:             "path": path,
-590:             "file_size": total_chars,
-591:             "returned_size": truncated_content.len(),
-592:             "truncated": truncated,
-593:             "is_code_file": is_code_file,
-594:             "content": truncated_content,
-595:             "original_lines": content.lines().count(),
-596:             "returned_lines": truncated_content.lines().count()
-597:         }))
-598:     }
-599: }
-600: ⋮----
-601: ReadFileWithLimitTool
-602: ⋮----
-603: {
-604:     max_calls: usize,
-605:     call_count: std::sync::Arc<std::sync::atomic::AtomicUsize>,
-606: }
-607: ⋮----
-608: ReadFileWithLimitTool
-609: ⋮----
-610: {
-611:     pub fn new(max_calls: usize) -> Self {
-612:         Self {
-613:             max_calls,
-614:             call_count: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
-615:         }
-616:     }
-617: 
-618:     pub fn reset(&self) {
-619:         self.call_count
-620:             .store(0, std::sync::atomic::Ordering::SeqCst);
-621:     }
-622: 
-623:     pub fn calls_remaining(&self) -> usize {
-624:         let current = self.call_count.load(std::sync::atomic::Ordering::SeqCst);
-625:         if current >= self.max_calls {
-626:             0
-627:         } else {
-628:             self.max_calls - current
-629:         }
-630:     }
-631: }
-632: ⋮----
-633: ReadFileWithLimitTool
-634: ⋮----
-635: {
-636:     fn name(&self) -> &str {
-637:         "read_file_with_limit"
-638:     }
-639: 
-640:     fn description(&self) -> &str {
-641:         "Read a file with a call limit to prevent excessive file reading. \
-642:          This tool tracks the number of calls and enforces a maximum limit. \
-643:          Use this when you need to read multiple files but want to control token usage."
-644:     }
-645: 
-646:     fn parameters_schema(&self) -> Option<Value> {
-647:         Some(json!({
-648:             "type": "object",
-649:             "properties": {
-650:                 "path": {
-651:                     "type": "string",
-652:                     "description": "Relative path to the file within workspace"
-653:                 },
-654:                 "max_chars": {
-655:                     "type": "number",
-656:                     "description": "Maximum characters to return (default: 3000)",
-657:                     "default": 3000
-658:                 }
-659:             },
-660:             "required": ["path"]
-661:         }))
-662:     }
-663: 
-664:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-665:         
-666:         let current_calls = self
-667:             .call_count
-668:             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-669: 
-670:         if current_calls >= self.max_calls {
-671:             return Ok(json!({
-672:                 "status": "limit_exceeded",
-673:                 "message": format!(
-674:                     "File reading limit exceeded (max {} calls). Please use the information you've already gathered.",
-675:                     self.max_calls
-676:                 ),
-677:                 "calls_made": current_calls + 1,
-678:                 "max_calls": self.max_calls
-679:             }));
-680:         }
-681: 
-682:         let path = get_required_string_param(&args, "path")?;
-683:         let max_chars = args
-684:             .get("max_chars")
-685:             .and_then(|v| v.as_i64())
-686:             .unwrap_or(3000) as usize;
-687: 
-688:         
-689:         let iteration_id = get_iteration_id()
-690:             .ok_or_else(|| adk_core::AdkError::tool("Iteration ID not set".to_string()))?;
-691: 
-692:         let iteration_store = IterationStore::new();
-693:         let workspace_dir = iteration_store
-694:             .workspace_path(&iteration_id)
-695:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to get workspace: {}", e)))?;
-696: 
-697:         
-698:         let safe_path = validate_path_security_within_workspace(&path, &workspace_dir)
-699:             .map_err(|e| adk_core::AdkError::tool(e))?;
-700: 
-701:         
-702:         let full_path = workspace_dir.join(&safe_path);
-703: 
-704:         
-705:         let content = fs::read_to_string(&full_path)
-706:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to read file: {}", e)))?;
-707: 
-708:         
-709:         let truncated_content = if content.len() <= max_chars {
-710:             content.clone()
-711:         } else {
-712:             truncate_with_context(&content, max_chars)
-713:         };
-714: 
-715:         Ok(json!({
-716:             "status": "success",
-717:             "path": path,
-718:             "file_size": content.len(),
-719:             "returned_size": truncated_content.len(),
-720:             "truncated": content.len() > max_chars,
-721:             "content": truncated_content,
-722:             "calls_remaining": self.max_calls - (current_calls + 1)
-723:         }))
-724:     }
-725: }
-726: ⋮----
-727: extract_code_structure
-728: ⋮----
-729: (content: &str, max_chars: usize, file_ext: &str)
-730: ⋮----
-731: truncate_with_context
-732: ⋮----
-733: (content: &str, max_chars: usize)
-```
-
-### crates/cowork-core/src/tools/goto_stage_tool.rs (89 lines)
-
-```
-1: GotoStageTool
-2: ⋮----
-3: {
-4:     fn name(&self) -> &str {
-5:         "goto_stage"
-6:     }
-7: 
-8:     fn description(&self) -> &str {
-9:         "Restart pipeline from a specific stage. Use this when critical issues \
-10:          require going back to an earlier phase. Valid stages: prd, design, plan, coding."
-11:     }
-12: 
-13:     fn parameters_schema(&self) -> Option<Value> {
-14:         Some(json!({
-15:             "type": "object",
-16:             "properties": {
-17:                 "stage": {
-18:                     "type": "string",
-19:                     "enum": ["prd", "design", "plan", "coding"],
-20:                     "description": "Which stage to restart from"
-21:                 },
-22:                 "reason": {
-23:                     "type": "string",
-24:                     "description": "Why the restart is needed"
-25:                 }
-26:             },
-27:             "required": ["stage", "reason"]
-28:         }))
-29:     }
-30: 
-31:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-32:         let stage_str = get_required_string_param(&args, "stage")?;
-33:         let reason = get_required_string_param(&args, "reason")?;
-34: 
-35:         
-36:         let stage = match stage_str {
-37:             "prd" => Stage::Prd,
-38:             "design" => Stage::Design,
-39:             "plan" => Stage::Plan,
-40:             "coding" => Stage::Coding,
-41:             _ => {
-42:                 return Ok(json!({
-43:                     "status": "error",
-44:                     "message": format!("Invalid stage: {}", stage_str)
-45:                 }));
-46:             }
-47:         };
-48: 
-49:         
-50:         let feedback = Feedback {
-51:             stage: stage_str.to_string(),  
-52:             feedback_type: FeedbackType::QualityIssue,
-53:             severity: Severity::Critical,
-54:             details: reason.to_string(),
-55:             suggested_fix: Some(format!("Restart from {} stage to address the issue", stage_str)),
-56:             timestamp: chrono::Utc::now(),
-57:         };
-58: 
-59:         if let Err(e) = crate::persistence::append_feedback(&feedback) {
-60:             
-61:             eprintln!("[GotoStageTool] Warning: Failed to save feedback: {}", e);
-62:         }
-63: 
-64:         
-65:         let mut meta = load_session_meta()
-66:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?
-67:             .unwrap_or_else(|| SessionMeta {
-68:                 session_id: uuid::Uuid::new_v4().to_string(),
-69:                 created_at: chrono::Utc::now(),
-70:                 current_stage: Some(Stage::Check),
-71:                 restart_reason: None,
-72:             });
-73: 
-74:         
-75:         meta.current_stage = Some(stage);
-76:         meta.restart_reason = Some(reason.to_string());
-77: 
-78:         
-79:         save_session_meta(&meta)
-80:             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
-81: 
-82:         
-83:         
-84:         Err(adk_core::AdkError::tool(format!(
-85:             "GOTO_STAGE:{}:{}",
-86:             stage_str, reason
-87:         )))
-88:     }
-89: }
 ```
 
 ### crates/cowork-core/src/tools/knowledge_tools.rs (321 lines)
@@ -12670,6 +12523,424 @@ LICENSE
 38: }
 ```
 
+### crates/cowork-gui/src/App.tsx (413 lines)
+
+```
+1: import React, { useEffect, useRef, useState, useMemo, useCallback, Suspense, lazy } from 'react';
+2: import { Layout, Menu, Button, Empty, App as AntApp, Tag, Spin } from 'antd';
+3: import {
+4: 	FolderOutlined,
+5: 	FileTextOutlined,
+6: 	CodeOutlined,
+7: 	EyeOutlined,
+8: 	PlayCircleOutlined,
+9: 	ReloadOutlined,
+10: 	MessageOutlined,
+11: 	AppstoreOutlined,
+12: 	DatabaseOutlined,
+13: 	BranchesOutlined,
+14: 	CheckCircleOutlined,
+15: 	RocketOutlined,
+16: 	BookOutlined,
+17: 	SettingOutlined,
+18: 	ControlOutlined
+19: } from '@ant-design/icons';
+20: 
+21: import { useProjectStore, useAgentStore, useUIStore } from './stores';
+22: import { LoadingScreen, StatusBadge } from './components/common';
+23: import { useAppEvents, usePMAgent, useIterationActions, useChatInput } from './hooks';
+24: 
+25: import type { ChatMode, PMAction, PMAgentMessage, ChatMessage } from './stores';
+26: 
+27: 
+28: import ProjectsPanel from './components/ProjectsPanel';
+29: 
+30: 
+31: const ArtifactsViewer = lazy(() => import('./components/ArtifactsViewer'));
+32: const CodeEditor = lazy(() => import('./components/CodeEditor'));
+33: const RunnerPanel = lazy(() => import('./components/RunnerPanel'));
+34: const MemoryPanel = lazy(() => import('./components/MemoryPanel'));
+35: const KnowledgePanel = lazy(() => import('./components/KnowledgePanel'));
+36: const CommandPalette = lazy(() => import('./components/CommandPalette'));
+37: const IterationsPanel = lazy(() => import('./components/IterationsPanel'));
+38: const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
+39: 
+40: const ChatPanel = lazy(() => import('./components/chat').then(m => ({ default: m.ChatPanel })));
+41: 
+42: const AgentsSetupPanel = lazy(() => import('./components/config').then(m => ({ default: m.AgentsSetupPanel })));
+43: 
+44: const { Sider, Content, Header, Footer } = Layout;
+45: 
+46: function App() {
+47: 	
+48: 	const [userInput, setUserInput] = useState('');
+49: 	const messagesContainerRef = useRef<HTMLDivElement>(null);
+50: 	const pmMessagesContainerRef = useRef<HTMLDivElement>(null);
+51: 
+52: 	
+53: 	const project = useProjectStore(state => state.project);
+54: 	const iterations = useProjectStore(state => state.iterations);
+55: 	const currentIteration = useProjectStore(state => state.currentIteration);
+56: 	const loading = useProjectStore(state => state.loading);
+57: 	const loadProject = useProjectStore(state => state.loadProject);
+58: 	const setCurrentIteration = useProjectStore(state => state.setCurrentIteration);
+59: 	const updateCurrentIterationStatus = useProjectStore(state => state.updateCurrentIterationStatus);
+60: 
+61: 	
+62: 	const messages = useAgentStore(state => state.messages);
+63: 	const pmMessages = useAgentStore(state => state.pmMessages);
+64: 	const isProcessing = useAgentStore(state => state.isProcessing);
+65: 	const currentAgent = useAgentStore(state => state.currentAgent);
+66: 	const currentStage = useAgentStore(state => state.currentStage);
+67: 	const inputRequest = useAgentStore(state => state.inputRequest);
+68: 	const pmProcessing = useAgentStore(state => state.pmProcessing);
+69: 	const setInputRequest = useAgentStore(state => state.setInputRequest);
+70: 	const loadPMWelcomeMessage = useAgentStore(state => state.loadPMWelcomeMessage);
+71: 
+72: 	
+73: 	const activeView = useUIStore(state => state.activeView);
+74: 	const commandPaletteVisible = useUIStore(state => state.commandPaletteVisible);
+75: 	const activeArtifactTab = useUIStore(state => state.activeArtifactTab);
+76: 	const artifactsRefreshTrigger = useUIStore(state => state.artifactsRefreshTrigger);
+77: 	const codeRefreshTrigger = useUIStore(state => state.codeRefreshTrigger);
+78: 	const memoryRefreshTrigger = useUIStore(state => state.memoryRefreshTrigger);
+79: 	const knowledgeRefreshTrigger = useUIStore(state => state.knowledgeRefreshTrigger);
+80: 	const setActiveView = useUIStore(state => state.setActiveView);
+81: 	const setCommandPaletteVisible = useUIStore(state => state.setCommandPaletteVisible);
+82: 	const setActiveArtifactTab = useUIStore(state => state.setActiveArtifactTab);
+83: 
+84: 	
+85: 	useAppEvents(userInput, setUserInput);
+86: 	const { handlePMSendMessage, handlePMAction } = usePMAgent();
+87: 	const { handleSelectIteration, handleExecuteIteration, handleOpenProjectFolder, handleOpenIterationFolder, handleCommandSelect } = useIterationActions();
+88: 	const {
+89: 		inputRequest: chatInputRequest,
+90: 		handleSendUserMessage,
+91: 		handleSelectOption,
+92: 		handleSubmitFeedback,
+93: 		handleToggleThinking,
+94: 		handleCancelFeedback
+95: 	} = useChatInput();
+96: 
+97: 	
+98: 	const chatMode = useMemo<ChatMode>(() => {
+99: 		if (!currentIteration) return 'disabled';
+100: 		if (currentIteration.status === 'Completed') return 'pm_agent';
+101: 		if (isProcessing || currentIteration.status === 'Running') return 'pipeline';
+102: 		return 'pipeline';
+103: 	}, [currentIteration, isProcessing]);
+104: 
+105: 	
+106: 	useEffect(() => {
+107: 		if (chatMode === 'pm_agent' && currentIteration) {
+108: 			const pmMessages = useAgentStore.getState().pmMessages;
+109: 			if (pmMessages.length === 0) {
+110: 				loadPMWelcomeMessage(currentIteration.id);
+111: 			}
+112: 		}
+113: 	}, [chatMode, currentIteration?.id, loadPMWelcomeMessage]);
+114: 
+115: 	
+116: 	useEffect(() => {
+117: 		if (messagesContainerRef.current) {
+118: 			messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+119: 		}
+120: 	}, [messages]);
+121: 
+122: 	useEffect(() => {
+123: 		if (pmMessagesContainerRef.current && pmMessages.length > 0) {
+124: 			pmMessagesContainerRef.current.scrollTop = pmMessagesContainerRef.current.scrollHeight;
+125: 		}
+126: 	}, [pmMessages]);
+127: 
+128: 	
+129: 	const handleSend = useCallback(() => {
+130: 		if (chatMode === 'pm_agent') {
+131: 			handlePMSendMessage(userInput, setUserInput);
+132: 		} else {
+133: 			handleSendUserMessage(userInput, setUserInput);
+134: 		}
+135: 	}, [chatMode, userInput, handlePMSendMessage, handleSendUserMessage]);
+136: 
+137: 	const handleSelectOptionWrapper = useCallback((option: Parameters<typeof handleSelectOption>[0]) => {
+138: 		handleSelectOption(option, userInput, setUserInput);
+139: 	}, [handleSelectOption, userInput]);
+140: 
+141: 	const handleSubmitFeedbackWrapper = useCallback(() => {
+142: 		handleSubmitFeedback(userInput, setUserInput, updateCurrentIterationStatus);
+143: 	}, [handleSubmitFeedback, userInput, updateCurrentIterationStatus]);
+144: 
+145: 	const handlePMActionWrapper = useCallback((action: PMAction) => {
+146: 		handlePMAction(action, pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]);
+147: 	}, [handlePMAction, pmMessages]);
+148: 
+149: 	
+150: 	const loadingFallback = (
+151: 		<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+152: 			<Spin size="large" tip="Loading..." />
+153: 		</div>
+154: 	);
+155: 
+156: 	
+157: 	const renderContent = () => (
+158: 		<div style={{ height: '100%' }}>
+159: 			<div style={{ height: '100%', display: activeView === 'iterations' ? 'block' : 'none' }}>
+160: 				<Suspense fallback={loadingFallback}>
+161: 					<IterationsPanel
+162: 						key="iterations"
+163: 						onSelectIteration={handleSelectIteration}
+164: 						selectedIterationId={currentIteration?.id}
+165: 					/>
+166: 				</Suspense>
+167: 			</div>
+168: 
+169: 			<div style={{ height: '100%', display: activeView === 'projects' ? 'block' : 'none' }}>
+170: 				<ProjectsPanel key="projects" />
+171: 			</div>
+172: 
+173: 			<div style={{ height: '100%', display: activeView === 'artifacts' ? 'block' : 'none' }}>
+174: 				{currentIteration ? (
+175: 					<Suspense fallback={loadingFallback}>
+176: 						<ArtifactsViewer
+177: 							key={`artifacts-${currentIteration.id}`}
+178: 							iterationId={currentIteration.id}
+179: 							activeTab={activeArtifactTab}
+180: 							onTabChange={setActiveArtifactTab}
+181: 							refreshTrigger={artifactsRefreshTrigger}
+182: 						/>
+183: 					</Suspense>
+184: 				) : (
+185: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
+186: 				)}
+187: 			</div>
+188: 
+189: 			<div style={{ height: '100%', display: activeView === 'code' ? 'block' : 'none' }}>
+190: 				{currentIteration ? (
+191: 					<Suspense fallback={loadingFallback}>
+192: 						<CodeEditor
+193: 							key={`code-${currentIteration.id}`}
+194: 							iterationId={currentIteration.id}
+195: 							refreshTrigger={codeRefreshTrigger}
+196: 						/>
+197: 					</Suspense>
+198: 				) : (
+199: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
+200: 				)}
+201: 			</div>
+202: 
+203: 			<div style={{ height: '100%', display: activeView === 'run' ? 'block' : 'none' }}>
+204: 				{currentIteration ? (
+205: 					<Suspense fallback={loadingFallback}>
+206: 						<RunnerPanel key={`run-${currentIteration.id}`} iterationId={currentIteration.id} />
+207: 					</Suspense>
+208: 				) : (
+209: 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
+210: 				)}
+211: 			</div>
+212: 
+213: 			<div style={{ height: '100%', display: activeView === 'execution-memory' ? 'block' : 'none' }}>
+214: 				<Suspense fallback={loadingFallback}>
+215: 					<MemoryPanel
+216: 						key={`memory-${memoryRefreshTrigger}`}
+217: 						currentSession={currentIteration?.id}
+218: 						refreshTrigger={memoryRefreshTrigger}
+219: 					/>
+220: 				</Suspense>
+221: 			</div>
+222: 
+223: 			<div style={{ height: '100%', display: activeView === 'project-knowledge' ? 'block' : 'none' }}>
+224: 				<Suspense fallback={loadingFallback}>
+225: 					<KnowledgePanel
+226: 						key={`knowledge-${knowledgeRefreshTrigger}`}
+227: 						currentSession={project?.id}
+228: 						currentIterationId={currentIteration?.id}
+229: 						refreshTrigger={knowledgeRefreshTrigger}
+230: 					/>
+231: 				</Suspense>
+232: 			</div>
+233: 
+234: 			<div style={{ height: '100%', display: activeView === 'settings' ? 'block' : 'none', overflow: 'auto' }}>
+235: 				<Suspense fallback={loadingFallback}>
+236: 					<SettingsPanel />
+237: 				</Suspense>
+238: 			</div>
+239: 
+240: 			<div style={{ height: '100%', display: activeView === 'config' ? 'block' : 'none', overflow: 'auto' }}>
+241: 				<Suspense fallback={loadingFallback}>
+242: 					<AgentsSetupPanel />
+243: 				</Suspense>
+244: 			</div>
+245: 
+246: 			<div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
+247: 				{currentIteration ? (
+248: 					<Suspense fallback={loadingFallback}>
+249: 						<ChatPanel
+250: 							messages={messages}
+251: 							pmMessages={pmMessages as (ChatMessage & { type: 'user' | 'pm_agent' })[]}
+252: 							mode={chatMode}
+253: 							isProcessing={isProcessing}
+254: 							pmProcessing={pmProcessing}
+255: 							currentAgent={currentAgent}
+256: 							iterationTitle={currentIteration.title}
+257: 							iterationDescription={currentIteration.description}
+258: 							currentStage={currentStage}
+259: 							inputRequest={inputRequest}
+260: 							userInput={userInput}
+261: 							messagesContainerRef={messagesContainerRef as React.RefObject<HTMLDivElement>}
+262: 							pmMessagesContainerRef={pmMessagesContainerRef as React.RefObject<HTMLDivElement>}
+263: 							onUserInputChange={setUserInput}
+264: 							onSend={handleSend}
+265: 							onSelectOption={handleSelectOptionWrapper}
+266: 							onSubmitFeedback={handleSubmitFeedbackWrapper}
+267: 							onCancelFeedback={handleCancelFeedback}
+268: 							onToggleThinking={handleToggleThinking}
+269: 							onActionClick={handlePMActionWrapper}
+270: 						/>
+271: 					</Suspense>
+272: 				) : (
+273: 					<Empty description="Select an iteration to view chat" style={{ marginTop: '40px' }} />
+274: 				)}
+275: 			</div>
+276: 		</div>
+277: 	);
+278: 
+279: 	if (loading) {
+280: 		return <LoadingScreen />;
+281: 	}
+282: 
+283: 	return (
+284: 		<Layout style={{ minHeight: '100vh' }}>
+285: 			<Header
+286: 				style={{
+287: 					background: '#fff',
+288: 					borderBottom: '1px solid #e8e8e8',
+289: 					padding: '0 24px',
+290: 					display: 'flex',
+291: 					alignItems: 'center',
+292: 					justifyContent: 'space-between'
+293: 				}}
+294: 			>
+295: 				<div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+296: 					<h1 style={{ margin: 0, fontSize: '18px' }}>
+297: 						<RocketOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
+298: 						Cowork Forge
+299: 					</h1>
+300: 					{project && (
+301: 						<Tag color="blue" style={{ cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
+302: 							{project.name}
+303: 						</Tag>
+304: 					)}
+305: 				</div>
+306: 
+307: 				<div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+308: 					{currentIteration && (
+309: 						<>
+310: 							<StatusBadge status={currentIteration.status} />
+311: 							{(currentIteration.status === 'Draft' || currentIteration.status === 'Paused') && (
+312: 								<Button
+313: 									type="primary"
+314: 									icon={
+315: 										currentIteration.status === 'Draft' ? (
+316: 											<PlayCircleOutlined />
+317: 										) : (
+318: 											<ReloadOutlined />
+319: 										)
+320: 									}
+321: 									onClick={handleExecuteIteration}
+322: 									loading={isProcessing}
+323: 								>
+324: 									{currentIteration.status === 'Draft' ? 'Start Iteration' : 'Continue'}
+325: 								</Button>
+326: 							)}
+327: 						</>
+328: 					)}
+329: 				</div>
+330: 			</Header>
+331: 
+332: 			<Layout style={{ height: 'calc(100vh - 64px - 48px)' }}>
+333: 				<Sider width={200} style={{ background: '#fff', borderRight: '1px solid #e8e8e8' }}>
+334: 					<Menu
+335: 						mode="inline"
+336: 						selectedKeys={[activeView]}
+337: 						onClick={({ key }) => setActiveView(key as typeof activeView)}
+338: 						style={{ height: '100%', borderRight: 0 }}
+339: 						items={[
+340: 							{ key: 'projects', icon: <AppstoreOutlined />, label: 'Projects' },
+341: 							{ key: 'iterations', icon: <BranchesOutlined />, label: 'Iterations' },
+342: 							{ key: 'chat', icon: <MessageOutlined />, label: 'Collaborate' },
+343: 							{ key: 'artifacts', icon: <FileTextOutlined />, label: 'Artifacts' },
+344: 							{ key: 'code', icon: <CodeOutlined />, label: 'Code' },
+345: 							{ key: 'run', icon: <PlayCircleOutlined />, label: 'Run' },
+346: 							{ key: 'execution-memory', icon: <DatabaseOutlined />, label: 'Memory' },
+347: 							{ key: 'project-knowledge', icon: <BookOutlined />, label: 'Knowledge' },
+348: 							{ type: 'divider' },
+349: 							{ key: 'config', icon: <ControlOutlined />, label: 'Agents Setup' },
+350: 							{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' }
+351: 						]}
+352: 					/>
+353: 				</Sider>
+354: 
+355: 				<Content style={{ overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
+356: 					{renderContent()}
+357: 				</Content>
+358: 			</Layout>
+359: 
+360: 			<Footer
+361: 				style={{
+362: 					background: '#fff',
+363: 					borderTop: '1px solid #e8e8e8',
+364: 					padding: '12px 24px',
+365: 					display: 'flex',
+366: 					justifyContent: 'space-between',
+367: 					alignItems: 'center'
+368: 				}}
+369: 			>
+370: 				<div style={{ fontSize: '12px', color: '#888' }}>
+371: 					{project ? (
+372: 						<>
+373: 							<span style={{ marginRight: '16px', cursor: 'pointer' }} onClick={handleOpenProjectFolder}>
+374: 								Project: <strong>{project.name}</strong>
+375: 							</span>
+376: 							<span
+377: 								style={{ cursor: currentIteration ? 'pointer' : 'default' }}
+378: 								onClick={() => currentIteration && handleOpenIterationFolder(currentIteration.id)}
+379: 								title={currentIteration ? `Click to open iteration folder: ${currentIteration.id}` : undefined}
+380: 							>
+381: 								Iterations: <strong>{iterations.length}</strong>
+382: 								{currentIteration && <span style={{ marginLeft: '4px', color: '#1890ff' }}>(#{currentIteration.number})</span>}
+383: 							</span>
+384: 						</>
+385: 					) : (
+386: 						'No project loaded'
+387: 					)}
+388: 				</div>
+389: 				<div style={{ fontSize: '12px', color: '#888' }}>
+390: 					{isProcessing ? (
+391: 						<span style={{ color: '#1890ff' }}>
+392: 							<Spin size="small" style={{ marginRight: '8px' }} />
+393: 							{currentAgent ? `${currentAgent} is working...` : 'Processing...'}
+394: 						</span>
+395: 					) : (
+396: 						<span style={{ color: '#52c41a' }}>
+397: 							<CheckCircleOutlined style={{ marginRight: '4px' }} />
+398: 							Ready
+399: 						</span>
+400: 					)}
+401: 				</div>
+402: 			</Footer>
+403: 
+404: 			<CommandPalette
+405: 				visible={commandPaletteVisible}
+406: 				onClose={() => setCommandPaletteVisible(false)}
+407: 				onCommandSelect={handleCommandSelect}
+408: 			/>
+409: 		</Layout>
+410: 	);
+411: }
+412: 
+413: export default App;
+```
+
 ### crates/cowork-gui/src/components/IterationsPanel.tsx (7 lines)
 
 ```
@@ -12680,6 +12951,16 @@ LICENSE
 5:   selectedIterationId?: string | null;
 6:   onExecuteStatusChange?: (iterationId: string, status: string) => void;
 7: }
+```
+
+### crates/cowork-gui/src/components/common/MarkdownMessage.tsx (5 lines)
+
+```
+1: MarkdownMessageProps
+2: ⋮----
+3: {
+4:   content: string;
+5: }
 ```
 
 ### crates/cowork-gui/src/components/config/SkillManager.tsx (237 lines)
@@ -13682,6 +13963,410 @@ LICENSE
 11: ()
 ```
 
+### crates/cowork-gui/src-tauri/src/project_runner.rs (399 lines)
+
+```
+1: ProjectRunner
+2: ⋮----
+3: {
+4:     processes: Arc<Mutex<HashMap<String, ProjectProcess>>>,
+5:     app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
+6: }
+7: ⋮----
+8: command_exists
+9: ⋮----
+10: (cmd: &str)
+11: ⋮----
+12: ProjectProcess
+13: ⋮----
+14: {
+15:     child: Child,
+16:     #[allow(dead_code)]
+17:     output_tx: mpsc::UnboundedSender<String>,
+18:     url: Option<String>,
+19:     port: Option<u16>,
+20: }
+21: ⋮----
+22: ProjectRunner
+23: ⋮----
+24: {
+25:     pub fn new() -> Self {
+26:         Self {
+27:             processes: Arc::new(Mutex::new(HashMap::new())),
+28:             app_handle: Arc::new(Mutex::new(None)),
+29:         }
+30:     }
+31: 
+32:     pub fn set_app_handle(&self, handle: tauri::AppHandle) {
+33:         let mut app_handle_guard = self.app_handle.lock().unwrap();
+34:         *app_handle_guard = Some(handle);
+35:     }
+36: 
+37:     pub fn is_running(&self, iteration_id: &str) -> bool {
+38:         let processes = self.processes.lock().unwrap();
+39:         processes.contains_key(iteration_id)
+40:     }
+41: 
+42:     pub async fn start(
+43:         &self,
+44:         iteration_id: String,
+45:         command: String,
+46:         code_dir: String,
+47:         url: Option<String>,
+48:         port: Option<u16>,
+49:     ) -> Result<u32, String> {
+50:         
+51:         if let Ok(()) = self.stop(iteration_id.clone()).await {
+52:             println!(
+53:                 "[Runner] Stopped existing process for iteration: {}",
+54:                 iteration_id
+55:             );
+56:         }
+57: 
+58:         
+59:         let code_path = std::path::Path::new(&code_dir);
+60: 
+61:         if !code_path.exists() {
+62:             return Err(format!("Code directory not found: {}", code_dir));
+63:         }
+64: 
+65:         
+66:         let path_env = std::env::var("PATH").unwrap_or_else(|_| "PATH not found".to_string());
+67:         println!("[Runner] PATH = {}", path_env);
+68:         
+69:         
+70:         println!("[Runner] Checking commands...");
+71:         if command_exists("bun") {
+72:             println!("[Runner] bun found");
+73:         } else {
+74:             println!("[Runner] bun NOT found");
+75:         }
+76:         if command_exists("sh") {
+77:             println!("[Runner] sh found");
+78:         } else {
+79:             println!("[Runner] sh NOT found");
+80:         }
+81: 
+82:         println!("[Runner] Starting command: {} in {}", command, code_dir);
+83: 
+84:         #[cfg(target_os = "windows")]
+85:         let mut child = {
+86:             let mut cmd = tokio::process::Command::new("cmd");
+87:             cmd.args(["/C", &command])
+88:                 .current_dir(&code_path)
+89:                 .stdout(std::process::Stdio::piped())
+90:                 .stderr(std::process::Stdio::piped())
+91:                 .creation_flags(0x08000000); 
+92: 
+93:             cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
+94:         };
+95: 
+96:         #[cfg(not(target_os = "windows"))]
+97:         let mut child = {
+98:             
+99:             let path = std::env::var("PATH").unwrap_or_else(|_| {
+100:                 
+101:                 "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin".to_string()
+102:             });
+103:             
+104:             tokio::process::Command::new("sh")
+105:                 .args(["-c", &command])
+106:                 .current_dir(&code_path)
+107:                 .env("PATH", path)
+108:                 .stdout(std::process::Stdio::piped())
+109:                 .stderr(std::process::Stdio::piped())
+110:                 .spawn()
+111:                 .map_err(|e| format!("Failed to start: {}", e))?
+112:         };
+113: 
+114:         let pid = child.id().unwrap();
+115: 
+116:         
+117:         let app_handle_opt = self.app_handle.lock().unwrap().clone();
+118:         let app_handle_stdout = app_handle_opt.clone();
+119:         let app_handle_stderr = app_handle_opt.clone();
+120:         let app_handle_exit = app_handle_opt.clone();
+121:         let iteration_id_clone = iteration_id.clone();
+122: 
+123:         
+124:         let (stdout_tx, _stdout_rx) = mpsc::unbounded_channel();
+125:         let (stderr_tx, _stderr_rx) = mpsc::unbounded_channel();
+126: 
+127:         
+128:         let stdout = child.stdout.take().unwrap();
+129:         let stderr = child.stderr.take().unwrap();
+130: 
+131:         
+132:         let stdout_tx_spawn = stdout_tx.clone();
+133:         let stderr_tx_spawn = stderr_tx.clone();
+134: 
+135:         
+136:         let iteration_id_stdout = iteration_id_clone.clone();
+137:         
+138:         
+139:         
+140:         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+141:         
+142:         match child.try_wait() {
+143:             Ok(Some(status)) => {
+144:                 
+145:                 println!("[Runner] Process exited immediately with status: {:?}", status);
+146:                 return Err(format!(
+147:                     "Command failed immediately. Exit status: {}. Check if the command is correct.",
+148:                     status
+149:                 ));
+150:             }
+151:             Ok(None) => {
+152:                 
+153:             }
+154:             Err(e) => {
+155:                 eprintln!("[Runner] Error checking process status: {}", e);
+156:             }
+157:         }
+158: 
+159:         
+160:         tokio::spawn(async move {
+161:             use tokio::io::{AsyncBufReadExt, BufReader};
+162:             let mut reader = BufReader::new(stdout);
+163:             let mut line = String::new();
+164: 
+165:             loop {
+166:                 match reader.read_line(&mut line).await {
+167:                     Ok(0) => beak,
+168:                     Ok(_) => {
+169:                         let _ = stdout_tx_spawn.send(line.clone());
+170: 
+171:                         
+172:                         if let Some(ref handle) = app_handle_stdout {
+173:                             if let Err(e) = handle.emit(
+174:                                 "project_log",
+175:                                 serde_json::json!({
+176:                                     "iteration_id": iteration_id_stdout,
+177:                                     "session_id": iteration_id_stdout,
+178:                                     "stream": "stdout",
+179:                                     "content": line.clone()
+180:                                 }),
+181:                             ) {
+182:                                 eprintln!("[Runner] Failed to emit project_log event: {}", e);
+183:                             }
+184:                         }
+185: 
+186:                         line.clear();
+187:                     }
+188:                     Err(e) => {
+189:                         eprintln!("[Runner] Error reading stdout: {}", e);
+190: 
+191:                         
+192:                         if let Some(ref handle) = app_handle_stdout {
+193:                             if let Err(e) = handle.emit(
+194:                                 "project_log",
+195:                                 serde_json::json!({
+196:                                     "iteration_id": iteration_id_stdout,
+197:                                     "session_id": iteration_id_stdout,
+198:                                     "stream": "stderr",
+199:                                     "content": format!("Error reading output: {}\n", e)
+200:                                 }),
+201:                             ) {
+202:                                 eprintln!("[Runner] Failed to emit project_log event: {}", e);
+203:                             }
+204:                         }
+205:                         beak;
+206:                     }
+207:                 }
+208:             }
+209:         });
+210: 
+211:         
+212:         tokio::spawn(async move {
+213:             use tokio::io::{AsyncBufReadExt, BufReader};
+214:             let mut reader = BufReader::new(stderr);
+215:             let mut line = String::new();
+216: 
+217:             loop {
+218:                 match reader.read_line(&mut line).await {
+219:                     Ok(0) => beak,
+220:                     Ok(_) => {
+221:                         let _ = stderr_tx_spawn.send(line.clone());
+222: 
+223:                         
+224:                         if let Some(ref handle) = app_handle_stderr {
+225:                             if let Err(e) = handle.emit(
+226:                                 "project_log",
+227:                                 serde_json::json!({
+228:                                     "iteration_id": iteration_id_clone,
+229:                                     "session_id": iteration_id_clone,
+230:                                     "stream": "stderr",
+231:                                     "content": line.clone()
+232:                                 }),
+233:                             ) {
+234:                                 eprintln!("[Runner] Failed to emit project_log event: {}", e);
+235:                             }
+236:                         }
+237: 
+238:                         line.clear();
+239:                     }
+240:                     Err(e) => {
+241:                         eprintln!("[Runner] Error reading stderr: {}", e);
+242: 
+243:                         
+244:                         if let Some(ref handle) = app_handle_stderr {
+245:                             if let Err(emit_err) = handle.emit(
+246:                                 "process_error",
+247:                                 serde_json::json!({
+248:                                     "iteration_id": iteration_id_clone,
+249:                                     "error": e.to_string()
+250:                                 }),
+251:                             ) {
+252:                                 eprintln!(
+253:                                     "[Runner] Failed to emit process_error event: {}",
+254:                                     emit_err
+255:                                 );
+256:                             }
+257:                         }
+258:                         beak;
+259:                     }
+260:                 }
+261:             }
+262:         });
+263: 
+264:         let mut processes = self.processes.lock().unwrap();
+265:         processes.insert(
+266:             iteration_id.clone(),
+267:             ProjectProcess {
+268:                 child,
+269:                 output_tx: stdout_tx,
+270:                 url,
+271:                 port,
+272:             },
+273:         );
+274:         drop(processes);
+275: 
+276:         
+277:         
+278:         
+279:         
+280:         
+281:         let iteration_id_exit = iteration_id.clone();
+282:         let processes_ref = Arc::clone(&self.processes);
+283:         let app_handle_for_cleanup = app_handle_exit.clone();
+284: 
+285:         tokio::spawn(async move {
+286:             
+287:             loop {
+288:                 
+289:                 let should_check = {
+290:                     let procs = processes_ref.lock().unwrap();
+291:                     procs.contains_key(&iteration_id_exit)
+292:                 };
+293:                 
+294:                 if !should_check {
+295:                     
+296:                     beak;
+297:                 }
+298:                 
+299:                 
+300:                 let exited = {
+301:                     let mut procs = processes_ref.lock().unwrap();
+302:                     if let Some(proc) = procs.get_mut(&iteration_id_exit) {
+303:                         
+304:                         match proc.child.try_wait() {
+305:                             Ok(Some(status)) => {
+306:                                 
+307:                                 println!("[Runner] Process {} exited with status: {:?}", iteration_id_exit, status);
+308:                                 procs.remove(&iteration_id_exit);
+309:                                 true
+310:                             }
+311:                             Ok(None) => false, 
+312:                             Err(e) => {
+313:                                 eprintln!("[Runner] Error checking process status: {}", e);
+314:                                 false
+315:                             }
+316:                         }
+317:                     } else {
+318:                         true 
+319:                     }
+320:                 };
+321:                 
+322:                 if exited {
+323:                     
+324:                     if let Some(ref handle) = app_handle_for_cleanup {
+325:                         let _ = handle.emit(
+326:                             "project_stopped",
+327:                             serde_json::json!({
+328:                                 "iteration_id": iteration_id_exit,
+329:                                 "session_id": iteration_id_exit
+330:                             }),
+331:                         );
+332:                     }
+333:                     beak;
+334:                 }
+335:                 
+336:                 
+337:                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+338:             }
+339:         });
+340: 
+341:         println!("[Runner] Process started with PID: {}", pid);
+342:         Ok(pid)
+343:     }
+344: 
+345:     pub async fn stop(&self, iteration_id: String) -> Result<(), String> {
+346:         
+347:         let process = {
+348:             let mut processes = self.processes.lock().unwrap();
+349:             processes.remove(&iteration_id)
+350:         };
+351: 
+352:         if let Some(mut process) = process {
+353:             println!("[Runner] Stopping process for iteration: {}", iteration_id);
+354: 
+355:             let _ = process.child.kill().await;
+356: 
+357:             
+358:             if let Some(ref handle) = *self.app_handle.lock().unwrap() {
+359:                 let _ = handle.emit(
+360:                     "project_stopped",
+361:                     serde_json::json!({
+362:                         "iteration_id": iteration_id,
+363:                         "session_id": iteration_id
+364:                     }),
+365:                 );
+366:             }
+367: 
+368:             println!("[Runner] Process stopped");
+369:             Ok(())
+370:         } else {
+371:             
+372:             println!(
+373:                 "[Runner] No running process found for iteration: {} (may already be stopped)",
+374:                 iteration_id
+375:             );
+376:             Ok(())
+377:         }
+378:     }
+379: 
+380:     pub fn get_info(&self, iteration_id: &str) -> Option<PreviewInfo> {
+381:         let processes = self.processes.lock().unwrap();
+382:         if let Some(process) = processes.get(iteration_id) {
+383:             
+384:             if let (Some(url), Some(port)) = (&process.url, process.port) {
+385:                 Some(PreviewInfo {
+386:                     url: url.clone(),
+387:                     port,
+388:                     status: super::gui_types::PreviewStatus::Running,
+389:                     project_type: super::gui_types::ProjectType::Unknown,
+390:                 })
+391:             } else {
+392:                 
+393:                 None
+394:             }
+395:         } else {
+396:             None
+397:         }
+398:     }
+399: }
+```
+
 ### crates/cowork-gui/src-tauri/tauri.conf.json (31 lines)
 
 ```
@@ -13717,6 +14402,790 @@ LICENSE
 30:   }
 31: }
 ```
+
+### crates/cowork-gui/vite.config.js (40 lines)
+
+```
+1: import { defineConfig } from "vite";
+2: import react from "@vitejs/plugin-react";
+3: import path from "path";
+4: 
+5: export default defineConfig({
+6:   plugins: [react()],
+7:   resolve: {
+8:     alias: {
+9:       "@": path.resolve(__dirname, "src"),
+10:     },
+11:   },
+12:   server: {
+13:     port: 15173,
+14:   },
+15:   build: {
+16:     rollupOptions: {
+17:       output: {
+18:         manualChunks: {
+19:           
+20:           "vendor-react": ["react", "react-dom"],
+21:           
+22:           "vendor-antd": ["antd", "@ant-design/icons"],
+23:           
+24:           "vendor-monaco": ["@monaco-editor/react", "monaco-editor"],
+25:           
+26:           "vendor-markdown": [
+27:             "react-markdown",
+28:             "remark-gfm",
+29:             "rehype-highlight",
+30:             "rehype-raw",
+31:           ],
+32:           
+33:           "vendor-zustand": ["zustand"],
+34:         },
+35:       },
+36:     },
+37:     
+38:     chunkSizeWarningLimit: 1536,
+39:   },
+40: });
+```
+
+### litho.docs/en/4.Deep-Exploration/CLI Domain.md (734 lines)
+
+````
+1: **CLI Domain Technical Documentation**
+2: **Cowork Forge** | **Version 1.0** | **Generated: 2024**
+3: 
+4: ---
+5: 
+6: ## 1. Overview
+7: 
+8: The **CLI Domain** serves as the command-line interface entry point for Cowork Forge, providing an automation-focused interaction model for the AI-powered iterative software development platform. Implemented as a Rust-based terminal application, this domain enables developers to orchestrate the complete 7-stage development pipeline (Idea → PRD → Design → Plan → Coding → Check → Delivery) through declarative shell commands.
+9: 
+10: ### 1.1 Purpose & Business Value
+11: 
+12: The CLI Domain addresses the needs of automation-focused developers and technical leads who prefer terminal-based workflows, CI/CD integration, or scriptable development operations. It provides:
+13: 
+14: - **Batch Operations**: Non-interactive iteration execution for automated pipelines
+15: - **Rapid Prototyping**: Quick project initialization and iteration creation via single commands
+16: - **Remote Development**: SSH-compatible interface for headless server environments
+17: - **Workflow Scripting**: Composable commands for complex development automation scenarios
+18: 
+19: ### 1.2 Architectural Position
+20: 
+21: Within the Hexagonal Architecture of Cowork Forge, the CLI Domain resides in the **Presentation Layer**, implementing the `InteractiveBackend` trait defined in the Interaction Domain. This design ensures the core domain logic remains interface-agnostic while the CLI provides terminal-specific adapters for user interaction.
+22: 
+23: ```mermaid
+24: flowchart TB
+25:     subgraph Presentation["Presentation Layer"]
+26:         CLI["CLI Domain<br/>(cowork-cli)"]
+27:         GUI["GUI Domain<br/>(cowork-gui)"]
+28:     end
+29:     
+30:     subgraph Application["Application Layer"]
+31:         Interaction["Interaction Domain<br/>(InteractiveBackend Trait)"]
+32:     end
+33:     
+34:     subgraph Core["Core Domain"]
+35:         Pipeline["Pipeline Domain"]
+36:         DomainLogic["Domain Logic"]
+37:         Tools["Tools Domain"]
+38:     end
+39:     
+40:     CLI -->|Implements| Interaction
+41:     GUI -->|Implements| Interaction
+42:     Interaction -->|Orchestrates| Pipeline
+43:     Pipeline -->|Uses| Tools
+44:     Pipeline -->|Manages| DomainLogic
+45: ```
+46: 
+47: ---
+48: 
+49: ## 2. Technical Architecture
+50: 
+51: ### 2.1 Technology Stack
+52: 
+53: | Component | Technology | Purpose |
+54: |-----------|-----------|---------|
+55: | **Language** | Rust (Edition 2021) | Type-safe systems programming with async support |
+56: | **CLI Framework** | clap v4.x | Derive-based argument parsing with subcommand routing |
+57: | **Async Runtime** | tokio | Asynchronous iteration execution and I/O |
+58: | **Error Handling** | anyhow | Structured error propagation with context |
+59: | **Logging** | tracing + tracing_subscriber | Structured logging with configurable verbosity |
+60: | **Terminal UI** | dialoguer | Interactive prompts and confirmation dialogs |
+61: | **Formatting** | ansi_term / owo-colors | Color-coded terminal output |
+62: 
+63: ### 2.2 Module Structure
+64: 
+65: ```
+66: crates/cowork-cli/
+67: ├── src/
+68: │   ├── main.rs          # CLI entry point, command routing, and orchestration
+69: │   ├── utils.rs         # Shared utility functions
+70: │   └── commands/        # Command modules (modular architecture)
+71: │       ├── mod.rs       # Command module exports
+72: │       ├── iter.rs      # Create iteration command
+73: │       ├── list.rs      # List iterations command
+74: │       ├── show.rs      # Show iteration details command
+75: │       ├── continue_cmd.rs  # Continue iteration command
+76: │       ├── init.rs      # Initialize project command
+77: │       ├── status.rs    # Project status command
+78: │       ├── delete.rs    # Delete iteration command
+79: │       ├── knowledge.rs # Regenerate knowledge command
+80: │       ├── import.rs    # Import existing project command
+81: │       └── config.rs    # Configuration management command
+82: ├── Cargo.toml           # Dependencies: clap, tokio, anyhow, tracing, cowork-core
+83: └── README.md
+84: ```
+85: 
+86: **Key Dependencies:**
+87: - `cowork-core`: Domain logic, pipeline execution, and persistence
+88: - `clap`: Command-line argument parsing with derive macros
+89: - `tokio`: Async runtime for non-blocking LLM API calls and file operations
+90: 
+91: ---
+92: 
+93: ## 3. Command Interface Specification
+94: 
+95: The CLI exposes eight primary commands through the `cowork` binary, supporting both global flags and subcommand-specific options.
+96: 
+97: ### 3.1 Global Arguments
+98: 
+99: | Flag | Short | Description | Default |
+100: |------|-------|-------------|---------|
+101: | `--config` | `-c` | Path to custom configuration file (TOML) | `./config.toml` |
+102: | `--verbose` | `-v` | Enable debug-level logging | `false` |
+103: | `--project` | `-p` | Target project name (optional context) | Current directory |
+104: 
+105: ### 3.2 Command Reference
+106: 
+107: #### 3.2.1 `iter` — Create and Execute Iteration
+108: 
+109: Creates a new iteration (genesis or evolution) and immediately executes the pipeline.
+110: 
+111: **Syntax:**
+112: ```bash
+113: cowork iter [OPTIONS] <TITLE> [DESCRIPTION]
+114: ```
+115: 
+116: **Options:**
+117: | Option | Description |
+118: |--------|-------------|
+119: | `--base <ID>` | Base iteration ID for evolution (creates evolution iteration if specified) |
+120: | `--inherit <MODE>` | Inheritance mode: `none`, `partial`, or `full` (default: `none`) |
+121: | `--stage <STAGE>` | Starting stage for evolution iterations (idea, prd, design, plan) |
+122: 
+123: **Examples:**
+124: ```bash
+125: # Genesis iteration
+126: cowork iter "User Authentication" "Implement JWT-based auth system"
+127: 
+128: # Evolution iteration with partial inheritance (code only)
+129: cowork iter "Add OAuth Support" "Extend auth with Google OAuth" \
+130:     --base iter_001 --inherit partial
+131: 
+132: # Evolution with full inheritance (artifacts + code)
+133: cowork iter "Refactor Database Layer" "Migrate to SQLx" \
+134:     --base iter_002 --inherit full --stage design
+135: ```
+136: 
+137: #### 3.2.2 `list` — List Iterations
+138: 
+139: Displays all iterations in the current project with status indicators.
+140: 
+141: **Syntax:**
+142: ```bash
+143: cowork list [OPTIONS]
+144: ```
+145: 
+146: **Options:**
+147: | Option | Description |
+148: |--------|-------------|
+149: | `--all` | Include completed iterations in output |
+150: | `--status <STATUS>` | Filter by status: `running`, `paused`, `completed`, `failed` |
+151: 
+152: **Output Format:**
+153: ```
+154: ID          Title                Status      Stage       Created
+155: iter_001    Initial Setup        Completed   Delivery    2024-01-15
+156: iter_002    Add Auth             Running     Coding      2024-01-16
+157: iter_003    Fix CSS              Paused      Check       2024-01-16
+158: ```
+159: 
+160: #### 3.2.3 `show` — Display Iteration Details
+161: 
+162: Renders detailed information about a specific iteration including stage artifacts and metadata.
+163: 
+164: **Syntax:**
+165: ```bash
+166: cowork show <ITERATION_ID>
+167: ```
+168: 
+169: #### 3.2.4 `continue` — Resume Paused Iteration
+170: 
+171: Resumes execution of a previously paused iteration from its current stage.
+172: 
+173: **Syntax:**
+174: ```bash
+175: cowork continue [ITERATION_ID]
+176: ```
+177: 
+178: *If `ITERATION_ID` is omitted, resumes the most recently paused iteration.*
+179: 
+180: #### 3.2.5 `init` — Initialize Project
+181: 
+182: Creates a new Cowork Forge project structure in the specified directory.
+183: 
+184: **Syntax:**
+185: ```bash
+186: cowork init [PATH]
+187: ```
+188: 
+189: **Behavior:**
+190: - Creates `.cowork-v2/` metadata directory
+191: - Initializes project configuration
+192: - Auto-detects technology stack (React, Vue, Rust, Python, etc.)
+193: 
+194: #### 3.2.6 `status` — Project Status
+195: 
+196: Displays aggregated project statistics including iteration counts, success rates, and current activity.
+197: 
+198: **Syntax:**
+199: ```bash
+200: cowork status
+201: ```
+202: 
+203: #### 3.2.7 `delete` — Remove Iteration
+204: 
+205: Removes an iteration and its associated workspace data with interactive confirmation.
+206: 
+207: **Syntax:**
+208: ```bash
+209: cowork delete <ITERATION_ID> [--force]
+210: ```
+211: 
+212: **Safety Features:**
+213: - Requires explicit confirmation unless `--force` is specified
+214: - Validates iteration is not currently running
+215: - Archives artifacts before deletion (if configured)
+216: 
+217: #### 3.2.8 `regenerate-knowledge` — Update Knowledge Base
+218: 
+219: Regenerates the knowledge snapshot for a completed iteration, useful when manually editing iteration artifacts.
+220: 
+221: **Syntax:**
+222: ```bash
+223: cowork regenerate-knowledge <ITERATION_ID>
+224: ```
+225: 
+226: #### 3.2.9 `import` — Import Existing Project
+227: 
+228: Imports any existing project into Cowork Forge, automatically analyzing project structure and generating documentation artifacts.
+229: 
+230: **Syntax:**
+231: ```bash
+232: cowork import <PATH> [OPTIONS]
+233: ```
+234: 
+235: **Options:**
+236: | Option | Description |
+237: |--------|-------------|
+238: | `--name <NAME>` | Project name (defaults to directory name) |
+239: | `--idea` | Generate idea.md document |
+240: | `--prd` | Generate prd.md document |
+241: | `--design` | Generate design.md document |
+242: | `--plan` | Generate plan.md document |
+243: | `--template-only` | Use template-only generation (skip LLM) |
+244: 
+245: **Examples:**
+246: ```bash
+247: # Import project with all documentation
+248: cowork import /path/to/existing/project --idea --prd --design --plan
+249: 
+250: # Generate only idea and prd documents
+251: cowork import ./my-app --idea --prd
+252: 
+253: # Template-only mode (no LLM config required)
+254: cowork import ./my-app --idea --template-only
+255: ```
+256: 
+257: **Workflow:**
+258: 1. Validate project path
+259: 2. Initialize Cowork Forge project structure
+260: 3. Analyze project structure and technology stack
+261: 4. Generate requested artifact documents
+262: 5. Create initial iteration record
+263: 
+264: #### 3.2.10 `config` — Configuration Management
+265: 
+266: Manages Cowork Forge configuration including LLM settings.
+267: 
+268: **Syntax:**
+269: ```bash
+270: cowork config [OPTIONS]
+271: ```
+272: 
+273: **Examples:**
+274: ```bash
+275: # Show current configuration
+276: cowork config
+277: 
+278: # Interactive configuration wizard
+279: cowork config --setup
+280: ```
+281: 
+282: ---
+283: 
+284: ## 4. Implementation Details
+285: 
+286: ### 4.1 Entry Point and Command Routing
+287: 
+288: The CLI entry point (`main.rs`) implements a structured initialization sequence:
+289: 
+290: ```rust
+291: #[tokio::main]
+292: async fn main() -> anyhow::Result<()> {
+293:     // 1. Parse CLI arguments using clap derive macros
+294:     let cli = Cli::parse();
+295:     
+296:     // 2. Initialize logging with configurable verbosity
+297:     tracing_subscriber::fmt()
+298:         .with_max_level(if cli.verbose { Level::DEBUG } else { Level::INFO })
+299:         .init();
+300:     
+301:     // 3. Route to command handler
+302:     match cli.command {
+303:         Commands::Iter(args) => cmd_iter(args).await,
+304:         Commands::List(args) => cmd_list(args).await,
+305:         // ... additional commands
+306:     }
+307: }
+308: ```
+309: 
+310: **Command Enumeration Structure:**
+311: ```rust
+312: #[derive(Subcommand)]
+313: enum Commands {
+314:     /// Create and execute a new iteration
+315:     Iter(IterArgs),
+316:     /// List all iterations
+317:     List(ListArgs),
+318:     /// Show iteration details
+319:     Show(ShowArgs),
+320:     /// Continue a paused iteration
+321:     Continue(ContinueArgs),
+322:     /// Initialize a new project
+323:     Init(InitArgs),
+324:     /// Show project status
+325:     Status,
+326:     /// Delete an iteration
+327:     Delete(DeleteArgs),
+328:     /// Regenerate knowledge for completed iteration
+329:     RegenerateKnowledge(RegenerateArgs),
+330:     /// Import existing project into Cowork Forge
+331:     Import(ImportArgs),
+332:     /// Manage configuration
+333:     Config(ConfigArgs),
+334: }
+335: ```
+336: 
+337: ### 4.2 Backend Initialization and Dependency Injection
+338: 
+339: The CLI implements the `InteractiveBackend` trait to provide terminal-specific interaction capabilities:
+340: 
+341: ```rust
+342: async fn cmd_iter(args: IterArgs) -> anyhow::Result<()> {
+343:     // 1. Initialize persistence stores
+344:     let project_store = ProjectStore::new();
+345:     let iteration_store = IterationStore::new();
+346:     
+347:     // 2. Load or create project
+348:     let project = project_store.load(&args.project)
+349:         .ok_or_else(|| anyhow!("Project not found. Run 'cowork init' first"))?;
+350:     
+351:     // 3. Create CLI backend (implements InteractiveBackend)
+352:     let backend = Arc::new(CliBackend::new());
+353:     
+354:     // 4. Initialize LLM client with rate limiting
+355:     let config = ModelConfig::from_file("config.toml")
+356:         .or_else(|_| ModelConfig::from_env())?;
+357:     let llm_client = create_llm_client(&config)?;
+358:     
+359:     // 5. Create iteration executor
+360:     let executor = IterationExecutor::new(backend.clone());
+361:     
+362:     // 6. Create iteration (genesis or evolution)
+363:     let iteration = if let Some(base_id) = args.base {
+364:         Iteration::create_evolution(
+365:             &project, 
+366:             args.title, 
+367:             args.description, 
+368:             base_id, 
+369:             args.inherit_mode
+370:         )?
+371:     } else {
+372:         Iteration::create_genesis(&project, args.title, args.description)?
+373:     };
+374:     
+375:     // 7. Execute pipeline
+376:     executor.execute(project, iteration.id(), None, Some(llm_client)).await?;
+377:     
+378:     Ok(())
+379: }
+380: ```
+381: 
+382: ### 4.3 Terminal Output Formatting
+383: 
+384: The CLI employs ANSI color codes for semantic output classification:
+385: 
+386: | Color | Semantic Meaning | Usage Example |
+387: |-------|-----------------|---------------|
+388: | **Green** | Success/Completed | `✅ Iteration completed successfully` |
+389: | **Yellow** | Warning/Running | `⚠️  Iteration running: Step 3/7` |
+390: | **Cyan** | Information/Paused | `⏸️  Iteration paused at PRD stage` |
+391: | **Red** | Error/Failed | `❌ Error: LLM API rate limit exceeded` |
+392: | **Blue** | Headers/Metadata | Section titles in `show` command |
+393: 
+394: ### 4.4 Configuration Management
+395: 
+396: The CLI supports dual configuration sources with precedence:
+397: 
+398: 1. **File-based**: `config.toml` in project root or specified via `--config`
+399: 2. **Environment-based**: Environment variables for LLM credentials
+400: 
+401: **Configuration Resolution:**
+402: ```rust
+403: impl ModelConfig {
+404:     pub fn from_file(path: &str) -> Result<Self, ConfigError> {
+405:         // Load from TOML
+406:     }
+407:     
+408:     pub fn from_env() -> Result<Self, ConfigError> {
+409:         // Load from OPENAI_API_KEY, OPENAI_BASE_URL, etc.
+410:     }
+411: }
+412: ```
+413: 
+414: ---
+415: 
+416: ## 5. Integration Architecture
+417: 
+418: ### 5.1 Domain Dependencies
+419: 
+420: The CLI Domain maintains strict dependencies on core infrastructure:
+421: 
+422: ```mermaid
+423: flowchart LR
+424:     CLI["CLI Domain"] -->|Uses| Interaction["Interaction Domain"]
+425:     CLI -->|Persists| Persistence["Persistence Domain"]
+426:     CLI -->|Orchestrates| Pipeline["Pipeline Domain"]
+427:     CLI -->|Configures| LLM["LLM Integration Domain"]
+428:     
+429:     Interaction -->|Implements| CLI_Backend["CLI Backend<br/>(Terminal UI)"]
+430: ```
+431: 
+432: **Dependency Details:**
+433: 
+434: | Dependency | Interface | Purpose |
+435: |------------|-----------|---------|
+436: | **Interaction Domain** | `InteractiveBackend` trait | HITL prompts, progress display, streaming output |
+437: | **Persistence Domain** | `ProjectStore`, `IterationStore` | Project metadata and iteration workspace management |
+438: | **Pipeline Domain** | `IterationExecutor` | 7-stage pipeline orchestration |
+439: | **LLM Integration** | `ModelConfig`, `create_llm_client` | AI agent configuration and rate-limited API access |
+440: 
+441: ### 5.2 Human-in-the-Loop (HITL) Implementation
+442: 
+443: For stages requiring human validation, the CLI implements the `InteractiveBackend` trait methods:
+444: 
+445: ```rust
+446: impl InteractiveBackend for CliBackend {
+447:     async fn request_confirmation(&self, content: &str) -> anyhow::Result<UserResponse> {
+448:         // Display content with syntax highlighting
+449:         println!("{}", content);
+450:         
+451:         // Interactive prompt using dialoguer
+452:         let options = vec!["Pass", "Edit", "Feedback"];
+453:         let selection = Select::with_theme(&ColorfulTheme::default())
+454:             .with_prompt("Action")
+455:             .items(&options)
+456:             .interact()?;
+457:             
+458:         match selection {
+459:             0 => Ok(UserResponse::Pass),
+460:             1 => Ok(UserResponse::Edit(self.open_editor(content).await?)),
+461:             2 => Ok(UserResponse::Feedback(self.collect_feedback().await?)),
+462:             _ => unreachable!(),
+463:         }
+464:     }
+465:     
+466:     async fn display_stream(&self, chunk: &str) -> anyhow::Result<()> {
+467:         // Real-time streaming output for AI responses
+468:         print!("{}", chunk);
+469:         std::io::stdout().flush()?;
+470:         Ok(())
+471:     }
+472: }
+473: ```
+474: 
+475: ---
+476: 
+477: ## 6. Execution Workflows
+478: 
+479: ### 6.1 Genesis Iteration Flow
+480: 
+481: ```mermaid
+482: sequenceDiagram
+483:     participant User
+484:     participant CLI as CLI Entry
+485:     participant Store as Persistence
+486:     participant Core as cowork_core
+487:     participant Executor as IterationExecutor
+488:     participant LLM as LLM Client
+489:     
+490:     User->>CLI: cowork iter "Feature X" --project myapp
+491:     CLI->>CLI: Cli::parse() → Commands::Iter
+492:     CLI->>CLI: Initialize tracing_subscriber
+493:     
+494:     CLI->>Store: ProjectStore::load("myapp")
+495:     Store-->>CLI: Project
+496:     
+497:     CLI->>Core: CliBackend::new()
+498:     CLI->>Core: Iteration::create_genesis(project, title, desc)
+499:     Core-->>CLI: Iteration { id: iter_003, ... }
+500:     
+501:     CLI->>Store: iteration_store.save(&iteration)
+502:     CLI->>Store: project.add_iteration(summary)
+503:     
+504:     CLI->>Core: ModelConfig::from_file("config.toml")
+505:     Core-->>CLI: ModelConfig
+506:     
+507:     CLI->>LLM: create_llm_client(&config)
+508:     LLM-->>CLI: RateLimitedLlm
+509:     
+510:     CLI->>Executor: IterationExecutor::new(backend)
+511:     CLI->>Executor: executor.execute(project, iter_003, None, Some(llm))
+512:     
+513:     loop 7 Stages with HITL Gates
+514:         Executor->>Core: Execute stage with AI agent
+515:         alt HITL Required
+516:             Core->>CLI: request_confirmation()
+517:             CLI-->>User: Display content & prompt
+518:             User-->>CLI: Input response
+519:             CLI-->>Core: UserResponse
+520:         end
+521:     end
+522:     
+523:     Executor-->>CLI: Result<()>
+524:     CLI-->>User: ✅ Iteration completed
+525: ```
+526: 
+527: ### 6.2 Evolution Iteration Flow
+528: 
+529: ```mermaid
+530: sequenceDiagram
+531:     participant User
+532:     participant CLI
+533:     participant Core as Domain Logic
+534:     participant Pipeline
+535:     
+536:     User->>CLI: cowork iter "Fix Auth" --base iter_001 --inherit partial
+537:     CLI->>Core: Iteration::create_evolution(base_id, Partial)
+538:     
+539:     Note over Core: Analyze change scope<br/>Determine start stage
+540:     
+541:     Core-->>CLI: Evolution iteration<br/>(resumes from Plan stage)
+542:     
+543:     CLI->>Core: LoadBaseKnowledgeTool::execute(base_id)
+544:     Core-->>CLI: Historical context
+545:     
+546:     CLI->>Pipeline: Resume from Plan stage
+547:     Pipeline->>Pipeline: Execute Plan→Coding→Check→Delivery
+548:     
+549:     Pipeline-->>CLI: Evolution complete
+550: ```
+551: 
+552: ---
+553: 
+554: ## 7. Error Handling and Resilience
+555: 
+556: ### 7.1 Error Propagation Strategy
+557: 
+558: The CLI uses `anyhow` for ergonomic error handling with context propagation:
+559: 
+560: ```rust
+561: async fn cmd_delete(args: DeleteArgs) -> anyhow::Result<()> {
+562:     let store = ProjectStore::new()
+563:         .context("Failed to initialize project store")?;
+564:         
+565:     let iteration = store.load(&args.id)
+566:         .with_context(|| format!("Iteration {} not found", args.id))?;
+567:         
+568:     if iteration.status() == IterationStatus::Running {
+569:         return Err(anyhow!("Cannot delete running iteration. Pause first."));
+570:     }
+571:     
+572:     if !args.force {
+573:         let confirmed = Confirm::with_theme(&ColorfulTheme::default())
+574:             .with_prompt("Delete iteration permanently?")
+575:             .interact()?;
+576:             
+577:         if !confirmed {
+578:             return Ok(()); // Graceful exit
+579:         }
+580:     }
+581:     
+582:     store.delete(&args.id)
+583:         .context("Failed to delete iteration files")?;
+584:         
+585:     Ok(())
+586: }
+587: ```
+588: 
+589: ### 7.2 Common Error Scenarios
+590: 
+591: | Error Code | Scenario | User Message |
+592: |------------|----------|--------------|
+593: | `E001` | Project not initialized | `❌ Error: Run 'cowork init' first` |
+594: | `E002` | Invalid base iteration | `❌ Error: Base iteration 'iter_999' not found` |
+595: | `E003` | LLM configuration missing | `❌ Error: No LLM config found. Set OPENAI_API_KEY or create config.toml` |
+596: | `E004` | Rate limit exceeded | `⚠️  Warning: Rate limit hit. Retrying in 2s...` |
+597: | `E005` | Workspace permission denied | `❌ Error: Permission denied accessing .cowork-v2/` |
+598: 
+599: ---
+600: 
+601: ## 8. Configuration Schema
+602: 
+603: ### 8.1 config.toml Structure
+604: 
+605: ```toml
+606: [llm]
+607: provider = "openai"
+608: api_key = "sk-..."
+609: base_url = "https://api.openai.com/v1"
+610: model = "gpt-5"
+611: temperature = 0.7
+612: max_tokens = 4096
+613: 
+614: [cli]
+615: theme = "auto"  # auto, light, dark
+616: confirm_destructive = true
+617: editor = "vim"  # or $EDITOR
+618: ```
+619: 
+620: ### 8.2 Environment Variables
+621: 
+622: | Variable | Purpose | Example |
+623: |----------|---------|---------|
+624: | `COWORK_CONFIG` | Override default config path | `/path/to/config.toml` |
+625: | `OPENAI_API_KEY` | LLM authentication | `sk-abc123...` |
+626: | `OPENAI_BASE_URL` | Custom LLM endpoint | `https://api.openai.com/v1` |
+627: | `COWORK_EDITOR` | Preferred external editor | `code --wait` |
+628: 
+629: ---
+630: 
+631: ## 9. Performance Considerations
+632: 
+633: ### 9.1 Async Execution Model
+634: 
+635: The CLI leverages Tokio's async runtime to handle concurrent operations:
+636: 
+637: - **LLM Streaming**: Non-blocking token streaming with real-time terminal output
+638: - **File I/O**: Async file operations during artifact generation
+639: - **Process Management**: Parallel external command execution during Check stage
+640: 
+641: ### 9.2 Memory Management
+642: 
+643: - **Arc<CliBackend>**: Shared backend state across async tasks
+644: - **Streaming Processing**: Constant memory usage for large AI responses via streaming
+645: - **Workspace Isolation**: Each iteration maintains independent file handles
+646: 
+647: ---
+648: 
+649: ## 10. Security Considerations
+650: 
+651: ### 10.1 Path Validation
+652: 
+653: All file operations validate workspace containment:
+654: 
+655: ```rust
+656: fn validate_workspace_path(path: &Path) -> anyhow::Result<()> {
+657:     let canonical = path.canonicalize()?;
+658:     let workspace = get_workspace_root()?.canonicalize()?;
+659:     
+660:     if !canonical.starts_with(&workspace) {
+661:         return Err(anyhow!("Path {} escapes workspace", path.display()));
+662:     }
+663:     Ok(())
+664: }
+665: ```
+666: 
+667: ### 10.2 Sensitive Data Handling
+668: 
+669: - API keys loaded from environment or config file with `0600` permissions check
+670: - No logging of LLM prompts containing potential secrets
+671: - Secure temporary file cleanup on SIGINT/SIGTERM
+672: 
+673: ---
+674: 
+675: ## 11. Extension Points
+676: 
+677: ### 11.1 Adding New Commands
+678: 
+679: To add a new subcommand:
+680: 
+681: 1. Define args struct with `clap::Args` derive
+682: 2. Add variant to `Commands` enum
+683: 3. Implement handler function in `main.rs`
+684: 4. Register in command router match statement
+685: 
+686: ```rust
+687: #[derive(Args)]
+688: struct ExportArgs {
+689:     iteration_id: String,
+690:     format: ExportFormat,
+691: }
+692: 
+693: async fn cmd_export(args: ExportArgs) -> anyhow::Result<()> {
+694:     // Implementation
+695: }
+696: ```
+697: 
+698: ### 11.2 Custom Backends
+699: 
+700: The `InteractiveBackend` trait allows for specialized CLI implementations (e.g., JSON output mode, silent mode):
+701: 
+702: ```rust
+703: struct JsonBackend;
+704: 
+705: impl InteractiveBackend for JsonBackend {
+706:     async fn display_message(&self, msg: &str) -> anyhow::Result<()> {
+707:         println!(r#"{{"type": "message", "content": "{}"}}"#, msg);
+708:         Ok(())
+709:     }
+710:     // ... implement other methods
+711: }
+712: ```
+713: 
+714: ---
+715: 
+716: ## 12. Troubleshooting Guide
+717: 
+718: | Issue | Diagnostic | Solution |
+719: |-------|-----------|----------|
+720: | `command not found: cowork` | Binary not in PATH | Run `cargo install --path crates/cowork-cli` |
+721: | `Failed to initialize project store` | Permission denied on `.cowork-v2/` | Check directory permissions: `chmod 755 .cowork-v2` |
+722: | `LLM client creation failed` | Missing API key | Set `OPENAI_API_KEY` environment variable |
+723: | `Iteration execution hangs` | HITL waiting for input | Check if external editor opened in background |
+724: | `Color codes not rendering` | Terminal lacks ANSI support | Use `--no-color` flag or set `NO_COLOR=1` |
+725: 
+726: ---
+727: 
+728: **Document Control**
+729: - **Author**: Cowork Forge Architecture Team
+730: - **Review Cycle**: Quarterly
+731: - **Related Documents**: 
+732:   - [Pipeline Domain Architecture](./pipeline-domain.md)
+733:   - [Interaction Domain Specification](./interaction-domain.md)
+734:   - [LLM Integration Guide](./llm-integration.md)
+````
 
 ### litho.docs/en/4.Deep-Exploration/Persistence Domain.md (436 lines)
 
@@ -14933,184 +16402,72 @@ LICENSE
 18: )
 ```
 
-### crates/cowork-core/src/config_definition/agent_definition.rs (175 lines)
+### crates/cowork-core/src/config_definition/default_configs/agents/built-in/coding_actor.json (63 lines)
 
 ```
-1: AgentType
-2: ⋮----
-3: {
-4:     
-5:     #[default]
-6:     Simple,
-7:     
-8:     Loop {
-9:         
-10:         max_iterations: Option<u32>,
+1: {
+2:   "id": "coding_actor",
+3:   "name": "Coding Actor",
+4:   "description": "Implements the code based on the implementation plan",
+5:   "version": "1.0.0",
+6:   "agent_type": "simple",
+7:   "instruction": "builtin://coding_actor",
+8:   "tools": [
+9:     {
+10:       "tool_id": "load_feedback_history"
 11:     },
-12: }
-13: ⋮----
-14: ModelConfig
-15: ⋮----
-16: {
-17:     
-18:     pub model_id: Option<String>,
-19:     
-20:     pub temperature: Option<f32>,
-21:     
-22:     pub max_tokens: Option<u32>,
-23:     
-24:     pub top_p: Option<f32>,
-25: }
-26: ⋮----
-27: ModelConfig
-28: ⋮----
-29: {
-30:     fn default() -> Self {
-31:         Self {
-32:             model_id: None,
-33:             temperature: Some(0.7),
-34:             max_tokens: None,
-35:             top_p: None,
-36:         }
-37:     }
-38: }
-39: ⋮----
-40: ToolReference
-41: ⋮----
-42: {
-43:     
-44:     pub tool_id: String,
-45:     
-46:     pub config: Option<HashMap<String, serde_json::Value>>,
-47: }
-48: ⋮----
-49: AgentDefinition
-50: ⋮----
-51: {
-52:     
-53:     pub id: String,
-54:     
-55:     pub name: String,
-56:     
-57:     pub description: Option<String>,
-58:     
-59:     pub version: Option<String>,
-60:     
-61:     
-62:     #[serde(default)]
-63:     pub agent_type: AgentType,
-64:     
-65:     
-66:     
-67:     
-68:     
-69:     
-70:     pub instruction: String,
-71:     
-72:     
-73:     #[serde(default)]
-74:     pub tools: Vec<ToolReference>,
-75:     
-76:     
-77:     #[serde(default)]
-78:     pub model: ModelConfig,
-79:     
-80:     
-81:     #[serde(default)]
-82:     pub include_contents: IncludeContentsMode,
-83:     
-84:     
-85:     #[serde(default)]
-86:     pub tags: Vec<String>,
-87:     
-88:     
-89:     #[serde(default)]
-90:     pub metadata: HashMap<String, serde_json::Value>,
-91: }
-92: ⋮----
-93: IncludeContentsMode
-94: ⋮----
-95: {
-96:     
-97:     #[default]
-98:     None,
-99:     
-100:     All,
-101:     
-102:     Selected(Vec<String>),
-103: }
-104: ⋮----
-105: ActorCriticDefinition
-106: ⋮----
-107: {
-108:     
-109:     pub actor: AgentDefinition,
-110:     
-111:     pub critic: AgentDefinition,
-112:     
-113:     pub max_iterations: Option<u32>,
-114: }
-115: ⋮----
-116: AgentDefinition
-117: ⋮----
-118: {
-119:     
-120:     pub fn new(id: impl Into<String>, name: impl Into<String>, instruction: impl Into<String>) -> Self {
-121:         Self {
-122:             id: id.into(),
-123:             name: name.into(),
-124:             description: None,
-125:             version: None,
-126:             agent_type: AgentType::Simple,
-127:             instruction: instruction.into(),
-128:             tools: Vec::new(),
-129:             model: ModelConfig::default(),
-130:             include_contents: IncludeContentsMode::None,
-131:             tags: Vec::new(),
-132:             metadata: HashMap::new(),
-133:         }
-134:     }
-135:     
-136:     
-137:     pub fn with_tool(mut self, tool_id: impl Into<String>) -> Self {
-138:         self.tools.push(ToolReference {
-139:             tool_id: tool_id.into(),
-140:             config: None,
-141:         });
-142:         self
-143:     }
-144:     
-145:     
-146:     pub fn with_tool_config(mut self, tool_id: impl Into<String>, config: HashMap<String, serde_json::Value>) -> Self {
-147:         self.tools.push(ToolReference {
-148:             tool_id: tool_id.into(),
-149:             config: Some(config),
-150:         });
-151:         self
-152:     }
-153:     
-154:     
-155:     pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
-156:         self.tags.push(tag.into());
-157:         self
-158:     }
-159:     
-160:     
-161:     pub fn as_loop(mut self, max_iterations: Option<u32>) -> Self {
-162:         self.agent_type = AgentType::Loop { max_iterations };
-163:         self
-164:     }
-165:     
-166:     
-167:     pub fn with_model(mut self, model: ModelConfig) -> Self {
-168:         self.model = model;
-169:         self
-170:     }
-171: }
-172: ⋮----
-173: test_agent_definition_serialization
-174: ⋮----
-175: ()
+12:     {
+13:       "tool_id": "get_implementation_plan"
+14:     },
+15:     {
+16:       "tool_id": "get_requirements"
+17:     },
+18:     {
+19:       "tool_id": "load_design_doc"
+20:     },
+21:     {
+22:       "tool_id": "update_task_status"
+23:     },
+24:     {
+25:       "tool_id": "update_feature_status"
+26:     },
+27:     {
+28:       "tool_id": "read_file"
+29:     },
+30:     {
+31:       "tool_id": "write_file"
+32:     },
+33:     {
+34:       "tool_id": "list_files"
+35:     },
+36:     {
+37:       "tool_id": "run_command"
+38:     },
+39:     {
+40:       "tool_id": "read_file_truncated"
+41:     },
+42:     {
+43:       "tool_id": "goto_stage"
+44:     },
+45:     {
+46:       "tool_id": "query_memory"
+47:     },
+48:     {
+49:       "tool_id": "save_insight"
+50:     },
+51:     {
+52:       "tool_id": "save_issue"
+53:     },
+54:     {
+55:       "tool_id": "save_learning"
+56:     }
+57:   ],
+58:   "model": {
+59:     "temperature": 0.7
+60:   },
+61:   "include_contents": "none",
+62:   "tags": ["built-in", "coding", "actor"]
+63: }
 ```
 
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/delivery_agent.json (36 lines)
@@ -15744,6 +17101,421 @@ LICENSE
 2: pub use models::*;
 ```
 
+### crates/cowork-core/src/data/models.rs (410 lines)
+
+```
+1: Requirements
+2: ⋮----
+3: {
+4:     pub schema_version: String,
+5:     pub created_at: DateTime<Utc>,
+6:     pub updated_at: DateTime<Utc>,
+7:     pub requirements: Vec<Requirement>,
+8: }
+9: ⋮----
+10: Requirement
+11: ⋮----
+12: {
+13:     pub id: String,  
+14:     pub title: String,
+15:     pub description: String,
+16:     pub priority: Priority,
+17:     pub category: RequirementCategory,
+18:     pub acceptance_criteria: Vec<String>,
+19:     pub related_features: Vec<String>,  
+20: }
+21: ⋮----
+22: Priority
+23: ⋮----
+24: {
+25:     High,
+26:     Medium,
+27:     Low,
+28: }
+29: ⋮----
+30: RequirementCategory
+31: ⋮----
+32: {
+33:     Functional,
+34:     NonFunctional,
+35: }
+36: ⋮----
+37: FeatureList
+38: ⋮----
+39: {
+40:     pub schema_version: String,
+41:     pub features: Vec<Feature>,
+42: }
+43: ⋮----
+44: Feature
+45: ⋮----
+46: {
+47:     pub id: String,  
+48:     pub name: String,
+49:     pub description: String,
+50:     pub requirement_ids: Vec<String>,
+51:     pub status: FeatureStatus,
+52:     pub assigned_to_tasks: Vec<String>,  
+53:     pub completion_criteria: Vec<String>,
+54:     pub created_at: DateTime<Utc>,
+55:     pub completed_at: Option<DateTime<Utc>>,
+56:     #[serde(default)]
+57:     pub metadata: FeatureMetadata,
+58: }
+59: ⋮----
+60: FeatureStatus
+61: ⋮----
+62: {
+63:     Pending,
+64:     InProgress,
+65:     Completed,
+66:     Blocked,
+67: }
+68: ⋮----
+69: FeatureMetadata
+70: ⋮----
+71: {
+72:     #[serde(skip_serializing_if = "Option::is_none")]
+73:     pub estimated_effort: Option<String>,
+74:     #[serde(default)]
+75:     pub dependencies: Vec<String>,
+76: }
+77: ⋮----
+78: DesignSpec
+79: ⋮----
+80: {
+81:     pub schema_version: String,
+82:     pub architecture: Architecture,
+83:     pub technology_stack: TechnologyStack,
+84:     pub deployment: DeploymentInfo,
+85: }
+86: ⋮----
+87: Architecture
+88: ⋮----
+89: {
+90:     pub style: String,  
+91:     pub components: Vec<DesignComponent>,
+92:     pub data_models: Vec<DataModel>,
+93: }
+94: ⋮----
+95: DesignComponent
+96: ⋮----
+97: {
+98:     pub id: String,  
+99:     pub name: String,
+100:     #[serde(rename = "type")]
+101:     pub component_type: ComponentType,
+102:     pub responsibilities: Vec<String>,
+103:     pub technology: String,
+104:     pub interfaces: Vec<ComponentInterface>,
+105:     pub related_features: Vec<String>,  
+106: }
+107: ⋮----
+108: ComponentType
+109: ⋮----
+110: {
+111:     BackendService,
+112:     FrontendComponent,
+113:     Database,
+114:     ApiGateway,
+115:     MessageQueue,
+116:     Other(String),
+117: }
+118: ⋮----
+119: ComponentInterface
+120: ⋮----
+121: {
+122:     pub name: String,
+123:     pub inputs: Vec<String>,
+124:     pub outputs: Vec<String>,
+125: }
+126: ⋮----
+127: DataModel
+128: ⋮----
+129: {
+130:     pub name: String,
+131:     pub fields: Vec<DataField>,
+132: }
+133: ⋮----
+134: DataField
+135: ⋮----
+136: {
+137:     pub name: String,
+138:     #[serde(rename = "type")]
+139:     pub field_type: String,
+140: }
+141: ⋮----
+142: TechnologyStack
+143: ⋮----
+144: {
+145:     #[serde(skip_serializing_if = "Option::is_none")]
+146:     pub backend: Option<String>,
+147:     #[serde(skip_serializing_if = "Option::is_none")]
+148:     pub frontend: Option<String>,
+149:     #[serde(skip_serializing_if = "Option::is_none")]
+150:     pub database: Option<String>,
+151: }
+152: ⋮----
+153: DeploymentInfo
+154: ⋮----
+155: {
+156:     pub architecture: String,
+157: }
+158: ⋮----
+159: ImplementationPlan
+160: ⋮----
+161: {
+162:     pub schema_version: String,
+163:     pub milestones: Vec<Milestone>,
+164:     pub tasks: Vec<Task>,
+165: }
+166: ⋮----
+167: Milestone
+168: ⋮----
+169: {
+170:     pub id: String,  
+171:     pub name: String,
+172:     pub features: Vec<String>,  
+173:     #[serde(skip_serializing_if = "Option::is_none")]
+174:     pub deadline: Option<String>,
+175: }
+176: ⋮----
+177: Task
+178: ⋮----
+179: {
+180:     pub id: String,  
+181:     pub title: String,
+182:     pub description: String,
+183:     pub feature_id: String,
+184:     pub component_id: String,
+185:     pub status: TaskStatus,
+186:     pub dependencies: Vec<String>,  
+187:     #[serde(skip_serializing_if = "Option::is_none")]
+188:     pub estimated_effort: Option<String>,
+189:     pub files_to_create: Vec<String>,
+190:     pub acceptance_criteria: Vec<String>,
+191:     pub created_at: DateTime<Utc>,
+192:     pub started_at: Option<DateTime<Utc>>,
+193:     pub completed_at: Option<DateTime<Utc>>,
+194: }
+195: ⋮----
+196: TaskStatus
+197: ⋮----
+198: {
+199:     Pending,
+200:     InProgress,
+201:     Completed,
+202:     Blocked,
+203: }
+204: ⋮----
+205: CodeMetadata
+206: ⋮----
+207: {
+208:     pub schema_version: String,
+209:     pub files: Vec<FileMetadata>,
+210:     pub build_status: BuildStatus,
+211:     pub test_status: TestStatus,
+212:     pub readme_path: Option<String>,
+213:     pub project_type: String,
+214: }
+215: ⋮----
+216: FileMetadata
+217: ⋮----
+218: {
+219:     pub path: String,
+220:     pub task_id: String,
+221:     #[serde(skip_serializing_if = "Option::is_none")]
+222:     pub feature_id: Option<String>,
+223:     #[serde(skip_serializing_if = "Option::is_none")]
+224:     pub component_id: Option<String>,
+225:     pub created_at: DateTime<Utc>,
+226:     pub last_modified: DateTime<Utc>,
+227:     pub lines_of_code: usize,
+228:     pub test_coverage: f32,
+229: }
+230: ⋮----
+231: BuildStatus
+232: ⋮----
+233: {
+234:     pub last_build: DateTime<Utc>,
+235:     pub success: bool,
+236:     pub errors: Vec<String>,
+237: }
+238: ⋮----
+239: TestStatus
+240: ⋮----
+241: {
+242:     pub last_run: DateTime<Utc>,
+243:     pub total: usize,
+244:     pub passed: usize,
+245:     pub failed: usize,
+246:     pub details: Vec<TestDetail>,
+247: }
+248: ⋮----
+249: TestDetail
+250: ⋮----
+251: {
+252:     pub test_name: String,
+253:     pub status: String,  
+254:     #[serde(skip_serializing_if = "Option::is_none")]
+255:     pub message: Option<String>,
+256: }
+257: ⋮----
+258: SessionMeta
+259: ⋮----
+260: {
+261:     pub session_id: String,  
+262:     pub created_at: DateTime<Utc>,
+263:     pub current_stage: Option<Stage>,
+264:     #[serde(skip_serializing_if = "Option::is_none")]
+265:     pub restart_reason: Option<String>,
+266: }
+267: ⋮----
+268: Stage
+269: ⋮----
+270: {
+271:     Idea,
+272:     Prd,
+273:     Design,
+274:     Plan,
+275:     Coding,
+276:     Check,
+277:     Delivery,
+278: }
+279: ⋮----
+280: FeedbackHistory
+281: ⋮----
+282: {
+283:     pub feedbacks: Vec<Feedback>,
+284: }
+285: ⋮----
+286: Feedback
+287: ⋮----
+288: {
+289:     pub stage: String,  
+290:     pub feedback_type: FeedbackType,
+291:     pub severity: Severity,
+292:     pub details: String,
+293:     #[serde(skip_serializing_if = "Option::is_none")]
+294:     pub suggested_fix: Option<String>,
+295:     pub timestamp: DateTime<Utc>,
+296: }
+297: ⋮----
+298: FeedbackType
+299: ⋮----
+300: {
+301:     BuildError,
+302:     QualityIssue,
+303:     MissingRequirement,
+304:     MissingArtifact,
+305:     ArchitectureIssue,
+306:     TaskScopeIssue,
+307:     Suggestion,
+308: }
+309: ⋮----
+310: Severity
+311: ⋮----
+312: {
+313:     Critical,
+314:     Major,
+315:     Minor,
+316: }
+317: ⋮----
+318: Requirements
+319: ⋮----
+320: {
+321:     pub fn new() -> Self {
+322:         Self {
+323:             schema_version: "1.0".to_string(),
+324:             created_at: Utc::now(),
+325:             updated_at: Utc::now(),
+326:             requirements: Vec::new(),
+327:         }
+328:     }
+329: }
+330: ⋮----
+331: FeatureList
+332: ⋮----
+333: {
+334:     pub fn new() -> Self {
+335:         Self {
+336:             schema_version: "1.0".to_string(),
+337:             features: Vec::new(),
+338:         }
+339:     }
+340: }
+341: ⋮----
+342: DesignSpec
+343: ⋮----
+344: {
+345:     pub fn new() -> Self {
+346:         Self {
+347:             schema_version: "1.0".to_string(),
+348:             architecture: Architecture {
+349:                 style: String::new(),
+350:                 components: Vec::new(),
+351:                 data_models: Vec::new(),
+352:             },
+353:             technology_stack: TechnologyStack {
+354:                 backend: None,
+355:                 frontend: None,
+356:                 database: None,
+357:             },
+358:             deployment: DeploymentInfo {
+359:                 architecture: String::new(),
+360:             },
+361:         }
+362:     }
+363: }
+364: ⋮----
+365: ImplementationPlan
+366: ⋮----
+367: {
+368:     pub fn new() -> Self {
+369:         Self {
+370:             schema_version: "1.0".to_string(),
+371:             milestones: Vec::new(),
+372:             tasks: Vec::new(),
+373:         }
+374:     }
+375: }
+376: ⋮----
+377: CodeMetadata
+378: ⋮----
+379: {
+380:     pub fn new() -> Self {
+381:         Self {
+382:             schema_version: "1.0".to_string(),
+383:             files: Vec::new(),
+384:             build_status: BuildStatus {
+385:                 last_build: Utc::now(),
+386:                 success: false,
+387:                 errors: Vec::new(),
+388:             },
+389:             test_status: TestStatus {
+390:                 last_run: Utc::now(),
+391:                 total: 0,
+392:                 passed: 0,
+393:                 failed: 0,
+394:                 details: Vec::new(),
+395:             },
+396:             readme_path: None,
+397:             project_type: "Unknown".to_string(),
+398:         }
+399:     }
+400: }
+401: ⋮----
+402: FeedbackHistory
+403: ⋮----
+404: {
+405:     pub fn new() -> Self {
+406:         Self {
+407:             feedbacks: Vec::new(),
+408:         }
+409:     }
+410: }
+```
+
 ### crates/cowork-core/src/importer/artifact_generator.rs (109 lines)
 
 ```
@@ -16219,6 +17991,359 @@ LICENSE
 130: ⋮----
 131: (structure: &ProjectStructure, technologies: &[DetectedTechnology])
 ```
+
+### crates/cowork-core/src/instructions/coding.rs (348 lines)
+
+````
+1: pub const CODING_ACTOR_INSTRUCTION: &str = r#"
+2: # Your Role
+3: You are Coding Actor. Implement or update ALL pending tasks by writing **SIMPLE, CLEAN** code.
+4: 
+5: # Core Principle: SIMPLICITY & CORE FUNCTIONALITY ONLY
+6: - **Simple code**: No over-engineering, avoid unnecessary abstractions
+7: - **Minimal dependencies**: Use built-in features when possible, avoid unnecessary package bloat
+8: - **No tests**: Don't write test files (unless explicitly required in tasks)
+9: - **No premature optimization**: Don't optimize performance unless there's a clear bottleneck
+10: - **No infrastructure code**: Don't write deployment/monitoring/logging code (unless explicitly required)
+11: - **Clear structure**: Organize code logically into files/modules that match the feature structure
+12: - **Focus on core features**: Implement only what's needed to make features work
+13: - **Reasonable code organization**: Use straightforward structuring (e.g., separate modules/files for distinct features); avoid forcing every pattern but don't fear simple modularization
+14: - **Basic error handling**: Handle errors that can reasonably occur (file I/O, API responses, null checks); use the language's standard error mechanisms (Result, try/catch, error returns). Don't add excessive nested error wrapping, but DO handle errors where operations can fail.
+15: 
+16: # ⚠️ CRITICAL: COMPLETE PROJECT STRUCTURE (NEW - HIGHEST PRIORITY)
+17: **BEFORE implementing any feature, you MUST create ALL essential project files:**
+18: 
+19: ## For Frontend/Web Projects (React/Vue/Vanilla):
+20: **CREATE THESE FILES FIRST (in this order):**
+21: 1. ✅ `package.json` - COMPLETE with:
+22:    - Correct dependencies (react, vite, etc.) with version numbers
+23:    - Scripts: "dev", "build", "preview"
+24:    - Type: "module" (for ESM)
+25: 2. ✅ `vite.config.js` (or build tool config) - proper plugin configuration
+26: 3. ✅ `.gitignore` - exclude node_modules, dist, .env
+27: 4. ✅ `index.html` - entry HTML with:
+28:    - Proper DOCTYPE and structure
+29:    - <div id="root"> or equivalent
+30:    - <script> tag importing main entry
+31: 5. ✅ `src/main.jsx` (or main.js) - application entry point
+32: 6. ✅ `tsconfig.json` - if using TypeScript
+33: 
+34: ## For Node.js Backend/Tool:
+35: **CREATE THESE FILES FIRST:**
+36: 1. ✅ `package.json` - with dependencies, "bin" entry (for CLI tools), start script
+37: 2. ✅ Main entry (`src/index.js` or `index.js`)
+38: 3. ✅ `.gitignore` - exclude node_modules
+39: 
+40: ## For Rust Projects:
+41: **CREATE THESE FILES FIRST:**
+42: 1. ✅ `Cargo.toml` - with [package] metadata and [dependencies]
+43: 2. ✅ `src/main.rs` or `src/lib.rs` - with proper structure
+44: 3. ✅ `.gitignore` - exclude /target
+45: 
+46: ## For Python Projects:
+47: **CREATE THESE FILES FIRST:**
+48: 1. ✅ `requirements.txt` or `pyproject.toml` - with all dependencies
+49: 2. ✅ Main entry (`main.py` or `src/__init__.py`)
+50: 3. ✅ `.gitignore` - exclude __pycache__, *.pyc
+51: 
+52: **VALIDATION BEFORE PROCEEDING:**
+53: After creating essential files, verify:
+54: - [ ] Can the project be initialized? (npm install / cargo build works)
+55: - [ ] Are all config files in place?
+56: - [ ] Is entry file properly configured?
+57: 
+58: # Workflow - TWO MODES
+59: 
+60: ## Mode Detection (FIRST STEP)
+61: 1. Call `load_feedback_history({"stage": "coding"})` to check if this is a restart
+62: 2. If feedback history exists and has entries → **UPDATE MODE**
+63: 3. If no feedback history or empty → **NEW MODE**
+64: 
+65: ## NEW MODE (全新实现)
+66: 
+67: ### Step 1: Load Plan (MANDATORY)
+68: 1. Call `get_plan()` to see ALL pending tasks
+69: 2. **STOP** if no tasks - report and exit
+70: 
+71: ### Step 1.5: Create Essential Project Files FIRST (NEW - MANDATORY)
+72: 3. **CRITICAL**: Before implementing any features, create ALL essential files:
+73:    - Read Plan document's "Required Files Checklist"
+74:    - Identify which tasks create config/entry files (usually TASK-001, TASK-002)
+75:    - **IMPLEMENT THESE TASKS FIRST** before any feature tasks
+76:    - Use `write_file()` to create:
+77:      - package.json/Cargo.toml/requirements.txt (COMPLETE with dependencies)
+78:      - Entry files (index.html, main.js, src/main.rs, etc.)
+79:      - Config files (vite.config.js, tsconfig.json, etc.)
+80:      - .gitignore
+81: 4. Mark these essential file tasks as completed with `update_task_status()`
+82: 
+83: **EXAMPLE IMPLEMENTATION ORDER:**
+84: ```
+85: 1. Write package.json with ALL dependencies and scripts
+86: 2. Write vite.config.js with proper React plugin setup
+87: 3. Write .gitignore
+88: 4. Write index.html with <div id="root"> and script import
+89: 5. Write src/main.jsx with ReactDOM.render
+90: 6. Mark TASK-001, TASK-002 as completed
+91: 7. NOW implement feature tasks (TASK-003, TASK-004, ...)
+92: ```
+93: 
+94: ### Step 2: Implement ALL Tasks
+95: 5. **Implement ALL pending tasks in one go**:
+96:    - Write simple, straightforward code for each task
+97:    - Avoid complex abstractions
+98:    - Use comments only when necessary
+99: 6. Mark ALL tasks as completed with `update_task_status(task_id, "completed")`
+100: 7. Mark corresponding features as completed with `update_feature_status(feature_id, "completed")`
+101: 
+102: ### Step 3: Generate README.md (MANDATORY)
+103: 6. **你必须生成一个完整的 README.md 文件**，包含以下内容：
+104: 
+105: #### README.md 必须包含：
+106: 1. **项目简介** - 简要说明项目功能
+107: 2. **环境要求** - 列出所需的环境（如 Node.js 版本、Python 版本、Rust 版本等）
+108: 3. **依赖安装** - 明确的安装命令（如 `npm install`, `pip install -r requirements.txt`）
+109: 4. **运行项目** - 如何启动项目的命令（如 `npm run dev`, `cargo run`, `python main.py`）
+110: 5. **构建命令** - 如需构建，提供构建命令（如 `npm run build`, `cargo build --release`）
+111: 6. **项目结构** - 主要文件和目录说明
+112: 
+113: #### README.md 模板：
+114: ```markdown
+115: # [项目名称]
+116: 
+117: ## 简介
+118: [项目功能简介]
+119: 
+120: ## 环境要求
+121: - [要求1]
+122: - [要求2]
+123: 
+124: ## 依赖安装
+125: \`\`\`bash
+126: [安装依赖的命令]
+127: \`\`\`
+128: 
+129: ## 运行项目
+130: \`\`\`bash
+131: [运行项目的命令]
+132: \`\`\`
+133: 
+134: ## 构建命令（如需要）
+135: \`\`\`bash
+136: [构建命令]
+137: \`\`\`
+138: 
+139: ## 项目结构
+140: - [目录/文件说明]
+141: ```
+142: 
+143: 7. 使用 `write_file("README.md", <readme_content>)` 保存 README
+144: 
+145: ### Exit Condition
+146: - When ALL tasks are marked as "completed" AND README.md is generated, you are done with your turn.
+147: - The Critic will automatically review your work next.
+148: 
+149: ## UPDATE MODE (增量更新 - 当 GotoStage 回退到此阶段时)
+150: 
+151: ### Step 1: Analyze Feedback
+152: 1. Call `load_feedback_history({"stage": "coding"})` - 获取最近的反馈信息
+153: 2. Read feedback.details to understand what needs to change
+154: 
+155: ### Step 2: Load Existing State
+156: 3. Call `get_plan()` to read current task statuses
+157: 4. Check which tasks are completed and which are pending
+158: 
+159: ### Step 3: Incremental Implementation
+160: 5. Analyze feedback and determine what to modify:
+161:    - Which completed tasks need fixes?
+162:    - Which pending tasks need to be implemented differently?
+163:    - What code changes are required?
+164: 
+165: 6. Apply targeted updates:
+166:    - Fix issues in existing code files
+167:    - Update implementations based on feedback
+168:    - Modify task statuses if needed
+169:    - Document any code changes in comments
+170: 
+171: ### Step 4: Update Task Statuses
+172: 7. Update task statuses to reflect completion
+173: 8. Update feature statuses if all related tasks are done
+174: 
+175: ### UPDATE MODE Example
+176: 
+177: ```
+178: # 假设 feedback 显示: "认证API端点需要添加JWT验证，修复路由错误"
+179: 
+180: 1. load_feedback_history()
+181:    → feedbacks: [{
+182:        feedback_type: "QualityIssue",
+183:        severity: "Critical",
+184:        details: "认证API端点需要添加JWT验证，修复路由错误"
+185:      }]
+186: 
+187: 2. get_plan()
+188:    → Returns current task statuses
+189: 
+190: 3. read_file("src/api/auth.rs")
+191:    → Read existing auth code
+192: 
+193: 4. 分析需要修改的内容:
+194:    - 添加 JWT 验证中间件
+195:    - 修复路由配置错误
+196:    - 更新认证端点
+197: 
+198: 5. 增量更新代码:
+199:    - 修改 src/api/auth.rs，添加 JWT 验证
+200:    - 修复 src/main.rs 中的路由配置
+201:    - 添加必要的依赖
+202: 
+203: 6. update_task_status("TASK-003", "completed")
+204:    update_feature_status("FEAT-001", "completed")
+205: 
+206: 7. 完成！Critic 将审查更新后的代码
+207: ```
+208: 
+209: # Adaptive Task Management
+210: 
+211: During implementation, you may discover that the plan needs adjustments:
+212: 
+213: ## When plan needs major changes:
+214: - If you find missing prerequisites, incorrect task ordering, or fundamental design flaws,
+215:   call `goto_stage("plan", "Plan needs adjustment: <specific reasons>")` to return to planning.
+216: - Be specific about what needs to change and why.
+217: 
+218: ## Guidelines:
+219: - **Be conservative**: Only request plan changes when truly necessary
+220: - **Stay focused**: Implement what's in the plan first
+221: - **Use status updates**: Use `update_task_status(task_id, "completed")` to mark tasks done
+222: - **Use feature status**: Use `update_feature_status(feature_id, "completed")` to mark features done
+223: 
+224: ## Handle Critic Feedback (IF IN ITERATION 2+):
+225: **IMPORTANT**: In iterations after the first one, check the conversation history for Critic's feedback:
+226: 
+227: 1. **Look at the previous messages** - Critic's feedback is in the conversation history
+228: 2. **If Critic said code is incomplete or has issues**:
+229:    - Read exactly what issues were mentioned
+230:    - Complete any missing tasks
+231:    - Fix any code quality issues
+232:    - Simplify over-engineered code if needed
+233: 3. **If Critic requested replanning**: Acknowledge (human will review)
+234: 4. **If no issues mentioned** - Critic approved and you're done!
+235: 
+236: **Remember**: You can SEE Critic's messages in the conversation. Read them and take action.
+237: 
+238: # Tools
+239: 
+240: ## Core Tools
+241: - load_feedback_history() ← **START HERE - 检测是否是 UPDATE MODE**
+242: - get_plan() - See all tasks
+243: - read_file(path) - Read existing code
+244: - write_file(path, content) - Write code (also use this to save README.md)
+245: - list_files(path) - List files in directory
+246: - update_task_status(task_id, status) - Update task status
+247: - update_feature_status(feature_id, status) - Update feature status
+248: 
+249: # CRITICAL RULES
+250: 
+251: ## For NEW MODE
+252: 1. Implement ALL pending tasks in one go
+253: 2. Keep code simple and straightforward - avoid unnecessary abstractions and over-engineering
+254: 3. No tests/optimization/infrastructure unless explicitly required
+255: 4. **Use minimal dependencies** - prefer standard library over external packages when practical
+256: 5. Mark all tasks as completed when done
+257: 6. Stop immediately when all tasks are completed
+258: 7. **Don't over-refactor** - write code that works and is readable; you may split code into files/modules for clarity, but avoid endless restructuring
+259: 8. Generate README.md ONCE on initial creation; don't regenerate it in UPDATE MODE unless feedback explicitly asks
+260: 
+261: ## For UPDATE MODE
+262: - Fix only what's mentioned in feedback
+263: - Preserve working code, only modify problematic parts
+264: - Update task statuses to reflect progress
+265: - Be efficient - incremental fixes are faster than full rewrite
+266: 
+267: **REMEMBER**: 
+268: - Always start with `load_feedback_history()` to detect mode
+269: - In UPDATE MODE, focus on fixing specific issues mentioned in feedback
+270: - In NEW MODE, implement all pending tasks and stop
+271: "#;
+272: 
+273: pub const CODING_CRITIC_INSTRUCTION: &str = r#"
+274: # Your Role
+275: You are Coding Critic. Verify that Coding Actor completed ALL tasks and code is functional.
+276: 
+277: # Workflow - SIMPLE AND DIRECT
+278: 
+279: ## Step 1: Check Task Completion
+280: 1. Call `get_plan()` to see all tasks
+281: 2. Verify that ALL tasks have status "completed"
+282: 
+283: ## Step 2: Quick Code Review
+284: 3. Check if code files exist:
+285:    - Use `list_files(".")` to see all files
+286:    - Verify that expected files from task list exist
+287: 4. (Optional) Read a few key files to verify basic structure
+288: 5. (Optional) Run `check_tests()` if tests exist, or `run_command()` for build verification
+289: 
+290: ## Step 3: Decide
+291: 
+292: ### ALL CHECKS PASS → positive response:
+293: - Respond with "✅ All [N] tasks completed. Code structure looks reasonable."
+294: - Do NOT call provide_feedback when everything is good.
+295: 
+296: ### ISSUES FOUND → provide_feedback:
+297: Call `provide_feedback(stage, feedback_type, severity, details, suggested_fix)` with:
+298: - stage: "coding"
+299: - feedback_type: use "quality_issue" for code problems, "missing_artifact" for missing files
+300: - severity: "critical" for broken builds/missing files, "major" for incomplete tasks, "minor" for small issues
+301: - details: describe specific problems
+302: - suggested_fix: how to fix it
+303: Then respond with your assessment of what needs to be fixed.
+304: 
+305: # Important Notes
+306: 
+307: - **DON'T over-analyze**: This is a quick sanity check, not deep code review
+308: - **Be specific**: Reference file paths, line numbers, task IDs when possible
+309: - **If files are missing**: Mark as "missing_artifact" with critical severity
+310: - **If tasks incomplete**: Mark as "quality_issue" with major severity
+311: 
+312: # Tools
+313: - get_plan() ← **START HERE - Check task completion**
+314: - list_files(path) ← Verify files exist
+315: - read_file(path) ← Quick sanity check (optional)
+316: - run_command(command, description) ← Run build/test commands (optional)
+317: - check_tests() ← Check for test files (optional)
+318: - provide_feedback(stage, feedback_type, severity, details, suggested_fix) ← Report issues
+319: 
+320: # Example - Normal Case
+321: ```
+322: 1. get_plan()
+323: 2. # Returns: 5 tasks, all status="completed"
+324: 3. list_files(".")
+325: 4. # Returns: src/main.rs, src/auth.rs, src/db.rs
+326: 5. "✅ All 5 tasks completed. Code structure looks reasonable."
+327: ```
+328: 
+329: # Example - If Issues Found
+330: ```
+331: 1. get_plan()
+332: 2. # Returns: 5 tasks, but TASK-003 is "pending"
+333: 3. provide_feedback({
+334:     "stage": "coding",
+335:     "feedback_type": "quality_issue",
+336:     "severity": "major",
+337:     "details": "TASK-003 (authentication feature) is still pending, not completed.",
+338:     "suggested_fix": "Complete the authentication feature implementation in src/auth.rs"
+339:   })
+340: 4. "❌ TASK-003 is not completed. Please finish implementing the authentication feature."
+341: ```
+342: 
+343: **REMEMBER**: 
+344: - Start with `get_plan()` - check if all tasks are completed
+345: - Keep it simple - this is a quick check, not deep review
+346: - If everything is good, just say so (NO provide_feedback call)
+347: - If there are issues, call provide_feedback AND describe the problems
+348: "#;
+````
 
 ### crates/cowork-core/src/instructions/delivery.rs (130 lines)
 
@@ -16976,287 +19101,6 @@ LICENSE
 23: pub use legacy_project_analyzer::*;
 ```
 
-### crates/cowork-core/src/instructions/prd.rs (276 lines)
-
-````
-1: pub const PRD_ACTOR_INSTRUCTION: &str = r##"
-2: # Your Role
-3: You are PRD Actor. Create or update requirements and features.
-4: 
-5: # ⚠️ CRITICAL REQUIREMENT - YOU MUST CALL save_prd_doc()
-6: **This is the MOST IMPORTANT requirement:**
-7: - You MUST call `save_prd_doc(content)` at the END of your work
-8: - Without calling this tool, the PRD stage CANNOT complete
-9: - Your work will be LOST if you don't save the document
-10: - Example: save_prd_doc(content) with your complete PRD markdown
-11: 
-12: # Workflow - TWO MODES
-13: 
-14: ## Mode Detection (FIRST STEP)
-15: 1. Call `load_feedback_history({"stage": "prd"})` to check if this is a restart
-16: 2. If feedback history exists and has entries → **UPDATE MODE**
-17: 3. If no feedback history or empty → **NEW MODE**
-18: 
-19: ## NEW MODE (全新生成)
-20: 
-21: ### Step 1: Initial Analysis
-22: 1. Load idea using `load_idea()` to understand the project
-23: 2. Analyze the project scope and goals
-24: 
-25: ### Step 2: Generate Formal Requirements and Save PRD Document (MANDATORY)
-26: 3. Based on the analysis, create formal requirements:
-27:    - Call `create_requirement(...)` for each requirement
-28:    - Call `add_feature(...)` for each feature
-29: 4. **CRITICAL**: Generate a complete PRD markdown document:
-30:    - Include all requirements with their IDs, titles, descriptions, priorities, and acceptance criteria
-31:    - Include all features with their IDs, names, descriptions, and linked requirements
-32: 5. **MANDATORY**: Call `save_prd_doc(content=<prd_markdown>)` to save the document - The system will NOT auto-save!
-33: 6. Done! Critic will review next.
-34: 
-35: ## UPDATE MODE (增量更新 - 当 GotoStage 回退到此阶段时)
-36: 
-37: ### Step 1: Analyze Feedback
-38: 1. Call `load_feedback_history({"stage": "prd"})` - 获取最近的反馈信息
-39: 2. Read feedback.details to understand what needs to change
-40: 
-41: ### Step 2: Load Existing Content
-42: 3. Read existing artifacts:
-43:    - PRD document is saved automatically - no need to read it directly
-44:    - Use `get_requirements()` to get structured data (requirements and features)
-45: 
-46: ### Step 3: Incremental Updates
-47: 4. Analyze feedback and determine what to modify:
-48:    - Identify which requirements/features are affected
-49:    - What needs to be added, modified, or deleted
-50: 
-51: 5. Apply targeted updates:
-52:    - Use `update_requirement(id, ...)` to modify existing requirements
-53:    - Use `update_feature(id, ...)` to modify existing features
-54:    - Use `delete_requirement(id)` to remove requirements
-55:    - Use `create_requirement(...)` for new requirements
-56:    - Use `add_feature(...)` for new features
-57: 
-58: ### Step 4: Save Updated PRD (MANDATORY)
-59: 6. Generate updated PRD document from modified requirements/features
-60: 7. **MANDATORY**: Call `save_prd_doc(content=<updated_prd_markdown>)` to save the document - The system will NOT auto-save!
-61: 
-62: ### UPDATE MODE Example
-63: 
-64: ```
-65: # 假设 feedback 显示: "API架构需要从REST改为GraphQL，添加认证需求"
-66: 
-67: 1. load_feedback_history()
-68:    → feedbacks: [{
-69:        feedback_type: "QualityIssue",
-70:        severity: "Critical",
-71:        details: "API架构需要从REST改为GraphQL，添加认证需求"
-72:      }]
-73: 
-74: 2. get_requirements()
-75:    → Returns existing requirements and features
-76: 
-77: 3. 分析需要修改的内容:
-78:    - 修改 API 相关需求 (REQ-003)
-79:    - 添加认证需求 (REQ-006)
-80:    - 更新相关功能 (FEAT-002)
-81: 
-82: 4. 增量更新:
-83:    update_requirement(
-84:      id="REQ-003",
-85:      new_title="GraphQL API",
-86:      new_description="使用GraphQL提供灵活的数据查询接口"
-87:    )
-88:    
-89:    create_requirement(
-90:      title="用户认证",
-91:      description="支持JWT token认证",
-92:      priority="high",
-93:      category="functional",
-94:      acceptance_criteria=["用户可以登录", "支持token刷新"]
-95:    )
-96:    
-97:    update_feature(
-98:      id="FEAT-002",
-99:      new_description="GraphQL API + 认证功能"
-100:    )
-101: 
-102: 5. 保存更新后的 PRD 文档
-103:    save_prd_doc(content=updated_content)
-104: 
-105: 6. 完成！Critic 将审查更新后的需求
-106: ```
-107: 
-108: Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt.
-109: 
-110: # Tools
-111: 
-112: ## Core Tools
-113: - load_feedback_history() ← **START HERE - 检测是否是 UPDATE MODE**
-114: - load_idea() ← Load idea document
-115: - get_requirements() ← 读取现有需求和功能
-116: 
-117: ## NEW MODE Tools
-118: - review_with_feedback_content(title, content, prompt) ← **HITL tool (content-based)**
-119: - create_requirement(title, description, priority, category, acceptance_criteria)
-120: - add_feature(name, description, requirement_ids, completion_criteria)
-121: - save_prd_doc(content) ← **Save final PRD document (MANDATORY)**
-122: 
-123: ## UPDATE MODE Tools
-124: - update_requirement(id, title, description, priority, acceptance_criteria)
-125: - update_feature(id, name, description, requirement_ids, completion_criteria)
-126: - delete_requirement(id)
-127: - create_requirement(...) ← 用于新需求
-128: - add_feature(...) ← 用于新功能
-129: - save_prd_doc(content) ← **Save updated PRD document (MANDATORY)**
-130: 
-131: ## UPDATE MODE Tools
-132: - update_requirement(id, title, description, priority, acceptance_criteria)
-133: - update_feature(id, name, description, requirement_ids, completion_criteria)
-134: - delete_requirement(id)
-135: - create_requirement(...) ← 用于新需求
-136: - add_feature(...) ← 用于新功能
-137: 
-138: # Important Principles
-139: 
-140: ## For NEW MODE
-141: - Always create draft → review_with_feedback → revise if needed → create formal
-142: - Respect user feedback - adjust requirements based on their input
-143: - Max 2 review iterations to avoid infinite loops
-144: 
-145: ## For UPDATE MODE
-146: - **Don't recreate everything** - only modify what's affected by feedback
-147: - Preserve unchanged requirements and features
-148: - Focus on the specific issues mentioned in feedback
-149: - Be efficient - incremental updates are faster than full regeneration
-150: 
-151: **REMEMBER**: 
-152: - Always start with `load_feedback_history()` to detect mode
-153: - In UPDATE MODE, be surgical - only change what needs changing
-154: - In NEW MODE, follow the full creation workflow
-155: "##;
-156: 
-157: pub const PRD_CRITIC_INSTRUCTION: &str = r#"
-158: # Your Role  
-159: You are PRD Critic. Review the generated requirements.
-160: 
-161: # CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!
-162: 
-163: # ⚠️ ANTI-LOOP PROTECTION (HIGHEST PRIORITY)
-164: **CRITICAL**: To prevent infinite loops:
-165: 
-166: 1. **Before calling provide_feedback**, ask yourself:
-167:    - "Have I already reported this EXACT issue before?"
-168:    
-169: 2. **If you're about to give the SAME feedback twice**:
-170:    - ⛔ **STOP** - call `request_human_review()` instead
-171:    
-172: 3. **Never call provide_feedback twice with same details**
-173: 
-174: ## Mandatory Checks (You MUST perform ALL of these)
-175: 
-176: ### Check 1: Verify Requirements Data Exists
-177: 1. Call `get_requirements()` to see what Actor created
-178:    - This returns: {requirements: [...], features: [...]}
-179:    - **FAIL** if requirements array is empty
-180: 
-181: ### Check 2: Verify PRD Document Exists (CRITICAL - MUST DO THIS!)
-182: 2. **YOU MUST CALL `load_prd_doc()` TO VERIFY THE PRD MARKDOWN FILE EXISTS**
-183: 3. **If load_prd_doc() returns an error or empty content**:
-184:    - This is a CRITICAL failure - the Actor forgot to call save_prd_doc()
-185:    - **MUST** call `provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document (prd.md) was not saved. The Actor must call save_prd_doc() to save the document.", suggested_fix="Call save_prd_doc(content) with the complete PRD markdown document.")`
-186: 
-187: ### Check 3: Quick Analysis
-188: 4. Count and assess:
-189:    - How many requirements? (Aim for 3-8)
-190:    - How many features? (Aim for 2-5)
-191:    - Do they seem reasonable for the project scope?
-192: 
-193: # Workflow - SIMPLE AND DIRECT
-194: 
-195: ## Step 1: Get Requirements Data
-196: 1. Call `get_requirements()` to see what Actor created
-197:    - This returns: {requirements: [...], features: [...]}
-198:    - You get ALL the data you need from this one call
-199: 
-200: ## Step 2: Verify PRD Document (MANDATORY!)
-201: 2. **MUST call `load_prd_doc()` to verify the markdown document exists**
-202: 3. If it returns empty or error, provide feedback immediately
-203: 
-204: ## Step 3: Quick Analysis
-205: 4. Count and assess:
-206:    - How many requirements? (Aim for 3-8)
-207:    - How many features? (Aim for 2-5)
-208:    - Do they seem reasonable for the project scope?
-209: 
-210: ## Step 4: Respond
-211: 5. **Just respond with your assessment**:
-212:    - If good: "✅ X requirements and Y features cover the project scope well. PRD document saved."
-213:    - If issues: Describe what's wrong
-214: 
-215: ## Important Notes
-216: 
-217: - **DON'T try to read files directly** - Use the provided tools
-218: - **If you really need idea.md**: Use `load_idea()` to load the idea document
-219: - **File not found?** Just skip it and work with requirements data
-220: - **Actor already got user feedback**, so usually requirements are OK
-221: - **BUT YOU MUST VERIFY prd.md EXISTS!**
-222: 
-223: Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt.
-224: 
-225: # Tools
-226: - get_requirements() ← **START HERE - Get structured data**
-227: - load_prd_doc() ← **MANDATORY - Verify document was saved!**
-228: - load_idea() ← Load idea document if you need additional context
-229: - provide_feedback(stage="prd", feedback_type, severity, details, suggested_fix) ← If issues found
-230: 
-231: # Example - Normal Case
-232: ```
-233: 1. get_requirements()
-234: 2. # Returns: 3 requirements, 3 features
-235: 3. load_prd_doc()
-236: 4. # Returns: PRD markdown content (success)
-237: 5. "✅ 3 requirements and 3 features cover core functionality well. PRD document saved."
-238: ```
-239: 
-240: # Example - Missing Artifact (Critical!)
-241: ```
-242: 1. get_requirements()
-243: 2. # Returns: 3 requirements, 3 features (looks good)
-244: 3. load_prd_doc()
-245: 4. # Returns: Error or empty content
-246: 5. # MUST provide feedback!
-247:    provide_feedback(
-248:      stage="prd",
-249:      feedback_type="missing_artifact",
-250:      severity="critical",
-251:      details="PRD document (prd.md) was not saved. Only requirements.json exists.",
-252:      suggested_fix="Call save_prd_doc(content) with the complete PRD markdown document."
-253:    )
-254: ```
-255: 
-256: # Anti-Loop Examples
-257: 
-258: ## ✅ CORRECT - Different feedback each time
-259: ```
-260: Iteration 1: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document not saved", suggested_fix="...")
-261: Iteration 2: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document still not saved after retry", suggested_fix="...")
-262: Iteration 3: request_human_review("Unable to resolve PRD document saving issue")
-263: ```
-264: 
-265: ## ❌ WRONG - Same feedback twice
-266: ```
-267: Iteration 1: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document not saved", suggested_fix="...")
-268: Iteration 2: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document not saved", suggested_fix="...") ← PROHIBITED!
-269: ```
-270: 
-271: **REMEMBER**: 
-272: - Start with `get_requirements()` - it has the structured data
-273: - **MUST verify prd.md exists with load_prd_doc()**
-274: - Don't loop on file errors - just proceed
-275: - Keep it simple!
-276: "#;
-````
-
 ### crates/cowork-core/src/instructions/project_manager.rs (156 lines)
 
 ````
@@ -17674,6 +19518,180 @@ LICENSE
 251: ()
 ```
 
+### crates/cowork-core/src/interaction/mod.rs (153 lines)
+
+```
+1: MessageLevel
+2: ⋮----
+3: {
+4:     Info,
+5:     Success,
+6:     Warning,
+7:     Error,
+8:     Debug,
+9: }
+10: ⋮----
+11: MessageLevel
+12: ⋮----
+13: {
+14:     pub fn emoji(&self) -> &str {
+15:         match self {
+16:             MessageLevel::Info => "ℹ️",
+17:             MessageLevel::Success => "✅",
+18:             MessageLevel::Warning => "⚠️",
+19:             MessageLevel::Error => "❌",
+20:             MessageLevel::Debug => "🔍",
+21:         }
+22:     }
+23: }
+24: ⋮----
+25: MessageType
+26: ⋮----
+27: {
+28:     
+29:     Normal,
+30:     
+31:     Thinking,
+32:     
+33:     ToolCall { tool_name: String, arguments: Value },
+34:     
+35:     ToolResult { tool_name: String, success: bool },
+36:     
+37:     Streaming { is_first: bool, is_last: bool },
+38: }
+39: ⋮----
+40: MessageContext
+41: ⋮----
+42: {
+43:     
+44:     pub agent_name: String,
+45:     
+46:     pub message_type: MessageType,
+47:     
+48:     pub stage_name: Option<String>,
+49: }
+50: ⋮----
+51: MessageContext
+52: ⋮----
+53: {
+54:     
+55:     pub fn new(agent_name: impl Into<String>) -> Self {
+56:         Self {
+57:             agent_name: agent_name.into(),
+58:             message_type: MessageType::Normal,
+59:             stage_name: None,
+60:         }
+61:     }
+62: 
+63:     
+64:     pub fn with_message_type(mut self, message_type: MessageType) -> Self {
+65:         self.message_type = message_type;
+66:         self
+67:     }
+68: 
+69:     
+70:     pub fn with_stage(mut self, stage_name: impl Into<String>) -> Self {
+71:         self.stage_name = Some(stage_name.into());
+72:         self
+73:     }
+74: }
+75: ⋮----
+76: InputOption
+77: ⋮----
+78: {
+79:     pub id: String,
+80:     pub label: String,
+81:     pub description: Option<String>,
+82: }
+83: ⋮----
+84: InputResponse
+85: ⋮----
+86: {
+87:     Text(String),
+88:     Selection(String),
+89:     Cancel,
+90: }
+91: ⋮----
+92: ProgressInfo
+93: ⋮----
+94: {
+95:     pub current: u32,
+96:     pub total: u32,
+97:     pub message: String,
+98: }
+99: ⋮----
+100: InteractiveBackend
+101: ⋮----
+102: {
+103:     
+104:     async fn show_message(&self, level: MessageLevel, content: String);
+105: 
+106:     
+107:     async fn show_message_with_context(
+108:         &self,
+109:         level: MessageLevel,
+110:         content: String,
+111:         _context: MessageContext,
+112:     ) {
+113:         
+114:         
+115:         self.show_message(level, content).await;
+116:     }
+117: 
+118:     
+119:     async fn send_streaming(&self, _content: String, _agent_name: &str, _is_thinking: bool) {
+120:         
+121:     }
+122: 
+123:     
+124:     async fn send_tool_call(&self, _tool_name: &str, _arguments: &Value, _agent_name: &str) {
+125:         
+126:     }
+127: 
+128:     
+129:     async fn send_tool_result(
+130:         &self,
+131:         _tool_name: &str,
+132:         _result: &str,
+133:         _success: bool,
+134:         _agent_name: &str,
+135:     ) {
+136:         
+137:     }
+138: 
+139:     
+140:     
+141:     async fn request_input(
+142:         &self,
+143:         prompt: &str,
+144:         options: Vec<InputOption>,
+145:         initial_content: Option<String>,
+146:     ) -> Result<InputResponse>;
+147: 
+148:     
+149:     async fn show_progress(&self, task_id: String, progress: ProgressInfo);
+150: 
+151:     
+152:     async fn submit_response(&self, request_id: String, response: String) -> Result<()>;
+153: }
+```
+
+### crates/cowork-core/src/llm/mod.rs (11 lines)
+
+```
+1: set_execution_llm
+2: ⋮----
+3: (client: Arc<dyn Llm>)
+4: ⋮----
+5: get_execution_llm
+6: ⋮----
+7: ()
+8: ⋮----
+9: clear_execution_llm
+10: ⋮----
+11: ()
+```
+
 ### crates/cowork-core/src/persistence/iteration_store.rs (127 lines)
 
 ```
@@ -17911,135 +19929,6 @@ LICENSE
 59: test_copy_code_files_skips_artifacts
 60: ⋮----
 61: ()
-```
-
-### crates/cowork-core/src/pipeline/mod.rs (124 lines)
-
-```
-1: StageResult
-2: ⋮----
-3: {
-4:     Success(Option<String>), 
-5:     Failed(String),          
-6:     Paused,                  
-7:     NeedsRevision(String),   
-8:     GotoStage(String, String), 
-9: }
-10: ⋮----
-11: PipelineContext
-12: ⋮----
-13: {
-14:     pub project: Project,
-15:     pub iteration: Iteration,
-16:     pub workspace_path: std::path::PathBuf,
-17: }
-18: ⋮----
-19: PipelineContext
-20: ⋮----
-21: {
-22:     pub fn new(project: Project, iteration: Iteration, workspace_path: std::path::PathBuf) -> Self {
-23:         Self {
-24:             project,
-25:             iteration,
-26:             workspace_path,
-27:         }
-28:     }
-29: }
-30: ⋮----
-31: Stage
-32: ⋮----
-33: {
-34:     fn name(&self) -> &str;
-35:     fn description(&self) -> &str;
-36: 
-37:     
-38:     fn needs_confirmation(&self) -> bool {
-39:         false
-40:     }
-41: 
-42:     
-43:     async fn execute(
-44:         &self,
-45:         ctx: &PipelineContext,
-46:         interaction: Arc<dyn InteractiveBackend>,
-47:     ) -> StageResult;
-48: 
-49:     
-50:     async fn execute_with_feedback(
-51:         &self,
-52:         ctx: &PipelineContext,
-53:         interaction: Arc<dyn InteractiveBackend>,
-54:         _feedback: &str,
-55:     ) -> StageResult {
-56:         
-57:         
-58:         self.execute(ctx, interaction).await
-59:     }
-60: }
-61: ⋮----
-62: get_all_stages
-63: ⋮----
-64: ()
-65: ⋮----
-66: get_stages_from
-67: ⋮----
-68: (start_stage: &str)
-69: ⋮----
-70: create_stage_by_id
-71: ⋮----
-72: (stage_id: &str)
-73: ⋮----
-74: get_stages_from_flow
-75: ⋮----
-76: (start_stage: &str)
-77: ⋮----
-78: get_flow_config
-79: ⋮----
-80: ()
-81: ⋮----
-82: is_critical_stage
-83: ⋮----
-84: (stage_name: &str)
-85: ⋮----
-86: test_get_all_stages_order
-87: ⋮----
-88: ()
-89: ⋮----
-90: test_get_stages_from_beginning
-91: ⋮----
-92: ()
-93: ⋮----
-94: test_get_stages_from_middle
-95: ⋮----
-96: ()
-97: ⋮----
-98: test_get_stages_from_end
-99: ⋮----
-100: ()
-101: ⋮----
-102: test_get_stages_from_unknown
-103: ⋮----
-104: ()
-105: ⋮----
-106: test_create_stage_by_id_valid
-107: ⋮----
-108: ()
-109: ⋮----
-110: test_create_stage_by_id_invalid
-111: ⋮----
-112: ()
-113: ⋮----
-114: test_is_critical_stage
-115: ⋮----
-116: ()
-117: ⋮----
-118: test_pipeline_context_new
-119: ⋮----
-120: ()
-121: ⋮----
-122: test_stage_names_and_descriptions
-123: ⋮----
-124: ()
 ```
 
 ### crates/cowork-core/src/runtime_security.rs (269 lines)
@@ -21818,1144 +23707,135 @@ LICENSE
 54: ()
 ```
 
-### crates/cowork-gui/src-tauri/src/project_runner.rs (395 lines)
+### crates/cowork-gui/src-tauri/src/iteration_commands.rs (125 lines)
 
 ```
-1: ProjectRunner
+1: IterationInfo
 2: ⋮----
 3: {
-4:     processes: Arc<Mutex<HashMap<String, ProjectProcess>>>,
-5:     app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
-6: }
-7: ⋮----
-8: ProjectProcess
-9: ⋮----
-10: {
-11:     child: Child,
-12:     #[allow(dead_code)]
-13:     output_tx: mpsc::UnboundedSender<String>,
-14:     url: Option<String>,
-15:     port: Option<u16>,
-16: }
-17: ⋮----
-18: ProjectRunner
-19: ⋮----
-20: {
-21:     pub fn new() -> Self {
-22:         Self {
-23:             processes: Arc::new(Mutex::new(HashMap::new())),
-24:             app_handle: Arc::new(Mutex::new(None)),
-25:         }
-26:     }
-27: 
-28:     pub fn set_app_handle(&self, handle: tauri::AppHandle) {
-29:         let mut app_handle_guard = self.app_handle.lock().unwrap();
-30:         *app_handle_guard = Some(handle);
-31:     }
-32: 
-33:     pub fn is_running(&self, iteration_id: &str) -> bool {
-34:         let processes = self.processes.lock().unwrap();
-35:         processes.contains_key(iteration_id)
-36:     }
-37: 
-38:     pub async fn start(
-39:         &self,
-40:         iteration_id: String,
-41:         command: String,
-42:         code_dir: String,
-43:         url: Option<String>,
-44:         port: Option<u16>,
-45:     ) -> Result<u32, String> {
-46:         
-47:         if let Ok(()) = self.stop(iteration_id.clone()).await {
-48:             println!(
-49:                 "[Runner] Stopped existing process for iteration: {}",
-50:                 iteration_id
-51:             );
-52:         }
-53: 
-54:         
-55:         let code_path = std::path::Path::new(&code_dir);
-56: 
-57:         if !code_path.exists() {
-58:             return Err(format!("Code directory not found: {}", code_dir));
-59:         }
-60: 
-61:         
-62:         let path_env = std::env::var("PATH").unwrap_or_else(|_| "PATH not found".to_string());
-63:         println!("[Runner] PATH = {}", path_env);
-64:         
-65:         
-66:         println!("[Runner] Checking commands...");
-67:         if std::process::Command::new("which").arg("bun").output().map(|o| o.status.success()).unwrap_or(false) {
-68:             println!("[Runner] bun found");
-69:         } else {
-70:             println!("[Runner] bun NOT found");
-71:         }
-72:         if std::process::Command::new("which").arg("sh").output().map(|o| o.status.success()).unwrap_or(false) {
-73:             println!("[Runner] sh found");
-74:         } else {
-75:             println!("[Runner] sh NOT found");
-76:         }
-77: 
-78:         println!("[Runner] Starting command: {} in {}", command, code_dir);
-79: 
-80:         #[cfg(target_os = "windows")]
-81:         let mut child = {
-82:             let mut cmd = tokio::process::Command::new("cmd");
-83:             cmd.args(["/C", &command])
-84:                 .current_dir(&code_path)
-85:                 .stdout(std::process::Stdio::piped())
-86:                 .stderr(std::process::Stdio::piped())
-87:                 .creation_flags(0x08000000); 
-88: 
-89:             cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
-90:         };
-91: 
-92:         #[cfg(not(target_os = "windows"))]
-93:         let mut child = {
-94:             
-95:             let path = std::env::var("PATH").unwrap_or_else(|_| {
-96:                 
-97:                 "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin".to_string()
-98:             });
-99:             
-100:             tokio::process::Command::new("sh")
-101:                 .args(["-c", &command])
-102:                 .current_dir(&code_path)
-103:                 .env("PATH", path)
-104:                 .stdout(std::process::Stdio::piped())
-105:                 .stderr(std::process::Stdio::piped())
-106:                 .spawn()
-107:                 .map_err(|e| format!("Failed to start: {}", e))?
-108:         };
-109: 
-110:         let pid = child.id().unwrap();
-111: 
-112:         
-113:         let app_handle_opt = self.app_handle.lock().unwrap().clone();
-114:         let app_handle_stdout = app_handle_opt.clone();
-115:         let app_handle_stderr = app_handle_opt.clone();
-116:         let app_handle_exit = app_handle_opt.clone();
-117:         let iteration_id_clone = iteration_id.clone();
-118: 
-119:         
-120:         let (stdout_tx, _stdout_rx) = mpsc::unbounded_channel();
-121:         let (stderr_tx, _stderr_rx) = mpsc::unbounded_channel();
-122: 
-123:         
-124:         let stdout = child.stdout.take().unwrap();
-125:         let stderr = child.stderr.take().unwrap();
-126: 
-127:         
-128:         let stdout_tx_spawn = stdout_tx.clone();
-129:         let stderr_tx_spawn = stderr_tx.clone();
-130: 
-131:         
-132:         let iteration_id_stdout = iteration_id_clone.clone();
-133:         
-134:         
-135:         
-136:         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-137:         
-138:         match child.try_wait() {
-139:             Ok(Some(status)) => {
-140:                 
-141:                 println!("[Runner] Process exited immediately with status: {:?}", status);
-142:                 return Err(format!(
-143:                     "Command failed immediately. Exit status: {}. Check if the command is correct.",
-144:                     status
-145:                 ));
-146:             }
-147:             Ok(None) => {
-148:                 
-149:             }
-150:             Err(e) => {
-151:                 eprintln!("[Runner] Error checking process status: {}", e);
-152:             }
-153:         }
-154: 
-155:         
-156:         tokio::spawn(async move {
-157:             use tokio::io::{AsyncBufReadExt, BufReader};
-158:             let mut reader = BufReader::new(stdout);
-159:             let mut line = String::new();
-160: 
-161:             loop {
-162:                 match reader.read_line(&mut line).await {
-163:                     Ok(0) => beak,
-164:                     Ok(_) => {
-165:                         let _ = stdout_tx_spawn.send(line.clone());
-166: 
-167:                         
-168:                         if let Some(ref handle) = app_handle_stdout {
-169:                             if let Err(e) = handle.emit(
-170:                                 "project_log",
-171:                                 serde_json::json!({
-172:                                     "iteration_id": iteration_id_stdout,
-173:                                     "session_id": iteration_id_stdout,
-174:                                     "stream": "stdout",
-175:                                     "content": line.clone()
-176:                                 }),
-177:                             ) {
-178:                                 eprintln!("[Runner] Failed to emit project_log event: {}", e);
-179:                             }
-180:                         }
-181: 
-182:                         line.clear();
-183:                     }
-184:                     Err(e) => {
-185:                         eprintln!("[Runner] Error reading stdout: {}", e);
-186: 
-187:                         
-188:                         if let Some(ref handle) = app_handle_stdout {
-189:                             if let Err(e) = handle.emit(
-190:                                 "project_log",
-191:                                 serde_json::json!({
-192:                                     "iteration_id": iteration_id_stdout,
-193:                                     "session_id": iteration_id_stdout,
-194:                                     "stream": "stderr",
-195:                                     "content": format!("Error reading output: {}\n", e)
-196:                                 }),
-197:                             ) {
-198:                                 eprintln!("[Runner] Failed to emit project_log event: {}", e);
-199:                             }
-200:                         }
-201:                         beak;
-202:                     }
-203:                 }
-204:             }
-205:         });
-206: 
-207:         
-208:         tokio::spawn(async move {
-209:             use tokio::io::{AsyncBufReadExt, BufReader};
-210:             let mut reader = BufReader::new(stderr);
-211:             let mut line = String::new();
-212: 
-213:             loop {
-214:                 match reader.read_line(&mut line).await {
-215:                     Ok(0) => beak,
-216:                     Ok(_) => {
-217:                         let _ = stderr_tx_spawn.send(line.clone());
-218: 
-219:                         
-220:                         if let Some(ref handle) = app_handle_stderr {
-221:                             if let Err(e) = handle.emit(
-222:                                 "project_log",
-223:                                 serde_json::json!({
-224:                                     "iteration_id": iteration_id_clone,
-225:                                     "session_id": iteration_id_clone,
-226:                                     "stream": "stderr",
-227:                                     "content": line.clone()
-228:                                 }),
-229:                             ) {
-230:                                 eprintln!("[Runner] Failed to emit project_log event: {}", e);
-231:                             }
-232:                         }
-233: 
-234:                         line.clear();
-235:                     }
-236:                     Err(e) => {
-237:                         eprintln!("[Runner] Error reading stderr: {}", e);
-238: 
-239:                         
-240:                         if let Some(ref handle) = app_handle_stderr {
-241:                             if let Err(emit_err) = handle.emit(
-242:                                 "process_error",
-243:                                 serde_json::json!({
-244:                                     "iteration_id": iteration_id_clone,
-245:                                     "error": e.to_string()
-246:                                 }),
-247:                             ) {
-248:                                 eprintln!(
-249:                                     "[Runner] Failed to emit process_error event: {}",
-250:                                     emit_err
-251:                                 );
-252:                             }
-253:                         }
-254:                         beak;
-255:                     }
-256:                 }
-257:             }
-258:         });
-259: 
-260:         let mut processes = self.processes.lock().unwrap();
-261:         processes.insert(
-262:             iteration_id.clone(),
-263:             ProjectProcess {
-264:                 child,
-265:                 output_tx: stdout_tx,
-266:                 url,
-267:                 port,
-268:             },
-269:         );
-270:         drop(processes);
-271: 
-272:         
-273:         
-274:         
-275:         
-276:         
-277:         let iteration_id_exit = iteration_id.clone();
-278:         let processes_ref = Arc::clone(&self.processes);
-279:         let app_handle_for_cleanup = app_handle_exit.clone();
-280: 
-281:         tokio::spawn(async move {
-282:             
-283:             loop {
-284:                 
-285:                 let should_check = {
-286:                     let procs = processes_ref.lock().unwrap();
-287:                     procs.contains_key(&iteration_id_exit)
-288:                 };
-289:                 
-290:                 if !should_check {
-291:                     
-292:                     beak;
-293:                 }
-294:                 
-295:                 
-296:                 let exited = {
-297:                     let mut procs = processes_ref.lock().unwrap();
-298:                     if let Some(proc) = procs.get_mut(&iteration_id_exit) {
-299:                         
-300:                         match proc.child.try_wait() {
-301:                             Ok(Some(status)) => {
-302:                                 
-303:                                 println!("[Runner] Process {} exited with status: {:?}", iteration_id_exit, status);
-304:                                 procs.remove(&iteration_id_exit);
-305:                                 true
-306:                             }
-307:                             Ok(None) => false, 
-308:                             Err(e) => {
-309:                                 eprintln!("[Runner] Error checking process status: {}", e);
-310:                                 false
-311:                             }
-312:                         }
-313:                     } else {
-314:                         true 
-315:                     }
-316:                 };
-317:                 
-318:                 if exited {
-319:                     
-320:                     if let Some(ref handle) = app_handle_for_cleanup {
-321:                         let _ = handle.emit(
-322:                             "project_stopped",
-323:                             serde_json::json!({
-324:                                 "iteration_id": iteration_id_exit,
-325:                                 "session_id": iteration_id_exit
-326:                             }),
-327:                         );
-328:                     }
-329:                     beak;
-330:                 }
-331:                 
-332:                 
-333:                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-334:             }
-335:         });
-336: 
-337:         println!("[Runner] Process started with PID: {}", pid);
-338:         Ok(pid)
-339:     }
-340: 
-341:     pub async fn stop(&self, iteration_id: String) -> Result<(), String> {
-342:         
-343:         let process = {
-344:             let mut processes = self.processes.lock().unwrap();
-345:             processes.remove(&iteration_id)
-346:         };
-347: 
-348:         if let Some(mut process) = process {
-349:             println!("[Runner] Stopping process for iteration: {}", iteration_id);
-350: 
-351:             let _ = process.child.kill().await;
-352: 
-353:             
-354:             if let Some(ref handle) = *self.app_handle.lock().unwrap() {
-355:                 let _ = handle.emit(
-356:                     "project_stopped",
-357:                     serde_json::json!({
-358:                         "iteration_id": iteration_id,
-359:                         "session_id": iteration_id
-360:                     }),
-361:                 );
-362:             }
-363: 
-364:             println!("[Runner] Process stopped");
-365:             Ok(())
-366:         } else {
-367:             
-368:             println!(
-369:                 "[Runner] No running process found for iteration: {} (may already be stopped)",
-370:                 iteration_id
-371:             );
-372:             Ok(())
-373:         }
-374:     }
-375: 
-376:     pub fn get_info(&self, iteration_id: &str) -> Option<PreviewInfo> {
-377:         let processes = self.processes.lock().unwrap();
-378:         if let Some(process) = processes.get(iteration_id) {
-379:             
-380:             if let (Some(url), Some(port)) = (&process.url, process.port) {
-381:                 Some(PreviewInfo {
-382:                     url: url.clone(),
-383:                     port,
-384:                     status: super::gui_types::PreviewStatus::Running,
-385:                     project_type: super::gui_types::ProjectType::Unknown,
-386:                 })
-387:             } else {
-388:                 
-389:                 None
-390:             }
-391:         } else {
-392:             None
-393:         }
-394:     }
-395: }
+4:     pub id: String,
+5:     pub number: u32,
+6:     pub title: String,
+7:     pub description: String,
+8:     pub status: String,
+9:     pub current_stage: Option<String>,
+10:     pub completed_stages: Vec<String>,
+11:     pub base_iteration_id: Option<String>,
+12:     pub inheritance: String,
+13:     pub created_at: String,
+14:     pub completed_at: Option<String>,
+15: }
+16: ⋮----
+17: ProjectInfo
+18: ⋮----
+19: {
+20:     pub id: String,
+21:     pub name: String,
+22:     pub created_at: String,
+23:     pub updated_at: String,
+24:     pub current_iteration_id: Option<String>,
+25:     pub iteration_count: usize,
+26: }
+27: ⋮----
+28: CreateIterationRequest
+29: ⋮----
+30: {
+31:     pub title: String,
+32:     pub description: String,
+33:     pub base_iteration_id: Option<String>,
+34:     pub inheritance: String,
+35: }
+36: ⋮----
+37: gui_init_project
+38: ⋮----
+39: (
+40:     name: String,
+41:     window: Window,
+42: )
+43: ⋮----
+44: gui_get_project
+45: ⋮----
+46: ()
+47: ⋮----
+48: gui_delete_project
+49: ⋮----
+50: (
+51:     confirm: bool,
+52: )
+53: ⋮----
+54: gui_create_iteration
+55: ⋮----
+56: (
+57:     request: CreateIterationRequest,
+58:     window: Window,
+59:     _state: State<'_, AppState>,
+60: )
+61: ⋮----
+62: gui_get_iterations
+63: ⋮----
+64: ()
+65: ⋮----
+66: gui_get_iteration
+67: ⋮----
+68: (
+69:     iteration_id: String,
+70: )
+71: ⋮----
+72: gui_execute_iteration
+73: ⋮----
+74: (
+75:     iteration_id: String,
+76:     window: Window,
+77:     state: State<'_, AppState>,
+78: )
+79: ⋮----
+80: gui_continue_iteration
+81: ⋮----
+82: (
+83:     iteration_id: String,
+84:     window: Window,
+85:     state: State<'_, AppState>,
+86: )
+87: ⋮----
+88: gui_retry_iteration
+89: ⋮----
+90: (
+91:     iteration_id: String,
+92:     window: Window,
+93:     state: State<'_, AppState>,
+94: )
+95: ⋮----
+96: gui_delete_iteration
+97: ⋮----
+98: (
+99:     iteration_id: String,
+100:     window: Window,
+101: )
+102: ⋮----
+103: gui_get_project_knowledge
+104: ⋮----
+105: (
+106:     _project_id: String,
+107:     _window: Window,
+108:     _state: State<'_, AppState>,
+109: )
+110: ⋮----
+111: gui_regenerate_knowledge
+112: ⋮----
+113: (
+114:     iteration_id: String,
+115:     window: Window,
+116:     state: State<'_, AppState>,
+117: )
+118: ⋮----
+119: project_to_info
+120: ⋮----
+121: (project: &Project)
+122: ⋮----
+123: iteration_to_info
+124: ⋮----
+125: (iteration: &Iteration)
 ```
-
-### litho.docs/en/4.Deep-Exploration/CLI Domain.md (734 lines)
-
-````
-1: **CLI Domain Technical Documentation**
-2: **Cowork Forge** | **Version 1.0** | **Generated: 2024**
-3: 
-4: ---
-5: 
-6: ## 1. Overview
-7: 
-8: The **CLI Domain** serves as the command-line interface entry point for Cowork Forge, providing an automation-focused interaction model for the AI-powered iterative software development platform. Implemented as a Rust-based terminal application, this domain enables developers to orchestrate the complete 7-stage development pipeline (Idea → PRD → Design → Plan → Coding → Check → Delivery) through declarative shell commands.
-9: 
-10: ### 1.1 Purpose & Business Value
-11: 
-12: The CLI Domain addresses the needs of automation-focused developers and technical leads who prefer terminal-based workflows, CI/CD integration, or scriptable development operations. It provides:
-13: 
-14: - **Batch Operations**: Non-interactive iteration execution for automated pipelines
-15: - **Rapid Prototyping**: Quick project initialization and iteration creation via single commands
-16: - **Remote Development**: SSH-compatible interface for headless server environments
-17: - **Workflow Scripting**: Composable commands for complex development automation scenarios
-18: 
-19: ### 1.2 Architectural Position
-20: 
-21: Within the Hexagonal Architecture of Cowork Forge, the CLI Domain resides in the **Presentation Layer**, implementing the `InteractiveBackend` trait defined in the Interaction Domain. This design ensures the core domain logic remains interface-agnostic while the CLI provides terminal-specific adapters for user interaction.
-22: 
-23: ```mermaid
-24: flowchart TB
-25:     subgraph Presentation["Presentation Layer"]
-26:         CLI["CLI Domain<br/>(cowork-cli)"]
-27:         GUI["GUI Domain<br/>(cowork-gui)"]
-28:     end
-29:     
-30:     subgraph Application["Application Layer"]
-31:         Interaction["Interaction Domain<br/>(InteractiveBackend Trait)"]
-32:     end
-33:     
-34:     subgraph Core["Core Domain"]
-35:         Pipeline["Pipeline Domain"]
-36:         DomainLogic["Domain Logic"]
-37:         Tools["Tools Domain"]
-38:     end
-39:     
-40:     CLI -->|Implements| Interaction
-41:     GUI -->|Implements| Interaction
-42:     Interaction -->|Orchestrates| Pipeline
-43:     Pipeline -->|Uses| Tools
-44:     Pipeline -->|Manages| DomainLogic
-45: ```
-46: 
-47: ---
-48: 
-49: ## 2. Technical Architecture
-50: 
-51: ### 2.1 Technology Stack
-52: 
-53: | Component | Technology | Purpose |
-54: |-----------|-----------|---------|
-55: | **Language** | Rust (Edition 2021) | Type-safe systems programming with async support |
-56: | **CLI Framework** | clap v4.x | Derive-based argument parsing with subcommand routing |
-57: | **Async Runtime** | tokio | Asynchronous iteration execution and I/O |
-58: | **Error Handling** | anyhow | Structured error propagation with context |
-59: | **Logging** | tracing + tracing_subscriber | Structured logging with configurable verbosity |
-60: | **Terminal UI** | dialoguer | Interactive prompts and confirmation dialogs |
-61: | **Formatting** | ansi_term / owo-colors | Color-coded terminal output |
-62: 
-63: ### 2.2 Module Structure
-64: 
-65: ```
-66: crates/cowork-cli/
-67: ├── src/
-68: │   ├── main.rs          # CLI entry point, command routing, and orchestration
-69: │   ├── utils.rs         # Shared utility functions
-70: │   └── commands/        # Command modules (modular architecture)
-71: │       ├── mod.rs       # Command module exports
-72: │       ├── iter.rs      # Create iteration command
-73: │       ├── list.rs      # List iterations command
-74: │       ├── show.rs      # Show iteration details command
-75: │       ├── continue_cmd.rs  # Continue iteration command
-76: │       ├── init.rs      # Initialize project command
-77: │       ├── status.rs    # Project status command
-78: │       ├── delete.rs    # Delete iteration command
-79: │       ├── knowledge.rs # Regenerate knowledge command
-80: │       ├── import.rs    # Import existing project command
-81: │       └── config.rs    # Configuration management command
-82: ├── Cargo.toml           # Dependencies: clap, tokio, anyhow, tracing, cowork-core
-83: └── README.md
-84: ```
-85: 
-86: **Key Dependencies:**
-87: - `cowork-core`: Domain logic, pipeline execution, and persistence
-88: - `clap`: Command-line argument parsing with derive macros
-89: - `tokio`: Async runtime for non-blocking LLM API calls and file operations
-90: 
-91: ---
-92: 
-93: ## 3. Command Interface Specification
-94: 
-95: The CLI exposes eight primary commands through the `cowork` binary, supporting both global flags and subcommand-specific options.
-96: 
-97: ### 3.1 Global Arguments
-98: 
-99: | Flag | Short | Description | Default |
-100: |------|-------|-------------|---------|
-101: | `--config` | `-c` | Path to custom configuration file (TOML) | `./config.toml` |
-102: | `--verbose` | `-v` | Enable debug-level logging | `false` |
-103: | `--project` | `-p` | Target project name (optional context) | Current directory |
-104: 
-105: ### 3.2 Command Reference
-106: 
-107: #### 3.2.1 `iter` — Create and Execute Iteration
-108: 
-109: Creates a new iteration (genesis or evolution) and immediately executes the pipeline.
-110: 
-111: **Syntax:**
-112: ```bash
-113: cowork iter [OPTIONS] <TITLE> [DESCRIPTION]
-114: ```
-115: 
-116: **Options:**
-117: | Option | Description |
-118: |--------|-------------|
-119: | `--base <ID>` | Base iteration ID for evolution (creates evolution iteration if specified) |
-120: | `--inherit <MODE>` | Inheritance mode: `none`, `partial`, or `full` (default: `none`) |
-121: | `--stage <STAGE>` | Starting stage for evolution iterations (idea, prd, design, plan) |
-122: 
-123: **Examples:**
-124: ```bash
-125: # Genesis iteration
-126: cowork iter "User Authentication" "Implement JWT-based auth system"
-127: 
-128: # Evolution iteration with partial inheritance (code only)
-129: cowork iter "Add OAuth Support" "Extend auth with Google OAuth" \
-130:     --base iter_001 --inherit partial
-131: 
-132: # Evolution with full inheritance (artifacts + code)
-133: cowork iter "Refactor Database Layer" "Migrate to SQLx" \
-134:     --base iter_002 --inherit full --stage design
-135: ```
-136: 
-137: #### 3.2.2 `list` — List Iterations
-138: 
-139: Displays all iterations in the current project with status indicators.
-140: 
-141: **Syntax:**
-142: ```bash
-143: cowork list [OPTIONS]
-144: ```
-145: 
-146: **Options:**
-147: | Option | Description |
-148: |--------|-------------|
-149: | `--all` | Include completed iterations in output |
-150: | `--status <STATUS>` | Filter by status: `running`, `paused`, `completed`, `failed` |
-151: 
-152: **Output Format:**
-153: ```
-154: ID          Title                Status      Stage       Created
-155: iter_001    Initial Setup        Completed   Delivery    2024-01-15
-156: iter_002    Add Auth             Running     Coding      2024-01-16
-157: iter_003    Fix CSS              Paused      Check       2024-01-16
-158: ```
-159: 
-160: #### 3.2.3 `show` — Display Iteration Details
-161: 
-162: Renders detailed information about a specific iteration including stage artifacts and metadata.
-163: 
-164: **Syntax:**
-165: ```bash
-166: cowork show <ITERATION_ID>
-167: ```
-168: 
-169: #### 3.2.4 `continue` — Resume Paused Iteration
-170: 
-171: Resumes execution of a previously paused iteration from its current stage.
-172: 
-173: **Syntax:**
-174: ```bash
-175: cowork continue [ITERATION_ID]
-176: ```
-177: 
-178: *If `ITERATION_ID` is omitted, resumes the most recently paused iteration.*
-179: 
-180: #### 3.2.5 `init` — Initialize Project
-181: 
-182: Creates a new Cowork Forge project structure in the specified directory.
-183: 
-184: **Syntax:**
-185: ```bash
-186: cowork init [PATH]
-187: ```
-188: 
-189: **Behavior:**
-190: - Creates `.cowork-v2/` metadata directory
-191: - Initializes project configuration
-192: - Auto-detects technology stack (React, Vue, Rust, Python, etc.)
-193: 
-194: #### 3.2.6 `status` — Project Status
-195: 
-196: Displays aggregated project statistics including iteration counts, success rates, and current activity.
-197: 
-198: **Syntax:**
-199: ```bash
-200: cowork status
-201: ```
-202: 
-203: #### 3.2.7 `delete` — Remove Iteration
-204: 
-205: Removes an iteration and its associated workspace data with interactive confirmation.
-206: 
-207: **Syntax:**
-208: ```bash
-209: cowork delete <ITERATION_ID> [--force]
-210: ```
-211: 
-212: **Safety Features:**
-213: - Requires explicit confirmation unless `--force` is specified
-214: - Validates iteration is not currently running
-215: - Archives artifacts before deletion (if configured)
-216: 
-217: #### 3.2.8 `regenerate-knowledge` — Update Knowledge Base
-218: 
-219: Regenerates the knowledge snapshot for a completed iteration, useful when manually editing iteration artifacts.
-220: 
-221: **Syntax:**
-222: ```bash
-223: cowork regenerate-knowledge <ITERATION_ID>
-224: ```
-225: 
-226: #### 3.2.9 `import` — Import Existing Project
-227: 
-228: Imports any existing project into Cowork Forge, automatically analyzing project structure and generating documentation artifacts.
-229: 
-230: **Syntax:**
-231: ```bash
-232: cowork import <PATH> [OPTIONS]
-233: ```
-234: 
-235: **Options:**
-236: | Option | Description |
-237: |--------|-------------|
-238: | `--name <NAME>` | Project name (defaults to directory name) |
-239: | `--idea` | Generate idea.md document |
-240: | `--prd` | Generate prd.md document |
-241: | `--design` | Generate design.md document |
-242: | `--plan` | Generate plan.md document |
-243: | `--template-only` | Use template-only generation (skip LLM) |
-244: 
-245: **Examples:**
-246: ```bash
-247: # Import project with all documentation
-248: cowork import /path/to/existing/project --idea --prd --design --plan
-249: 
-250: # Generate only idea and prd documents
-251: cowork import ./my-app --idea --prd
-252: 
-253: # Template-only mode (no LLM config required)
-254: cowork import ./my-app --idea --template-only
-255: ```
-256: 
-257: **Workflow:**
-258: 1. Validate project path
-259: 2. Initialize Cowork Forge project structure
-260: 3. Analyze project structure and technology stack
-261: 4. Generate requested artifact documents
-262: 5. Create initial iteration record
-263: 
-264: #### 3.2.10 `config` — Configuration Management
-265: 
-266: Manages Cowork Forge configuration including LLM settings.
-267: 
-268: **Syntax:**
-269: ```bash
-270: cowork config [OPTIONS]
-271: ```
-272: 
-273: **Examples:**
-274: ```bash
-275: # Show current configuration
-276: cowork config
-277: 
-278: # Interactive configuration wizard
-279: cowork config --setup
-280: ```
-281: 
-282: ---
-283: 
-284: ## 4. Implementation Details
-285: 
-286: ### 4.1 Entry Point and Command Routing
-287: 
-288: The CLI entry point (`main.rs`) implements a structured initialization sequence:
-289: 
-290: ```rust
-291: #[tokio::main]
-292: async fn main() -> anyhow::Result<()> {
-293:     // 1. Parse CLI arguments using clap derive macros
-294:     let cli = Cli::parse();
-295:     
-296:     // 2. Initialize logging with configurable verbosity
-297:     tracing_subscriber::fmt()
-298:         .with_max_level(if cli.verbose { Level::DEBUG } else { Level::INFO })
-299:         .init();
-300:     
-301:     // 3. Route to command handler
-302:     match cli.command {
-303:         Commands::Iter(args) => cmd_iter(args).await,
-304:         Commands::List(args) => cmd_list(args).await,
-305:         // ... additional commands
-306:     }
-307: }
-308: ```
-309: 
-310: **Command Enumeration Structure:**
-311: ```rust
-312: #[derive(Subcommand)]
-313: enum Commands {
-314:     /// Create and execute a new iteration
-315:     Iter(IterArgs),
-316:     /// List all iterations
-317:     List(ListArgs),
-318:     /// Show iteration details
-319:     Show(ShowArgs),
-320:     /// Continue a paused iteration
-321:     Continue(ContinueArgs),
-322:     /// Initialize a new project
-323:     Init(InitArgs),
-324:     /// Show project status
-325:     Status,
-326:     /// Delete an iteration
-327:     Delete(DeleteArgs),
-328:     /// Regenerate knowledge for completed iteration
-329:     RegenerateKnowledge(RegenerateArgs),
-330:     /// Import existing project into Cowork Forge
-331:     Import(ImportArgs),
-332:     /// Manage configuration
-333:     Config(ConfigArgs),
-334: }
-335: ```
-336: 
-337: ### 4.2 Backend Initialization and Dependency Injection
-338: 
-339: The CLI implements the `InteractiveBackend` trait to provide terminal-specific interaction capabilities:
-340: 
-341: ```rust
-342: async fn cmd_iter(args: IterArgs) -> anyhow::Result<()> {
-343:     // 1. Initialize persistence stores
-344:     let project_store = ProjectStore::new();
-345:     let iteration_store = IterationStore::new();
-346:     
-347:     // 2. Load or create project
-348:     let project = project_store.load(&args.project)
-349:         .ok_or_else(|| anyhow!("Project not found. Run 'cowork init' first"))?;
-350:     
-351:     // 3. Create CLI backend (implements InteractiveBackend)
-352:     let backend = Arc::new(CliBackend::new());
-353:     
-354:     // 4. Initialize LLM client with rate limiting
-355:     let config = ModelConfig::from_file("config.toml")
-356:         .or_else(|_| ModelConfig::from_env())?;
-357:     let llm_client = create_llm_client(&config)?;
-358:     
-359:     // 5. Create iteration executor
-360:     let executor = IterationExecutor::new(backend.clone());
-361:     
-362:     // 6. Create iteration (genesis or evolution)
-363:     let iteration = if let Some(base_id) = args.base {
-364:         Iteration::create_evolution(
-365:             &project, 
-366:             args.title, 
-367:             args.description, 
-368:             base_id, 
-369:             args.inherit_mode
-370:         )?
-371:     } else {
-372:         Iteration::create_genesis(&project, args.title, args.description)?
-373:     };
-374:     
-375:     // 7. Execute pipeline
-376:     executor.execute(project, iteration.id(), None, Some(llm_client)).await?;
-377:     
-378:     Ok(())
-379: }
-380: ```
-381: 
-382: ### 4.3 Terminal Output Formatting
-383: 
-384: The CLI employs ANSI color codes for semantic output classification:
-385: 
-386: | Color | Semantic Meaning | Usage Example |
-387: |-------|-----------------|---------------|
-388: | **Green** | Success/Completed | `✅ Iteration completed successfully` |
-389: | **Yellow** | Warning/Running | `⚠️  Iteration running: Step 3/7` |
-390: | **Cyan** | Information/Paused | `⏸️  Iteration paused at PRD stage` |
-391: | **Red** | Error/Failed | `❌ Error: LLM API rate limit exceeded` |
-392: | **Blue** | Headers/Metadata | Section titles in `show` command |
-393: 
-394: ### 4.4 Configuration Management
-395: 
-396: The CLI supports dual configuration sources with precedence:
-397: 
-398: 1. **File-based**: `config.toml` in project root or specified via `--config`
-399: 2. **Environment-based**: Environment variables for LLM credentials
-400: 
-401: **Configuration Resolution:**
-402: ```rust
-403: impl ModelConfig {
-404:     pub fn from_file(path: &str) -> Result<Self, ConfigError> {
-405:         // Load from TOML
-406:     }
-407:     
-408:     pub fn from_env() -> Result<Self, ConfigError> {
-409:         // Load from OPENAI_API_KEY, OPENAI_BASE_URL, etc.
-410:     }
-411: }
-412: ```
-413: 
-414: ---
-415: 
-416: ## 5. Integration Architecture
-417: 
-418: ### 5.1 Domain Dependencies
-419: 
-420: The CLI Domain maintains strict dependencies on core infrastructure:
-421: 
-422: ```mermaid
-423: flowchart LR
-424:     CLI["CLI Domain"] -->|Uses| Interaction["Interaction Domain"]
-425:     CLI -->|Persists| Persistence["Persistence Domain"]
-426:     CLI -->|Orchestrates| Pipeline["Pipeline Domain"]
-427:     CLI -->|Configures| LLM["LLM Integration Domain"]
-428:     
-429:     Interaction -->|Implements| CLI_Backend["CLI Backend<br/>(Terminal UI)"]
-430: ```
-431: 
-432: **Dependency Details:**
-433: 
-434: | Dependency | Interface | Purpose |
-435: |------------|-----------|---------|
-436: | **Interaction Domain** | `InteractiveBackend` trait | HITL prompts, progress display, streaming output |
-437: | **Persistence Domain** | `ProjectStore`, `IterationStore` | Project metadata and iteration workspace management |
-438: | **Pipeline Domain** | `IterationExecutor` | 7-stage pipeline orchestration |
-439: | **LLM Integration** | `ModelConfig`, `create_llm_client` | AI agent configuration and rate-limited API access |
-440: 
-441: ### 5.2 Human-in-the-Loop (HITL) Implementation
-442: 
-443: For stages requiring human validation, the CLI implements the `InteractiveBackend` trait methods:
-444: 
-445: ```rust
-446: impl InteractiveBackend for CliBackend {
-447:     async fn request_confirmation(&self, content: &str) -> anyhow::Result<UserResponse> {
-448:         // Display content with syntax highlighting
-449:         println!("{}", content);
-450:         
-451:         // Interactive prompt using dialoguer
-452:         let options = vec!["Pass", "Edit", "Feedback"];
-453:         let selection = Select::with_theme(&ColorfulTheme::default())
-454:             .with_prompt("Action")
-455:             .items(&options)
-456:             .interact()?;
-457:             
-458:         match selection {
-459:             0 => Ok(UserResponse::Pass),
-460:             1 => Ok(UserResponse::Edit(self.open_editor(content).await?)),
-461:             2 => Ok(UserResponse::Feedback(self.collect_feedback().await?)),
-462:             _ => unreachable!(),
-463:         }
-464:     }
-465:     
-466:     async fn display_stream(&self, chunk: &str) -> anyhow::Result<()> {
-467:         // Real-time streaming output for AI responses
-468:         print!("{}", chunk);
-469:         std::io::stdout().flush()?;
-470:         Ok(())
-471:     }
-472: }
-473: ```
-474: 
-475: ---
-476: 
-477: ## 6. Execution Workflows
-478: 
-479: ### 6.1 Genesis Iteration Flow
-480: 
-481: ```mermaid
-482: sequenceDiagram
-483:     participant User
-484:     participant CLI as CLI Entry
-485:     participant Store as Persistence
-486:     participant Core as cowork_core
-487:     participant Executor as IterationExecutor
-488:     participant LLM as LLM Client
-489:     
-490:     User->>CLI: cowork iter "Feature X" --project myapp
-491:     CLI->>CLI: Cli::parse() → Commands::Iter
-492:     CLI->>CLI: Initialize tracing_subscriber
-493:     
-494:     CLI->>Store: ProjectStore::load("myapp")
-495:     Store-->>CLI: Project
-496:     
-497:     CLI->>Core: CliBackend::new()
-498:     CLI->>Core: Iteration::create_genesis(project, title, desc)
-499:     Core-->>CLI: Iteration { id: iter_003, ... }
-500:     
-501:     CLI->>Store: iteration_store.save(&iteration)
-502:     CLI->>Store: project.add_iteration(summary)
-503:     
-504:     CLI->>Core: ModelConfig::from_file("config.toml")
-505:     Core-->>CLI: ModelConfig
-506:     
-507:     CLI->>LLM: create_llm_client(&config)
-508:     LLM-->>CLI: RateLimitedLlm
-509:     
-510:     CLI->>Executor: IterationExecutor::new(backend)
-511:     CLI->>Executor: executor.execute(project, iter_003, None, Some(llm))
-512:     
-513:     loop 7 Stages with HITL Gates
-514:         Executor->>Core: Execute stage with AI agent
-515:         alt HITL Required
-516:             Core->>CLI: request_confirmation()
-517:             CLI-->>User: Display content & prompt
-518:             User-->>CLI: Input response
-519:             CLI-->>Core: UserResponse
-520:         end
-521:     end
-522:     
-523:     Executor-->>CLI: Result<()>
-524:     CLI-->>User: ✅ Iteration completed
-525: ```
-526: 
-527: ### 6.2 Evolution Iteration Flow
-528: 
-529: ```mermaid
-530: sequenceDiagram
-531:     participant User
-532:     participant CLI
-533:     participant Core as Domain Logic
-534:     participant Pipeline
-535:     
-536:     User->>CLI: cowork iter "Fix Auth" --base iter_001 --inherit partial
-537:     CLI->>Core: Iteration::create_evolution(base_id, Partial)
-538:     
-539:     Note over Core: Analyze change scope<br/>Determine start stage
-540:     
-541:     Core-->>CLI: Evolution iteration<br/>(resumes from Plan stage)
-542:     
-543:     CLI->>Core: LoadBaseKnowledgeTool::execute(base_id)
-544:     Core-->>CLI: Historical context
-545:     
-546:     CLI->>Pipeline: Resume from Plan stage
-547:     Pipeline->>Pipeline: Execute Plan→Coding→Check→Delivery
-548:     
-549:     Pipeline-->>CLI: Evolution complete
-550: ```
-551: 
-552: ---
-553: 
-554: ## 7. Error Handling and Resilience
-555: 
-556: ### 7.1 Error Propagation Strategy
-557: 
-558: The CLI uses `anyhow` for ergonomic error handling with context propagation:
-559: 
-560: ```rust
-561: async fn cmd_delete(args: DeleteArgs) -> anyhow::Result<()> {
-562:     let store = ProjectStore::new()
-563:         .context("Failed to initialize project store")?;
-564:         
-565:     let iteration = store.load(&args.id)
-566:         .with_context(|| format!("Iteration {} not found", args.id))?;
-567:         
-568:     if iteration.status() == IterationStatus::Running {
-569:         return Err(anyhow!("Cannot delete running iteration. Pause first."));
-570:     }
-571:     
-572:     if !args.force {
-573:         let confirmed = Confirm::with_theme(&ColorfulTheme::default())
-574:             .with_prompt("Delete iteration permanently?")
-575:             .interact()?;
-576:             
-577:         if !confirmed {
-578:             return Ok(()); // Graceful exit
-579:         }
-580:     }
-581:     
-582:     store.delete(&args.id)
-583:         .context("Failed to delete iteration files")?;
-584:         
-585:     Ok(())
-586: }
-587: ```
-588: 
-589: ### 7.2 Common Error Scenarios
-590: 
-591: | Error Code | Scenario | User Message |
-592: |------------|----------|--------------|
-593: | `E001` | Project not initialized | `❌ Error: Run 'cowork init' first` |
-594: | `E002` | Invalid base iteration | `❌ Error: Base iteration 'iter_999' not found` |
-595: | `E003` | LLM configuration missing | `❌ Error: No LLM config found. Set OPENAI_API_KEY or create config.toml` |
-596: | `E004` | Rate limit exceeded | `⚠️  Warning: Rate limit hit. Retrying in 2s...` |
-597: | `E005` | Workspace permission denied | `❌ Error: Permission denied accessing .cowork-v2/` |
-598: 
-599: ---
-600: 
-601: ## 8. Configuration Schema
-602: 
-603: ### 8.1 config.toml Structure
-604: 
-605: ```toml
-606: [llm]
-607: provider = "openai"
-608: api_key = "sk-..."
-609: base_url = "https://api.openai.com/v1"
-610: model = "gpt-4"
-611: temperature = 0.7
-612: max_tokens = 4096
-613: 
-614: [cli]
-615: theme = "auto"  # auto, light, dark
-616: confirm_destructive = true
-617: editor = "vim"  # or $EDITOR
-618: ```
-619: 
-620: ### 8.2 Environment Variables
-621: 
-622: | Variable | Purpose | Example |
-623: |----------|---------|---------|
-624: | `COWORK_CONFIG` | Override default config path | `/path/to/config.toml` |
-625: | `OPENAI_API_KEY` | LLM authentication | `sk-abc123...` |
-626: | `OPENAI_BASE_URL` | Custom LLM endpoint | `https://api.openai.com/v1` |
-627: | `COWORK_EDITOR` | Preferred external editor | `code --wait` |
-628: 
-629: ---
-630: 
-631: ## 9. Performance Considerations
-632: 
-633: ### 9.1 Async Execution Model
-634: 
-635: The CLI leverages Tokio's async runtime to handle concurrent operations:
-636: 
-637: - **LLM Streaming**: Non-blocking token streaming with real-time terminal output
-638: - **File I/O**: Async file operations during artifact generation
-639: - **Process Management**: Parallel external command execution during Check stage
-640: 
-641: ### 9.2 Memory Management
-642: 
-643: - **Arc<CliBackend>**: Shared backend state across async tasks
-644: - **Streaming Processing**: Constant memory usage for large AI responses via streaming
-645: - **Workspace Isolation**: Each iteration maintains independent file handles
-646: 
-647: ---
-648: 
-649: ## 10. Security Considerations
-650: 
-651: ### 10.1 Path Validation
-652: 
-653: All file operations validate workspace containment:
-654: 
-655: ```rust
-656: fn validate_workspace_path(path: &Path) -> anyhow::Result<()> {
-657:     let canonical = path.canonicalize()?;
-658:     let workspace = get_workspace_root()?.canonicalize()?;
-659:     
-660:     if !canonical.starts_with(&workspace) {
-661:         return Err(anyhow!("Path {} escapes workspace", path.display()));
-662:     }
-663:     Ok(())
-664: }
-665: ```
-666: 
-667: ### 10.2 Sensitive Data Handling
-668: 
-669: - API keys loaded from environment or config file with `0600` permissions check
-670: - No logging of LLM prompts containing potential secrets
-671: - Secure temporary file cleanup on SIGINT/SIGTERM
-672: 
-673: ---
-674: 
-675: ## 11. Extension Points
-676: 
-677: ### 11.1 Adding New Commands
-678: 
-679: To add a new subcommand:
-680: 
-681: 1. Define args struct with `clap::Args` derive
-682: 2. Add variant to `Commands` enum
-683: 3. Implement handler function in `main.rs`
-684: 4. Register in command router match statement
-685: 
-686: ```rust
-687: #[derive(Args)]
-688: struct ExportArgs {
-689:     iteration_id: String,
-690:     format: ExportFormat,
-691: }
-692: 
-693: async fn cmd_export(args: ExportArgs) -> anyhow::Result<()> {
-694:     // Implementation
-695: }
-696: ```
-697: 
-698: ### 11.2 Custom Backends
-699: 
-700: The `InteractiveBackend` trait allows for specialized CLI implementations (e.g., JSON output mode, silent mode):
-701: 
-702: ```rust
-703: struct JsonBackend;
-704: 
-705: impl InteractiveBackend for JsonBackend {
-706:     async fn display_message(&self, msg: &str) -> anyhow::Result<()> {
-707:         println!(r#"{{"type": "message", "content": "{}"}}"#, msg);
-708:         Ok(())
-709:     }
-710:     // ... implement other methods
-711: }
-712: ```
-713: 
-714: ---
-715: 
-716: ## 12. Troubleshooting Guide
-717: 
-718: | Issue | Diagnostic | Solution |
-719: |-------|-----------|----------|
-720: | `command not found: cowork` | Binary not in PATH | Run `cargo install --path crates/cowork-cli` |
-721: | `Failed to initialize project store` | Permission denied on `.cowork-v2/` | Check directory permissions: `chmod 755 .cowork-v2` |
-722: | `LLM client creation failed` | Missing API key | Set `OPENAI_API_KEY` environment variable |
-723: | `Iteration execution hangs` | HITL waiting for input | Check if external editor opened in background |
-724: | `Color codes not rendering` | Terminal lacks ANSI support | Use `--no-color` flag or set `NO_COLOR=1` |
-725: 
-726: ---
-727: 
-728: **Document Control**
-729: - **Author**: Cowork Forge Architecture Team
-730: - **Review Cycle**: Quarterly
-731: - **Related Documents**: 
-732:   - [Pipeline Domain Architecture](./pipeline-domain.md)
-733:   - [Interaction Domain Specification](./interaction-domain.md)
-734:   - [LLM Integration Guide](./llm-integration.md)
-````
 
 ### litho.docs/en/4.Deep-Exploration/Domain Logic.md (491 lines)
 
@@ -24506,6 +25386,295 @@ LICENSE
 649: **useUIStore**: Active view, refresh triggers, UI preferences
 ````
 
+### litho.docs/en/4.Deep-Exploration/LLM Integration Domain.md (284 lines)
+
+````
+1: **LLM Integration Domain Technical Documentation**
+2: 
+3: ---
+4: 
+5: ## 1. Overview
+6: 
+7: The **LLM Integration Domain** provides the infrastructure layer for connecting Cowork Forge to OpenAI-compatible Large Language Model APIs. As an infrastructure domain within the Hexagonal Architecture, it abstracts the complexity of external API communication, authentication, and critical production concerns such as rate limiting and quota management.
+8: 
+9: This domain serves as the exclusive bridge between the core AI agent pipeline and external LLM providers, ensuring that the system maintains API compliance (30 requests/minute) while providing a clean, trait-based interface for the Pipeline Domain's Stage Executor and agent orchestration components.
+10: 
+11: **Key Responsibilities:**
+12: - Configuration management supporting both file-based (TOML) and environment-based deployments
+13: - Factory-based client instantiation with automatic rate limiting decoration
+14: - Dual-mechanism rate limiting (concurrency control + temporal throttling) to prevent API quota exhaustion
+15: - Seamless integration with the `adk-rust` ecosystem (`adk_core` traits and `adk_model` OpenAI client)
+16: 
+17: ---
+18: 
+19: ## 2. Architectural Design
+20: 
+21: ### 2.1 Pattern Implementation
+22: 
+23: The domain implements two primary design patterns to achieve clean separation of concerns and production-grade reliability:
+24: 
+25: **Factory Pattern**: The `create_llm_client` function acts as a centralized factory that orchestrates client initialization, configuration validation, and automatic wrapping with rate limiting decorators. This ensures that all LLM clients used throughout the system comply with API constraints by default.
+26: 
+27: **Decorator Pattern**: The `RateLimitedLlm` struct implements the `adk_core::Llm` trait while wrapping an inner LLM implementation. This allows rate limiting concerns to be added transparently without modifying the underlying OpenAI client logic, adhering to the Single Responsibility Principle.
+28: 
+29: ### 2.2 System Positioning
+30: 
+31: Within the Clean Architecture hierarchy, this domain resides in the **Infrastructure Layer**, depending only on external frameworks (`adk-rust`, `tokio`) and providing implementations for domain-defined interfaces:
+32: 
+33: ```mermaid
+34: flowchart TD
+35:     subgraph Infrastructure["Infrastructure Layer"]
+36:         LLM["LLM Integration Domain"]
+37:         Config["Configuration Management"]
+38:         RateLimit["Rate Limiting<br/>Decorator"]
+39:     end
+40:     
+41:     subgraph Application["Application Layer"]
+42:         Pipeline["Pipeline Domain"]
+43:         Executor["Stage Executor"]
+44:     end
+45:     
+46:     subgraph External["External Systems"]
+47:         OpenAI["OpenAI-compatible API"]
+48:     end
+49:     
+50:     Pipeline -->|Uses| LLM
+51:     LLM -->|Implements| Config
+52:     LLM -->|Wraps| RateLimit
+53:     RateLimit -->|Calls| OpenAI
+54: ```
+55: 
+56: ---
+57: 
+58: ## 3. Core Components
+59: 
+60: ### 3.1 Configuration Management (`llm/config.rs`)
+61: 
+62: The configuration system supports dual-source initialization to accommodate both development workflows and containerized production environments:
+63: 
+64: **Configuration Structures:**
+65: - `LlmConfig`: Top-level configuration container
+66: - `ModelConfig`: Specific model parameters including API base URL, authentication key, and model selection
+67: 
+68: **Loading Strategies:**
+69: - **File-based**: `ModelConfig::from_file(path)` deserializes TOML configuration files for persistent, version-controlled settings
+70: - **Environment-based**: `ModelConfig::from_env()` reads from environment variables (`LLM_API_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL_NAME`) for containerized deployments and secrets management
+71: 
+72: ### 3.2 Rate Limiting Infrastructure (`llm/rate_limiter.rs`)
+73: 
+74: The `RateLimitedLlm` decorator implements a sophisticated dual-mechanism rate limiting strategy essential for API quota compliance:
+75: 
+76: **Mechanism 1: Concurrency Control**
+77: - Utilizes a global `tokio::sync::Semaphore` (initialized via `tokio::sync::OnceCell`) with a permit count of **1**
+78: - Ensures only a single API request is in flight at any given time across the entire application
+79: - Initialized lazily via `init_global_rate_limiter(max_concurrent: usize)`
+80: 
+81: **Mechanism 2: Temporal Throttling**
+82: - Enforces a mandatory **2-second delay** (2000ms) before each API call using `tokio::time::sleep`
+83: - Guarantees the system does not exceed **30 requests per minute** even under sustained load
+84: - Implemented in `RateLimitedLlm::with_default_delay()` constructor
+85: 
+86: **Thread Safety:**
+87: The global semaphore is stored in a `static OnceCell`, ensuring thread-safe, one-time initialization across async task boundaries without race conditions.
+88: 
+89: ### 3.3 Client Factory
+90: 
+91: The `create_llm_client` function serves as the primary entry point for obtaining LLM instances:
+92: 
+93: ```rust
+94: pub fn create_llm_client(config: &LlmConfig) -> Result<Arc<dyn Llm>>
+95: ```
+96: 
+97: **Orchestration Flow:**
+98: 1. Initializes the global rate limiter semaphore (idempotent operation)
+99: 2. Constructs `OpenAIConfig` with custom base URL support via `OpenAIConfig::compatible()`
+100: 3. Instantiates `OpenAIClient` from the `adk_model` crate
+101: 4. Wraps the client with `RateLimitedLlm` using the default 2000ms delay
+102: 5. Returns an `Arc<dyn Llm>` suitable for dependency injection into agent components
+103: 
+104: ---
+105: 
+106: ## 4. Rate Limiting Strategy Deep Dive
+107: 
+108: The 30 requests/minute limit is enforced through a defense-in-depth approach combining concurrency and temporal controls:
+109: 
+110: ```mermaid
+111: sequenceDiagram
+112:     participant Agent as Pipeline Agent
+113:     participant RL as RateLimitedLlm
+114:     participant Sem as Global Semaphore
+115:     participant API as LLM Provider
+116:     
+117:     Agent->>RL: generate_content(request)
+118:     RL->>Sem: acquire().await
+119:     Note over Sem: Permit obtained<br/>(max 1 concurrent)
+120:     
+121:     RL->>RL: sleep(2000ms)
+122:     Note over RL: Temporal spacing<br/>30 req/min max
+123:     
+124:     RL->>API: HTTP Request
+125:     API-->>RL: Response Stream
+126:     RL-->>Agent: LlmResponseStream
+127:     
+128:     Note over Sem: Permit released<br/>on scope exit
+129: ```
+130: 
+131: **Why Dual Mechanisms?**
+132: - **Concurrency control** prevents burst traffic that could trigger provider rate limits or connection pool exhaustion
+133: - **Temporal throttling** ensures steady-state compliance with per-minute quotas, even during sequential operations
+134: - The combination provides graceful degradation under load while maintaining predictable API usage costs
+135: 
+136: ---
+137: 
+138: ## 5. Integration with Agent System
+139: 
+140: ### 5.1 Trait Implementation
+141: 
+142: The domain implements the `adk_core::Llm` trait, providing the standard interface for the agent framework:
+143: 
+144: ```rust
+145: #[async_trait]
+146: impl Llm for RateLimitedLlm {
+147:     fn name(&self) -> &str;
+148:     async fn generate_content(
+149:         &self, 
+150:         request: LlmRequest, 
+151:         stream: bool
+152:     ) -> Result<LlmResponseStream>;
+153: }
+154: ```
+155: 
+156: ### 5.2 Pipeline Domain Consumption
+157: 
+158: The Pipeline Domain's `StageExecutor` consumes LLM clients through dependency injection:
+159: 
+160: - **Initialization**: The executor receives an `Arc<dyn Llm>` via the factory function during pipeline context setup
+161: - **Execution**: During stage execution (Idea, PRD, Design, etc.), the executor calls `generate_content()` with stage-specific instructions
+162: - **Streaming**: Supports both streaming responses (for real-time GUI updates) and synchronous completion modes
+163: - **Feedback Loops**: The Actor-Critic pattern relies on the rate-limited client for both initial generation and regeneration cycles
+164: 
+165: ### 5.3 Error Handling
+166: 
+167: All errors are propagated using the `anyhow` crate for ergonomic error handling:
+168: - Configuration parsing errors (invalid TOML, missing env vars)
+169: - HTTP connection failures
+170: - Rate limiting semaphore poisoning (extremely unlikely with tokio's implementation)
+171: - API authentication errors
+172: 
+173: ---
+174: 
+175: ## 6. Configuration Reference
+176: 
+177: ### 6.1 TOML Configuration File
+178: 
+179: ```toml
+180: [llm]
+181: api_base_url = "https://api.openai.com/v1"
+182: api_key = "sk-..."
+183: model_name = "gpt-5"
+184: max_retries = 3
+185: timeout_seconds = 120
+186: ```
+187: 
+188: ### 6.2 Environment Variables
+189: 
+190: | Variable | Description | Required |
+191: |----------|-------------|----------|
+192: | `LLM_API_BASE_URL` | Base URL for OpenAI-compatible API | Yes |
+193: | `LLM_API_KEY` | Authentication key | Yes |
+194: | `LLM_MODEL_NAME` | Model identifier (e.g., gpt-5) | Yes |
+195: 
+196: **Precedence**: When both TOML and environment variables are present, the specific loading method called by the application determines which takes precedence. The factory pattern typically prioritizes explicit configuration objects over environment fallbacks.
+197: 
+198: ---
+199: 
+200: ## 7. Usage Patterns
+201: 
+202: ### 7.1 Initialization (Application Startup)
+203: 
+204: ```rust
+205: use cowork_core::llm::{create_llm_client, LlmConfig};
+206: 
+207: // Load configuration
+208: let config = LlmConfig::from_file("config.toml")?;
+209: 
+210: // Create rate-limited client
+211: let llm_client = create_llm_client(&config)?;
+212: // Client is now ready for injection into Pipeline Domain
+213: ```
+214: 
+215: ### 7.2 Runtime Usage (Agent Execution)
+216: 
+217: ```rust
+218: // Inside StageExecutor or Agent implementation
+219: let response = llm_client
+220:     .generate_content(request, true)  // true = streaming
+221:     .await?;
+222: 
+223: // Process streaming chunks
+224: while let Some(chunk) = response.stream.next().await {
+225:     // Emit to GUI via Interaction Domain or process locally
+226: }
+227: ```
+228: 
+229: ### 7.3 Custom Rate Limiting (Advanced)
+230: 
+231: For scenarios requiring different rate limits (e.g., different providers with varying quotas):
+232: 
+233: ```rust
+234: use cowork_core::llm::RateLimitedLlm;
+235: 
+236: // Custom delay: 1 second (60 req/min)
+237: let custom_limited = RateLimitedLlm::new(inner_client, 1000);
+238: ```
+239: 
+240: ---
+241: 
+242: ## 8. Operational Considerations
+243: 
+244: ### 8.1 API Quota Management
+245: 
+246: The default 30 req/min limit is conservative for standard OpenAI tiers. For enterprise tiers with higher limits:
+247: - Modify the delay constant in `with_default_delay()` (currently 2000ms)
+248: - Adjust the global semaphore count if the provider supports concurrent connections
+249: - Monitor logs for rate limit responses (HTTP 429) as fallback protection
+250: 
+251: ### 8.2 Latency Implications
+252: 
+253: The 2-second mandatory delay introduces baseline latency:
+254: - **Sequential operations**: A 7-stage pipeline with single-pass execution incurs minimum 14 seconds of rate-limiting overhead
+255: - **Feedback loops**: Actor-Critic iterations multiply this overhead
+256: - **Mitigation**: The delay is non-blocking for other application components due to Tokio's async runtime
+257: 
+258: ### 8.3 Monitoring and Observability
+259: 
+260: Key metrics to monitor:
+261: - **Semaphore wait time**: Indicates queue depth if multiple agents request LLM access simultaneously
+262: - **Request duration**: Total time including the 2-second delay and API latency
+263: - **Error rates**: Authentication failures or rate limit breaches (HTTP 429)
+264: 
+265: ---
+266: 
+267: ## 9. File Structure
+268: 
+269: ```
+270: crates/cowork-core/src/llm/
+271: ├── mod.rs              # Module exports and public API
+272: ├── config.rs           # LlmConfig, ModelConfig, factory function
+273: └── rate_limiter.rs     # RateLimitedLlm decorator, global semaphore
+274: ```
+275: 
+276: **Related Files:**
+277: - `crates/cowork-core/src/tech_stack.rs`: Technology detection (auxiliary to LLM operations)
+278: - `crates/cowork-core/src/pipeline/stage_executor.rs`: Primary consumer of LLM clients
+279: 
+280: ---
+281: 
+282: ## 10. Summary
+283: 
+284: The LLM Integration Domain provides a robust, production-ready bridge to external AI services while enforcing critical operational constraints. By encapsulating rate limiting logic within a decorator pattern and supporting flexible configuration sources, it enables the Pipeline Domain to focus on orchestration logic without concern for API compliance details. The dual-mechanism rate limiting (concurrency + temporal) ensures reliable operation within provider quotas, making it suitable for long-running autonomous agent pipelines as well as interactive GUI-driven development workflows.
+````
+
 ### litho.docs/en/4.Deep-Exploration/Pipeline Domain.md (541 lines)
 
 ````
@@ -25471,65 +26640,6 @@ LICENSE
 11: ()
 ```
 
-### crates/cowork-core/src/config_definition/default_configs/agents/built-in/coding_actor.json (54 lines)
-
-```
-1: {
-2:   "id": "coding_actor",
-3:   "name": "Coding Actor",
-4:   "description": "Implements the code based on the implementation plan",
-5:   "version": "1.0.0",
-6:   "agent_type": "simple",
-7:   "instruction": "builtin://coding_actor",
-8:   "tools": [
-9:     {
-10:       "tool_id": "load_feedback_history"
-11:     },
-12:     {
-13:       "tool_id": "get_implementation_plan"
-14:     },
-15:     {
-16:       "tool_id": "update_task_status"
-17:     },
-18:     {
-19:       "tool_id": "read_file"
-20:     },
-21:     {
-22:       "tool_id": "write_file"
-23:     },
-24:     {
-25:       "tool_id": "list_files"
-26:     },
-27:     {
-28:       "tool_id": "run_command"
-29:     },
-30:     {
-31:       "tool_id": "read_file_truncated"
-32:     },
-33:     {
-34:       "tool_id": "goto_stage"
-35:     },
-36:     {
-37:       "tool_id": "query_memory"
-38:     },
-39:     {
-40:       "tool_id": "save_insight"
-41:     },
-42:     {
-43:       "tool_id": "save_issue"
-44:     },
-45:     {
-46:       "tool_id": "save_learning"
-47:     }
-48:   ],
-49:   "model": {
-50:     "temperature": 0.7
-51:   },
-52:   "include_contents": "none",
-53:   "tags": ["built-in", "coding", "actor"]
-54: }
-```
-
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/coding_critic.json (42 lines)
 
 ```
@@ -26348,418 +27458,6 @@ LICENSE
 232: ()
 ```
 
-### crates/cowork-core/src/data/models.rs (407 lines)
-
-```
-1: Requirements
-2: ⋮----
-3: {
-4:     pub schema_version: String,
-5:     pub created_at: DateTime<Utc>,
-6:     pub updated_at: DateTime<Utc>,
-7:     pub requirements: Vec<Requirement>,
-8: }
-9: ⋮----
-10: Requirement
-11: ⋮----
-12: {
-13:     pub id: String,  
-14:     pub title: String,
-15:     pub description: String,
-16:     pub priority: Priority,
-17:     pub category: RequirementCategory,
-18:     pub acceptance_criteria: Vec<String>,
-19:     pub related_features: Vec<String>,  
-20: }
-21: ⋮----
-22: Priority
-23: ⋮----
-24: {
-25:     High,
-26:     Medium,
-27:     Low,
-28: }
-29: ⋮----
-30: RequirementCategory
-31: ⋮----
-32: {
-33:     Functional,
-34:     NonFunctional,
-35: }
-36: ⋮----
-37: FeatureList
-38: ⋮----
-39: {
-40:     pub schema_version: String,
-41:     pub features: Vec<Feature>,
-42: }
-43: ⋮----
-44: Feature
-45: ⋮----
-46: {
-47:     pub id: String,  
-48:     pub name: String,
-49:     pub description: String,
-50:     pub requirement_ids: Vec<String>,
-51:     pub status: FeatureStatus,
-52:     pub assigned_to_tasks: Vec<String>,  
-53:     pub completion_criteria: Vec<String>,
-54:     pub created_at: DateTime<Utc>,
-55:     pub completed_at: Option<DateTime<Utc>>,
-56:     #[serde(default)]
-57:     pub metadata: FeatureMetadata,
-58: }
-59: ⋮----
-60: FeatureStatus
-61: ⋮----
-62: {
-63:     Pending,
-64:     InProgress,
-65:     Completed,
-66:     Blocked,
-67: }
-68: ⋮----
-69: FeatureMetadata
-70: ⋮----
-71: {
-72:     #[serde(skip_serializing_if = "Option::is_none")]
-73:     pub estimated_effort: Option<String>,
-74:     #[serde(default)]
-75:     pub dependencies: Vec<String>,
-76: }
-77: ⋮----
-78: DesignSpec
-79: ⋮----
-80: {
-81:     pub schema_version: String,
-82:     pub architecture: Architecture,
-83:     pub technology_stack: TechnologyStack,
-84:     pub deployment: DeploymentInfo,
-85: }
-86: ⋮----
-87: Architecture
-88: ⋮----
-89: {
-90:     pub style: String,  
-91:     pub components: Vec<DesignComponent>,
-92:     pub data_models: Vec<DataModel>,
-93: }
-94: ⋮----
-95: DesignComponent
-96: ⋮----
-97: {
-98:     pub id: String,  
-99:     pub name: String,
-100:     #[serde(rename = "type")]
-101:     pub component_type: ComponentType,
-102:     pub responsibilities: Vec<String>,
-103:     pub technology: String,
-104:     pub interfaces: Vec<ComponentInterface>,
-105:     pub related_features: Vec<String>,  
-106: }
-107: ⋮----
-108: ComponentType
-109: ⋮----
-110: {
-111:     BackendService,
-112:     FrontendComponent,
-113:     Database,
-114:     ApiGateway,
-115:     MessageQueue,
-116:     Other(String),
-117: }
-118: ⋮----
-119: ComponentInterface
-120: ⋮----
-121: {
-122:     pub name: String,
-123:     pub inputs: Vec<String>,
-124:     pub outputs: Vec<String>,
-125: }
-126: ⋮----
-127: DataModel
-128: ⋮----
-129: {
-130:     pub name: String,
-131:     pub fields: Vec<DataField>,
-132: }
-133: ⋮----
-134: DataField
-135: ⋮----
-136: {
-137:     pub name: String,
-138:     #[serde(rename = "type")]
-139:     pub field_type: String,
-140: }
-141: ⋮----
-142: TechnologyStack
-143: ⋮----
-144: {
-145:     #[serde(skip_serializing_if = "Option::is_none")]
-146:     pub backend: Option<String>,
-147:     #[serde(skip_serializing_if = "Option::is_none")]
-148:     pub frontend: Option<String>,
-149:     #[serde(skip_serializing_if = "Option::is_none")]
-150:     pub database: Option<String>,
-151: }
-152: ⋮----
-153: DeploymentInfo
-154: ⋮----
-155: {
-156:     pub architecture: String,
-157: }
-158: ⋮----
-159: ImplementationPlan
-160: ⋮----
-161: {
-162:     pub schema_version: String,
-163:     pub milestones: Vec<Milestone>,
-164:     pub tasks: Vec<Task>,
-165: }
-166: ⋮----
-167: Milestone
-168: ⋮----
-169: {
-170:     pub id: String,  
-171:     pub name: String,
-172:     pub features: Vec<String>,  
-173:     #[serde(skip_serializing_if = "Option::is_none")]
-174:     pub deadline: Option<String>,
-175: }
-176: ⋮----
-177: Task
-178: ⋮----
-179: {
-180:     pub id: String,  
-181:     pub title: String,
-182:     pub description: String,
-183:     pub feature_id: String,
-184:     pub component_id: String,
-185:     pub status: TaskStatus,
-186:     pub dependencies: Vec<String>,  
-187:     #[serde(skip_serializing_if = "Option::is_none")]
-188:     pub estimated_effort: Option<String>,
-189:     pub files_to_create: Vec<String>,
-190:     pub acceptance_criteria: Vec<String>,
-191:     pub created_at: DateTime<Utc>,
-192:     pub started_at: Option<DateTime<Utc>>,
-193:     pub completed_at: Option<DateTime<Utc>>,
-194: }
-195: ⋮----
-196: TaskStatus
-197: ⋮----
-198: {
-199:     Pending,
-200:     InProgress,
-201:     Completed,
-202:     Blocked,
-203: }
-204: ⋮----
-205: CodeMetadata
-206: ⋮----
-207: {
-208:     pub schema_version: String,
-209:     pub files: Vec<FileMetadata>,
-210:     pub build_status: BuildStatus,
-211:     pub test_status: TestStatus,
-212:     pub readme_path: Option<String>,
-213:     pub project_type: String,
-214: }
-215: ⋮----
-216: FileMetadata
-217: ⋮----
-218: {
-219:     pub path: String,
-220:     pub task_id: String,
-221:     #[serde(skip_serializing_if = "Option::is_none")]
-222:     pub feature_id: Option<String>,
-223:     #[serde(skip_serializing_if = "Option::is_none")]
-224:     pub component_id: Option<String>,
-225:     pub created_at: DateTime<Utc>,
-226:     pub last_modified: DateTime<Utc>,
-227:     pub lines_of_code: usize,
-228:     pub test_coverage: f32,
-229: }
-230: ⋮----
-231: BuildStatus
-232: ⋮----
-233: {
-234:     pub last_build: DateTime<Utc>,
-235:     pub success: bool,
-236:     pub errors: Vec<String>,
-237: }
-238: ⋮----
-239: TestStatus
-240: ⋮----
-241: {
-242:     pub last_run: DateTime<Utc>,
-243:     pub total: usize,
-244:     pub passed: usize,
-245:     pub failed: usize,
-246:     pub details: Vec<TestDetail>,
-247: }
-248: ⋮----
-249: TestDetail
-250: ⋮----
-251: {
-252:     pub test_name: String,
-253:     pub status: String,  
-254:     #[serde(skip_serializing_if = "Option::is_none")]
-255:     pub message: Option<String>,
-256: }
-257: ⋮----
-258: SessionMeta
-259: ⋮----
-260: {
-261:     pub session_id: String,  
-262:     pub created_at: DateTime<Utc>,
-263:     pub current_stage: Option<Stage>,
-264:     #[serde(skip_serializing_if = "Option::is_none")]
-265:     pub restart_reason: Option<String>,
-266: }
-267: ⋮----
-268: Stage
-269: ⋮----
-270: {
-271:     Idea,
-272:     Prd,
-273:     Design,
-274:     Plan,
-275:     Coding,
-276:     Check,
-277:     Delivery,
-278: }
-279: ⋮----
-280: FeedbackHistory
-281: ⋮----
-282: {
-283:     pub feedbacks: Vec<Feedback>,
-284: }
-285: ⋮----
-286: Feedback
-287: ⋮----
-288: {
-289:     pub stage: String,  
-290:     pub feedback_type: FeedbackType,
-291:     pub severity: Severity,
-292:     pub details: String,
-293:     #[serde(skip_serializing_if = "Option::is_none")]
-294:     pub suggested_fix: Option<String>,
-295:     pub timestamp: DateTime<Utc>,
-296: }
-297: ⋮----
-298: FeedbackType
-299: ⋮----
-300: {
-301:     BuildError,
-302:     QualityIssue,
-303:     MissingRequirement,
-304:     Suggestion,
-305: }
-306: ⋮----
-307: Severity
-308: ⋮----
-309: {
-310:     Critical,
-311:     Major,
-312:     Minor,
-313: }
-314: ⋮----
-315: Requirements
-316: ⋮----
-317: {
-318:     pub fn new() -> Self {
-319:         Self {
-320:             schema_version: "1.0".to_string(),
-321:             created_at: Utc::now(),
-322:             updated_at: Utc::now(),
-323:             requirements: Vec::new(),
-324:         }
-325:     }
-326: }
-327: ⋮----
-328: FeatureList
-329: ⋮----
-330: {
-331:     pub fn new() -> Self {
-332:         Self {
-333:             schema_version: "1.0".to_string(),
-334:             features: Vec::new(),
-335:         }
-336:     }
-337: }
-338: ⋮----
-339: DesignSpec
-340: ⋮----
-341: {
-342:     pub fn new() -> Self {
-343:         Self {
-344:             schema_version: "1.0".to_string(),
-345:             architecture: Architecture {
-346:                 style: String::new(),
-347:                 components: Vec::new(),
-348:                 data_models: Vec::new(),
-349:             },
-350:             technology_stack: TechnologyStack {
-351:                 backend: None,
-352:                 frontend: None,
-353:                 database: None,
-354:             },
-355:             deployment: DeploymentInfo {
-356:                 architecture: String::new(),
-357:             },
-358:         }
-359:     }
-360: }
-361: ⋮----
-362: ImplementationPlan
-363: ⋮----
-364: {
-365:     pub fn new() -> Self {
-366:         Self {
-367:             schema_version: "1.0".to_string(),
-368:             milestones: Vec::new(),
-369:             tasks: Vec::new(),
-370:         }
-371:     }
-372: }
-373: ⋮----
-374: CodeMetadata
-375: ⋮----
-376: {
-377:     pub fn new() -> Self {
-378:         Self {
-379:             schema_version: "1.0".to_string(),
-380:             files: Vec::new(),
-381:             build_status: BuildStatus {
-382:                 last_build: Utc::now(),
-383:                 success: false,
-384:                 errors: Vec::new(),
-385:             },
-386:             test_status: TestStatus {
-387:                 last_run: Utc::now(),
-388:                 total: 0,
-389:                 passed: 0,
-390:                 failed: 0,
-391:                 details: Vec::new(),
-392:             },
-393:             readme_path: None,
-394:             project_type: "Unknown".to_string(),
-395:         }
-396:     }
-397: }
-398: ⋮----
-399: FeedbackHistory
-400: ⋮----
-401: {
-402:     pub fn new() -> Self {
-403:         Self {
-404:             feedbacks: Vec::new(),
-405:         }
-406:     }
-407: }
-```
-
 ### crates/cowork-core/src/domain/memory.rs (377 lines)
 
 ```
@@ -27250,354 +27948,6 @@ LICENSE
 91:     }
 92: }
 ```
-
-### crates/cowork-core/src/instructions/coding.rs (343 lines)
-
-````
-1: pub const CODING_ACTOR_INSTRUCTION: &str = r#"
-2: # Your Role
-3: You are Coding Actor. Implement or update ALL pending tasks by writing **SIMPLE, CLEAN** code.
-4: 
-5: # Core Principle: SIMPLICITY & CORE FUNCTIONALITY ONLY
-6: - **Simple code**: No complex patterns, no over-engineering, avoid abstractions
-7: - **Minimal dependencies**: Use built-in features when possible, avoid npm/pip/cargo bloat
-8: - **No tests**: Don't write test files (unless explicitly required in tasks)
-9: - **No optimization**: Don't optimize performance (unless explicitly required)
-10: - **No infrastructure code**: Don't write deployment/monitoring/logging code (unless explicitly required)
-11: - **Clear structure**: Easy to understand, easy to modify
-12: - **Focus on core features**: Implement only what's needed to make features work
-13: - **Avoid design patterns**: Don't use Singleton, Factory, Observer unless absolutely necessary
-14: - **No defensive programming**: Don't add excessive error handling unless critical
-15: 
-16: # ⚠️ CRITICAL: COMPLETE PROJECT STRUCTURE (NEW - HIGHEST PRIORITY)
-17: **BEFORE implementing any feature, you MUST create ALL essential project files:**
-18: 
-19: ## For Frontend/Web Projects (React/Vue/Vanilla):
-20: **CREATE THESE FILES FIRST (in this order):**
-21: 1. ✅ `package.json` - COMPLETE with:
-22:    - Correct dependencies (react, vite, etc.) with version numbers
-23:    - Scripts: "dev", "build", "preview"
-24:    - Type: "module" (for ESM)
-25: 2. ✅ `vite.config.js` (or build tool config) - proper plugin configuration
-26: 3. ✅ `.gitignore` - exclude node_modules, dist, .env
-27: 4. ✅ `index.html` - entry HTML with:
-28:    - Proper DOCTYPE and structure
-29:    - <div id="root"> or equivalent
-30:    - <script> tag importing main entry
-31: 5. ✅ `src/main.jsx` (or main.js) - application entry point
-32: 6. ✅ `tsconfig.json` - if using TypeScript
-33: 
-34: ## For Node.js Backend/Tool:
-35: **CREATE THESE FILES FIRST:**
-36: 1. ✅ `package.json` - with dependencies, "bin" entry (for CLI tools), start script
-37: 2. ✅ Main entry (`src/index.js` or `index.js`)
-38: 3. ✅ `.gitignore` - exclude node_modules
-39: 
-40: ## For Rust Projects:
-41: **CREATE THESE FILES FIRST:**
-42: 1. ✅ `Cargo.toml` - with [package] metadata and [dependencies]
-43: 2. ✅ `src/main.rs` or `src/lib.rs` - with proper structure
-44: 3. ✅ `.gitignore` - exclude /target
-45: 
-46: ## For Python Projects:
-47: **CREATE THESE FILES FIRST:**
-48: 1. ✅ `requirements.txt` or `pyproject.toml` - with all dependencies
-49: 2. ✅ Main entry (`main.py` or `src/__init__.py`)
-50: 3. ✅ `.gitignore` - exclude __pycache__, *.pyc
-51: 
-52: **VALIDATION BEFORE PROCEEDING:**
-53: After creating essential files, verify:
-54: - [ ] Can the project be initialized? (npm install / cargo build works)
-55: - [ ] Are all config files in place?
-56: - [ ] Is entry file properly configured?
-57: 
-58: # Workflow - TWO MODES
-59: 
-60: ## Mode Detection (FIRST STEP)
-61: 1. Call `load_feedback_history({"stage": "coding"})` to check if this is a restart
-62: 2. If feedback history exists and has entries → **UPDATE MODE**
-63: 3. If no feedback history or empty → **NEW MODE**
-64: 
-65: ## NEW MODE (全新实现)
-66: 
-67: ### Step 1: Load Plan (MANDATORY)
-68: 1. Call `get_plan()` to see ALL pending tasks
-69: 2. **STOP** if no tasks - report and exit
-70: 
-71: ### Step 1.5: Create Essential Project Files FIRST (NEW - MANDATORY)
-72: 3. **CRITICAL**: Before implementing any features, create ALL essential files:
-73:    - Read Plan document's "Required Files Checklist"
-74:    - Identify which tasks create config/entry files (usually TASK-001, TASK-002)
-75:    - **IMPLEMENT THESE TASKS FIRST** before any feature tasks
-76:    - Use `write_file()` to create:
-77:      - package.json/Cargo.toml/requirements.txt (COMPLETE with dependencies)
-78:      - Entry files (index.html, main.js, src/main.rs, etc.)
-79:      - Config files (vite.config.js, tsconfig.json, etc.)
-80:      - .gitignore
-81: 4. Mark these essential file tasks as completed with `update_task_status()`
-82: 
-83: **EXAMPLE IMPLEMENTATION ORDER:**
-84: ```
-85: 1. Write package.json with ALL dependencies and scripts
-86: 2. Write vite.config.js with proper React plugin setup
-87: 3. Write .gitignore
-88: 4. Write index.html with <div id="root"> and script import
-89: 5. Write src/main.jsx with ReactDOM.render
-90: 6. Mark TASK-001, TASK-002 as completed
-91: 7. NOW implement feature tasks (TASK-003, TASK-004, ...)
-92: ```
-93: 
-94: ### Step 2: Implement ALL Tasks
-95: 5. **Implement ALL pending tasks in one go**:
-96:    - Write simple, straightforward code for each task
-97:    - Avoid complex abstractions
-98:    - Use comments only when necessary
-99: 6. Mark ALL tasks as completed with `update_task_status(task_id, "completed")`
-100: 7. Mark corresponding features as completed with `update_feature_status(feature_id, "completed")`
-101: 
-102: ### Step 3: Generate README.md (MANDATORY)
-103: 6. **你必须生成一个完整的 README.md 文件**，包含以下内容：
-104: 
-105: #### README.md 必须包含：
-106: 1. **项目简介** - 简要说明项目功能
-107: 2. **环境要求** - 列出所需的环境（如 Node.js 版本、Python 版本、Rust 版本等）
-108: 3. **依赖安装** - 明确的安装命令（如 `npm install`, `pip install -r requirements.txt`）
-109: 4. **运行项目** - 如何启动项目的命令（如 `npm run dev`, `cargo run`, `python main.py`）
-110: 5. **构建命令** - 如需构建，提供构建命令（如 `npm run build`, `cargo build --release`）
-111: 6. **项目结构** - 主要文件和目录说明
-112: 
-113: #### README.md 模板：
-114: ```markdown
-115: # [项目名称]
-116: 
-117: ## 简介
-118: [项目功能简介]
-119: 
-120: ## 环境要求
-121: - [要求1]
-122: - [要求2]
-123: 
-124: ## 依赖安装
-125: \`\`\`bash
-126: [安装依赖的命令]
-127: \`\`\`
-128: 
-129: ## 运行项目
-130: \`\`\`bash
-131: [运行项目的命令]
-132: \`\`\`
-133: 
-134: ## 构建命令（如需要）
-135: \`\`\`bash
-136: [构建命令]
-137: \`\`\`
-138: 
-139: ## 项目结构
-140: - [目录/文件说明]
-141: ```
-142: 
-143: 7. 使用 `write_file("README.md", <readme_content>)` 保存 README
-144: 
-145: ### Exit Condition
-146: - When ALL tasks are marked as "completed" AND README.md is generated, stop immediately
-147: - No need to wait for critic review
-148: 
-149: ## UPDATE MODE (增量更新 - 当 GotoStage 回退到此阶段时)
-150: 
-151: ### Step 1: Analyze Feedback
-152: 1. Call `load_feedback_history({"stage": "coding"})` - 获取最近的反馈信息
-153: 2. Read feedback.details to understand what needs to change
-154: 
-155: ### Step 2: Load Existing State
-156: 3. Call `get_plan()` to read current task statuses
-157: 4. Check which tasks are completed and which are pending
-158: 
-159: ### Step 3: Incremental Implementation
-160: 5. Analyze feedback and determine what to modify:
-161:    - Which completed tasks need fixes?
-162:    - Which pending tasks need to be implemented differently?
-163:    - What code changes are required?
-164: 
-165: 6. Apply targeted updates:
-166:    - Fix issues in existing code files
-167:    - Update implementations based on feedback
-168:    - Modify task statuses if needed
-169:    - Document any code changes in comments
-170: 
-171: ### Step 4: Update Task Statuses
-172: 7. Update task statuses to reflect completion
-173: 8. Update feature statuses if all related tasks are done
-174: 
-175: ### UPDATE MODE Example
-176: 
-177: ```
-178: # 假设 feedback 显示: "认证API端点需要添加JWT验证，修复路由错误"
-179: 
-180: 1. load_feedback_history()
-181:    → feedbacks: [{
-182:        feedback_type: "QualityIssue",
-183:        severity: "Critical",
-184:        details: "认证API端点需要添加JWT验证，修复路由错误"
-185:      }]
-186: 
-187: 2. get_plan()
-188:    → Returns current task statuses
-189: 
-190: 3. read_file("src/api/auth.rs")
-191:    → Read existing auth code
-192: 
-193: 4. 分析需要修改的内容:
-194:    - 添加 JWT 验证中间件
-195:    - 修复路由配置错误
-196:    - 更新认证端点
-197: 
-198: 5. 增量更新代码:
-199:    - 修改 src/api/auth.rs，添加 JWT 验证
-200:    - 修复 src/main.rs 中的路由配置
-201:    - 添加必要的依赖
-202: 
-203: 6. update_task_status("TASK-003", "completed")
-204:    update_feature_status("FEAT-001", "completed")
-205: 
-206: 7. 完成！Critic 将审查更新后的代码
-207: ```
-208: 
-209: # Adaptive Task Management - NEW CAPABILITY
-210: 
-211: During implementation, you may discover that the plan needs adjustments. You now have tools to handle this:
-212: 
-213: ## When to CREATE new tasks (create_task):
-214: - You discover a missing dependency or prerequisite
-215: - A task is too large and should be split into smaller pieces
-216: - You find a new technical requirement not in the original plan
-217: - Example: "Need to create API client before implementing feature X"
-218: 
-219: ## When to UPDATE tasks (update_task):
-220: - Task dependencies have changed during implementation
-221: - Files to create have changed based on actual code structure
-222: - Task description needs clarification based on what you learned
-223: - Example: "Task X now depends on Task Y which wasn't originally planned"
-224: 
-225: ## When to DELETE tasks (delete_task):
-226: - A task is no longer needed (duplicate or obsolete)
-227: - The approach has changed making this task irrelevant
-228: - A task was incorrectly planned and cannot be implemented
-229: - Example: "This database migration task is not needed because we're using in-memory storage"
-230: 
-231: ## Guidelines for Task Management:
-232: - **Be conservative**: Only modify tasks when truly necessary
-233: - **Always provide reason**: Every create/update/delete must include a clear reason
-234: - **Stay focused**: Don't over-plan; focus on what's needed for current implementation
-235: - **Maintain consistency**: Keep task IDs, dependencies, and status aligned
-236: 
-237: ## Handle Critic Feedback (IF IN ITERATION 2+):
-238: **IMPORTANT**: In iterations after the first one, check the conversation history for Critic's feedback:
-239: 
-240: 1. **Look at the previous messages** - Critic's feedback is in the conversation history
-241: 2. **If Critic said code is incomplete or has issues**:
-242:    - Read exactly what issues were mentioned
-243:    - Complete any missing tasks
-244:    - Fix any code quality issues
-245:    - Simplify over-engineered code if needed
-246: 3. **If Critic requested replanning**: Acknowledge (human will review)
-247: 4. **If no issues mentioned** - Critic approved and you're done!
-248: 
-249: **Remember**: You can SEE Critic's messages in the conversation. Read them and take action.
-250: 
-251: # Tools
-252: 
-253: ## Core Tools
-254: - load_feedback_history() ← **START HERE - 检测是否是 UPDATE MODE**
-255: - get_plan() - See all tasks
-256: - read_file(path) - Read existing code
-257: - write_file(path, content) - Write code (also use this to save README.md)
-258: - list_files(path) - List files in directory
-259: - update_task_status(task_id, status) - Update task status
-260: - update_feature_status(feature_id, status) - Update feature status
-261: 
-262: ## Task Management Tools
-263: - create_task(title, description, feature_id, component_id, files_to_create, dependencies, acceptance_criteria)
-264: - update_task(task_id, reason, title?, description?, dependencies?, files_to_create?, acceptance_criteria?)
-265: - delete_task(task_id, reason)
-266: 
-267: # CRITICAL RULES
-268: 
-269: ## For NEW MODE
-270: 1. Implement ALL pending tasks in one go
-271: 2. Keep code simple and straightforward - **avoid abstractions, design patterns, excessive error handling**
-272: 3. No tests/optimization/infrastructure unless explicitly required
-273: 4. **Use minimal dependencies** - prefer standard library over external packages
-274: 5. Mark all tasks as completed when done
-275: 6. Stop immediately when all tasks are completed
-276: 7. **Don't refactor** - write code that works, not perfect code
-277: 
-278: ## For UPDATE MODE
-279: - Fix only what's mentioned in feedback
-280: - Preserve working code, only modify problematic parts
-281: - Update task statuses to reflect progress
-282: - Be efficient - incremental fixes are faster than full rewrite
-283: 
-284: **REMEMBER**: 
-285: - Always start with `load_feedback_history()` to detect mode
-286: - In UPDATE MODE, focus on fixing specific issues mentioned in feedback
-287: - In NEW MODE, implement all pending tasks and stop
-288: "#;
-289: 
-290: pub const CODING_CRITIC_INSTRUCTION: &str = r#"
-291: # Your Role
-292: You are Coding Critic. Verify that Coding Actor completed ALL tasks.
-293: 
-294: # Workflow - SIMPLE AND DIRECT
-295: 
-296: ## Step 1: Check Task Completion
-297: 1. Call `get_plan()` to see all tasks
-298: 2. Verify that ALL tasks have status "completed"
-299: 
-300: ## Step 2: Quick Code Review
-301: 3. Check if code files exist:
-302:    - Use `list_files(".")` to see all files
-303:    - Verify that expected files from task list exist
-304: 4. (Optional) Read a few key files to verify basic structure
-305: 
-306: ## Step 3: Respond
-307: 5. **Just respond with your assessment**:
-308:    - If good: "✅ All [N] tasks completed. Code structure looks reasonable."
-309:    - If issues: Describe what's wrong
-310: 
-311: # Important Notes
-312: 
-313: - **DON'T over-analyze**: This is a quick sanity check, not deep code review
-314: - **DON't run tests**: Tests may not exist, don't try to run them
-315: - **DON't check for optimizations**: Performance is not a concern here
-316: - **If files are missing**: Describe which files are missing
-317: 
-318: # Tools
-319: - get_plan() ← **START HERE - Check task completion**
-320: - list_files(path) ← Verify files exist
-321: - read_file(path) ← Quick sanity check (optional)
-322: 
-323: # Example - Normal Case
-324: ```
-325: 1. get_plan()
-326: 2. # Returns: 5 tasks, all status="completed"
-327: 3. list_files(".")
-328: 4. # Returns: src/main.rs, src/auth.rs, src/db.rs
-329: 5. "✅ All 5 tasks completed. Code structure looks reasonable."
-330: ```
-331: 
-332: # Example - If Issues Found
-333: ```
-334: 1. get_plan()
-335: 2. # Returns: 5 tasks, but TASK-003 is "pending"
-336: 3. "❌ TASK-003 is not completed. Please finish implementing the authentication feature."
-337: ```
-338: 
-339: **REMEMBER**: 
-340: - Start with `get_plan()` - check if all tasks are completed
-341: - Keep it simple - this is a quick check, not deep review
-342: - If tasks are incomplete, say which ones need work
-343: "#;
-````
 
 ### crates/cowork-core/src/instructions/knowledge_gen.rs (267 lines)
 
@@ -28498,265 +28848,6 @@ LICENSE
 169:         Ok(())
 170:     }
 171: }
-```
-
-### crates/cowork-core/src/interaction/mod.rs (153 lines)
-
-```
-1: MessageLevel
-2: ⋮----
-3: {
-4:     Info,
-5:     Success,
-6:     Warning,
-7:     Error,
-8:     Debug,
-9: }
-10: ⋮----
-11: MessageLevel
-12: ⋮----
-13: {
-14:     pub fn emoji(&self) -> &str {
-15:         match self {
-16:             MessageLevel::Info => "ℹ️",
-17:             MessageLevel::Success => "✅",
-18:             MessageLevel::Warning => "⚠️",
-19:             MessageLevel::Error => "❌",
-20:             MessageLevel::Debug => "🔍",
-21:         }
-22:     }
-23: }
-24: ⋮----
-25: MessageType
-26: ⋮----
-27: {
-28:     
-29:     Normal,
-30:     
-31:     Thinking,
-32:     
-33:     ToolCall { tool_name: String, arguments: Value },
-34:     
-35:     ToolResult { tool_name: String, success: bool },
-36:     
-37:     Streaming { is_first: bool, is_last: bool },
-38: }
-39: ⋮----
-40: MessageContext
-41: ⋮----
-42: {
-43:     
-44:     pub agent_name: String,
-45:     
-46:     pub message_type: MessageType,
-47:     
-48:     pub stage_name: Option<String>,
-49: }
-50: ⋮----
-51: MessageContext
-52: ⋮----
-53: {
-54:     
-55:     pub fn new(agent_name: impl Into<String>) -> Self {
-56:         Self {
-57:             agent_name: agent_name.into(),
-58:             message_type: MessageType::Normal,
-59:             stage_name: None,
-60:         }
-61:     }
-62: 
-63:     
-64:     pub fn with_message_type(mut self, message_type: MessageType) -> Self {
-65:         self.message_type = message_type;
-66:         self
-67:     }
-68: 
-69:     
-70:     pub fn with_stage(mut self, stage_name: impl Into<String>) -> Self {
-71:         self.stage_name = Some(stage_name.into());
-72:         self
-73:     }
-74: }
-75: ⋮----
-76: InputOption
-77: ⋮----
-78: {
-79:     pub id: String,
-80:     pub label: String,
-81:     pub description: Option<String>,
-82: }
-83: ⋮----
-84: InputResponse
-85: ⋮----
-86: {
-87:     Text(String),
-88:     Selection(String),
-89:     Cancel,
-90: }
-91: ⋮----
-92: ProgressInfo
-93: ⋮----
-94: {
-95:     pub current: u32,
-96:     pub total: u32,
-97:     pub message: String,
-98: }
-99: ⋮----
-100: InteractiveBackend
-101: ⋮----
-102: {
-103:     
-104:     async fn show_message(&self, level: MessageLevel, content: String);
-105: 
-106:     
-107:     async fn show_message_with_context(
-108:         &self,
-109:         level: MessageLevel,
-110:         content: String,
-111:         _context: MessageContext,
-112:     ) {
-113:         
-114:         
-115:         self.show_message(level, content).await;
-116:     }
-117: 
-118:     
-119:     async fn send_streaming(&self, _content: String, _agent_name: &str, _is_thinking: bool) {
-120:         
-121:     }
-122: 
-123:     
-124:     async fn send_tool_call(&self, _tool_name: &str, _arguments: &Value, _agent_name: &str) {
-125:         
-126:     }
-127: 
-128:     
-129:     async fn send_tool_result(
-130:         &self,
-131:         _tool_name: &str,
-132:         _result: &str,
-133:         _success: bool,
-134:         _agent_name: &str,
-135:     ) {
-136:         
-137:     }
-138: 
-139:     
-140:     
-141:     async fn request_input(
-142:         &self,
-143:         prompt: &str,
-144:         options: Vec<InputOption>,
-145:         initial_content: Option<String>,
-146:     ) -> Result<InputResponse>;
-147: 
-148:     
-149:     async fn show_progress(&self, task_id: String, progress: ProgressInfo);
-150: 
-151:     
-152:     async fn submit_response(&self, request_id: String, response: String) -> Result<()>;
-153: }
-```
-
-### crates/cowork-core/src/interaction/tauri.rs (86 lines)
-
-```
-1: TauriBackend
-2: ⋮----
-3: {
-4:     
-5: }
-6: ⋮----
-7: TauriBackend
-8: ⋮----
-9: {
-10:     pub fn new() -> Self {
-11:         Self {}
-12:     }
-13: }
-14: ⋮----
-15: TauriBackend
-16: ⋮----
-17: {
-18:     async fn show_message(&self, level: MessageLevel, content: String) {
-19:         
-20:         println!("{} [Tauri]: {}", level.emoji(), content);
-21:     }
-22: 
-23:     async fn show_message_with_context(
-24:         &self,
-25:         level: MessageLevel,
-26:         content: String,
-27:         context: MessageContext,
-28:     ) {
-29:         
-30:         let prefix = match &context.stage_name {
-31:             Some(stage) => format!("[{}:{}]", context.agent_name, stage),
-32:             None => format!("[{}]", context.agent_name),
-33:         };
-34:         println!("{} {} {}", level.emoji(), prefix, content);
-35:     }
-36: 
-37:     async fn send_streaming(&self, content: String, agent_name: &str, is_thinking: bool) {
-38:         let prefix = if is_thinking { "💭" } else { "📝" };
-39:         println!("{} [{}] {}", prefix, agent_name, content);
-40:     }
-41: 
-42:     async fn send_tool_call(&self, tool_name: &str, _arguments: &Value, agent_name: &str) {
-43:         println!("🔧 [{}] Calling tool: {}", agent_name, tool_name);
-44:     }
-45: 
-46:     async fn send_tool_result(
-47:         &self,
-48:         tool_name: &str,
-49:         _result: &str,
-50:         success: bool,
-51:         agent_name: &str,
-52:     ) {
-53:         let status = if success { "✓" } else { "✗" };
-54:         println!("{} [{}] Tool {} completed", status, agent_name, tool_name);
-55:     }
-56: 
-57:     async fn request_input(
-58:         &self,
-59:         _prompt: &str,
-60:         _options: Vec<InputOption>,
-61:         _initial_content: Option<String>,
-62:     ) -> Result<InputResponse> {
-63:         
-64:         
-65:         Ok(InputResponse::Cancel)
-66:     }
-67: 
-68:     async fn show_progress(&self, task_id: String, progress: ProgressInfo) {
-69:         
-70:         let percentage = if progress.total > 0 {
-71:             (progress.current as f64 / progress.total as f64 * 100.0) as u32
-72:         } else {
-73:             0
-74:         };
-75:         println!(
-76:             "[Tauri Progress] [{}%] {}: {}/{}",
-77:             percentage, task_id, progress.current, progress.total
-78:         );
-79:     }
-80: 
-81:     async fn submit_response(&self, request_id: String, response: String) -> Result<()> {
-82:         
-83:         println!("[Tauri HITL] Response for {}: {}", request_id, response);
-84:         Ok(())
-85:     }
-86: }
-```
-
-### crates/cowork-core/src/llm/mod.rs (5 lines)
-
-```
-1: pub mod config;
-2: pub mod rate_limiter;
-3: 
-4: pub use config::*;
-5: pub use rate_limiter::*;
 ```
 
 ### crates/cowork-core/src/llm/rate_limiter.rs (178 lines)
@@ -33609,136 +33700,6 @@ LICENSE
 178: }
 ```
 
-### crates/cowork-gui/src-tauri/src/iteration_commands.rs (125 lines)
-
-```
-1: IterationInfo
-2: ⋮----
-3: {
-4:     pub id: String,
-5:     pub number: u32,
-6:     pub title: String,
-7:     pub description: String,
-8:     pub status: String,
-9:     pub current_stage: Option<String>,
-10:     pub completed_stages: Vec<String>,
-11:     pub base_iteration_id: Option<String>,
-12:     pub inheritance: String,
-13:     pub created_at: String,
-14:     pub completed_at: Option<String>,
-15: }
-16: ⋮----
-17: ProjectInfo
-18: ⋮----
-19: {
-20:     pub id: String,
-21:     pub name: String,
-22:     pub created_at: String,
-23:     pub updated_at: String,
-24:     pub current_iteration_id: Option<String>,
-25:     pub iteration_count: usize,
-26: }
-27: ⋮----
-28: CreateIterationRequest
-29: ⋮----
-30: {
-31:     pub title: String,
-32:     pub description: String,
-33:     pub base_iteration_id: Option<String>,
-34:     pub inheritance: String,
-35: }
-36: ⋮----
-37: gui_init_project
-38: ⋮----
-39: (
-40:     name: String,
-41:     window: Window,
-42: )
-43: ⋮----
-44: gui_get_project
-45: ⋮----
-46: ()
-47: ⋮----
-48: gui_delete_project
-49: ⋮----
-50: (
-51:     confirm: bool,
-52: )
-53: ⋮----
-54: gui_create_iteration
-55: ⋮----
-56: (
-57:     request: CreateIterationRequest,
-58:     window: Window,
-59:     _state: State<'_, AppState>,
-60: )
-61: ⋮----
-62: gui_get_iterations
-63: ⋮----
-64: ()
-65: ⋮----
-66: gui_get_iteration
-67: ⋮----
-68: (
-69:     iteration_id: String,
-70: )
-71: ⋮----
-72: gui_execute_iteration
-73: ⋮----
-74: (
-75:     iteration_id: String,
-76:     window: Window,
-77:     state: State<'_, AppState>,
-78: )
-79: ⋮----
-80: gui_continue_iteration
-81: ⋮----
-82: (
-83:     iteration_id: String,
-84:     window: Window,
-85:     state: State<'_, AppState>,
-86: )
-87: ⋮----
-88: gui_retry_iteration
-89: ⋮----
-90: (
-91:     iteration_id: String,
-92:     window: Window,
-93:     state: State<'_, AppState>,
-94: )
-95: ⋮----
-96: gui_delete_iteration
-97: ⋮----
-98: (
-99:     iteration_id: String,
-100:     window: Window,
-101: )
-102: ⋮----
-103: gui_get_project_knowledge
-104: ⋮----
-105: (
-106:     _project_id: String,
-107:     _window: Window,
-108:     _state: State<'_, AppState>,
-109: )
-110: ⋮----
-111: gui_regenerate_knowledge
-112: ⋮----
-113: (
-114:     iteration_id: String,
-115:     window: Window,
-116:     state: State<'_, AppState>,
-117: )
-118: ⋮----
-119: project_to_info
-120: ⋮----
-121: (project: &Project)
-122: ⋮----
-123: iteration_to_info
-124: ⋮----
-125: (iteration: &Iteration)
-```
-
 ### crates/cowork-gui/src-tauri/src/main.rs (3 lines)
 
 ```
@@ -35193,295 +35154,6 @@ LICENSE
 328: The Interaction Domain exemplifies the system's adherence to Hexagonal Architecture by strictly separating interface concerns from business logic. Through the `InteractiveBackend` trait, Cowork Forge achieves true interface portability—enabling the same sophisticated AI pipeline to operate in both automated CI/CD environments (CLI) and rich interactive development environments (Desktop GUI) without code duplication or domain pollution.
 329: 
 330: The domain's sophisticated handling of asynchronous HITL workflows, combined with context-aware messaging and robust concurrency management, provides the foundation for reliable human-AI collaboration in software development workflows.
-````
-
-### litho.docs/en/4.Deep-Exploration/LLM Integration Domain.md (284 lines)
-
-````
-1: **LLM Integration Domain Technical Documentation**
-2: 
-3: ---
-4: 
-5: ## 1. Overview
-6: 
-7: The **LLM Integration Domain** provides the infrastructure layer for connecting Cowork Forge to OpenAI-compatible Large Language Model APIs. As an infrastructure domain within the Hexagonal Architecture, it abstracts the complexity of external API communication, authentication, and critical production concerns such as rate limiting and quota management.
-8: 
-9: This domain serves as the exclusive bridge between the core AI agent pipeline and external LLM providers, ensuring that the system maintains API compliance (30 requests/minute) while providing a clean, trait-based interface for the Pipeline Domain's Stage Executor and agent orchestration components.
-10: 
-11: **Key Responsibilities:**
-12: - Configuration management supporting both file-based (TOML) and environment-based deployments
-13: - Factory-based client instantiation with automatic rate limiting decoration
-14: - Dual-mechanism rate limiting (concurrency control + temporal throttling) to prevent API quota exhaustion
-15: - Seamless integration with the `adk-rust` ecosystem (`adk_core` traits and `adk_model` OpenAI client)
-16: 
-17: ---
-18: 
-19: ## 2. Architectural Design
-20: 
-21: ### 2.1 Pattern Implementation
-22: 
-23: The domain implements two primary design patterns to achieve clean separation of concerns and production-grade reliability:
-24: 
-25: **Factory Pattern**: The `create_llm_client` function acts as a centralized factory that orchestrates client initialization, configuration validation, and automatic wrapping with rate limiting decorators. This ensures that all LLM clients used throughout the system comply with API constraints by default.
-26: 
-27: **Decorator Pattern**: The `RateLimitedLlm` struct implements the `adk_core::Llm` trait while wrapping an inner LLM implementation. This allows rate limiting concerns to be added transparently without modifying the underlying OpenAI client logic, adhering to the Single Responsibility Principle.
-28: 
-29: ### 2.2 System Positioning
-30: 
-31: Within the Clean Architecture hierarchy, this domain resides in the **Infrastructure Layer**, depending only on external frameworks (`adk-rust`, `tokio`) and providing implementations for domain-defined interfaces:
-32: 
-33: ```mermaid
-34: flowchart TD
-35:     subgraph Infrastructure["Infrastructure Layer"]
-36:         LLM["LLM Integration Domain"]
-37:         Config["Configuration Management"]
-38:         RateLimit["Rate Limiting<br/>Decorator"]
-39:     end
-40:     
-41:     subgraph Application["Application Layer"]
-42:         Pipeline["Pipeline Domain"]
-43:         Executor["Stage Executor"]
-44:     end
-45:     
-46:     subgraph External["External Systems"]
-47:         OpenAI["OpenAI-compatible API"]
-48:     end
-49:     
-50:     Pipeline -->|Uses| LLM
-51:     LLM -->|Implements| Config
-52:     LLM -->|Wraps| RateLimit
-53:     RateLimit -->|Calls| OpenAI
-54: ```
-55: 
-56: ---
-57: 
-58: ## 3. Core Components
-59: 
-60: ### 3.1 Configuration Management (`llm/config.rs`)
-61: 
-62: The configuration system supports dual-source initialization to accommodate both development workflows and containerized production environments:
-63: 
-64: **Configuration Structures:**
-65: - `LlmConfig`: Top-level configuration container
-66: - `ModelConfig`: Specific model parameters including API base URL, authentication key, and model selection
-67: 
-68: **Loading Strategies:**
-69: - **File-based**: `ModelConfig::from_file(path)` deserializes TOML configuration files for persistent, version-controlled settings
-70: - **Environment-based**: `ModelConfig::from_env()` reads from environment variables (`LLM_API_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL_NAME`) for containerized deployments and secrets management
-71: 
-72: ### 3.2 Rate Limiting Infrastructure (`llm/rate_limiter.rs`)
-73: 
-74: The `RateLimitedLlm` decorator implements a sophisticated dual-mechanism rate limiting strategy essential for API quota compliance:
-75: 
-76: **Mechanism 1: Concurrency Control**
-77: - Utilizes a global `tokio::sync::Semaphore` (initialized via `tokio::sync::OnceCell`) with a permit count of **1**
-78: - Ensures only a single API request is in flight at any given time across the entire application
-79: - Initialized lazily via `init_global_rate_limiter(max_concurrent: usize)`
-80: 
-81: **Mechanism 2: Temporal Throttling**
-82: - Enforces a mandatory **2-second delay** (2000ms) before each API call using `tokio::time::sleep`
-83: - Guarantees the system does not exceed **30 requests per minute** even under sustained load
-84: - Implemented in `RateLimitedLlm::with_default_delay()` constructor
-85: 
-86: **Thread Safety:**
-87: The global semaphore is stored in a `static OnceCell`, ensuring thread-safe, one-time initialization across async task boundaries without race conditions.
-88: 
-89: ### 3.3 Client Factory
-90: 
-91: The `create_llm_client` function serves as the primary entry point for obtaining LLM instances:
-92: 
-93: ```rust
-94: pub fn create_llm_client(config: &LlmConfig) -> Result<Arc<dyn Llm>>
-95: ```
-96: 
-97: **Orchestration Flow:**
-98: 1. Initializes the global rate limiter semaphore (idempotent operation)
-99: 2. Constructs `OpenAIConfig` with custom base URL support via `OpenAIConfig::compatible()`
-100: 3. Instantiates `OpenAIClient` from the `adk_model` crate
-101: 4. Wraps the client with `RateLimitedLlm` using the default 2000ms delay
-102: 5. Returns an `Arc<dyn Llm>` suitable for dependency injection into agent components
-103: 
-104: ---
-105: 
-106: ## 4. Rate Limiting Strategy Deep Dive
-107: 
-108: The 30 requests/minute limit is enforced through a defense-in-depth approach combining concurrency and temporal controls:
-109: 
-110: ```mermaid
-111: sequenceDiagram
-112:     participant Agent as Pipeline Agent
-113:     participant RL as RateLimitedLlm
-114:     participant Sem as Global Semaphore
-115:     participant API as LLM Provider
-116:     
-117:     Agent->>RL: generate_content(request)
-118:     RL->>Sem: acquire().await
-119:     Note over Sem: Permit obtained<br/>(max 1 concurrent)
-120:     
-121:     RL->>RL: sleep(2000ms)
-122:     Note over RL: Temporal spacing<br/>30 req/min max
-123:     
-124:     RL->>API: HTTP Request
-125:     API-->>RL: Response Stream
-126:     RL-->>Agent: LlmResponseStream
-127:     
-128:     Note over Sem: Permit released<br/>on scope exit
-129: ```
-130: 
-131: **Why Dual Mechanisms?**
-132: - **Concurrency control** prevents burst traffic that could trigger provider rate limits or connection pool exhaustion
-133: - **Temporal throttling** ensures steady-state compliance with per-minute quotas, even during sequential operations
-134: - The combination provides graceful degradation under load while maintaining predictable API usage costs
-135: 
-136: ---
-137: 
-138: ## 5. Integration with Agent System
-139: 
-140: ### 5.1 Trait Implementation
-141: 
-142: The domain implements the `adk_core::Llm` trait, providing the standard interface for the agent framework:
-143: 
-144: ```rust
-145: #[async_trait]
-146: impl Llm for RateLimitedLlm {
-147:     fn name(&self) -> &str;
-148:     async fn generate_content(
-149:         &self, 
-150:         request: LlmRequest, 
-151:         stream: bool
-152:     ) -> Result<LlmResponseStream>;
-153: }
-154: ```
-155: 
-156: ### 5.2 Pipeline Domain Consumption
-157: 
-158: The Pipeline Domain's `StageExecutor` consumes LLM clients through dependency injection:
-159: 
-160: - **Initialization**: The executor receives an `Arc<dyn Llm>` via the factory function during pipeline context setup
-161: - **Execution**: During stage execution (Idea, PRD, Design, etc.), the executor calls `generate_content()` with stage-specific instructions
-162: - **Streaming**: Supports both streaming responses (for real-time GUI updates) and synchronous completion modes
-163: - **Feedback Loops**: The Actor-Critic pattern relies on the rate-limited client for both initial generation and regeneration cycles
-164: 
-165: ### 5.3 Error Handling
-166: 
-167: All errors are propagated using the `anyhow` crate for ergonomic error handling:
-168: - Configuration parsing errors (invalid TOML, missing env vars)
-169: - HTTP connection failures
-170: - Rate limiting semaphore poisoning (extremely unlikely with tokio's implementation)
-171: - API authentication errors
-172: 
-173: ---
-174: 
-175: ## 6. Configuration Reference
-176: 
-177: ### 6.1 TOML Configuration File
-178: 
-179: ```toml
-180: [llm]
-181: api_base_url = "https://api.openai.com/v1"
-182: api_key = "sk-..."
-183: model_name = "gpt-4"
-184: max_retries = 3
-185: timeout_seconds = 120
-186: ```
-187: 
-188: ### 6.2 Environment Variables
-189: 
-190: | Variable | Description | Required |
-191: |----------|-------------|----------|
-192: | `LLM_API_BASE_URL` | Base URL for OpenAI-compatible API | Yes |
-193: | `LLM_API_KEY` | Authentication key | Yes |
-194: | `LLM_MODEL_NAME` | Model identifier (e.g., gpt-4, gpt-3.5-turbo) | Yes |
-195: 
-196: **Precedence**: When both TOML and environment variables are present, the specific loading method called by the application determines which takes precedence. The factory pattern typically prioritizes explicit configuration objects over environment fallbacks.
-197: 
-198: ---
-199: 
-200: ## 7. Usage Patterns
-201: 
-202: ### 7.1 Initialization (Application Startup)
-203: 
-204: ```rust
-205: use cowork_core::llm::{create_llm_client, LlmConfig};
-206: 
-207: // Load configuration
-208: let config = LlmConfig::from_file("config.toml")?;
-209: 
-210: // Create rate-limited client
-211: let llm_client = create_llm_client(&config)?;
-212: // Client is now ready for injection into Pipeline Domain
-213: ```
-214: 
-215: ### 7.2 Runtime Usage (Agent Execution)
-216: 
-217: ```rust
-218: // Inside StageExecutor or Agent implementation
-219: let response = llm_client
-220:     .generate_content(request, true)  // true = streaming
-221:     .await?;
-222: 
-223: // Process streaming chunks
-224: while let Some(chunk) = response.stream.next().await {
-225:     // Emit to GUI via Interaction Domain or process locally
-226: }
-227: ```
-228: 
-229: ### 7.3 Custom Rate Limiting (Advanced)
-230: 
-231: For scenarios requiring different rate limits (e.g., different providers with varying quotas):
-232: 
-233: ```rust
-234: use cowork_core::llm::RateLimitedLlm;
-235: 
-236: // Custom delay: 1 second (60 req/min)
-237: let custom_limited = RateLimitedLlm::new(inner_client, 1000);
-238: ```
-239: 
-240: ---
-241: 
-242: ## 8. Operational Considerations
-243: 
-244: ### 8.1 API Quota Management
-245: 
-246: The default 30 req/min limit is conservative for standard OpenAI tiers. For enterprise tiers with higher limits:
-247: - Modify the delay constant in `with_default_delay()` (currently 2000ms)
-248: - Adjust the global semaphore count if the provider supports concurrent connections
-249: - Monitor logs for rate limit responses (HTTP 429) as fallback protection
-250: 
-251: ### 8.2 Latency Implications
-252: 
-253: The 2-second mandatory delay introduces baseline latency:
-254: - **Sequential operations**: A 7-stage pipeline with single-pass execution incurs minimum 14 seconds of rate-limiting overhead
-255: - **Feedback loops**: Actor-Critic iterations multiply this overhead
-256: - **Mitigation**: The delay is non-blocking for other application components due to Tokio's async runtime
-257: 
-258: ### 8.3 Monitoring and Observability
-259: 
-260: Key metrics to monitor:
-261: - **Semaphore wait time**: Indicates queue depth if multiple agents request LLM access simultaneously
-262: - **Request duration**: Total time including the 2-second delay and API latency
-263: - **Error rates**: Authentication failures or rate limit breaches (HTTP 429)
-264: 
-265: ---
-266: 
-267: ## 9. File Structure
-268: 
-269: ```
-270: crates/cowork-core/src/llm/
-271: ├── mod.rs              # Module exports and public API
-272: ├── config.rs           # LlmConfig, ModelConfig, factory function
-273: └── rate_limiter.rs     # RateLimitedLlm decorator, global semaphore
-274: ```
-275: 
-276: **Related Files:**
-277: - `crates/cowork-core/src/tech_stack.rs`: Technology detection (auxiliary to LLM operations)
-278: - `crates/cowork-core/src/pipeline/stage_executor.rs`: Primary consumer of LLM clients
-279: 
-280: ---
-281: 
-282: ## 10. Summary
-283: 
-284: The LLM Integration Domain provides a robust, production-ready bridge to external AI services while enforcing critical operational constraints. By encapsulating rate limiting logic within a decorator pattern and supporting flexible configuration sources, it enables the Pipeline Domain to focus on orchestration logic without concern for API compliance details. The dual-mechanism rate limiting (concurrency + temporal) ensures reliable operation within provider quotas, making it suitable for long-running autonomous agent pipelines as well as interactive GUI-driven development workflows.
 ````
 
 ### litho.docs/en/4.Deep-Exploration/Memory Domain.md (476 lines)
@@ -38247,7 +37919,7 @@ LICENSE
 180: [llm]
 181: api_base_url = "https://api.openai.com/v1"
 182: api_key = "sk-..."
-183: model_name = "gpt-4"
+183: model_name = "gpt-5"
 184: max_retries = 3
 185: timeout_seconds = 120
 186: ```
@@ -38258,7 +37930,7 @@ LICENSE
 191: |----------|-------------|----------|
 192: | `LLM_API_BASE_URL` | OpenAI 兼容 API 的基础 URL | 是 |
 193: | `LLM_API_KEY` | 认证密钥 | 是 |
-194: | `LLM_MODEL_NAME` | 模型标识符（如 gpt-4、gpt-3.5-turbo） | 是 |
+194: | `LLM_MODEL_NAME` | 模型标识符（如 gpt-5） | 是 |
 195: 
 196: **优先级**：当 TOML 和环境变量同时存在时，应用程序调用的特定加载方法决定哪个优先。工厂模式通常优先考虑显式配置对象而不是环境变量回退。
 197: 
@@ -41667,7 +41339,7 @@ LICENSE
 579: provider = "openai"
 580: api_key = "sk-..."
 581: base_url = "https://api.openai.com/v1"
-582: model = "gpt-4"
+582: model = "gpt-5"
 583: temperature = 0.7
 584: max_tokens = 4096
 585: 

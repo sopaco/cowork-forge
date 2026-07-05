@@ -93,7 +93,7 @@ impl Tool for PMGotoStageTool {
         };
 
         if let Err(e) = append_feedback(&feedback) {
-            eprintln!("[PMGotoStageTool] Warning: Failed to save feedback: {}", e);
+            tracing::warn!("[PMGotoStageTool] Failed to save feedback: {}", e);
         }
 
         // Load or create session meta

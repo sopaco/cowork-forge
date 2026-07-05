@@ -65,7 +65,7 @@ impl Tool for GotoStageTool {
         };
 
         if let Err(e) = crate::persistence::append_feedback(&feedback) {
-            eprintln!("[GotoStageTool] Warning: Failed to save feedback: {}", e);
+            tracing::warn!("[GotoStageTool] Failed to save feedback: {}", e);
         }
 
         let mut meta = load_session_meta()

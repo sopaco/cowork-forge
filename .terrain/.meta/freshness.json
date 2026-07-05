@@ -3,15 +3,15 @@
   "project": "cowork-forge",
   "repo_path": ".",
   "baseline": {
-    "git_head": "88d1464890d17dbfb0d1df7476e6673de56f9c51",
-    "git_head_at": "2026-07-04T23:35:35.981353700+00:00",
+    "git_head": "a526c449ab8fbf9e0a3dcfd0476771d327fd8d6b",
+    "git_head_at": "2026-07-05T00:33:33.777275600+00:00",
     "dirty": true
   },
   "assets": {
     "agent_pack": {
       "path": "agent/repomix.md",
-      "synced_at": "2026-07-04T22:02:36.788192500+00:00",
-      "baseline_git_head": "88d1464890d17dbfb0d1df7476e6673de56f9c51",
+      "synced_at": "2026-07-04T23:38:17.657841600+00:00",
+      "baseline_git_head": "a526c449ab8fbf9e0a3dcfd0476771d327fd8d6b",
       "stale": false,
       "freshness_score": 95
     },
@@ -20,31 +20,31 @@
       "synced_at": "2026-07-04T22:06:58.019311800+00:00",
       "baseline_git_head": "88d1464890d17dbfb0d1df7476e6673de56f9c51",
       "stale": false,
-      "freshness_score": 85
+      "freshness_score": 80
     },
     "human_docs": {
       "path": "human/",
-      "synced_at": "2026-07-04T22:02:36.837854700+00:00",
+      "synced_at": "2026-07-04T23:38:17.711684200+00:00",
       "stale": false,
       "freshness_score": 95
     }
   },
   "drift": {
-    "commits_since_baseline": 0,
-    "changed_files_since_baseline": 0,
+    "commits_since_baseline": 1,
+    "changed_files_since_baseline": 34,
     "sample_changed_files": []
   },
   "summary": {
-    "overall_score": 85,
+    "overall_score": 80,
     "overall_stale": false,
-    "commits_since_baseline": 0,
-    "changed_files_count": 0,
-    "current_git_head": "88d1464",
+    "commits_since_baseline": 1,
+    "changed_files_count": 34,
+    "current_git_head": "a526c44",
     "working_tree_dirty": true,
     "is_git_repo": true,
-    "last_computed_at": "2026-07-04T23:35:35.981353700+00:00",
+    "last_computed_at": "2026-07-05T00:33:33.777275600+00:00",
     "agent_pack_score": 95,
-    "agent_context_score": 85,
+    "agent_context_score": 80,
     "human_docs_score": 95,
     "macro_preload_allowed": true,
     "drift_factors": [
@@ -52,7 +52,7 @@
         "id": "baseline_match",
         "severity": "info",
         "title": "与 baseline 提交一致",
-        "detail": "源码索引与 Agent 上下文均基于提交 88d1464890d17dbfb0d1df7476e6673de56f9c51 生成，相对 HEAD 无文件漂移。"
+        "detail": "源码索引与 Agent 上下文均基于提交 a526c449ab8fbf9e0a3dcfd0476771d327fd8d6b 生成，相对 HEAD 无文件漂移。"
       },
       {
         "id": "dirty_tree",
@@ -65,18 +65,18 @@
         "id": "context_lineage",
         "severity": "info",
         "title": "Agent 上下文受源码索引牵连",
-        "detail": "架构上下文原始分 95/100，按规则不超过源码索引分数的 90%，现为 85/100。",
-        "points_lost": 10
+        "detail": "架构上下文原始分 89/100，按规则不超过源码索引分数的 90%，现为 80/100。",
+        "points_lost": 9
       },
       {
         "id": "overall_driver",
         "severity": "info",
         "title": "总分由 Agent 架构上下文决定",
-        "detail": "综合分取三层最低值：源码索引 95、Agent 上下文 85、人类文档 95。"
+        "detail": "综合分取三层最低值：源码索引 95、Agent 上下文 80、人类文档 95。"
       }
     ],
-    "pack_baseline_short": "88d1464",
+    "pack_baseline_short": "a526c44",
     "context_baseline_short": "88d1464"
   },
-  "last_computed_at": "2026-07-04T23:35:35.981353700+00:00"
+  "last_computed_at": "2026-07-05T00:33:33.777275600+00:00"
 }

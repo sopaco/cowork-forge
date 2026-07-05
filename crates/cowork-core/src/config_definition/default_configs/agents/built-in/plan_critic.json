@@ -19,6 +19,12 @@
       "tool_id": "provide_feedback"
     },
     {
+      "tool_id": "exit_loop"
+    },
+    {
+      "tool_id": "request_human_review"
+    },
+    {
       "tool_id": "read_file"
     },
     {
@@ -37,6 +43,6 @@
   "model": {
     "temperature": 0.3
   },
-  "include_contents": "none",
+  "include_contents": "default",
   "tags": ["built-in", "planning", "critic"]
 }

@@ -260,7 +260,7 @@ impl IterationExecutor {
                         // Consume the feedback immediately so it is not re-applied on a
                         // later attempt or a subsequent run of this stage.
                         if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
-                            eprintln!("[Warning] Failed to clear consumed feedback for stage '{}': {}", stage_name, e);
+                            tracing::warn!("Failed to clear consumed feedback for stage '{}': {}", stage_name, e);
                         }
                     }
                 }
@@ -347,7 +347,7 @@ impl IterationExecutor {
                             }
 
                             if let Err(e) = crate::persistence::clear_stage_feedback(&stage_name) {
-                                eprintln!("[Warning] Failed to clear feedback for stage '{}': {}", stage_name, e);
+                                tracing::warn!("Failed to clear feedback for stage '{}': {}", stage_name, e);
                             }
 
                             iteration.complete_stage(&stage_name, artifact_path.clone());
@@ -454,7 +454,7 @@ impl IterationExecutor {
                         }
                         StageResult::Failed(e) => {
                             last_error = Some(e.clone());
-                            eprintln!("[Executor] Stage '{}' failed: {}", stage_name, e);
+                            tracing::error!("[Executor] Stage '{}' failed: {}", stage_name, e);
                             self.interaction
                                 .show_message_with_context(
                                     crate::interaction::MessageLevel::Error,

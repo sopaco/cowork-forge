@@ -101,10 +101,12 @@ pub struct AgentDefinition {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum IncludeContentsMode {
-    /// No content included
+    /// No content included - stateless, only current turn
     #[default]
     None,
-    /// Include all content
+    /// Default behavior - include conversation history within the current session
+    Default,
+    /// Include all available content
     All,
     /// Include only specified content types
     Selected(Vec<String>),

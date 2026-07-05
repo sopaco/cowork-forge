@@ -679,7 +679,7 @@ pub async fn execute_pm_agent_message_streaming(
     // Load artifacts summary for context
     let artifacts_summary = load_artifacts_summary_for_pm(&iteration_store, &iteration_id)
         .unwrap_or_else(|e| {
-            eprintln!("[PM Agent] Warning: Failed to load artifacts: {}", e);
+            tracing::warn!("[PM Agent] Failed to load artifacts: {}", e);
             String::new()
         });
 
@@ -825,7 +825,7 @@ pub async fn execute_pm_agent_message_streaming(
                 }
             }
             Err(e) => {
-                eprintln!("[PM Agent] Event error: {}", e);
+                tracing::warn!("[PM Agent] Event error: {}", e);
             }
         }
     }

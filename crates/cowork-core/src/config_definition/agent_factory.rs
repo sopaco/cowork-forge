@@ -6,7 +6,7 @@ use std::sync::Arc;
 use anyhow::{Result, Context};
 
 use crate::config_definition::{
-    AgentDefinition, StageDefinition, StageType,
+    AgentDefinition, StageDefinition, StageType, IncludeContentsMode,
     global_registry,
 };
 use crate::instructions::*;
@@ -16,6 +16,7 @@ use crate::skills::{SkillManager, SelectionPolicy};
 use adk_agent::{LlmAgentBuilder, LoopAgent};
 use adk_core::{Llm, Agent, IncludeContents};
 use adk_skill::select_skill_prompt_block;
+use adk_tool::ExitLoopTool;
 use crate::llm::config::McpConfig;
 use crate::tools::{create_mcp_toolsets_from_config, ConnectedMcpToolset};
 
@@ -229,9 +230,8 @@ pub fn create_agent_from_config_with_stage(
     // Add MCP toolsets if available
     builder = add_mcp_toolsets_to_builder(builder);
 
-    // Set content inclusion mode:
-    // Simple standalone agents use None to keep context focused.
-    let include_contents = IncludeContents::None;
+    // Set content inclusion mode from config
+    let include_contents = include_contents_mode_to_adk(&definition.include_contents);
     builder = builder.include_contents(include_contents);
 
     // Build the agent
@@ -320,12 +320,23 @@ fn create_simple_agent_from_config_with_stage(
     builder = add_mcp_toolsets_to_builder(builder);
 
     // Set content inclusion mode:
-    // - ActorCritic sub-agents use Default so Critic can see Actor's tool calls/outputs
-    //   within the same LoopAgent run, enabling proper multi-turn feedback loops.
-    // - Simple agents use None to keep context focused and avoid token bloat.
-    let include_contents = match stage_type {
-        Some(StageType::ActorCritic) => IncludeContents::Default,
-        _ => IncludeContents::None,
+    // - If config explicitly specifies a mode, use that.
+    // - Otherwise, ActorCritic sub-agents default to Default so Critic can see
+    //   Actor's tool calls/outputs within the same LoopAgent run.
+    // - Simple agents default to None to keep context focused.
+    let include_contents = match &definition.include_contents {
+        IncludeContentsMode::None => IncludeContents::None,
+        IncludeContentsMode::Default => IncludeContents::Default,
+        IncludeContentsMode::All => IncludeContents::Default,
+        IncludeContentsMode::Selected(_) => IncludeContents::Default,
+    };
+    let include_contents = if matches!(include_contents, IncludeContents::None) {
+        match stage_type {
+            Some(StageType::ActorCritic) => IncludeContents::Default,
+            _ => IncludeContents::None,
+        }
+    } else {
+        include_contents
     };
     builder = builder.include_contents(include_contents);
 
@@ -447,6 +458,9 @@ fn create_tool_from_reference(tool_id: &str, iteration_id: &str) -> Result<Arc<d
         // HITL tools
         "provide_feedback" => Arc::new(ProvideFeedbackTool),
         "load_feedback_history" => Arc::new(LoadFeedbackHistoryTool),
+        "review_with_feedback_content" => Arc::new(ReviewWithFeedbackContentTool),
+        "request_human_review" => Arc::new(RequestHumanReviewTool),
+        "ask_user" => Arc::new(AskUserTool),
 
         // Memory tools
         "query_memory" => Arc::new(QueryMemoryTool::new(iteration_id.to_string())),
@@ -460,6 +474,7 @@ fn create_tool_from_reference(tool_id: &str, iteration_id: &str) -> Result<Arc<d
         "copy_workspace_to_project" => Arc::new(CopyWorkspaceToProjectTool),
 
         // Flow control tools
+        "exit_loop" => Arc::new(ExitLoopTool::new()),
         "goto_stage" => Arc::new(GotoStageTool),
 
         // PM tools (require iteration_id)
@@ -545,4 +560,14 @@ pub fn initialize_config_registry() -> Result<()> {
     );
 
     Ok(())
+}
+
+/// Convert config IncludeContentsMode to adk_core::IncludeContents
+fn include_contents_mode_to_adk(mode: &IncludeContentsMode) -> IncludeContents {
+    match mode {
+        IncludeContentsMode::None => IncludeContents::None,
+        IncludeContentsMode::Default => IncludeContents::Default,
+        IncludeContentsMode::All => IncludeContents::Default,
+        IncludeContentsMode::Selected(_) => IncludeContents::Default,
+    }
 }
