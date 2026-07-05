@@ -3,28 +3,28 @@
   "project": "cowork-forge",
   "repo_path": ".",
   "baseline": {
-    "git_head": "33485cab078f600191512f3906a58b5158d17ad6",
-    "git_head_at": "2026-07-05T01:14:40.075411400+00:00",
+    "git_head": "551d5eda547de6471db7c2a956cf571c51d444d8",
+    "git_head_at": "2026-07-05T05:21:45.171419300+00:00",
     "dirty": true
   },
   "assets": {
     "agent_pack": {
       "path": "agent/repomix.md",
-      "synced_at": "2026-07-05T01:12:34.030044600+00:00",
-      "baseline_git_head": "33485cab078f600191512f3906a58b5158d17ad6",
+      "synced_at": "2026-07-05T01:39:32.818559600+00:00",
+      "baseline_git_head": "551d5eda547de6471db7c2a956cf571c51d444d8",
       "stale": false,
       "freshness_score": 95
     },
     "agent_context": {
       "path": "agent/context.md",
-      "synced_at": "2026-07-05T01:14:38.355549400+00:00",
-      "baseline_git_head": "33485cab078f600191512f3906a58b5158d17ad6",
+      "synced_at": "2026-07-05T01:42:26.044883200+00:00",
+      "baseline_git_head": "551d5eda547de6471db7c2a956cf571c51d444d8",
       "stale": false,
       "freshness_score": 85
     },
     "human_docs": {
       "path": "human/",
-      "synced_at": "2026-07-05T01:12:34.032667900+00:00",
+      "synced_at": "2026-07-05T01:39:32.821933200+00:00",
       "stale": false,
       "freshness_score": 95
     }
@@ -39,10 +39,10 @@
     "overall_stale": false,
     "commits_since_baseline": 0,
     "changed_files_count": 0,
-    "current_git_head": "33485ca",
+    "current_git_head": "551d5ed",
     "working_tree_dirty": true,
     "is_git_repo": true,
-    "last_computed_at": "2026-07-05T01:14:40.075411400+00:00",
+    "last_computed_at": "2026-07-05T05:21:45.171419300+00:00",
     "agent_pack_score": 95,
     "agent_context_score": 85,
     "human_docs_score": 95,
@@ -52,7 +52,7 @@
         "id": "baseline_match",
         "severity": "info",
         "title": "与 baseline 提交一致",
-        "detail": "源码索引与 Agent 上下文均基于提交 33485cab078f600191512f3906a58b5158d17ad6 生成，相对 HEAD 无文件漂移。"
+        "detail": "源码索引与 Agent 上下文均基于提交 551d5eda547de6471db7c2a956cf571c51d444d8 生成，相对 HEAD 无文件漂移。"
       },
       {
         "id": "dirty_tree",
@@ -75,8 +75,8 @@
         "detail": "综合分取三层最低值：源码索引 95、Agent 上下文 85、人类文档 95。"
       }
     ],
-    "pack_baseline_short": "33485ca",
-    "context_baseline_short": "33485ca"
+    "pack_baseline_short": "551d5ed",
+    "context_baseline_short": "551d5ed"
   },
-  "last_computed_at": "2026-07-05T01:14:40.075411400+00:00"
+  "last_computed_at": "2026-07-05T05:21:45.171419300+00:00"
 }

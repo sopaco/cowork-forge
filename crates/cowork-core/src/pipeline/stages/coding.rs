@@ -178,6 +178,9 @@ impl CodingStage {
                             }
                             Some(AgentMessage::Completed) => {
                                 interaction_clone.show_message_with_context(MessageLevel::Info, "✅ Task completed".to_string(), ctx_external.clone()).await;
+                                // Exit the loop — the ACP client sends Completed after
+                                // the prompt finishes and the agent process is cleaned up.
+                                break;
                             }
                             None => {
                                 // Channel closed, exit loop
@@ -197,9 +200,15 @@ impl CodingStage {
         match result.await {
             // Inner Ok: ACP execution succeeded
             Ok(Ok(_output)) => {
-                // Wait for message handling to finish
-                let _ = message_handle.await;
-                
+                // Wait for message handling to finish (with timeout as a safety net).
+                // The ACP client sends AgentMessage::Completed after cleanup, which
+                // breaks the message loop. The timeout guards against any edge case
+                // where the loop fails to exit.
+                let _ = tokio::time::timeout(
+                    tokio::time::Duration::from_secs(10),
+                    message_handle,
+                ).await;
+
                 interaction
                     .show_message_with_context(
                         MessageLevel::Info,
@@ -211,6 +220,8 @@ impl CodingStage {
             }
             // Inner Err: ACP execution failed
             Ok(Err(e)) => {
+                // Abort the message loop on error — the result is already available.
+                message_handle.abort();
                 let error_msg = format!("External agent execution error: {}", e);
                 interaction
                     .show_message_with_context(
@@ -223,6 +234,8 @@ impl CodingStage {
             }
             // Outer Err: Channel/thread error
             Err(e) => {
+                // Abort the message loop on error — the result is already available.
+                message_handle.abort();
                 let error_msg = format!("External agent error: {}", e);
                 interaction
                     .show_message_with_context(

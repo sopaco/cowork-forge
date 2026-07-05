@@ -221,3 +221,5 @@ React Invoke Tauri Command → Core Pipeline
 | 遗留项目导入 | `crates/cowork-core/src/importer/` | 分析/逆向生成 |
 | 集成钩子 | `crates/cowork-core/src/integration/` | HookManager |
 | Artifact 存储 | `crates/cowork-core/src/tools/artifact_tools.rs` | 制品持久化 |
+| 项目运行时 | `crates/cowork-core/src/project_runtime.rs` | 运行时配置与安全上下文 |
+| 技术栈检测 | `crates/cowork-core/src/tech_stack.rs` | 遗留项目技术栈识别 |

@@ -388,10 +388,10 @@ fn run_acp_in_thread(
             Arc::new(std::sync::Mutex::new(Vec::new()));
         let stderr_buffer_clone = stderr_buffer.clone();
 
-        if let Some(stderr) = child.stderr.take() {
+        let stderr_handle: Option<tokio::task::JoinHandle<()>> = if let Some(stderr) = child.stderr.take() {
             let tx = message_tx.clone();
             let buf = stderr_buffer_clone.clone();
-            tokio::spawn(async move {
+            Some(tokio::spawn(async move {
                 use tokio::io::{AsyncBufReadExt, BufReader};
                 let mut stderr = BufReader::new(stderr).lines();
                 while let Ok(Some(line)) = stderr.next_line().await {
@@ -409,8 +409,10 @@ fn run_acp_in_thread(
                     };
                     let _ = tx.send(AgentMessage::Status(status));
                 }
-            });
-        }
+            }))
+        } else {
+            None
+        };
 
         // Helper to build an error context that includes recent stderr.
         let with_stderr = |msg: &str| {
@@ -432,6 +434,9 @@ fn run_acp_in_thread(
         let workspace_clone = workspace.clone();
         let tx_err = message_tx.clone();
         let status_tx = message_tx.clone();
+        // Clone for the completion notification sent after the local_set returns.
+        // The original message_tx is moved into CoworkClient inside the local_set block.
+        let completion_tx = message_tx.clone();
 
         let result: Result<String> = local_set
             .run_until(async move {
@@ -562,6 +567,27 @@ fn run_acp_in_thread(
             })
             .await;
 
+        // Cleanup: kill the child process and wait for stderr task to complete.
+        // This ensures all clones of message_tx are dropped before we return,
+        // which closes the message channel and unblocks the message loop in the
+        // pipeline stage. Without this, the stderr task (spawned via tokio::spawn)
+        // keeps message_tx alive and the channel never closes.
+        tracing::info!("Cleaning up ACP agent process");
+        let _ = child.start_kill();
+        // Wait for the child to exit (with a timeout to avoid hanging)
+        let _ = tokio::time::timeout(
+            tokio::time::Duration::from_secs(5),
+            child.wait(),
+        ).await;
+        // Wait for the stderr task to complete (it should exit once the child's
+        // stderr pipe closes, which happens when the child is killed)
+        if let Some(handle) = stderr_handle {
+            let _ = tokio::time::timeout(
+                tokio::time::Duration::from_secs(5),
+                handle,
+            ).await;
+        }
+
         if let Err(ref e) = result {
             let diagnostic = with_stderr(&e.to_string());
             tracing::error!(error = %diagnostic, "ACP agent failed");
@@ -569,8 +595,13 @@ fn run_acp_in_thread(
                 "ACP agent failed: {}",
                 diagnostic
             )));
+            // Signal the message loop to exit even on error
+            let _ = completion_tx.send(AgentMessage::Completed);
             return Err(anyhow::anyhow!(diagnostic));
         }
+        // Notify the message loop that the task is complete so it can exit.
+        // This is the primary signal that unblocks the pipeline stage.
+        let _ = completion_tx.send(AgentMessage::Completed);
         result
     })
 }

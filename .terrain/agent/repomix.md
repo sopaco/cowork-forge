@@ -1573,6 +1573,42 @@ LICENSE
 78: )
 ```
 
+### crates/cowork-core/src/tools/mod.rs (31 lines)
+
+```
+1: set_current_agent_name
+2: ⋮----
+3: (name: &str)
+4: ⋮----
+5: get_current_agent_name
+6: ⋮----
+7: ()
+8: ⋮----
+9: get_required_string_param
+10: ⋮----
+11: (args: &'a Value, key: &str)
+12: ⋮----
+13: get_optional_string_param
+14: ⋮----
+15: (args: &Value, key: &str)
+16: ⋮----
+17: get_required_array_param
+18: ⋮----
+19: (args: &'a Value, key: &str)
+20: ⋮----
+21: set_tool_notify_callback
+22: ⋮----
+23: (callback: F)
+24: ⋮----
+25: notify_tool_call
+26: ⋮----
+27: (tool_name: &str, args: &Value)
+28: ⋮----
+29: notify_tool_result
+30: ⋮----
+31: (tool_name: &str, result: &Result<Value, AdkError>)
+```
+
 ### crates/cowork-core/src/lib.rs (109 lines)
 
 ```
@@ -2333,42 +2369,6 @@ LICENSE
 641:         knowledge::regenerate_iteration_knowledge(&self.iteration_store, iteration_id, model).await
 642:     }
 643: }
-```
-
-### crates/cowork-core/src/tools/mod.rs (31 lines)
-
-```
-1: set_current_agent_name
-2: ⋮----
-3: (name: &str)
-4: ⋮----
-5: get_current_agent_name
-6: ⋮----
-7: ()
-8: ⋮----
-9: get_required_string_param
-10: ⋮----
-11: (args: &'a Value, key: &str)
-12: ⋮----
-13: get_optional_string_param
-14: ⋮----
-15: (args: &Value, key: &str)
-16: ⋮----
-17: get_required_array_param
-18: ⋮----
-19: (args: &'a Value, key: &str)
-20: ⋮----
-21: set_tool_notify_callback
-22: ⋮----
-23: (callback: F)
-24: ⋮----
-25: notify_tool_call
-26: ⋮----
-27: (tool_name: &str, args: &Value)
-28: ⋮----
-29: notify_tool_result
-30: ⋮----
-31: (tool_name: &str, result: &Result<Value, AdkError>)
 ```
 
 ### Cargo.toml (53 lines)
@@ -3849,664 +3849,6 @@ LICENSE
 15: pub use validator::*;
 16: pub use builtin::load_builtin_configs;
 17: pub use agent_factory::{create_agent_for_stage, create_agent_from_config, initialize_config_registry, initialize_mcp_toolsets, is_mcp_initialized};
-```
-
-### crates/cowork-core/src/config_definition/registry.rs (653 lines)
-
-```
-1: get_user_config_dir
-2: ⋮----
-3: ()
-4: ⋮----
-5: ensure_user_config_dir
-6: ⋮----
-7: ()
-8: ⋮----
-9: ConfigRegistry
-10: ⋮----
-11: {
-12:     
-13:     agents: RwLock<HashMap<String, AgentDefinition>>,
-14:     
-15:     stages: RwLock<HashMap<String, StageDefinition>>,
-16:     
-17:     flows: RwLock<HashMap<String, FlowDefinition>>,
-18:     
-19:     integrations: RwLock<HashMap<String, IntegrationDefinition>>,
-20:     
-21:     default_flow: RwLock<Option<String>>,
-22: }
-23: ⋮----
-24: ConfigRegistry
-25: ⋮----
-26: {
-27:     fn default() -> Self {
-28:         Self::new()
-29:     }
-30: }
-31: ⋮----
-32: ConfigRegistry
-33: ⋮----
-34: {
-35:     
-36:     pub fn new() -> Self {
-37:         Self {
-38:             agents: RwLock::new(HashMap::new()),
-39:             stages: RwLock::new(HashMap::new()),
-40:             flows: RwLock::new(HashMap::new()),
-41:             integrations: RwLock::new(HashMap::new()),
-42:             default_flow: RwLock::new(None),
-43:         }
-44:     }
-45:     
-46:     
-47:     
-48:     
-49:     
-50:     
-51:     pub fn register_agent(&self, definition: AgentDefinition) -> Result<()> {
-52:         let id = definition.id.clone();
-53:         let mut agents = self.agents.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-54:         agents.insert(id.clone(), definition);
-55:         tracing::debug!("Registered agent: {}", id);
-56:         Ok(())
-57:     }
-58:     
-59:     
-60:     pub fn get_agent(&self, id: &str) -> Option<AgentDefinition> {
-61:         let agents = self.agents.read().ok()?;
-62:         agents.get(id).cloned()
-63:     }
-64:     
-65:     
-66:     pub fn list_agents(&self) -> Vec<String> {
-67:         let agents = self.agents.read().unwrap_or_else(|e| {
-68:             tracing::error!("Lock error: {}", e);
-69:             panic!("Lock error")
-70:         });
-71:         agents.keys().cloned().collect()
-72:     }
-73:     
-74:     
-75:     pub fn unregister_agent(&self, id: &str) -> bool {
-76:         let mut agents = self.agents.write().unwrap_or_else(|e| {
-77:             tracing::error!("Lock error: {}", e);
-78:             panic!("Lock error")
-79:         });
-80:         agents.remove(id).is_some()
-81:     }
-82:     
-83:     
-84:     
-85:     
-86:     
-87:     
-88:     pub fn register_stage(&self, definition: StageDefinition) -> Result<()> {
-89:         let id = definition.id.clone();
-90:         let mut stages = self.stages.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-91:         stages.insert(id.clone(), definition);
-92:         tracing::debug!("Registered stage: {}", id);
-93:         Ok(())
-94:     }
-95:     
-96:     
-97:     pub fn get_stage(&self, id: &str) -> Option<StageDefinition> {
-98:         let stages = self.stages.read().ok()?;
-99:         stages.get(id).cloned()
-100:     }
-101:     
-102:     
-103:     pub fn list_stages(&self) -> Vec<String> {
-104:         let stages = self.stages.read().unwrap_or_else(|e| {
-105:             tracing::error!("Lock error: {}", e);
-106:             panic!("Lock error")
-107:         });
-108:         stages.keys().cloned().collect()
-109:     }
-110:     
-111:     
-112:     
-113:     
-114:     
-115:     
-116:     pub fn register_flow(&self, definition: FlowDefinition) -> Result<()> {
-117:         let id = definition.id.clone();
-118:         let mut flows = self.flows.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-119:         flows.insert(id.clone(), definition);
-120:         tracing::debug!("Registered flow: {}", id);
-121:         Ok(())
-122:     }
-123:     
-124:     
-125:     pub fn get_flow(&self, id: &str) -> Option<FlowDefinition> {
-126:         let flows = self.flows.read().ok()?;
-127:         flows.get(id).cloned()
-128:     }
-129:     
-130:     
-131:     pub fn list_flows(&self) -> Vec<String> {
-132:         let flows = self.flows.read().unwrap_or_else(|e| {
-133:             tracing::error!("Lock error: {}", e);
-134:             panic!("Lock error")
-135:         });
-136:         flows.keys().cloned().collect()
-137:     }
-138:     
-139:     
-140:     pub fn unregister_flow(&self, id: &str) -> bool {
-141:         let mut flows = self.flows.write().unwrap_or_else(|e| {
-142:             tracing::error!("Lock error: {}", e);
-143:             panic!("Lock error")
-144:         });
-145:         flows.remove(id).is_some()
-146:     }
-147:     
-148:     
-149:     pub fn set_default_flow(&self, id: Option<String>) -> Result<()> {
-150:         {
-151:             let mut default_flow = self.default_flow.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-152:             *default_flow = id.clone();
-153:         }
-154:         
-155:         self.save_settings()?;
-156:         Ok(())
-157:     }
-158:     
-159:     
-160:     
-161:     pub fn set_default_flow_without_save(&self, id: Option<String>) {
-162:         if let Ok(mut default_flow) = self.default_flow.write() {
-163:             *default_flow = id;
-164:         }
-165:     }
-166:     
-167:     
-168:     pub fn get_default_flow_id(&self) -> Option<String> {
-169:         let default_flow = self.default_flow.read().ok()?;
-170:         default_flow.clone()
-171:     }
-172:     
-173:     
-174:     pub fn get_default_flow(&self) -> Option<FlowDefinition> {
-175:         let default_flow = self.default_flow.read().ok()?;
-176:         let flow_id = default_flow.as_ref()?;
-177:         self.get_flow(flow_id)
-178:     }
-179:     
-180:     
-181:     
-182:     
-183:     
-184:     
-185:     fn get_settings_file_path() -> Option<PathBuf> {
-186:         get_user_config_dir().map(|dir| dir.join("settings.json"))
-187:     }
-188:     
-189:     
-190:     pub fn save_settings(&self) -> Result<()> {
-191:         let settings = Settings {
-192:             default_flow_id: self.get_default_flow_id(),
-193:         };
-194:         
-195:         let config_dir = ensure_user_config_dir()?;
-196:         let file_path = config_dir.join("settings.json");
-197:         let content = serde_json::to_string_pretty(&settings)
-198:             .with_context(|| "Failed to serialize settings")?;
-199:         
-200:         fs::write(&file_path, content)
-201:             .with_context(|| format!("Failed to write settings file: {:?}", file_path))?;
-202:         
-203:         tracing::debug!("Saved settings to {:?}", file_path);
-204:         Ok(())
-205:     }
-206:     
-207:     
-208:     pub fn load_settings(&self) -> Result<()> {
-209:         if let Some(file_path) = Self::get_settings_file_path() {
-210:             if file_path.exists() {
-211:                 match fs::read_to_string(&file_path)
-212:                     .and_then(|content| serde_json::from_str::<Settings>(&content)
-213:                         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-214:                 {
-215:                     Ok(settings) => {
-216:                         if let Some(flow_id) = settings.default_flow_id {
-217:                             
-218:                             if self.get_flow(&flow_id).is_some() {
-219:                                 let mut default_flow = self.default_flow.write()
-220:                                     .map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-221:                                 *default_flow = Some(flow_id.clone());
-222:                                 tracing::info!("Loaded default flow setting: {}", flow_id);
-223:                             } else {
-224:                                 tracing::warn!("Default flow '{}' not found, ignoring setting", flow_id);
-225:                             }
-226:                         }
-227:                     }
-228:                     Err(e) => {
-229:                         tracing::warn!("Failed to load settings: {}", e);
-230:                     }
-231:                 }
-232:             }
-233:         }
-234:         Ok(())
-235:     }
-236:     
-237:     
-238:     
-239:     
-240:     
-241:     
-242:     pub fn register_integration(&self, definition: IntegrationDefinition) -> Result<()> {
-243:         let id = definition.id.clone();
-244:         let mut integrations = self.integrations.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-245:         integrations.insert(id.clone(), definition);
-246:         tracing::debug!("Registered integration: {}", id);
-247:         Ok(())
-248:     }
-249:     
-250:     
-251:     pub fn get_integration(&self, id: &str) -> Option<IntegrationDefinition> {
-252:         let integrations = self.integrations.read().ok()?;
-253:         integrations.get(id).cloned()
-254:     }
-255:     
-256:     
-257:     pub fn list_integrations(&self) -> Vec<String> {
-258:         let integrations = self.integrations.read().unwrap_or_else(|e| {
-259:             tracing::error!("Lock error: {}", e);
-260:             panic!("Lock error")
-261:         });
-262:         integrations.keys().cloned().collect()
-263:     }
-264:     
-265:     
-266:     pub fn get_enabled_integrations(&self) -> Vec<IntegrationDefinition> {
-267:         let integrations = self.integrations.read().unwrap_or_else(|e| {
-268:             tracing::error!("Lock error: {}", e);
-269:             panic!("Lock error")
-270:         });
-271:         integrations.values().filter(|i| i.enabled).cloned().collect()
-272:     }
-273:     
-274:     
-275:     
-276:     
-277:     
-278:     
-279:     pub fn clear(&self) -> Result<()> {
-280:         {
-281:             let mut agents = self.agents.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-282:             agents.clear();
-283:         }
-284:         {
-285:             let mut stages = self.stages.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-286:             stages.clear();
-287:         }
-288:         {
-289:             let mut flows = self.flows.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-290:             flows.clear();
-291:         }
-292:         {
-293:             let mut integrations = self.integrations.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-294:             integrations.clear();
-295:         }
-296:         Ok(())
-297:     }
-298:     
-299:     
-300:     pub fn stats(&self) -> RegistryStats {
-301:         RegistryStats {
-302:             agents: self.agents.read().map(|g| g.len()).unwrap_or(0),
-303:             stages: self.stages.read().map(|g| g.len()).unwrap_or(0),
-304:             flows: self.flows.read().map(|g| g.len()).unwrap_or(0),
-305:             integrations: self.integrations.read().map(|g| g.len()).unwrap_or(0),
-306:         }
-307:     }
-308:     
-309:     
-310:     
-311:     
-312:     
-313:     
-314:     pub fn save_agent_to_file(&self, agent: &AgentDefinition) -> Result<()> {
-315:         let config_dir = ensure_user_config_dir()?;
-316:         let agents_dir = config_dir.join("agents");
-317:         fs::create_dir_all(&agents_dir)
-318:             .with_context(|| format!("Failed to create agents directory: {:?}", agents_dir))?;
-319:         
-320:         let file_path = agents_dir.join(format!("{}.json", agent.id));
-321:         let content = serde_json::to_string_pretty(agent)
-322:             .with_context(|| format!("Failed to serialize agent: {}", agent.id))?;
-323:         
-324:         fs::write(&file_path, content)
-325:             .with_context(|| format!("Failed to write agent file: {:?}", file_path))?;
-326:         
-327:         tracing::info!("Saved agent '{}' to {:?}", agent.id, file_path);
-328:         Ok(())
-329:     }
-330:     
-331:     
-332:     pub fn delete_agent_file(&self, id: &str) -> Result<()> {
-333:         if let Some(config_dir) = get_user_config_dir() {
-334:             let file_path = config_dir.join("agents").join(format!("{}.json", id));
-335:             if file_path.exists() {
-336:                 fs::remove_file(&file_path)
-337:                     .with_context(|| format!("Failed to delete agent file: {:?}", file_path))?;
-338:                 tracing::info!("Deleted agent file: {:?}", file_path);
-339:             }
-340:         }
-341:         Ok(())
-342:     }
-343:     
-344:     
-345:     pub fn save_stage_to_file(&self, stage: &StageDefinition) -> Result<()> {
-346:         let config_dir = ensure_user_config_dir()?;
-347:         let stages_dir = config_dir.join("stages");
-348:         fs::create_dir_all(&stages_dir)
-349:             .with_context(|| format!("Failed to create stages directory: {:?}", stages_dir))?;
-350:         
-351:         let file_path = stages_dir.join(format!("{}.json", stage.id));
-352:         let content = serde_json::to_string_pretty(stage)
-353:             .with_context(|| format!("Failed to serialize stage: {}", stage.id))?;
-354:         
-355:         fs::write(&file_path, content)
-356:             .with_context(|| format!("Failed to write stage file: {:?}", file_path))?;
-357:         
-358:         tracing::info!("Saved stage '{}' to {:?}", stage.id, file_path);
-359:         Ok(())
-360:     }
-361:     
-362:     
-363:     pub fn delete_stage_file(&self, id: &str) -> Result<()> {
-364:         if let Some(config_dir) = get_user_config_dir() {
-365:             let file_path = config_dir.join("stages").join(format!("{}.json", id));
-366:             if file_path.exists() {
-367:                 fs::remove_file(&file_path)
-368:                     .with_context(|| format!("Failed to delete stage file: {:?}", file_path))?;
-369:                 tracing::info!("Deleted stage file: {:?}", file_path);
-370:             }
-371:         }
-372:         Ok(())
-373:     }
-374:     
-375:     
-376:     pub fn save_flow_to_file(&self, flow: &FlowDefinition) -> Result<()> {
-377:         let config_dir = ensure_user_config_dir()?;
-378:         let flows_dir = config_dir.join("flows");
-379:         fs::create_dir_all(&flows_dir)
-380:             .with_context(|| format!("Failed to create flows directory: {:?}", flows_dir))?;
-381:         
-382:         let file_path = flows_dir.join(format!("{}.json", flow.id));
-383:         let content = serde_json::to_string_pretty(flow)
-384:             .with_context(|| format!("Failed to serialize flow: {}", flow.id))?;
-385:         
-386:         fs::write(&file_path, content)
-387:             .with_context(|| format!("Failed to write flow file: {:?}", file_path))?;
-388:         
-389:         tracing::info!("Saved flow '{}' to {:?}", flow.id, file_path);
-390:         Ok(())
-391:     }
-392:     
-393:     
-394:     pub fn delete_flow_file(&self, id: &str) -> Result<()> {
-395:         if let Some(config_dir) = get_user_config_dir() {
-396:             let file_path = config_dir.join("flows").join(format!("{}.json", id));
-397:             if file_path.exists() {
-398:                 fs::remove_file(&file_path)
-399:                     .with_context(|| format!("Failed to delete flow file: {:?}", file_path))?;
-400:                 tracing::info!("Deleted flow file: {:?}", file_path);
-401:             }
-402:         }
-403:         Ok(())
-404:     }
-405:     
-406:     
-407:     pub fn save_integration_to_file(&self, integration: &IntegrationDefinition) -> Result<()> {
-408:         let config_dir = ensure_user_config_dir()?;
-409:         let integrations_dir = config_dir.join("integrations");
-410:         fs::create_dir_all(&integrations_dir)
-411:             .with_context(|| format!("Failed to create integrations directory: {:?}", integrations_dir))?;
-412:         
-413:         let file_path = integrations_dir.join(format!("{}.json", integration.id));
-414:         let content = serde_json::to_string_pretty(integration)
-415:             .with_context(|| format!("Failed to serialize integration: {}", integration.id))?;
-416:         
-417:         fs::write(&file_path, content)
-418:             .with_context(|| format!("Failed to write integration file: {:?}", file_path))?;
-419:         
-420:         tracing::info!("Saved integration '{}' to {:?}", integration.id, file_path);
-421:         Ok(())
-422:     }
-423:     
-424:     
-425:     pub fn delete_integration_file(&self, id: &str) -> Result<()> {
-426:         if let Some(config_dir) = get_user_config_dir() {
-427:             let file_path = config_dir.join("integrations").join(format!("{}.json", id));
-428:             if file_path.exists() {
-429:                 fs::remove_file(&file_path)
-430:                     .with_context(|| format!("Failed to delete integration file: {:?}", file_path))?;
-431:                 tracing::info!("Deleted integration file: {:?}", file_path);
-432:             }
-433:         }
-434:         Ok(())
-435:     }
-436:     
-437:     
-438:     pub fn load_user_configs(&self) -> Result<LoadUserReport> {
-439:         let mut report = LoadUserReport::default();
-440:         
-441:         if let Some(config_dir) = get_user_config_dir() {
-442:             if config_dir.exists() {
-443:                 
-444:                 let agents_dir = config_dir.join("agents");
-445:                 if agents_dir.exists() {
-446:                     for entry in fs::read_dir(&agents_dir)
-447:                         .with_context(|| format!("Failed to read agents directory: {:?}", agents_dir))?
-448:                         .filter_map(|e| e.ok())
-449:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
-450:                     {
-451:                         let path = entry.path();
-452:                         match fs::read_to_string(&path)
-453:                             .and_then(|content| serde_json::from_str::<AgentDefinition>(&content)
-454:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-455:                         {
-456:                             Ok(agent) => {
-457:                                 let id = agent.id.clone();
-458:                                 self.register_agent(agent)?;
-459:                                 report.agents_loaded += 1;
-460:                                 tracing::debug!("Loaded user agent: {} from {:?}", id, path);
-461:                             }
-462:                             Err(e) => {
-463:                                 report.errors.push(format!("Failed to load agent from {:?}: {}", path, e));
-464:                             }
-465:                         }
-466:                     }
-467:                 }
-468:                 
-469:                 
-470:                 let stages_dir = config_dir.join("stages");
-471:                 if stages_dir.exists() {
-472:                     for entry in fs::read_dir(&stages_dir)
-473:                         .with_context(|| format!("Failed to read stages directory: {:?}", stages_dir))?
-474:                         .filter_map(|e| e.ok())
-475:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
-476:                     {
-477:                         let path = entry.path();
-478:                         match fs::read_to_string(&path)
-479:                             .and_then(|content| serde_json::from_str::<StageDefinition>(&content)
-480:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-481:                         {
-482:                             Ok(stage) => {
-483:                                 let id = stage.id.clone();
-484:                                 self.register_stage(stage)?;
-485:                                 report.stages_loaded += 1;
-486:                                 tracing::debug!("Loaded user stage: {} from {:?}", id, path);
-487:                             }
-488:                             Err(e) => {
-489:                                 report.errors.push(format!("Failed to load stage from {:?}: {}", path, e));
-490:                             }
-491:                         }
-492:                     }
-493:                 }
-494:                 
-495:                 
-496:                 let flows_dir = config_dir.join("flows");
-497:                 if flows_dir.exists() {
-498:                     for entry in fs::read_dir(&flows_dir)
-499:                         .with_context(|| format!("Failed to read flows directory: {:?}", flows_dir))?
-500:                         .filter_map(|e| e.ok())
-501:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
-502:                     {
-503:                         let path = entry.path();
-504:                         match fs::read_to_string(&path)
-505:                             .and_then(|content| serde_json::from_str::<FlowDefinition>(&content)
-506:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-507:                         {
-508:                             Ok(flow) => {
-509:                                 let id = flow.id.clone();
-510:                                 
-511:                                 if let Some(existing) = self.get_flow(&id) {
-512:                                     if existing.is_builtin {
-513:                                         tracing::debug!(
-514:                                             "Skipping user flow '{}' - builtin preset with same ID exists",
-515:                                             id
-516:                                         );
-517:                                         continue;
-518:                                     }
-519:                                 }
-520:                                 self.register_flow(flow)?;
-521:                                 report.flows_loaded += 1;
-522:                                 tracing::debug!("Loaded user flow: {} from {:?}", id, path);
-523:                             }
-524:                             Err(e) => {
-525:                                 report.errors.push(format!("Failed to load flow from {:?}: {}", path, e));
-526:                             }
-527:                         }
-528:                     }
-529:                 }
-530:                 
-531:                 
-532:                 let integrations_dir = config_dir.join("integrations");
-533:                 if integrations_dir.exists() {
-534:                     for entry in fs::read_dir(&integrations_dir)
-535:                         .with_context(|| format!("Failed to read integrations directory: {:?}", integrations_dir))?
-536:                         .filter_map(|e| e.ok())
-537:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
-538:                     {
-539:                         let path = entry.path();
-540:                         match fs::read_to_string(&path)
-541:                             .and_then(|content| serde_json::from_str::<IntegrationDefinition>(&content)
-542:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-543:                         {
-544:                             Ok(integration) => {
-545:                                 let id = integration.id.clone();
-546:                                 self.register_integration(integration)?;
-547:                                 report.integrations_loaded += 1;
-548:                                 tracing::debug!("Loaded user integration: {} from {:?}", id, path);
-549:                             }
-550:                             Err(e) => {
-551:                                 report.errors.push(format!("Failed to load integration from {:?}: {}", path, e));
-552:                             }
-553:                         }
-554:                     }
-555:                 }
-556:                 
-557:                 
-558:                 if let Err(e) = self.load_settings() {
-559:                     tracing::warn!("Failed to load settings: {}", e);
-560:                 }
-561:                 
-562:                 
-563:                 
-564:                 if self.get_default_flow_id().is_none() {
-565:                     if self.get_flow("default").is_some() {
-566:                         if let Err(e) = self.set_default_flow(Some("default".to_string())) {
-567:                             tracing::warn!("Failed to set default flow: {}", e);
-568:                         } else {
-569:                             tracing::info!("Set 'default' as the default flow (first time initialization)");
-570:                         }
-571:                     }
-572:                 }
-573:             }
-574:         } else {
-575:             
-576:             
-577:             if let Some(flow_id) = self.get_default_flow_id() {
-578:                 if let Err(e) = self.set_default_flow(Some(flow_id)) {
-579:                     tracing::warn!("Failed to save initial default flow setting: {}", e);
-580:                 }
-581:             }
-582:         }
-583:         
-584:         Ok(report)
-585:     }
-586: }
-587: ⋮----
-588: RegistryStats
-589: ⋮----
-590: {
-591:     pub agents: usize,
-592:     pub stages: usize,
-593:     pub flows: usize,
-594:     pub integrations: usize,
-595: }
-596: ⋮----
-597: LoadUserReport
-598: ⋮----
-599: {
-600:     pub agents_loaded: usize,
-601:     pub stages_loaded: usize,
-602:     pub flows_loaded: usize,
-603:     pub integrations_loaded: usize,
-604:     pub errors: Vec<String>,
-605: }
-606: ⋮----
-607: LoadReport
-608: ⋮----
-609: {
-610:     pub agents_loaded: usize,
-611:     pub stages_loaded: usize,
-612:     pub flows_loaded: usize,
-613:     pub integrations_loaded: usize,
-614:     pub default_flow_set: bool,
-615:     pub errors: Vec<String>,
-616: }
-617: ⋮----
-618: LoadReport
-619: ⋮----
-620: {
-621:     pub fn total_loaded(&self) -> usize {
-622:         self.agents_loaded + self.stages_loaded + self.flows_loaded + self.integrations_loaded
-623:     }
-624: 
-625:     pub fn has_errors(&self) -> bool {
-626:         !self.errors.is_empty()
-627:     }
-628: }
-629: ⋮----
-630: Settings
-631: ⋮----
-632: {
-633:     
-634:     pub default_flow_id: Option<String>,
-635: }
-636: ⋮----
-637: Settings
-638: ⋮----
-639: {
-640:     fn default() -> Self {
-641:         Self {
-642:             default_flow_id: None,
-643:         }
-644:     }
-645: }
-646: ⋮----
-647: global_registry
-648: ⋮----
-649: ()
-650: ⋮----
-651: test_registry_operations
-652: ⋮----
-653: ()
 ```
 
 ### crates/cowork-core/src/domain/iteration.rs (319 lines)
@@ -9986,30 +9328,6 @@ LICENSE
 210: }
 ```
 
-### crates/cowork-core/src/config_definition/builtin.rs (19 lines)
-
-```
-1: load_builtin_configs
-2: ⋮----
-3: (registry: &ConfigRegistry)
-4: ⋮----
-5: load_agent_from_embedded
-6: ⋮----
-7: (contents: &[u8])
-8: ⋮----
-9: load_stage_from_embedded
-10: ⋮----
-11: (contents: &[u8])
-12: ⋮----
-13: load_flow_from_embedded
-14: ⋮----
-15: (contents: &[u8])
-16: ⋮----
-17: test_load_builtin_configs
-18: ⋮----
-19: ()
-```
-
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/check_agent.json (51 lines)
 
 ```
@@ -10497,278 +9815,662 @@ LICENSE
 48: }
 ```
 
-### crates/cowork-core/src/config_definition/flow_definition.rs (269 lines)
+### crates/cowork-core/src/config_definition/registry.rs (653 lines)
 
 ```
-1: FlowDefinition
+1: get_user_config_dir
 2: ⋮----
-3: {
-4:     
-5:     pub id: String,
-6:     
-7:     pub name: String,
-8:     
-9:     pub description: Option<String>,
-10:     
-11:     pub version: Option<String>,
-12: 
-13:     
-14:     pub stages: Vec<StageReference>,
-15: 
+3: ()
+4: ⋮----
+5: ensure_user_config_dir
+6: ⋮----
+7: ()
+8: ⋮----
+9: ConfigRegistry
+10: ⋮----
+11: {
+12:     
+13:     agents: RwLock<HashMap<String, AgentDefinition>>,
+14:     
+15:     stages: RwLock<HashMap<String, StageDefinition>>,
 16:     
-17:     #[serde(default)]
-18:     pub start_stage: Option<String>,
-19: 
+17:     flows: RwLock<HashMap<String, FlowDefinition>>,
+18:     
+19:     integrations: RwLock<HashMap<String, IntegrationDefinition>>,
 20:     
-21:     #[serde(default)]
-22:     pub global_hooks: Vec<GlobalHookConfig>,
-23: 
-24:     
-25:     #[serde(default)]
-26:     pub config: FlowConfig,
-27: 
-28:     
-29:     #[serde(default)]
-30:     pub tags: Vec<String>,
-31: 
-32:     
-33:     #[serde(default)]
-34:     pub metadata: HashMap<String, serde_json::Value>,
-35: 
-36:     
-37:     #[serde(default)]
-38:     #[serde(skip_serializing_if = "is_false")]
-39:     pub is_builtin: bool,
-40: }
-41: ⋮----
-42: is_false
-43: ⋮----
-44: (value: &bool)
-45: ⋮----
-46: StageReference
-47: ⋮----
-48: {
+21:     default_flow: RwLock<Option<String>>,
+22: }
+23: ⋮----
+24: ConfigRegistry
+25: ⋮----
+26: {
+27:     fn default() -> Self {
+28:         Self::new()
+29:     }
+30: }
+31: ⋮----
+32: ConfigRegistry
+33: ⋮----
+34: {
+35:     
+36:     pub fn new() -> Self {
+37:         Self {
+38:             agents: RwLock::new(HashMap::new()),
+39:             stages: RwLock::new(HashMap::new()),
+40:             flows: RwLock::new(HashMap::new()),
+41:             integrations: RwLock::new(HashMap::new()),
+42:             default_flow: RwLock::new(None),
+43:         }
+44:     }
+45:     
+46:     
+47:     
+48:     
 49:     
-50:     pub stage_id: String,
-51:     
-52:     pub alias: Option<String>,
-53:     
-54:     #[serde(default)]
-55:     pub overrides: StageOverrides,
-56:     
-57:     #[serde(default)]
-58:     pub condition: Option<String>,
+50:     
+51:     pub fn register_agent(&self, definition: AgentDefinition) -> Result<()> {
+52:         let id = definition.id.clone();
+53:         let mut agents = self.agents.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+54:         agents.insert(id.clone(), definition);
+55:         tracing::debug!("Registered agent: {}", id);
+56:         Ok(())
+57:     }
+58:     
 59:     
-60:     pub on_success: Option<String>,
-61:     
-62:     pub on_failure: Option<String>,
-63: }
-64: ⋮----
-65: StageOverrides
-66: ⋮----
-67: {
-68:     
-69:     pub needs_confirmation: Option<bool>,
-70:     
-71:     #[serde(default)]
-72:     pub hooks: Vec<super::stage_definition::HookConfig>,
+60:     pub fn get_agent(&self, id: &str) -> Option<AgentDefinition> {
+61:         let agents = self.agents.read().ok()?;
+62:         agents.get(id).cloned()
+63:     }
+64:     
+65:     
+66:     pub fn list_agents(&self) -> Vec<String> {
+67:         let agents = self.agents.read().unwrap_or_else(|e| {
+68:             tracing::error!("Lock error: {}", e);
+69:             panic!("Lock error")
+70:         });
+71:         agents.keys().cloned().collect()
+72:     }
 73:     
-74:     pub timeout_secs: Option<u32>,
-75:     
-76:     #[serde(default)]
-77:     pub skip: bool,
-78: }
-79: ⋮----
-80: GlobalHookConfig
-81: ⋮----
-82: {
+74:     
+75:     pub fn unregister_agent(&self, id: &str) -> bool {
+76:         let mut agents = self.agents.write().unwrap_or_else(|e| {
+77:             tracing::error!("Lock error: {}", e);
+78:             panic!("Lock error")
+79:         });
+80:         agents.remove(id).is_some()
+81:     }
+82:     
 83:     
-84:     pub integration_id: String,
+84:     
 85:     
-86:     pub points: Vec<super::stage_definition::HookPoint>,
+86:     
 87:     
-88:     #[serde(default)]
-89:     pub blocking: bool,
-90:     
-91:     #[serde(default = "default_global_timeout")]
-92:     pub timeout_secs: u32,
-93: }
-94: ⋮----
-95: default_global_timeout
-96: ⋮----
-97: ()
-98: ⋮----
-99: FlowConfig
-100: ⋮----
-101: {
+88:     pub fn register_stage(&self, definition: StageDefinition) -> Result<()> {
+89:         let id = definition.id.clone();
+90:         let mut stages = self.stages.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+91:         stages.insert(id.clone(), definition);
+92:         tracing::debug!("Registered stage: {}", id);
+93:         Ok(())
+94:     }
+95:     
+96:     
+97:     pub fn get_stage(&self, id: &str) -> Option<StageDefinition> {
+98:         let stages = self.stages.read().ok()?;
+99:         stages.get(id).cloned()
+100:     }
+101:     
 102:     
-103:     #[serde(default = "default_stop_on_failure")]
-104:     pub stop_on_failure: bool,
-105: 
-106:     
-107:     pub max_total_time_secs: Option<u32>,
-108: 
-109:     
-110:     #[serde(default = "default_save_state")]
-111:     pub save_state_on_interrupt: bool,
-112: 
+103:     pub fn list_stages(&self) -> Vec<String> {
+104:         let stages = self.stages.read().unwrap_or_else(|e| {
+105:             tracing::error!("Lock error: {}", e);
+106:             panic!("Lock error")
+107:         });
+108:         stages.keys().cloned().collect()
+109:     }
+110:     
+111:     
+112:     
 113:     
-114:     #[serde(default)]
-115:     pub memory_scope: MemoryScope,
-116: 
-117:     
-118:     #[serde(default)]
-119:     pub inheritance: InheritanceConfig,
-120: }
-121: ⋮----
-122: FlowConfig
-123: ⋮----
-124: {
-125:     fn default() -> Self {
-126:         Self {
-127:             stop_on_failure: true,
-128:             max_total_time_secs: None,
-129:             save_state_on_interrupt: true,
-130:             memory_scope: MemoryScope::default(),
-131:             inheritance: InheritanceConfig::default(),
-132:         }
-133:     }
-134: }
-135: ⋮----
-136: default_stop_on_failure
-137: ⋮----
-138: ()
-139: ⋮----
-140: default_save_state
-141: ⋮----
-142: ()
-143: ⋮----
-144: MemoryScope
-145: ⋮----
-146: {
+114:     
+115:     
+116:     pub fn register_flow(&self, definition: FlowDefinition) -> Result<()> {
+117:         let id = definition.id.clone();
+118:         let mut flows = self.flows.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+119:         flows.insert(id.clone(), definition);
+120:         tracing::debug!("Registered flow: {}", id);
+121:         Ok(())
+122:     }
+123:     
+124:     
+125:     pub fn get_flow(&self, id: &str) -> Option<FlowDefinition> {
+126:         let flows = self.flows.read().ok()?;
+127:         flows.get(id).cloned()
+128:     }
+129:     
+130:     
+131:     pub fn list_flows(&self) -> Vec<String> {
+132:         let flows = self.flows.read().unwrap_or_else(|e| {
+133:             tracing::error!("Lock error: {}", e);
+134:             panic!("Lock error")
+135:         });
+136:         flows.keys().cloned().collect()
+137:     }
+138:     
+139:     
+140:     pub fn unregister_flow(&self, id: &str) -> bool {
+141:         let mut flows = self.flows.write().unwrap_or_else(|e| {
+142:             tracing::error!("Lock error: {}", e);
+143:             panic!("Lock error")
+144:         });
+145:         flows.remove(id).is_some()
+146:     }
 147:     
-148:     Project,
-149:     
-150:     Iteration,
-151:     
-152:     #[default]
-153:     Merged,
-154: }
-155: ⋮----
-156: InheritanceConfig
-157: ⋮----
-158: {
+148:     
+149:     pub fn set_default_flow(&self, id: Option<String>) -> Result<()> {
+150:         {
+151:             let mut default_flow = self.default_flow.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+152:             *default_flow = id.clone();
+153:         }
+154:         
+155:         self.save_settings()?;
+156:         Ok(())
+157:     }
+158:     
 159:     
-160:     #[serde(default)]
-161:     pub default_mode: InheritanceMode,
-162:     
-163:     #[serde(default)]
-164:     pub stage_mapping: HashMap<String, String>,
-165: }
-166: ⋮----
-167: InheritanceConfig
-168: ⋮----
-169: {
-170:     fn default() -> Self {
-171:         let mut stage_mapping = HashMap::new();
-172:         stage_mapping.insert("none".to_string(), "idea".to_string());
-173:         stage_mapping.insert("partial".to_string(), "idea".to_string());
-174:         stage_mapping.insert("full".to_string(), "idea".to_string());
-175: 
-176:         Self {
-177:             default_mode: InheritanceMode::Partial,
-178:             stage_mapping,
-179:         }
-180:     }
-181: }
-182: ⋮----
-183: InheritanceMode
-184: ⋮----
-185: {
-186:     
-187:     None,
+160:     
+161:     pub fn set_default_flow_without_save(&self, id: Option<String>) {
+162:         if let Ok(mut default_flow) = self.default_flow.write() {
+163:             *default_flow = id;
+164:         }
+165:     }
+166:     
+167:     
+168:     pub fn get_default_flow_id(&self) -> Option<String> {
+169:         let default_flow = self.default_flow.read().ok()?;
+170:         default_flow.clone()
+171:     }
+172:     
+173:     
+174:     pub fn get_default_flow(&self) -> Option<FlowDefinition> {
+175:         let default_flow = self.default_flow.read().ok()?;
+176:         let flow_id = default_flow.as_ref()?;
+177:         self.get_flow(flow_id)
+178:     }
+179:     
+180:     
+181:     
+182:     
+183:     
+184:     
+185:     fn get_settings_file_path() -> Option<PathBuf> {
+186:         get_user_config_dir().map(|dir| dir.join("settings.json"))
+187:     }
 188:     
-189:     #[default]
-190:     Partial,
-191:     
-192:     Full,
-193: }
-194: ⋮----
-195: FlowDefinition
-196: ⋮----
-197: {
-198:     
-199:     pub fn new(id: impl Into<String>, name: impl Into<String>) -> Self {
-200:         Self {
-201:             id: id.into(),
-202:             name: name.into(),
-203:             description: None,
-204:             version: None,
-205:             stages: Vec::new(),
-206:             start_stage: None,
-207:             global_hooks: Vec::new(),
-208:             config: FlowConfig::default(),
-209:             tags: Vec::new(),
-210:             metadata: HashMap::new(),
-211:             is_builtin: false,
-212:         }
-213:     }
-214:     
-215:     
-216:     pub fn as_builtin(mut self) -> Self {
-217:         self.is_builtin = true;
-218:         self
-219:     }
-220: 
-221:     
-222:     pub fn with_stage(mut self, stage_id: impl Into<String>) -> Self {
-223:         self.stages.push(StageReference {
-224:             stage_id: stage_id.into(),
-225:             alias: None,
-226:             overrides: StageOverrides::default(),
-227:             condition: None,
-228:             on_success: None,
-229:             on_failure: None,
-230:         });
-231:         self
-232:     }
-233: 
-234:     
-235:     pub fn with_stage_alias(mut self, stage_id: impl Into<String>, alias: impl Into<String>) -> Self {
-236:         self.stages.push(StageReference {
-237:             stage_id: stage_id.into(),
-238:             alias: Some(alias.into()),
-239:             overrides: StageOverrides::default(),
-240:             condition: None,
-241:             on_success: None,
-242:             on_failure: None,
-243:         });
-244:         self
-245:     }
-246: 
-247:     
-248:     pub fn start_at(mut self, stage: impl Into<String>) -> Self {
-249:         self.start_stage = Some(stage.into());
-250:         self
-251:     }
-252: 
-253:     
-254:     pub fn default_v3() -> Self {
-255:         Self::new("default", "Default Development Flow")
-256:             .with_stage("idea")
-257:             .with_stage("prd")
-258:             .with_stage("design")
-259:             .with_stage("plan")
-260:             .with_stage("coding")
-261:             .with_stage("check")
-262:             .with_stage("delivery")
-263:             .start_at("idea")
-264:     }
-265: }
-266: ⋮----
-267: test_flow_definition
-268: ⋮----
-269: ()
+189:     
+190:     pub fn save_settings(&self) -> Result<()> {
+191:         let settings = Settings {
+192:             default_flow_id: self.get_default_flow_id(),
+193:         };
+194:         
+195:         let config_dir = ensure_user_config_dir()?;
+196:         let file_path = config_dir.join("settings.json");
+197:         let content = serde_json::to_string_pretty(&settings)
+198:             .with_context(|| "Failed to serialize settings")?;
+199:         
+200:         fs::write(&file_path, content)
+201:             .with_context(|| format!("Failed to write settings file: {:?}", file_path))?;
+202:         
+203:         tracing::debug!("Saved settings to {:?}", file_path);
+204:         Ok(())
+205:     }
+206:     
+207:     
+208:     pub fn load_settings(&self) -> Result<()> {
+209:         if let Some(file_path) = Self::get_settings_file_path() {
+210:             if file_path.exists() {
+211:                 match fs::read_to_string(&file_path)
+212:                     .and_then(|content| serde_json::from_str::<Settings>(&content)
+213:                         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+214:                 {
+215:                     Ok(settings) => {
+216:                         if let Some(flow_id) = settings.default_flow_id {
+217:                             
+218:                             if self.get_flow(&flow_id).is_some() {
+219:                                 let mut default_flow = self.default_flow.write()
+220:                                     .map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+221:                                 *default_flow = Some(flow_id.clone());
+222:                                 tracing::info!("Loaded default flow setting: {}", flow_id);
+223:                             } else {
+224:                                 tracing::warn!("Default flow '{}' not found, ignoring setting", flow_id);
+225:                             }
+226:                         }
+227:                     }
+228:                     Err(e) => {
+229:                         tracing::warn!("Failed to load settings: {}", e);
+230:                     }
+231:                 }
+232:             }
+233:         }
+234:         Ok(())
+235:     }
+236:     
+237:     
+238:     
+239:     
+240:     
+241:     
+242:     pub fn register_integration(&self, definition: IntegrationDefinition) -> Result<()> {
+243:         let id = definition.id.clone();
+244:         let mut integrations = self.integrations.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+245:         integrations.insert(id.clone(), definition);
+246:         tracing::debug!("Registered integration: {}", id);
+247:         Ok(())
+248:     }
+249:     
+250:     
+251:     pub fn get_integration(&self, id: &str) -> Option<IntegrationDefinition> {
+252:         let integrations = self.integrations.read().ok()?;
+253:         integrations.get(id).cloned()
+254:     }
+255:     
+256:     
+257:     pub fn list_integrations(&self) -> Vec<String> {
+258:         let integrations = self.integrations.read().unwrap_or_else(|e| {
+259:             tracing::error!("Lock error: {}", e);
+260:             panic!("Lock error")
+261:         });
+262:         integrations.keys().cloned().collect()
+263:     }
+264:     
+265:     
+266:     pub fn get_enabled_integrations(&self) -> Vec<IntegrationDefinition> {
+267:         let integrations = self.integrations.read().unwrap_or_else(|e| {
+268:             tracing::error!("Lock error: {}", e);
+269:             panic!("Lock error")
+270:         });
+271:         integrations.values().filter(|i| i.enabled).cloned().collect()
+272:     }
+273:     
+274:     
+275:     
+276:     
+277:     
+278:     
+279:     pub fn clear(&self) -> Result<()> {
+280:         {
+281:             let mut agents = self.agents.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+282:             agents.clear();
+283:         }
+284:         {
+285:             let mut stages = self.stages.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+286:             stages.clear();
+287:         }
+288:         {
+289:             let mut flows = self.flows.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+290:             flows.clear();
+291:         }
+292:         {
+293:             let mut integrations = self.integrations.write().map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
+294:             integrations.clear();
+295:         }
+296:         Ok(())
+297:     }
+298:     
+299:     
+300:     pub fn stats(&self) -> RegistryStats {
+301:         RegistryStats {
+302:             agents: self.agents.read().map(|g| g.len()).unwrap_or(0),
+303:             stages: self.stages.read().map(|g| g.len()).unwrap_or(0),
+304:             flows: self.flows.read().map(|g| g.len()).unwrap_or(0),
+305:             integrations: self.integrations.read().map(|g| g.len()).unwrap_or(0),
+306:         }
+307:     }
+308:     
+309:     
+310:     
+311:     
+312:     
+313:     
+314:     pub fn save_agent_to_file(&self, agent: &AgentDefinition) -> Result<()> {
+315:         let config_dir = ensure_user_config_dir()?;
+316:         let agents_dir = config_dir.join("agents");
+317:         fs::create_dir_all(&agents_dir)
+318:             .with_context(|| format!("Failed to create agents directory: {:?}", agents_dir))?;
+319:         
+320:         let file_path = agents_dir.join(format!("{}.json", agent.id));
+321:         let content = serde_json::to_string_pretty(agent)
+322:             .with_context(|| format!("Failed to serialize agent: {}", agent.id))?;
+323:         
+324:         fs::write(&file_path, content)
+325:             .with_context(|| format!("Failed to write agent file: {:?}", file_path))?;
+326:         
+327:         tracing::info!("Saved agent '{}' to {:?}", agent.id, file_path);
+328:         Ok(())
+329:     }
+330:     
+331:     
+332:     pub fn delete_agent_file(&self, id: &str) -> Result<()> {
+333:         if let Some(config_dir) = get_user_config_dir() {
+334:             let file_path = config_dir.join("agents").join(format!("{}.json", id));
+335:             if file_path.exists() {
+336:                 fs::remove_file(&file_path)
+337:                     .with_context(|| format!("Failed to delete agent file: {:?}", file_path))?;
+338:                 tracing::info!("Deleted agent file: {:?}", file_path);
+339:             }
+340:         }
+341:         Ok(())
+342:     }
+343:     
+344:     
+345:     pub fn save_stage_to_file(&self, stage: &StageDefinition) -> Result<()> {
+346:         let config_dir = ensure_user_config_dir()?;
+347:         let stages_dir = config_dir.join("stages");
+348:         fs::create_dir_all(&stages_dir)
+349:             .with_context(|| format!("Failed to create stages directory: {:?}", stages_dir))?;
+350:         
+351:         let file_path = stages_dir.join(format!("{}.json", stage.id));
+352:         let content = serde_json::to_string_pretty(stage)
+353:             .with_context(|| format!("Failed to serialize stage: {}", stage.id))?;
+354:         
+355:         fs::write(&file_path, content)
+356:             .with_context(|| format!("Failed to write stage file: {:?}", file_path))?;
+357:         
+358:         tracing::info!("Saved stage '{}' to {:?}", stage.id, file_path);
+359:         Ok(())
+360:     }
+361:     
+362:     
+363:     pub fn delete_stage_file(&self, id: &str) -> Result<()> {
+364:         if let Some(config_dir) = get_user_config_dir() {
+365:             let file_path = config_dir.join("stages").join(format!("{}.json", id));
+366:             if file_path.exists() {
+367:                 fs::remove_file(&file_path)
+368:                     .with_context(|| format!("Failed to delete stage file: {:?}", file_path))?;
+369:                 tracing::info!("Deleted stage file: {:?}", file_path);
+370:             }
+371:         }
+372:         Ok(())
+373:     }
+374:     
+375:     
+376:     pub fn save_flow_to_file(&self, flow: &FlowDefinition) -> Result<()> {
+377:         let config_dir = ensure_user_config_dir()?;
+378:         let flows_dir = config_dir.join("flows");
+379:         fs::create_dir_all(&flows_dir)
+380:             .with_context(|| format!("Failed to create flows directory: {:?}", flows_dir))?;
+381:         
+382:         let file_path = flows_dir.join(format!("{}.json", flow.id));
+383:         let content = serde_json::to_string_pretty(flow)
+384:             .with_context(|| format!("Failed to serialize flow: {}", flow.id))?;
+385:         
+386:         fs::write(&file_path, content)
+387:             .with_context(|| format!("Failed to write flow file: {:?}", file_path))?;
+388:         
+389:         tracing::info!("Saved flow '{}' to {:?}", flow.id, file_path);
+390:         Ok(())
+391:     }
+392:     
+393:     
+394:     pub fn delete_flow_file(&self, id: &str) -> Result<()> {
+395:         if let Some(config_dir) = get_user_config_dir() {
+396:             let file_path = config_dir.join("flows").join(format!("{}.json", id));
+397:             if file_path.exists() {
+398:                 fs::remove_file(&file_path)
+399:                     .with_context(|| format!("Failed to delete flow file: {:?}", file_path))?;
+400:                 tracing::info!("Deleted flow file: {:?}", file_path);
+401:             }
+402:         }
+403:         Ok(())
+404:     }
+405:     
+406:     
+407:     pub fn save_integration_to_file(&self, integration: &IntegrationDefinition) -> Result<()> {
+408:         let config_dir = ensure_user_config_dir()?;
+409:         let integrations_dir = config_dir.join("integrations");
+410:         fs::create_dir_all(&integrations_dir)
+411:             .with_context(|| format!("Failed to create integrations directory: {:?}", integrations_dir))?;
+412:         
+413:         let file_path = integrations_dir.join(format!("{}.json", integration.id));
+414:         let content = serde_json::to_string_pretty(integration)
+415:             .with_context(|| format!("Failed to serialize integration: {}", integration.id))?;
+416:         
+417:         fs::write(&file_path, content)
+418:             .with_context(|| format!("Failed to write integration file: {:?}", file_path))?;
+419:         
+420:         tracing::info!("Saved integration '{}' to {:?}", integration.id, file_path);
+421:         Ok(())
+422:     }
+423:     
+424:     
+425:     pub fn delete_integration_file(&self, id: &str) -> Result<()> {
+426:         if let Some(config_dir) = get_user_config_dir() {
+427:             let file_path = config_dir.join("integrations").join(format!("{}.json", id));
+428:             if file_path.exists() {
+429:                 fs::remove_file(&file_path)
+430:                     .with_context(|| format!("Failed to delete integration file: {:?}", file_path))?;
+431:                 tracing::info!("Deleted integration file: {:?}", file_path);
+432:             }
+433:         }
+434:         Ok(())
+435:     }
+436:     
+437:     
+438:     pub fn load_user_configs(&self) -> Result<LoadUserReport> {
+439:         let mut report = LoadUserReport::default();
+440:         
+441:         if let Some(config_dir) = get_user_config_dir() {
+442:             if config_dir.exists() {
+443:                 
+444:                 let agents_dir = config_dir.join("agents");
+445:                 if agents_dir.exists() {
+446:                     for entry in fs::read_dir(&agents_dir)
+447:                         .with_context(|| format!("Failed to read agents directory: {:?}", agents_dir))?
+448:                         .filter_map(|e| e.ok())
+449:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+450:                     {
+451:                         let path = entry.path();
+452:                         match fs::read_to_string(&path)
+453:                             .and_then(|content| serde_json::from_str::<AgentDefinition>(&content)
+454:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+455:                         {
+456:                             Ok(agent) => {
+457:                                 let id = agent.id.clone();
+458:                                 self.register_agent(agent)?;
+459:                                 report.agents_loaded += 1;
+460:                                 tracing::debug!("Loaded user agent: {} from {:?}", id, path);
+461:                             }
+462:                             Err(e) => {
+463:                                 report.errors.push(format!("Failed to load agent from {:?}: {}", path, e));
+464:                             }
+465:                         }
+466:                     }
+467:                 }
+468:                 
+469:                 
+470:                 let stages_dir = config_dir.join("stages");
+471:                 if stages_dir.exists() {
+472:                     for entry in fs::read_dir(&stages_dir)
+473:                         .with_context(|| format!("Failed to read stages directory: {:?}", stages_dir))?
+474:                         .filter_map(|e| e.ok())
+475:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+476:                     {
+477:                         let path = entry.path();
+478:                         match fs::read_to_string(&path)
+479:                             .and_then(|content| serde_json::from_str::<StageDefinition>(&content)
+480:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+481:                         {
+482:                             Ok(stage) => {
+483:                                 let id = stage.id.clone();
+484:                                 self.register_stage(stage)?;
+485:                                 report.stages_loaded += 1;
+486:                                 tracing::debug!("Loaded user stage: {} from {:?}", id, path);
+487:                             }
+488:                             Err(e) => {
+489:                                 report.errors.push(format!("Failed to load stage from {:?}: {}", path, e));
+490:                             }
+491:                         }
+492:                     }
+493:                 }
+494:                 
+495:                 
+496:                 let flows_dir = config_dir.join("flows");
+497:                 if flows_dir.exists() {
+498:                     for entry in fs::read_dir(&flows_dir)
+499:                         .with_context(|| format!("Failed to read flows directory: {:?}", flows_dir))?
+500:                         .filter_map(|e| e.ok())
+501:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+502:                     {
+503:                         let path = entry.path();
+504:                         match fs::read_to_string(&path)
+505:                             .and_then(|content| serde_json::from_str::<FlowDefinition>(&content)
+506:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+507:                         {
+508:                             Ok(flow) => {
+509:                                 let id = flow.id.clone();
+510:                                 
+511:                                 if let Some(existing) = self.get_flow(&id) {
+512:                                     if existing.is_builtin {
+513:                                         tracing::debug!(
+514:                                             "Skipping user flow '{}' - builtin preset with same ID exists",
+515:                                             id
+516:                                         );
+517:                                         continue;
+518:                                     }
+519:                                 }
+520:                                 self.register_flow(flow)?;
+521:                                 report.flows_loaded += 1;
+522:                                 tracing::debug!("Loaded user flow: {} from {:?}", id, path);
+523:                             }
+524:                             Err(e) => {
+525:                                 report.errors.push(format!("Failed to load flow from {:?}: {}", path, e));
+526:                             }
+527:                         }
+528:                     }
+529:                 }
+530:                 
+531:                 
+532:                 let integrations_dir = config_dir.join("integrations");
+533:                 if integrations_dir.exists() {
+534:                     for entry in fs::read_dir(&integrations_dir)
+535:                         .with_context(|| format!("Failed to read integrations directory: {:?}", integrations_dir))?
+536:                         .filter_map(|e| e.ok())
+537:                         .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+538:                     {
+539:                         let path = entry.path();
+540:                         match fs::read_to_string(&path)
+541:                             .and_then(|content| serde_json::from_str::<IntegrationDefinition>(&content)
+542:                                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+543:                         {
+544:                             Ok(integration) => {
+545:                                 let id = integration.id.clone();
+546:                                 self.register_integration(integration)?;
+547:                                 report.integrations_loaded += 1;
+548:                                 tracing::debug!("Loaded user integration: {} from {:?}", id, path);
+549:                             }
+550:                             Err(e) => {
+551:                                 report.errors.push(format!("Failed to load integration from {:?}: {}", path, e));
+552:                             }
+553:                         }
+554:                     }
+555:                 }
+556:                 
+557:                 
+558:                 if let Err(e) = self.load_settings() {
+559:                     tracing::warn!("Failed to load settings: {}", e);
+560:                 }
+561:                 
+562:                 
+563:                 
+564:                 if self.get_default_flow_id().is_none() {
+565:                     if self.get_flow("default").is_some() {
+566:                         if let Err(e) = self.set_default_flow(Some("default".to_string())) {
+567:                             tracing::warn!("Failed to set default flow: {}", e);
+568:                         } else {
+569:                             tracing::info!("Set 'default' as the default flow (first time initialization)");
+570:                         }
+571:                     }
+572:                 }
+573:             }
+574:         } else {
+575:             
+576:             
+577:             if let Some(flow_id) = self.get_default_flow_id() {
+578:                 if let Err(e) = self.set_default_flow(Some(flow_id)) {
+579:                     tracing::warn!("Failed to save initial default flow setting: {}", e);
+580:                 }
+581:             }
+582:         }
+583:         
+584:         Ok(report)
+585:     }
+586: }
+587: ⋮----
+588: RegistryStats
+589: ⋮----
+590: {
+591:     pub agents: usize,
+592:     pub stages: usize,
+593:     pub flows: usize,
+594:     pub integrations: usize,
+595: }
+596: ⋮----
+597: LoadUserReport
+598: ⋮----
+599: {
+600:     pub agents_loaded: usize,
+601:     pub stages_loaded: usize,
+602:     pub flows_loaded: usize,
+603:     pub integrations_loaded: usize,
+604:     pub errors: Vec<String>,
+605: }
+606: ⋮----
+607: LoadReport
+608: ⋮----
+609: {
+610:     pub agents_loaded: usize,
+611:     pub stages_loaded: usize,
+612:     pub flows_loaded: usize,
+613:     pub integrations_loaded: usize,
+614:     pub default_flow_set: bool,
+615:     pub errors: Vec<String>,
+616: }
+617: ⋮----
+618: LoadReport
+619: ⋮----
+620: {
+621:     pub fn total_loaded(&self) -> usize {
+622:         self.agents_loaded + self.stages_loaded + self.flows_loaded + self.integrations_loaded
+623:     }
+624: 
+625:     pub fn has_errors(&self) -> bool {
+626:         !self.errors.is_empty()
+627:     }
+628: }
+629: ⋮----
+630: Settings
+631: ⋮----
+632: {
+633:     
+634:     pub default_flow_id: Option<String>,
+635: }
+636: ⋮----
+637: Settings
+638: ⋮----
+639: {
+640:     fn default() -> Self {
+641:         Self {
+642:             default_flow_id: None,
+643:         }
+644:     }
+645: }
+646: ⋮----
+647: global_registry
+648: ⋮----
+649: ()
+650: ⋮----
+651: test_registry_operations
+652: ⋮----
+653: ()
 ```
 
 ### crates/cowork-core/src/instructions/coding.rs (359 lines)
@@ -18165,6 +17867,30 @@ LICENSE
 18: )
 ```
 
+### crates/cowork-core/src/config_definition/builtin.rs (19 lines)
+
+```
+1: load_builtin_configs
+2: ⋮----
+3: (registry: &ConfigRegistry)
+4: ⋮----
+5: load_agent_from_embedded
+6: ⋮----
+7: (contents: &[u8])
+8: ⋮----
+9: load_stage_from_embedded
+10: ⋮----
+11: (contents: &[u8])
+12: ⋮----
+13: load_flow_from_embedded
+14: ⋮----
+15: (contents: &[u8])
+16: ⋮----
+17: test_load_builtin_configs
+18: ⋮----
+19: ()
+```
+
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/coding_critic.json (51 lines)
 
 ```
@@ -18441,6 +18167,280 @@ LICENSE
 63:   },
 64:   "tags": ["built-in", "default"]
 65: }
+```
+
+### crates/cowork-core/src/config_definition/flow_definition.rs (269 lines)
+
+```
+1: FlowDefinition
+2: ⋮----
+3: {
+4:     
+5:     pub id: String,
+6:     
+7:     pub name: String,
+8:     
+9:     pub description: Option<String>,
+10:     
+11:     pub version: Option<String>,
+12: 
+13:     
+14:     pub stages: Vec<StageReference>,
+15: 
+16:     
+17:     #[serde(default)]
+18:     pub start_stage: Option<String>,
+19: 
+20:     
+21:     #[serde(default)]
+22:     pub global_hooks: Vec<GlobalHookConfig>,
+23: 
+24:     
+25:     #[serde(default)]
+26:     pub config: FlowConfig,
+27: 
+28:     
+29:     #[serde(default)]
+30:     pub tags: Vec<String>,
+31: 
+32:     
+33:     #[serde(default)]
+34:     pub metadata: HashMap<String, serde_json::Value>,
+35: 
+36:     
+37:     #[serde(default)]
+38:     #[serde(skip_serializing_if = "is_false")]
+39:     pub is_builtin: bool,
+40: }
+41: ⋮----
+42: is_false
+43: ⋮----
+44: (value: &bool)
+45: ⋮----
+46: StageReference
+47: ⋮----
+48: {
+49:     
+50:     pub stage_id: String,
+51:     
+52:     pub alias: Option<String>,
+53:     
+54:     #[serde(default)]
+55:     pub overrides: StageOverrides,
+56:     
+57:     #[serde(default)]
+58:     pub condition: Option<String>,
+59:     
+60:     pub on_success: Option<String>,
+61:     
+62:     pub on_failure: Option<String>,
+63: }
+64: ⋮----
+65: StageOverrides
+66: ⋮----
+67: {
+68:     
+69:     pub needs_confirmation: Option<bool>,
+70:     
+71:     #[serde(default)]
+72:     pub hooks: Vec<super::stage_definition::HookConfig>,
+73:     
+74:     pub timeout_secs: Option<u32>,
+75:     
+76:     #[serde(default)]
+77:     pub skip: bool,
+78: }
+79: ⋮----
+80: GlobalHookConfig
+81: ⋮----
+82: {
+83:     
+84:     pub integration_id: String,
+85:     
+86:     pub points: Vec<super::stage_definition::HookPoint>,
+87:     
+88:     #[serde(default)]
+89:     pub blocking: bool,
+90:     
+91:     #[serde(default = "default_global_timeout")]
+92:     pub timeout_secs: u32,
+93: }
+94: ⋮----
+95: default_global_timeout
+96: ⋮----
+97: ()
+98: ⋮----
+99: FlowConfig
+100: ⋮----
+101: {
+102:     
+103:     #[serde(default = "default_stop_on_failure")]
+104:     pub stop_on_failure: bool,
+105: 
+106:     
+107:     pub max_total_time_secs: Option<u32>,
+108: 
+109:     
+110:     #[serde(default = "default_save_state")]
+111:     pub save_state_on_interrupt: bool,
+112: 
+113:     
+114:     #[serde(default)]
+115:     pub memory_scope: MemoryScope,
+116: 
+117:     
+118:     #[serde(default)]
+119:     pub inheritance: InheritanceConfig,
+120: }
+121: ⋮----
+122: FlowConfig
+123: ⋮----
+124: {
+125:     fn default() -> Self {
+126:         Self {
+127:             stop_on_failure: true,
+128:             max_total_time_secs: None,
+129:             save_state_on_interrupt: true,
+130:             memory_scope: MemoryScope::default(),
+131:             inheritance: InheritanceConfig::default(),
+132:         }
+133:     }
+134: }
+135: ⋮----
+136: default_stop_on_failure
+137: ⋮----
+138: ()
+139: ⋮----
+140: default_save_state
+141: ⋮----
+142: ()
+143: ⋮----
+144: MemoryScope
+145: ⋮----
+146: {
+147:     
+148:     Project,
+149:     
+150:     Iteration,
+151:     
+152:     #[default]
+153:     Merged,
+154: }
+155: ⋮----
+156: InheritanceConfig
+157: ⋮----
+158: {
+159:     
+160:     #[serde(default)]
+161:     pub default_mode: InheritanceMode,
+162:     
+163:     #[serde(default)]
+164:     pub stage_mapping: HashMap<String, String>,
+165: }
+166: ⋮----
+167: InheritanceConfig
+168: ⋮----
+169: {
+170:     fn default() -> Self {
+171:         let mut stage_mapping = HashMap::new();
+172:         stage_mapping.insert("none".to_string(), "idea".to_string());
+173:         stage_mapping.insert("partial".to_string(), "idea".to_string());
+174:         stage_mapping.insert("full".to_string(), "idea".to_string());
+175: 
+176:         Self {
+177:             default_mode: InheritanceMode::Partial,
+178:             stage_mapping,
+179:         }
+180:     }
+181: }
+182: ⋮----
+183: InheritanceMode
+184: ⋮----
+185: {
+186:     
+187:     None,
+188:     
+189:     #[default]
+190:     Partial,
+191:     
+192:     Full,
+193: }
+194: ⋮----
+195: FlowDefinition
+196: ⋮----
+197: {
+198:     
+199:     pub fn new(id: impl Into<String>, name: impl Into<String>) -> Self {
+200:         Self {
+201:             id: id.into(),
+202:             name: name.into(),
+203:             description: None,
+204:             version: None,
+205:             stages: Vec::new(),
+206:             start_stage: None,
+207:             global_hooks: Vec::new(),
+208:             config: FlowConfig::default(),
+209:             tags: Vec::new(),
+210:             metadata: HashMap::new(),
+211:             is_builtin: false,
+212:         }
+213:     }
+214:     
+215:     
+216:     pub fn as_builtin(mut self) -> Self {
+217:         self.is_builtin = true;
+218:         self
+219:     }
+220: 
+221:     
+222:     pub fn with_stage(mut self, stage_id: impl Into<String>) -> Self {
+223:         self.stages.push(StageReference {
+224:             stage_id: stage_id.into(),
+225:             alias: None,
+226:             overrides: StageOverrides::default(),
+227:             condition: None,
+228:             on_success: None,
+229:             on_failure: None,
+230:         });
+231:         self
+232:     }
+233: 
+234:     
+235:     pub fn with_stage_alias(mut self, stage_id: impl Into<String>, alias: impl Into<String>) -> Self {
+236:         self.stages.push(StageReference {
+237:             stage_id: stage_id.into(),
+238:             alias: Some(alias.into()),
+239:             overrides: StageOverrides::default(),
+240:             condition: None,
+241:             on_success: None,
+242:             on_failure: None,
+243:         });
+244:         self
+245:     }
+246: 
+247:     
+248:     pub fn start_at(mut self, stage: impl Into<String>) -> Self {
+249:         self.start_stage = Some(stage.into());
+250:         self
+251:     }
+252: 
+253:     
+254:     pub fn default_v3() -> Self {
+255:         Self::new("default", "Default Development Flow")
+256:             .with_stage("idea")
+257:             .with_stage("prd")
+258:             .with_stage("design")
+259:             .with_stage("plan")
+260:             .with_stage("coding")
+261:             .with_stage("check")
+262:             .with_stage("delivery")
+263:             .start_at("idea")
+264:     }
+265: }
+266: ⋮----
+267: test_flow_definition
+268: ⋮----
+269: ()
 ```
 
 ### crates/cowork-core/src/config_definition/validator.rs (70 lines)
