@@ -3,29 +3,29 @@
   "project": "cowork-forge",
   "repo_path": ".",
   "baseline": {
-    "git_head": "1442829c5d046af94a8554bf128ec4801c9bc4a2",
-    "git_head_at": "2026-07-05T14:15:46.380754800+00:00",
+    "git_head": "4a6f222816579f20780e207778b03d592f8d296b",
+    "git_head_at": "2026-07-05T15:03:38.937693300+00:00",
     "dirty": false
   },
   "assets": {
     "agent_pack": {
       "path": "agent/repomix.md",
-      "synced_at": "2026-07-05T14:13:45.686291800+00:00",
-      "baseline_git_head": "1442829c5d046af94a8554bf128ec4801c9bc4a2",
+      "synced_at": "2026-07-05T15:03:20.781893900+00:00",
+      "baseline_git_head": "4a6f222816579f20780e207778b03d592f8d296b",
       "stale": false,
       "freshness_score": 100
     },
     "agent_context": {
       "path": "agent/context.md",
-      "synced_at": "2026-07-05T14:15:45.349131500+00:00",
-      "baseline_git_head": "1442829c5d046af94a8554bf128ec4801c9bc4a2",
+      "synced_at": "2026-07-05T15:03:38.209061100+00:00",
+      "baseline_git_head": "4a6f222816579f20780e207778b03d592f8d296b",
       "stale": true,
       "stale_reason": "asset_not_ready",
       "freshness_score": 0
     },
     "human_docs": {
       "path": "human/",
-      "synced_at": "2026-07-05T14:13:45.688358300+00:00",
+      "synced_at": "2026-07-05T15:00:39.802481400+00:00",
       "stale": false,
       "freshness_score": 100
     }
@@ -40,10 +40,10 @@
     "overall_stale": true,
     "commits_since_baseline": 0,
     "changed_files_count": 0,
-    "current_git_head": "1442829",
+    "current_git_head": "4a6f222",
     "working_tree_dirty": false,
     "is_git_repo": true,
-    "last_computed_at": "2026-07-05T14:15:46.380754800+00:00",
+    "last_computed_at": "2026-07-05T15:03:38.937693300+00:00",
     "stale_reason": "asset_not_ready",
     "agent_pack_score": 100,
     "agent_context_score": 0,
@@ -60,7 +60,7 @@
         "id": "baseline_match",
         "severity": "info",
         "title": "与 baseline 提交一致",
-        "detail": "源码索引与 Agent 上下文均基于提交 1442829c5d046af94a8554bf128ec4801c9bc4a2 生成，相对 HEAD 无文件漂移。"
+        "detail": "源码索引与 Agent 上下文均基于提交 4a6f222816579f20780e207778b03d592f8d296b 生成，相对 HEAD 无文件漂移。"
       },
       {
         "id": "overall_driver",
@@ -75,8 +75,8 @@
         "detail": "分数 < 50：问答不会预加载可能过期的架构概览，需通过源码索引验证。"
       }
     ],
-    "pack_baseline_short": "1442829",
-    "context_baseline_short": "1442829"
+    "pack_baseline_short": "4a6f222",
+    "context_baseline_short": "4a6f222"
   },
-  "last_computed_at": "2026-07-05T14:15:46.380754800+00:00"
+  "last_computed_at": "2026-07-05T15:03:38.937693300+00:00"
 }
