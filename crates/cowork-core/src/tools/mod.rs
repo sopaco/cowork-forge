@@ -155,7 +155,6 @@ pub mod mcp_tools;
 
 // Re-exports
 pub use file_tools::*;
-pub use hitl_tools::*;
 pub use hitl_content_tools::*;
 pub use test_lint_tools::*;
 pub use data_tools::*;

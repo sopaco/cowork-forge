@@ -161,7 +161,6 @@ crates/
         file_tools.rs
         goto_stage_tool.rs
         hitl_content_tools.rs
-        hitl_tools.rs
         knowledge_tools.rs
         legacy_project_analyzer_tools.rs
         load_artifacts.rs
@@ -338,7 +337,7 @@ LICENSE
 
 ## Files
 
-### crates/cowork-core/src/pipeline/stage_executor.rs (561 lines)
+### crates/cowork-core/src/pipeline/stage_executor.rs (591 lines)
 
 ```
 1: check_event_for_goto_stage
@@ -595,313 +594,343 @@ LICENSE
 252:         
 253:         
 254:         
-255:         messages.push(initial_message.clone());
-256: 
-257:         Self {
-258:             session_id: session_id.to_string(),
-259:             app_name: "cowork_forge".to_string(),
-260:             user_id: "default_user".to_string(),
-261:             simple_state: SimpleState::new(),
-262:             messages: std::sync::Mutex::new(messages),
-263:             history_path,
-264:         }
-265:     }
-266: 
-267:     fn append_message_to_file(
-268:         path: &std::path::PathBuf,
-269:         content: &Content,
-270:     ) -> anyhow::Result<()> {
-271:         let line = serde_json::to_string(content)?;
-272:         use std::io::Write;
-273:         let mut file = std::fs::OpenOptions::new()
-274:             .create(true)
-275:             .append(true)
-276:             .open(path)?;
-277:         writeln!(file, "{}", line)?;
-278:         Ok(())
-279:     }
-280: }
-281: ⋮----
-282: SimpleSession
-283: ⋮----
-284: {
-285:     fn id(&self) -> &str {
-286:         &self.session_id
-287:     }
-288: 
-289:     fn app_name(&self) -> &str {
-290:         &self.app_name
-291:     }
-292: 
-293:     fn user_id(&self) -> &str {
-294:         &self.user_id
-295:     }
-296: 
-297:     fn state(&self) -> &dyn adk_core::State {
-298:         &self.simple_state
-299:     }
-300: 
-301:     fn conversation_history(&self) -> Vec<Content> {
-302:         self.messages.lock().map(|m| m.clone()).unwrap_or_default()
-303:     }
-304: 
-305:     fn append_to_history(&self, content: Content) {
-306:         if let Ok(mut messages) = self.messages.lock() {
-307:             messages.push(content.clone());
-308:         }
-309:         if let Err(e) = Self::append_message_to_file(&self.history_path, &content) {
-310:             tracing::warn!("Failed to persist session history: {}", e);
-311:         }
-312:     }
-313: }
-314: ⋮----
-315: SimpleArtifacts
-316: ⋮----
-317: {
-318:     artifacts_dir: std::path::PathBuf,
-319: }
-320: ⋮----
-321: SimpleArtifacts
-322: ⋮----
-323: {
-324:     fn new(iteration_id: &str) -> Self {
-325:         let artifacts_dir = crate::persistence::get_cowork_dir()
-326:             .map(|dir| dir.join("iterations").join(iteration_id).join("artifacts"))
-327:             .unwrap_or_else(|_| {
-328:                 std::path::PathBuf::from(".cowork-v2")
-329:                     .join("iterations")
-330:                     .join(iteration_id)
-331:                     .join("artifacts")
-332:             });
-333:         let _ = std::fs::create_dir_all(&artifacts_dir);
-334:         Self { artifacts_dir }
-335:     }
-336: 
-337:     fn safe_name(name: &str) -> Option<String> {
-338:         let sanitized: String = name
-339:             .chars()
-340:             .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
-341:             .collect();
-342:         if sanitized.is_empty() || sanitized != name {
-343:             None
-344:         } else {
-345:             Some(sanitized)
-346:         }
-347:     }
-348: 
-349:     fn path_for(&self, name: &str) -> Option<std::path::PathBuf> {
-350:         Self::safe_name(name).map(|n| self.artifacts_dir.join(n))
-351:     }
-352: }
-353: ⋮----
-354: SimpleArtifacts
-355: ⋮----
-356: {
-357:     async fn save(&self, name: &str, data: &adk_core::Part) -> adk_core::Result<i64> {
-358:         let path = self.path_for(name).ok_or_else(|| {
-359:             adk_core::AdkError::tool(format!("Invalid artifact name: {}", name))
-360:         })?;
-361: 
-362:         match data {
-363:             adk_core::Part::Text { text } => {
-364:                 std::fs::write(&path, text).map_err(|e| {
-365:                     adk_core::AdkError::tool(format!("Failed to write artifact {}: {}", name, e))
-366:                 })?;
-367:             }
-368:             adk_core::Part::InlineData { mime_type, data } => {
-369:                 let ext = match mime_type.as_str() {
-370:                     "text/markdown" | "text/plain" => "txt",
-371:                     "application/json" => "json",
-372:                     "image/png" => "png",
-373:                     "image/jpeg" => "jpg",
-374:                     _ => "bin",
-375:                 };
-376:                 let path = path.with_extension(ext);
-377:                 std::fs::write(&path, data).map_err(|e| {
-378:                     adk_core::AdkError::tool(format!("Failed to write artifact {}: {}", name, e))
-379:                 })?;
-380:             }
-381:             adk_core::Part::FileData { file_uri, .. } => {
-382:                 
-383:                 return Err(adk_core::AdkError::tool(format!(
-384:                     "Cannot save FileData artifact with URI: {}",
-385:                     file_uri
-386:                 )));
-387:             }
-388:             _ => {
-389:                 return Err(adk_core::AdkError::tool(
-390:                     "Unsupported artifact part type".to_string(),
-391:                 ));
-392:             }
-393:         }
-394:         Ok(1)
-395:     }
-396: 
-397:     async fn load(&self, name: &str) -> adk_core::Result<adk_core::Part> {
-398:         let path = self.path_for(name).ok_or_else(|| {
-399:             adk_core::AdkError::tool(format!("Invalid artifact name: {}", name))
-400:         })?;
-401: 
-402:         let data = std::fs::read(&path).map_err(|e| {
-403:             adk_core::AdkError::tool(format!("Failed to read artifact {}: {}", name, e))
-404:         })?;
-405: 
-406:         
-407:         if let Ok(text) = String::from_utf8(data.clone()) {
-408:             Ok(adk_core::Part::Text { text })
-409:         } else {
-410:             let mime_type = match path.extension().and_then(|e| e.to_str()) {
-411:                 Some("png") => "image/png",
-412:                 Some("jpg") | Some("jpeg") => "image/jpeg",
-413:                 _ => "application/octet-stream",
-414:             }
-415:             .to_string();
-416:             Ok(adk_core::Part::InlineData { mime_type, data })
-417:         }
-418:     }
-419: 
-420:     async fn list(&self) -> adk_core::Result<Vec<String>> {
-421:         let mut names = Vec::new();
-422:         if self.artifacts_dir.exists() {
-423:             for entry in std::fs::read_dir(&self.artifacts_dir).map_err(|e| {
-424:                 adk_core::AdkError::tool(format!("Failed to list artifacts: {}", e))
-425:             })? {
-426:                 let entry = entry.map_err(|e| adk_core::AdkError::tool(format!("Failed to read artifact entry: {}", e)))?;
-427:                 if entry.file_type().map(|t| t.is_file()).unwrap_or(false)
-428:                     && let Some(name) = entry.file_name().to_str()
-429:                 {
-430:                     names.push(name.to_string());
-431:                 }
-432:             }
-433:         }
-434:         Ok(names)
-435:     }
-436: }
-437: ⋮----
-438: SimpleMemory
-439: ⋮----
-440: {
-441:     iteration_id: String,
-442: }
-443: ⋮----
-444: SimpleMemory
-445: ⋮----
-446: {
-447:     fn new(iteration_id: &str) -> Self {
-448:         Self {
-449:             iteration_id: iteration_id.to_string(),
-450:         }
-451:     }
-452: }
-453: ⋮----
-454: SimpleMemory
-455: ⋮----
-456: {
-457:     async fn search(&self, query: &str) -> adk_core::Result<Vec<adk_core::MemoryEntry>> {
-458:         let store = crate::persistence::MemoryStore::new();
-459:         let memory_query = crate::domain::MemoryQuery {
-460:             scope: crate::domain::MemoryScope::Smart,
-461:             query_type: crate::domain::MemoryQueryType::All,
-462:             keywords: query.split_whitespace().map(|s| s.to_string()).collect(),
-463:             limit: Some(20),
-464:         };
-465: 
-466:         let result = store.query(&memory_query, Some(&self.iteration_id)).map_err(|e| {
-467:             adk_core::AdkError::memory(format!("Failed to query memory: {}", e))
-468:         })?;
-469: 
-470:         let mut entries = Vec::new();
-471:         for decision in result.decisions {
-472:             let decision_text = format!(
-473:                 "Decision: {}\nContext: {}\nOutcome: {}\nConsequences: {}",
-474:                 decision.title,
-475:                 decision.context,
-476:                 decision.decision,
-477:                 if decision.consequences.is_empty() {
-478:                     "None recorded".to_string()
-479:                 } else {
-480:                     decision.consequences.join(", ")
-481:                 }
-482:             );
-483:             entries.push(adk_core::MemoryEntry {
-484:                 content: adk_core::Content::new("model").with_text(decision_text),
-485:                 author: "project".to_string(),
-486:             });
-487:         }
-488:         for pattern in result.patterns {
-489:             let pattern_text = format!(
-490:                 "Pattern: {}\nDescription: {}\nUsage: {}\nTags: {}",
-491:                 pattern.name,
-492:                 pattern.description,
-493:                 if pattern.usage.is_empty() {
-494:                     "Not specified".to_string()
-495:                 } else {
-496:                     pattern.usage.join(", ")
-497:                 },
-498:                 if pattern.tags.is_empty() {
-499:                     "None".to_string()
-500:                 } else {
-501:                     pattern.tags.join(", ")
-502:                 }
-503:             );
-504:             entries.push(adk_core::MemoryEntry {
-505:                 content: adk_core::Content::new("model").with_text(pattern_text),
-506:                 author: "project".to_string(),
-507:             });
-508:         }
-509:         for insight in result.insights {
-510:             entries.push(adk_core::MemoryEntry {
-511:                 content: adk_core::Content::new("model").with_text(insight.content),
-512:                 author: insight.stage,
-513:             });
-514:         }
-515:         Ok(entries)
-516:     }
-517: }
-518: ⋮----
-519: SimpleState
-520: ⋮----
-521: {
-522:     data: std::collections::HashMap<String, serde_json::Value>,
-523: }
-524: ⋮----
-525: SimpleState
-526: ⋮----
-527: {
-528:     fn new() -> Self {
-529:         Self {
-530:             data: std::collections::HashMap::new(),
-531:         }
-532:     }
-533: }
-534: ⋮----
-535: SimpleState
-536: ⋮----
-537: {
-538:     fn get(&self, key: &str) -> Option<serde_json::Value> {
-539:         self.data.get(key).cloned()
-540:     }
-541: 
-542:     fn set(&mut self, key: String, value: serde_json::Value) {
-543:         self.data.insert(key, value);
-544:     }
-545: 
-546:     fn all(&self) -> std::collections::HashMap<String, serde_json::Value> {
-547:         self.data.clone()
-548:     }
-549: }
+255:         
+256:         
+257:         if let Err(e) = Self::append_message_to_file(&history_path, &initial_message) {
+258:             tracing::warn!("Failed to persist initial prompt to session history: {}", e);
+259:         }
+260:         messages.push(initial_message);
+261: 
+262:         Self {
+263:             session_id: session_id.to_string(),
+264:             app_name: "cowork_forge".to_string(),
+265:             user_id: "default_user".to_string(),
+266:             simple_state: SimpleState::new(),
+267:             messages: std::sync::Mutex::new(messages),
+268:             history_path,
+269:         }
+270:     }
+271: 
+272:     fn append_message_to_file(
+273:         path: &std::path::PathBuf,
+274:         content: &Content,
+275:     ) -> anyhow::Result<()> {
+276:         let line = serde_json::to_string(content)?;
+277:         use std::io::Write;
+278:         let mut file = std::fs::OpenOptions::new()
+279:             .create(true)
+280:             .append(true)
+281:             .open(path)?;
+282:         writeln!(file, "{}", line)?;
+283:         Ok(())
+284:     }
+285: 
+286:     
+287:     
+288:     
+289:     
+290:     
+291:     
+292:     fn truncate_for_view(messages: &[Content]) -> Vec<Content> {
+293:         if messages.len() <= MAX_HISTORY_MESSAGES {
+294:             return messages.to_vec();
+295:         }
+296:         let mut view = Vec::with_capacity(MAX_HISTORY_MESSAGES);
+297:         
+298:         view.push(messages[0].clone());
+299:         let tail_start = messages.len().saturating_sub(MAX_HISTORY_MESSAGES - 1);
+300:         view.extend_from_slice(&messages[tail_start..]);
+301:         tracing::debug!(
+302:             "SimpleSession: truncated history from {} to {} messages (cap={})",
+303:             messages.len(), view.len(), MAX_HISTORY_MESSAGES
+304:         );
+305:         view
+306:     }
+307: }
+308: ⋮----
+309: SimpleSession
+310: ⋮----
+311: {
+312:     fn id(&self) -> &str {
+313:         &self.session_id
+314:     }
+315: 
+316:     fn app_name(&self) -> &str {
+317:         &self.app_name
+318:     }
+319: 
+320:     fn user_id(&self) -> &str {
+321:         &self.user_id
+322:     }
+323: 
+324:     fn state(&self) -> &dyn adk_core::State {
+325:         &self.simple_state
+326:     }
+327: 
+328:     fn conversation_history(&self) -> Vec<Content> {
+329:         self.messages
+330:             .lock()
+331:             .map(|m| Self::truncate_for_view(&m))
+332:             .unwrap_or_default()
+333:     }
+334: 
+335:     fn append_to_history(&self, content: Content) {
+336:         if let Ok(mut messages) = self.messages.lock() {
+337:             messages.push(content.clone());
+338:         }
+339:         if let Err(e) = Self::append_message_to_file(&self.history_path, &content) {
+340:             tracing::warn!("Failed to persist session history: {}", e);
+341:         }
+342:     }
+343: }
+344: ⋮----
+345: SimpleArtifacts
+346: ⋮----
+347: {
+348:     artifacts_dir: std::path::PathBuf,
+349: }
+350: ⋮----
+351: SimpleArtifacts
+352: ⋮----
+353: {
+354:     fn new(iteration_id: &str) -> Self {
+355:         let artifacts_dir = crate::persistence::get_cowork_dir()
+356:             .map(|dir| dir.join("iterations").join(iteration_id).join("artifacts"))
+357:             .unwrap_or_else(|_| {
+358:                 std::path::PathBuf::from(".cowork-v2")
+359:                     .join("iterations")
+360:                     .join(iteration_id)
+361:                     .join("artifacts")
+362:             });
+363:         let _ = std::fs::create_dir_all(&artifacts_dir);
+364:         Self { artifacts_dir }
+365:     }
+366: 
+367:     fn safe_name(name: &str) -> Option<String> {
+368:         let sanitized: String = name
+369:             .chars()
+370:             .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
+371:             .collect();
+372:         if sanitized.is_empty() || sanitized != name {
+373:             None
+374:         } else {
+375:             Some(sanitized)
+376:         }
+377:     }
+378: 
+379:     fn path_for(&self, name: &str) -> Option<std::path::PathBuf> {
+380:         Self::safe_name(name).map(|n| self.artifacts_dir.join(n))
+381:     }
+382: }
+383: ⋮----
+384: SimpleArtifacts
+385: ⋮----
+386: {
+387:     async fn save(&self, name: &str, data: &adk_core::Part) -> adk_core::Result<i64> {
+388:         let path = self.path_for(name).ok_or_else(|| {
+389:             adk_core::AdkError::tool(format!("Invalid artifact name: {}", name))
+390:         })?;
+391: 
+392:         match data {
+393:             adk_core::Part::Text { text } => {
+394:                 std::fs::write(&path, text).map_err(|e| {
+395:                     adk_core::AdkError::tool(format!("Failed to write artifact {}: {}", name, e))
+396:                 })?;
+397:             }
+398:             adk_core::Part::InlineData { mime_type, data } => {
+399:                 let ext = match mime_type.as_str() {
+400:                     "text/markdown" | "text/plain" => "txt",
+401:                     "application/json" => "json",
+402:                     "image/png" => "png",
+403:                     "image/jpeg" => "jpg",
+404:                     _ => "bin",
+405:                 };
+406:                 let path = path.with_extension(ext);
+407:                 std::fs::write(&path, data).map_err(|e| {
+408:                     adk_core::AdkError::tool(format!("Failed to write artifact {}: {}", name, e))
+409:                 })?;
+410:             }
+411:             adk_core::Part::FileData { file_uri, .. } => {
+412:                 
+413:                 return Err(adk_core::AdkError::tool(format!(
+414:                     "Cannot save FileData artifact with URI: {}",
+415:                     file_uri
+416:                 )));
+417:             }
+418:             _ => {
+419:                 return Err(adk_core::AdkError::tool(
+420:                     "Unsupported artifact part type".to_string(),
+421:                 ));
+422:             }
+423:         }
+424:         Ok(1)
+425:     }
+426: 
+427:     async fn load(&self, name: &str) -> adk_core::Result<adk_core::Part> {
+428:         let path = self.path_for(name).ok_or_else(|| {
+429:             adk_core::AdkError::tool(format!("Invalid artifact name: {}", name))
+430:         })?;
+431: 
+432:         let data = std::fs::read(&path).map_err(|e| {
+433:             adk_core::AdkError::tool(format!("Failed to read artifact {}: {}", name, e))
+434:         })?;
+435: 
+436:         
+437:         if let Ok(text) = String::from_utf8(data.clone()) {
+438:             Ok(adk_core::Part::Text { text })
+439:         } else {
+440:             let mime_type = match path.extension().and_then(|e| e.to_str()) {
+441:                 Some("png") => "image/png",
+442:                 Some("jpg") | Some("jpeg") => "image/jpeg",
+443:                 _ => "application/octet-stream",
+444:             }
+445:             .to_string();
+446:             Ok(adk_core::Part::InlineData { mime_type, data })
+447:         }
+448:     }
+449: 
+450:     async fn list(&self) -> adk_core::Result<Vec<String>> {
+451:         let mut names = Vec::new();
+452:         if self.artifacts_dir.exists() {
+453:             for entry in std::fs::read_dir(&self.artifacts_dir).map_err(|e| {
+454:                 adk_core::AdkError::tool(format!("Failed to list artifacts: {}", e))
+455:             })? {
+456:                 let entry = entry.map_err(|e| adk_core::AdkError::tool(format!("Failed to read artifact entry: {}", e)))?;
+457:                 if entry.file_type().map(|t| t.is_file()).unwrap_or(false)
+458:                     && let Some(name) = entry.file_name().to_str()
+459:                 {
+460:                     names.push(name.to_string());
+461:                 }
+462:             }
+463:         }
+464:         Ok(names)
+465:     }
+466: }
+467: ⋮----
+468: SimpleMemory
+469: ⋮----
+470: {
+471:     iteration_id: String,
+472: }
+473: ⋮----
+474: SimpleMemory
+475: ⋮----
+476: {
+477:     fn new(iteration_id: &str) -> Self {
+478:         Self {
+479:             iteration_id: iteration_id.to_string(),
+480:         }
+481:     }
+482: }
+483: ⋮----
+484: SimpleMemory
+485: ⋮----
+486: {
+487:     async fn search(&self, query: &str) -> adk_core::Result<Vec<adk_core::MemoryEntry>> {
+488:         let store = crate::persistence::MemoryStore::new();
+489:         let memory_query = crate::domain::MemoryQuery {
+490:             scope: crate::domain::MemoryScope::Smart,
+491:             query_type: crate::domain::MemoryQueryType::All,
+492:             keywords: query.split_whitespace().map(|s| s.to_string()).collect(),
+493:             limit: Some(20),
+494:         };
+495: 
+496:         let result = store.query(&memory_query, Some(&self.iteration_id)).map_err(|e| {
+497:             adk_core::AdkError::memory(format!("Failed to query memory: {}", e))
+498:         })?;
+499: 
+500:         let mut entries = Vec::new();
+501:         for decision in result.decisions {
+502:             let decision_text = format!(
+503:                 "Decision: {}\nContext: {}\nOutcome: {}\nConsequences: {}",
+504:                 decision.title,
+505:                 decision.context,
+506:                 decision.decision,
+507:                 if decision.consequences.is_empty() {
+508:                     "None recorded".to_string()
+509:                 } else {
+510:                     decision.consequences.join(", ")
+511:                 }
+512:             );
+513:             entries.push(adk_core::MemoryEntry {
+514:                 content: adk_core::Content::new("model").with_text(decision_text),
+515:                 author: "project".to_string(),
+516:             });
+517:         }
+518:         for pattern in result.patterns {
+519:             let pattern_text = format!(
+520:                 "Pattern: {}\nDescription: {}\nUsage: {}\nTags: {}",
+521:                 pattern.name,
+522:                 pattern.description,
+523:                 if pattern.usage.is_empty() {
+524:                     "Not specified".to_string()
+525:                 } else {
+526:                     pattern.usage.join(", ")
+527:                 },
+528:                 if pattern.tags.is_empty() {
+529:                     "None".to_string()
+530:                 } else {
+531:                     pattern.tags.join(", ")
+532:                 }
+533:             );
+534:             entries.push(adk_core::MemoryEntry {
+535:                 content: adk_core::Content::new("model").with_text(pattern_text),
+536:                 author: "project".to_string(),
+537:             });
+538:         }
+539:         for insight in result.insights {
+540:             entries.push(adk_core::MemoryEntry {
+541:                 content: adk_core::Content::new("model").with_text(insight.content),
+542:                 author: insight.stage,
+543:             });
+544:         }
+545:         Ok(entries)
+546:     }
+547: }
+548: ⋮----
+549: SimpleState
 550: ⋮----
-551: extract_text_from_content
-552: ⋮----
-553: (content: &Content)
+551: {
+552:     data: std::collections::HashMap<String, serde_json::Value>,
+553: }
 554: ⋮----
-555: extract_text_from_event
+555: SimpleState
 556: ⋮----
-557: (event: &Event)
-558: ⋮----
-559: validate_artifact_content
-560: ⋮----
-561: (stage_name: &str, content: &str)
+557: {
+558:     fn new() -> Self {
+559:         Self {
+560:             data: std::collections::HashMap::new(),
+561:         }
+562:     }
+563: }
+564: ⋮----
+565: SimpleState
+566: ⋮----
+567: {
+568:     fn get(&self, key: &str) -> Option<serde_json::Value> {
+569:         self.data.get(key).cloned()
+570:     }
+571: 
+572:     fn set(&mut self, key: String, value: serde_json::Value) {
+573:         self.data.insert(key, value);
+574:     }
+575: 
+576:     fn all(&self) -> std::collections::HashMap<String, serde_json::Value> {
+577:         self.data.clone()
+578:     }
+579: }
+580: ⋮----
+581: extract_text_from_content
+582: ⋮----
+583: (content: &Content)
+584: ⋮----
+585: extract_text_from_event
+586: ⋮----
+587: (event: &Event)
+588: ⋮----
+589: validate_artifact_content
+590: ⋮----
+591: (stage_name: &str, content: &str)
 ```
 
 ### crates/cowork-gui/src-tauri/src/lib.rs (285 lines)
@@ -1461,143 +1490,87 @@ LICENSE
 262: <!-- terrain:end tools -->
 ````
 
-### crates/cowork-core/src/agents/mod.rs (134 lines)
+### crates/cowork-core/src/agents/mod.rs (78 lines)
 
 ```
-1: create_idea_agent
+1: create_summary_agent
 2: ⋮----
-3: (model: Arc<dyn Llm>)
+3: (model: Arc<dyn Llm>, iteration_id: String, iteration_number: u32)
 4: ⋮----
-5: create_idea_agent_with_id
+5: create_knowledge_generation_agent
 6: ⋮----
-7: (model: Arc<dyn Llm>, iteration_id: String)
-8: ⋮----
-9: create_prd_loop
-10: ⋮----
-11: (model: Arc<dyn Llm>)
-12: ⋮----
-13: create_prd_loop_with_id
-14: ⋮----
-15: (model: Arc<dyn Llm>, iteration_id: String)
-16: ⋮----
-17: create_design_loop
-18: ⋮----
-19: (model: Arc<dyn Llm>)
-20: ⋮----
-21: create_design_loop_with_id
-22: ⋮----
-23: (model: Arc<dyn Llm>, iteration_id: String)
-24: ⋮----
-25: create_plan_loop
-26: ⋮----
-27: (model: Arc<dyn Llm>)
-28: ⋮----
-29: create_plan_loop_with_id
-30: ⋮----
-31: (model: Arc<dyn Llm>, iteration_id: String)
+7: (
+8:     model: Arc<dyn Llm>,
+9:     iteration_id: String,
+10:     iteration_number: u32,
+11:     base_iteration_id: Option<String>
+12: )
+13: ⋮----
+14: create_project_manager_agent
+15: ⋮----
+16: (model: Arc<dyn Llm>, iteration_id: String)
+17: ⋮----
+18: load_artifacts_summary_for_pm
+19: ⋮----
+20: (iteration_store: &IterationStore, iteration_id: &str)
+21: ⋮----
+22: PMAgentResult
+23: ⋮----
+24: {
+25:     
+26:     pub message: String,
+27:     
+28:     pub actions: Vec<PMAgentAction>,
+29:     
+30:     pub parts: Vec<adk_core::Part>,
+31: }
 32: ⋮----
-33: create_coding_loop
+33: PMAgentAction
 34: ⋮----
-35: (model: Arc<dyn Llm>)
-36: ⋮----
-37: create_coding_loop_with_id
-38: ⋮----
-39: (model: Arc<dyn Llm>, iteration_id: String)
-40: ⋮----
-41: create_check_agent
-42: ⋮----
-43: (model: Arc<dyn Llm>)
-44: ⋮----
-45: create_check_agent_with_id
-46: ⋮----
-47: (model: Arc<dyn Llm>, iteration_id: String)
-48: ⋮----
-49: create_delivery_agent
-50: ⋮----
-51: (model: Arc<dyn Llm>)
-52: ⋮----
-53: create_delivery_agent_with_id
-54: ⋮----
-55: (model: Arc<dyn Llm>, iteration_id: String)
-56: ⋮----
-57: create_summary_agent
-58: ⋮----
-59: (model: Arc<dyn Llm>, iteration_id: String, iteration_number: u32)
+35: {
+36:     
+37:     #[serde(rename = "pm_goto_stage")]
+38:     GotoStage {
+39:         target_stage: String,
+40:         reason: String,
+41:     },
+42:     
+43:     #[serde(rename = "pm_create_iteration")]
+44:     CreateIteration {
+45:         iteration_id: String,
+46:         title: String,
+47:         description: String,
+48:         inheritance: String,
+49:     },
+50: }
+51: ⋮----
+52: PMAgentStreamCallback
+53: ⋮----
+54: {
+55:     
+56:     async fn on_text_chunk(&self, text: &str, is_first: bool, is_last: bool);
+57:     
+58:     async fn on_tool_call(&self, tool_name: &str, args: &serde_json::Value);
+59: }
 60: ⋮----
-61: create_knowledge_generation_agent
+61: execute_pm_agent_message_streaming
 62: ⋮----
 63: (
 64:     model: Arc<dyn Llm>,
 65:     iteration_id: String,
-66:     iteration_number: u32,
-67:     base_iteration_id: Option<String>
-68: )
-69: ⋮----
-70: create_project_manager_agent
-71: ⋮----
-72: (model: Arc<dyn Llm>, iteration_id: String)
-73: ⋮----
-74: load_artifacts_summary_for_pm
-75: ⋮----
-76: (iteration_store: &IterationStore, iteration_id: &str)
-77: ⋮----
-78: PMAgentResult
-79: ⋮----
-80: {
-81:     
-82:     pub message: String,
-83:     
-84:     pub actions: Vec<PMAgentAction>,
-85:     
-86:     pub parts: Vec<adk_core::Part>,
-87: }
-88: ⋮----
-89: PMAgentAction
-90: ⋮----
-91: {
-92:     
-93:     #[serde(rename = "pm_goto_stage")]
-94:     GotoStage {
-95:         target_stage: String,
-96:         reason: String,
-97:     },
-98:     
-99:     #[serde(rename = "pm_create_iteration")]
-100:     CreateIteration {
-101:         iteration_id: String,
-102:         title: String,
-103:         description: String,
-104:         inheritance: String,
-105:     },
-106: }
-107: ⋮----
-108: PMAgentStreamCallback
-109: ⋮----
-110: {
-111:     
-112:     async fn on_text_chunk(&self, text: &str, is_first: bool, is_last: bool);
-113:     
-114:     async fn on_tool_call(&self, tool_name: &str, args: &serde_json::Value);
-115: }
-116: ⋮----
-117: execute_pm_agent_message_streaming
-118: ⋮----
-119: (
-120:     model: Arc<dyn Llm>,
-121:     iteration_id: String,
-122:     message: String,
-123:     history: Vec<serde_json::Value>,
-124:     stream_callback: Option<Arc<dyn PMAgentStreamCallback>>,
-125: )
-126: ⋮----
-127: execute_pm_agent_message
-128: ⋮----
-129: (
-130:     model: Arc<dyn Llm>,
-131:     iteration_id: String,
-132:     message: String,
-133:     history: Vec<serde_json::Value>,
-134: )
+66:     message: String,
+67:     history: Vec<serde_json::Value>,
+68:     stream_callback: Option<Arc<dyn PMAgentStreamCallback>>,
+69: )
+70: ⋮----
+71: execute_pm_agent_message
+72: ⋮----
+73: (
+74:     model: Arc<dyn Llm>,
+75:     iteration_id: String,
+76:     message: String,
+77:     history: Vec<serde_json::Value>,
+78: )
 ```
 
 ### crates/cowork-core/src/lib.rs (109 lines)
@@ -1712,64 +1685,6 @@ LICENSE
 107: 
 108: 
 109: pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-```
-
-### Cargo.toml (53 lines)
-
-```
-1: [workspace]
-2: resolver = "2"
-3: members = [
-4:     "crates/cowork-core",
-5:     "crates/cowork-cli",
-6:     "crates/cowork-gui/src-tauri",
-7: ]
-8: 
-9: [workspace.package]
-10: version = "2.5.2"
-11: edition = "2024"
-12: authors = ["Sopaco"]
-13: license = "MIT"
-14: repository = "https://github.com/sopaco/cowork-forge"
-15: 
-16: [workspace.dependencies]
-17: adk-rust = "1.0.0"
-18: adk-core = "1.0.0"
-19: adk-agent = "1.0.0"
-20: adk-model = { version = "1.0.0", features = ["openai"] }
-21: adk-tool = "1.0.0"
-22: adk-runner = "1.0.0"
-23: adk-session = "1.0.0"
-24: adk-skill = "1.0.0"
-25: 
-26: tokio = { version = "1", features = ["full"] }
-27: tokio-util = { version = "0.7", features = ["compat"] }
-28: anyhow = "1"
-29: thiserror = "2"
-30: serde = { version = "1", features = ["derive"] }
-31: serde_json = "1"
-32: 
-33: toml = "1.0"
-34: 
-35: clap = { version = "4", features = ["derive"] }
-36: dialoguer = "0.12"
-37: console = "0.16"
-38: 
-39: tracing = "0.1"
-40: tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-41: 
-42: chrono = { version = "0.4", features = ["serde"] }
-43: uuid = { version = "1", features = ["v4", "serde"] }
-44: 
-45: dirs = "6"
-46: walkdir = "2"
-47: ignore = "0.4"
-48: 
-49: futures = "0.3"
-50: 
-51: tempfile = "3"
-52: 
-53: agent-client-protocol = "0.9"
 ```
 
 ### crates/cowork-core/src/pipeline/executor/mod.rs (643 lines)
@@ -1891,7 +1806,7 @@ LICENSE
 114:         let stages = get_stages_from_flow(&start_stage);
 115:         let flow_config = get_flow_config();
 116: 
-117:         println!(
+117:         tracing::info!(
 118:             "[Executor] Using Flow config: stop_on_failure={}, memory_scope={:?}",
 119:             flow_config.stop_on_failure, flow_config.memory_scope
 120:         );
@@ -1905,10 +1820,10 @@ LICENSE
 128:         
 129:         let memory_store = crate::persistence::MemoryStore::new();
 130:         if let Err(e) = memory_store.ensure_iteration_memory(&iteration.id) {
-131:             println!("[Executor] Warning: Failed to create iteration memory: {}", e);
+131:             tracing::warn!("[Executor] Failed to create iteration memory: {}", e);
 132:         }
 133: 
-134:         println!(
+134:         tracing::info!(
 135:             "[Executor] Iteration '{}' started, will execute {} stages starting from '{}'",
 136:             iteration.title,
 137:             stages.len(),
@@ -1929,11 +1844,11 @@ LICENSE
 152:         
 153:         if iteration.base_iteration_id.is_some() {
 154:             if let Err(e) = knowledge::inject_project_knowledge(&self.iteration_store, &iteration).await {
-155:                 println!("[Executor] Warning: Failed to inject project knowledge: {}", e);
+155:                 tracing::warn!("[Executor] Failed to inject project knowledge: {}", e);
 156:             }
 157:         }
 158: 
-159:         println!("[Executor] Starting stage execution loop...");
+159:         tracing::info!("[Executor] Starting stage execution loop...");
 160:         self.execute_stages_from(project, iteration, stages, workspace, flow_config, 0).await
 161:     }
 162: 
@@ -1968,7 +1883,7 @@ LICENSE
 191:             iteration.set_stage(&stage_name);
 192:             self.iteration_store.save(&iteration)?;
 193: 
-194:             println!("[Executor] Stage updated: {} (iteration: {})", stage_name, iteration.id);
+194:             tracing::info!("[Executor] Stage updated: {} (iteration: {})", stage_name, iteration.id);
 195: 
 196:             self.interaction
 197:                 .show_message_with_context(
@@ -1988,7 +1903,7 @@ LICENSE
 211: 
 212:             for attempt in 0..MAX_STAGE_RETRIES {
 213:                 if attempt > 0 {
-214:                     println!(
+214:                     tracing::info!(
 215:                         "[Executor] Retrying stage '{}' (attempt {}/{})",
 216:                         stage_name, attempt + 1, MAX_STAGE_RETRIES
 217:                     );
@@ -2286,7 +2201,7 @@ LICENSE
 509: 
 510:         
 511:         if let Err(e) = crate::persistence::MemoryStore::new().promote_insights_to_decisions(&iteration.id) {
-512:             println!("[Executor] Warning: Failed to promote insights: {}", e);
+512:             tracing::warn!("[Executor] Failed to promote insights: {}", e);
 513:         }
 514: 
 515:         project.current_iteration_id = Some(iteration.id.clone());
@@ -2312,7 +2227,7 @@ LICENSE
 535:     ) -> anyhow::Result<()> {
 536:         let mut iteration = self.iteration_store.load(iteration_id)?;
 537: 
-538:         println!(
+538:         tracing::info!(
 539:             "[Executor] Continuing iteration '{}' (status: {:?}, current_stage: {:?})",
 540:             iteration_id, iteration.status, iteration.current_stage
 541:         );
@@ -2322,7 +2237,7 @@ LICENSE
 545:         }
 546: 
 547:         let resume_stage = iteration.current_stage.clone();
-548:         println!("[Executor] Resuming from stage: {:?}", resume_stage);
+548:         tracing::info!("[Executor] Resuming from stage: {:?}", resume_stage);
 549: 
 550:         iteration.resume();
 551:         self.iteration_store.save(&iteration)?;
@@ -2352,7 +2267,7 @@ LICENSE
 575:     ) -> anyhow::Result<()> {
 576:         let mut iteration = self.iteration_store.load(iteration_id)?;
 577: 
-578:         println!(
+578:         tracing::info!(
 579:             "[Executor] Retrying failed iteration '{}' (status: {:?}, current_stage: {:?})",
 580:             iteration_id, iteration.status, iteration.current_stage
 581:         );
@@ -2364,7 +2279,7 @@ LICENSE
 587:         let retry_stage = if let Some(ref current) = iteration.current_stage {
 588:             current.clone()
 589:         } else {
-590:             println!("[Executor] No current_stage found, defaulting to 'check' for retry");
+590:             tracing::warn!("[Executor] No current_stage found, defaulting to 'check' for retry");
 591:             "check".to_string()
 592:         };
 593: 
@@ -2454,6 +2369,332 @@ LICENSE
 29: notify_tool_result
 30: ⋮----
 31: (tool_name: &str, result: &Result<Value, AdkError>)
+```
+
+### Cargo.toml (53 lines)
+
+```
+1: [workspace]
+2: resolver = "2"
+3: members = [
+4:     "crates/cowork-core",
+5:     "crates/cowork-cli",
+6:     "crates/cowork-gui/src-tauri",
+7: ]
+8: 
+9: [workspace.package]
+10: version = "2.5.2"
+11: edition = "2024"
+12: authors = ["Sopaco"]
+13: license = "MIT"
+14: repository = "https://github.com/sopaco/cowork-forge"
+15: 
+16: [workspace.dependencies]
+17: adk-rust = "1.0.0"
+18: adk-core = "1.0.0"
+19: adk-agent = "1.0.0"
+20: adk-model = { version = "1.0.0", features = ["openai"] }
+21: adk-tool = "1.0.0"
+22: adk-runner = "1.0.0"
+23: adk-session = "1.0.0"
+24: adk-skill = "1.0.0"
+25: 
+26: tokio = { version = "1", features = ["full"] }
+27: tokio-util = { version = "0.7", features = ["compat"] }
+28: anyhow = "1"
+29: thiserror = "2"
+30: serde = { version = "1", features = ["derive"] }
+31: serde_json = "1"
+32: 
+33: toml = "1.0"
+34: 
+35: clap = { version = "4", features = ["derive"] }
+36: dialoguer = "0.12"
+37: console = "0.16"
+38: 
+39: tracing = "0.1"
+40: tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+41: 
+42: chrono = { version = "0.4", features = ["serde"] }
+43: uuid = { version = "1", features = ["v4", "serde"] }
+44: 
+45: dirs = "6"
+46: walkdir = "2"
+47: ignore = "0.4"
+48: 
+49: futures = "0.3"
+50: 
+51: tempfile = "3"
+52: 
+53: agent-client-protocol = "0.9"
+```
+
+### crates/cowork-core/src/tools/control_tools.rs (263 lines)
+
+```
+1: ProvideFeedbackTool
+2: ⋮----
+3: {
+4:     fn name(&self) -> &str {
+5:         "provide_feedback"
+6:     }
+7: 
+8:     fn description(&self) -> &str {
+9:         "Provide structured feedback to escalate an issue to the executor level. \
+10:          This records the feedback and signals the LoopAgent to exit immediately \
+11:          so the executor can retry the stage with the feedback. \
+12:          Use this ONLY for critical/major issues that need executor-level retry. \
+13:          For minor issues that the Actor can fix in the next loop iteration, \
+14:          just describe them in your response (the Actor sees conversation history). \
+15:          When satisfied, call `exit_loop` instead."
+16:     }
+17: 
+18:     fn parameters_schema(&self) -> Option<Value> {
+19:         Some(json!({
+20:             "type": "object",
+21:             "properties": {
+22:                 "stage": {
+23:                     "type": "string",
+24:                     "description": "The stage providing this feedback (e.g., 'idea', 'prd', 'design', 'plan', 'coding', 'check', 'delivery')",
+25:                     "enum": ["idea", "prd", "design", "plan", "coding", "check", "delivery"]
+26:                 },
+27:                 "feedback_type": {
+28:                     "type": "string",
+29:                     "enum": [
+30:                         "build_error",
+31:                         "quality_issue",
+32:                         "missing_requirement",
+33:                         "missing_artifact",
+34:                         "architecture_issue",
+35:                         "task_scope_issue",
+36:                         "suggestion"
+37:                     ],
+38:                 },
+39:                 "severity": {
+40:                     "type": "string",
+41:                     "enum": ["critical", "major", "minor"],
+42:                 },
+43:                 "details": {"type": "string"},
+44:                 "suggested_fix": {"type": "string"}
+45:             },
+46:             "required": ["stage", "feedback_type", "severity", "details"]
+47:         }))
+48:     }
+49: 
+50:     async fn execute(&self, ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+51:         let stage = get_required_string_param(&args, "stage")?;
+52: 
+53:         let feedback_type = match get_required_string_param(&args, "feedback_type")? {
+54:             "build_error" => FeedbackType::BuildError,
+55:             "quality_issue" => FeedbackType::QualityIssue,
+56:             "missing_requirement" => FeedbackType::MissingRequirement,
+57:             "missing_artifact" => FeedbackType::MissingArtifact,
+58:             "architecture_issue" => FeedbackType::ArchitectureIssue,
+59:             "task_scope_issue" => FeedbackType::TaskScopeIssue,
+60:             _ => FeedbackType::Suggestion,
+61:         };
+62: 
+63:         let severity = match get_required_string_param(&args, "severity")? {
+64:             "critical" => Severity::Critical,
+65:             "major" => Severity::Major,
+66:             _ => Severity::Minor,
+67:         };
+68: 
+69:         let feedback = Feedback {
+70:             stage: stage.to_string(),
+71:             feedback_type,
+72:             severity,
+73:             details: get_required_string_param(&args, "details")?.to_string(),
+74:             suggested_fix: args
+75:                 .get("suggested_fix")
+76:                 .and_then(|v| v.as_str())
+77:                 .map(String::from),
+78:             timestamp: chrono::Utc::now(),
+79:         };
+80: 
+81:         append_feedback(&feedback).map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
+82: 
+83:         tracing::info!(
+84:             "[ProvideFeedbackTool] Feedback recorded for stage '{}' (severity: {:?}): {}",
+85:             stage, severity, feedback.details.chars().take(100).collect::<String>()
+86:         );
+87: 
+88:         
+89:         
+90:         
+91:         
+92:         let mut actions = EventActions::default();
+93:         actions.escalate = true;
+94:         ctx.set_actions(actions);
+95: 
+96:         Ok(json!({
+97:             "status": "feedback_recorded",
+98:             "message": "Feedback recorded. The loop will exit and the executor will retry the stage with this feedback."
+99:         }))
+100:     }
+101: }
+102: ⋮----
+103: AskUserTool
+104: ⋮----
+105: {
+106:     fn name(&self) -> &str {
+107:         "ask_user"
+108:     }
+109: 
+110:     fn description(&self) -> &str {
+111:         "Ask the user for confirmation or text input."
+112:     }
+113: 
+114:     fn parameters_schema(&self) -> Option<Value> {
+115:         Some(json!({
+116:             "type": "object",
+117:             "properties": {
+118:                 "question": {
+119:                     "type": "string",
+120:                     "description": "The question to ask the user"
+121:                 },
+122:                 "question_type": {
+123:                     "type": "string",
+124:                     "enum": ["yes_no", "text_input"],
+125:                     "description": "Type of question"
+126:                 }
+127:             },
+128:             "required": ["question", "question_type"]
+129:         }))
+130:     }
+131: 
+132:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+133:         let question = get_required_string_param(&args, "question")?;
+134:         let question_type = get_required_string_param(&args, "question_type")?;
+135: 
+136:         let interaction = get_interaction_backend()
+137:             .ok_or_else(|| adk_core::AdkError::tool("InteractiveBackend not set - cannot ask user".to_string()))?;
+138: 
+139:         match question_type {
+140:             "yes_no" => {
+141:                 let options = vec![
+142:                     InputOption {
+143:                         id: "yes".to_string(),
+144:                         label: "Yes".to_string(),
+145:                         description: Some("Confirm and proceed".to_string()),
+146:                     },
+147:                     InputOption {
+148:                         id: "no".to_string(),
+149:                         label: "No".to_string(),
+150:                         description: Some("Deny or cancel".to_string()),
+151:                     },
+152:                 ];
+153: 
+154:                 let response = interaction.request_input(
+155:                     question,
+156:                     options,
+157:                     None,
+158:                 ).await.map_err(|e| adk_core::AdkError::tool(format!("Input error: {}", e)))?;
+159: 
+160:                 let answer = match response {
+161:                     InputResponse::Selection(id) => id == "yes",
+162:                     InputResponse::Text(text) => {
+163:                         let trimmed = text.trim().to_lowercase();
+164:                         trimmed == "yes" || trimmed == "y" || trimmed == "true" || trimmed == "1"
+165:                     }
+166:                     InputResponse::Cancel => false,
+167:                 };
+168: 
+169:                 Ok(json!({
+170:                     "answer": answer,
+171:                     "answer_type": "boolean"
+172:                 }))
+173:             }
+174:             "text_input" => {
+175:                 let response = interaction.request_input(
+176:                     question,
+177:                     vec![],
+178:                     None,
+179:                 ).await.map_err(|e| adk_core::AdkError::tool(format!("Input error: {}", e)))?;
+180: 
+181:                 let answer = match response {
+182:                     InputResponse::Text(text) => text,
+183:                     InputResponse::Selection(_) => String::new(),
+184:                     InputResponse::Cancel => String::new(),
+185:                 };
+186: 
+187:                 Ok(json!({
+188:                     "answer": answer,
+189:                     "answer_type": "text"
+190:                 }))
+191:             }
+192:             _ => Ok(json!({"error": "Invalid question type. Use 'yes_no' or 'text_input'."})),
+193:         }
+194:     }
+195: }
+196: ⋮----
+197: RequestHumanReviewTool
+198: ⋮----
+199: {
+200:     fn name(&self) -> &str {
+201:         "request_human_review"
+202:     }
+203: 
+204:     fn description(&self) -> &str {
+205:         "Request human intervention when the Actor-Critic feedback loop cannot resolve an issue. \
+206:          This signals that the agent needs human judgment to proceed, and terminates the current loop."
+207:     }
+208: 
+209:     fn parameters_schema(&self) -> Option<Value> {
+210:         Some(json!({
+211:             "type": "object",
+212:             "properties": {
+213:                 "reason": {
+214:                     "type": "string",
+215:                     "description": "Why human review is needed (describe the stuck issue)"
+216:                 }
+217:             },
+218:             "required": ["reason"]
+219:         }))
+220:     }
+221: 
+222:     async fn execute(&self, ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+223:         let reason = get_required_string_param(&args, "reason")?;
+224: 
+225:         tracing::warn!("[RequestHumanReviewTool] Human review requested: {}", reason);
+226: 
+227:         if let Some(interaction) = get_interaction_backend() {
+228:             interaction.show_message(
+229:                 MessageLevel::Warning,
+230:                 format!("⚠️ Human review requested\nReason: {}", reason),
+231:             ).await;
+232: 
+233:             let options = vec![
+234:                 InputOption {
+235:                     id: "continue".to_string(),
+236:                     label: "Continue (agent will proceed)".to_string(),
+237:                     description: Some("Allow the agent to continue to the next stage".to_string()),
+238:                 },
+239:                 InputOption {
+240:                     id: "restart".to_string(),
+241:                     label: "Restart stage".to_string(),
+242:                     description: Some("Send the agent back to try again".to_string()),
+243:                 },
+244:             ];
+245: 
+246:             let _ = interaction.request_input(
+247:                 &format!("Human review needed: {}\n\nPlease choose how to proceed:", reason),
+248:                 options,
+249:                 None,
+250:             ).await;
+251:         }
+252: 
+253:         let mut actions = EventActions::default();
+254:         actions.escalate = true;
+255:         ctx.set_actions(actions);
+256: 
+257:         Ok(json!({
+258:             "status": "human_review_requested",
+259:             "reason": reason,
+260:             "message": "Human review has been requested. The loop will terminate."
+261:         }))
+262:     }
+263: }
 ```
 
 ### crates/cowork-gui/src/components/chat/InputArea.tsx (14 lines)
@@ -3226,258 +3467,6 @@ LICENSE
 92: ```
 93: "##;
 ````
-
-### crates/cowork-core/src/tools/control_tools.rs (247 lines)
-
-```
-1: ProvideFeedbackTool
-2: ⋮----
-3: {
-4:     fn name(&self) -> &str {
-5:         "provide_feedback"
-6:     }
-7: 
-8:     fn description(&self) -> &str {
-9:         "Provide structured feedback to the Actor agent. \
-10:          This feedback will be visible to the Actor in the next iteration."
-11:     }
-12: 
-13:     fn parameters_schema(&self) -> Option<Value> {
-14:         Some(json!({
-15:             "type": "object",
-16:             "properties": {
-17:                 "stage": {
-18:                     "type": "string",
-19:                     "description": "The stage providing this feedback (e.g., 'idea', 'prd', 'design', 'plan', 'coding', 'check', 'delivery')",
-20:                     "enum": ["idea", "prd", "design", "plan", "coding", "check", "delivery"]
-21:                 },
-22:                 "feedback_type": {
-23:                     "type": "string",
-24:                     "enum": [
-25:                         "build_error",
-26:                         "quality_issue",
-27:                         "missing_requirement",
-28:                         "missing_artifact",
-29:                         "architecture_issue",
-30:                         "task_scope_issue",
-31:                         "suggestion"
-32:                     ],
-33:                 },
-34:                 "severity": {
-35:                     "type": "string",
-36:                     "enum": ["critical", "major", "minor"],
-37:                 },
-38:                 "details": {"type": "string"},
-39:                 "suggested_fix": {"type": "string"}
-40:             },
-41:             "required": ["stage", "feedback_type", "severity", "details"]
-42:         }))
-43:     }
-44: 
-45:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-46:         let stage = get_required_string_param(&args, "stage")?;
-47: 
-48:         let feedback_type = match get_required_string_param(&args, "feedback_type")? {
-49:             "build_error" => FeedbackType::BuildError,
-50:             "quality_issue" => FeedbackType::QualityIssue,
-51:             "missing_requirement" => FeedbackType::MissingRequirement,
-52:             "missing_artifact" => FeedbackType::MissingArtifact,
-53:             "architecture_issue" => FeedbackType::ArchitectureIssue,
-54:             "task_scope_issue" => FeedbackType::TaskScopeIssue,
-55:             _ => FeedbackType::Suggestion,
-56:         };
-57: 
-58:         let severity = match get_required_string_param(&args, "severity")? {
-59:             "critical" => Severity::Critical,
-60:             "major" => Severity::Major,
-61:             _ => Severity::Minor,
-62:         };
-63: 
-64:         let feedback = Feedback {
-65:             stage: stage.to_string(),
-66:             feedback_type,
-67:             severity,
-68:             details: get_required_string_param(&args, "details")?.to_string(),
-69:             suggested_fix: args
-70:                 .get("suggested_fix")
-71:                 .and_then(|v| v.as_str())
-72:                 .map(String::from),
-73:             timestamp: chrono::Utc::now(),
-74:         };
-75: 
-76:         append_feedback(&feedback).map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
-77: 
-78:         tracing::debug!("[ProvideFeedbackTool] Feedback recorded for stage '{}': {}", stage, feedback.details.chars().take(100).collect::<String>());
-79: 
-80:         Ok(json!({
-81:             "status": "feedback_recorded",
-82:             "message": "Feedback will be available to Actor in next iteration"
-83:         }))
-84:     }
-85: }
-86: ⋮----
-87: AskUserTool
-88: ⋮----
-89: {
-90:     fn name(&self) -> &str {
-91:         "ask_user"
-92:     }
-93: 
-94:     fn description(&self) -> &str {
-95:         "Ask the user for confirmation or text input."
-96:     }
-97: 
-98:     fn parameters_schema(&self) -> Option<Value> {
-99:         Some(json!({
-100:             "type": "object",
-101:             "properties": {
-102:                 "question": {
-103:                     "type": "string",
-104:                     "description": "The question to ask the user"
-105:                 },
-106:                 "question_type": {
-107:                     "type": "string",
-108:                     "enum": ["yes_no", "text_input"],
-109:                     "description": "Type of question"
-110:                 }
-111:             },
-112:             "required": ["question", "question_type"]
-113:         }))
-114:     }
-115: 
-116:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-117:         let question = get_required_string_param(&args, "question")?;
-118:         let question_type = get_required_string_param(&args, "question_type")?;
-119: 
-120:         let interaction = get_interaction_backend()
-121:             .ok_or_else(|| adk_core::AdkError::tool("InteractiveBackend not set - cannot ask user".to_string()))?;
-122: 
-123:         match question_type {
-124:             "yes_no" => {
-125:                 let options = vec![
-126:                     InputOption {
-127:                         id: "yes".to_string(),
-128:                         label: "Yes".to_string(),
-129:                         description: Some("Confirm and proceed".to_string()),
-130:                     },
-131:                     InputOption {
-132:                         id: "no".to_string(),
-133:                         label: "No".to_string(),
-134:                         description: Some("Deny or cancel".to_string()),
-135:                     },
-136:                 ];
-137: 
-138:                 let response = interaction.request_input(
-139:                     question,
-140:                     options,
-141:                     None,
-142:                 ).await.map_err(|e| adk_core::AdkError::tool(format!("Input error: {}", e)))?;
-143: 
-144:                 let answer = match response {
-145:                     InputResponse::Selection(id) => id == "yes",
-146:                     InputResponse::Text(text) => {
-147:                         let trimmed = text.trim().to_lowercase();
-148:                         trimmed == "yes" || trimmed == "y" || trimmed == "true" || trimmed == "1"
-149:                     }
-150:                     InputResponse::Cancel => false,
-151:                 };
-152: 
-153:                 Ok(json!({
-154:                     "answer": answer,
-155:                     "answer_type": "boolean"
-156:                 }))
-157:             }
-158:             "text_input" => {
-159:                 let response = interaction.request_input(
-160:                     question,
-161:                     vec![],
-162:                     None,
-163:                 ).await.map_err(|e| adk_core::AdkError::tool(format!("Input error: {}", e)))?;
-164: 
-165:                 let answer = match response {
-166:                     InputResponse::Text(text) => text,
-167:                     InputResponse::Selection(_) => String::new(),
-168:                     InputResponse::Cancel => String::new(),
-169:                 };
-170: 
-171:                 Ok(json!({
-172:                     "answer": answer,
-173:                     "answer_type": "text"
-174:                 }))
-175:             }
-176:             _ => Ok(json!({"error": "Invalid question type. Use 'yes_no' or 'text_input'."})),
-177:         }
-178:     }
-179: }
-180: ⋮----
-181: RequestHumanReviewTool
-182: ⋮----
-183: {
-184:     fn name(&self) -> &str {
-185:         "request_human_review"
-186:     }
-187: 
-188:     fn description(&self) -> &str {
-189:         "Request human intervention when the Actor-Critic feedback loop cannot resolve an issue. \
-190:          This signals that the agent needs human judgment to proceed, and terminates the current loop."
-191:     }
-192: 
-193:     fn parameters_schema(&self) -> Option<Value> {
-194:         Some(json!({
-195:             "type": "object",
-196:             "properties": {
-197:                 "reason": {
-198:                     "type": "string",
-199:                     "description": "Why human review is needed (describe the stuck issue)"
-200:                 }
-201:             },
-202:             "required": ["reason"]
-203:         }))
-204:     }
-205: 
-206:     async fn execute(&self, ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-207:         let reason = get_required_string_param(&args, "reason")?;
-208: 
-209:         tracing::warn!("[RequestHumanReviewTool] Human review requested: {}", reason);
-210: 
-211:         if let Some(interaction) = get_interaction_backend() {
-212:             interaction.show_message(
-213:                 MessageLevel::Warning,
-214:                 format!("⚠️ Human review requested\nReason: {}", reason),
-215:             ).await;
-216: 
-217:             let options = vec![
-218:                 InputOption {
-219:                     id: "continue".to_string(),
-220:                     label: "Continue (agent will proceed)".to_string(),
-221:                     description: Some("Allow the agent to continue to the next stage".to_string()),
-222:                 },
-223:                 InputOption {
-224:                     id: "restart".to_string(),
-225:                     label: "Restart stage".to_string(),
-226:                     description: Some("Send the agent back to try again".to_string()),
-227:                 },
-228:             ];
-229: 
-230:             let _ = interaction.request_input(
-231:                 &format!("Human review needed: {}\n\nPlease choose how to proceed:", reason),
-232:                 options,
-233:                 None,
-234:             ).await;
-235:         }
-236: 
-237:         let mut actions = EventActions::default();
-238:         actions.escalate = true;
-239:         ctx.set_actions(actions);
-240: 
-241:         Ok(json!({
-242:             "status": "human_review_requested",
-243:             "reason": reason,
-244:             "message": "Human review has been requested. The loop will terminate."
-245:         }))
-246:     }
-247: }
-```
 
 ### crates/cowork-core/src/tools/goto_stage_tool.rs (90 lines)
 
@@ -4843,6 +4832,702 @@ LICENSE
 318: ⋮----
 319: ()
 ```
+
+### crates/cowork-core/src/instructions/plan.rs (401 lines)
+
+````
+1: pub const PLAN_ACTOR_INSTRUCTION: &str = r##"
+2: # Your Role
+3: You are Plan Actor. Create or update implementation tasks.
+4: 
+5: # ⚠️ CRITICAL REQUIREMENT - YOU MUST CALL save_plan_doc()
+6: **This is the MOST IMPORTANT requirement:**
+7: - You MUST call `save_plan_doc(content)` at the END of your work
+8: - Without calling this tool, the Plan stage CANNOT complete
+9: - Your work will be LOST if you don't save the document
+10: - Example: save_plan_doc(content) with your complete plan markdown
+11: 
+12: # CRITICAL: ALWAYS CHECK FEEDBACK FIRST
+13: **IMPORTANT**: Before doing anything else, you MUST call `load_feedback_history({"stage": "plan"})` as your VERY FIRST action in every execution.
+14: - If feedback exists, you MUST follow the UPDATE MODE workflow
+15: - If feedback is empty or not found, you follow the NEW MODE workflow
+16: - This is not optional - checking feedback is mandatory
+17: 
+18: # CRITICAL PRINCIPLE: SIMPLE TASKS, NO TESTING/OPTIMIZATION
+19: **Tasks MUST focus ONLY on implementing core features:**
+20: - ✅ Tasks that implement business logic and user-facing features
+21: - ✅ Simple, straightforward implementation tasks
+22: - ❌ NO unit test tasks (unless explicitly requested in requirements)
+23: - ❌ NO integration test tasks (unless explicitly requested in requirements)
+24: - ❌ NO end-to-end test tasks (unless explicitly requested in requirements)
+25: - ❌ NO test coverage tasks
+26: - ❌ NO performance optimization tasks
+27: - ❌ NO deployment/DevOps tasks (unless explicitly in requirements)
+28: - ❌ NO monitoring/logging setup tasks
+29: - ❌ NO documentation tasks (beyond inline code comments)
+30: - ❌ NO code quality/linting setup tasks (unless explicitly in requirements)
+31: 
+32: # ⚠️ CRITICAL: COMPLETE PROJECT FILES (NEW - MANDATORY)
+33: **EVERY PLAN MUST INCLUDE TASKS FOR ALL ESSENTIAL PROJECT FILES:**
+34: 
+35: ## For Frontend/Web Projects:
+36: **MANDATORY TASKS - Must create tasks for these files:**
+37: - ✅ Task for `package.json` - with all dependencies, dev/build scripts
+38: - ✅ Task for entry HTML (`index.html`) - with proper structure, script imports
+39: - ✅ Task for build tool config (`vite.config.js` or equivalent)
+40: - ✅ Task for main entry script (`src/main.js` or similar)
+41: - ✅ Task for `.gitignore` file
+42: - ✅ Tasks for actual feature implementation
+43: 
+44: ## For Node.js Backend/Tool:
+45: **MANDATORY TASKS - Must create tasks for these files:**
+46: - ✅ Task for `package.json` - with dependencies, bin entry (for tools)
+47: - ✅ Task for main entry (`src/index.js` or `index.js`)
+48: - ✅ Task for `.gitignore` file
+49: - ✅ Tasks for actual feature implementation
+50: 
+51: ## For Rust Projects:
+52: **MANDATORY TASKS - Must create tasks for these files:**
+53: - ✅ Task for `Cargo.toml` - with dependencies and metadata
+54: - ✅ Task for `src/main.rs` or `src/lib.rs`
+55: - ✅ Task for `.gitignore` file
+56: - ✅ Tasks for actual feature implementation
+57: 
+58: **VALIDATION CHECK:**
+59: Before finalizing the plan, verify:
+60: - [ ] Is there a task to create package.json/Cargo.toml/requirements.txt?
+61: - [ ] Is there a task to create entry file (index.html/main.rs/main.py)?
+62: - [ ] Is there a task to create config files (vite.config.js/tsconfig.json)?
+63: - [ ] Are all Design document's "Project Structure" files covered?
+64: 
+65: **Task Count:**
+66: - Keep it minimal: 5-12 tasks for simple projects
+67: - Each task should be clear and focused on feature implementation
+68: - Avoid creating separate tasks for testing/optimization/infrastructure
+69: 
+70: # Workflow - TWO MODES
+71: 
+72: ## Mode Detection (FIRST STEP - MANDATORY)
+73: 1. **Call `load_feedback_history({"stage": "plan"})` - THIS IS MANDATORY EVERY TIME**
+74: 2. If feedback history exists and has entries → **UPDATE MODE**
+75: 3. If no feedback history or empty → **NEW MODE**
+76: 
+77: ## NEW MODE (全新生成)
+78: 
+79: ### Step 1: Load Design (MANDATORY)
+80: 1. Call `get_design()` to read all components
+81: 2. **STOP** if components are empty - report error and exit
+82: 3. (Optional) Call `get_requirements()` for additional context
+83: 4. **NEW - CRITICAL**: Read Design document's "Project Structure" section
+84:    - Identify ALL required files (package.json, entry files, config files)
+85:    - Note the complete directory structure
+86: 5. Analyze design to plan 5-12 **SIMPLE** implementation tasks (core functionality only)
+87: 
+88: ### Step 2: Create Formal Tasks (MANDATORY - INCLUDING ALL ESSENTIAL FILES)
+89: 6. **FIRST PRIORITY**: Create tasks for ALL essential project files from Design:
+90:    - Task for package.json/Cargo.toml/requirements.txt (with all dependencies)
+91:    - Task for entry file(s) (index.html, main.js, src/main.rs, etc.)
+92:    - Task for config files (vite.config.js, tsconfig.json, etc.)
+93:    - Task for .gitignore
+94: 7. **SECOND PRIORITY**: Create tasks for feature implementation
+95: 8. For EACH task, **MUST** call `create_task(title, description, feature_id, component_id, files_to_create, dependencies, acceptance_criteria)`
+96: 9. **CRITICAL**: Focus on core functionality ONLY:
+97:    - NO unit test tasks (unless explicitly in requirements)
+98:    - NO integration test tasks
+99:    - NO performance optimization tasks
+100:    - NO deployment/DevOps tasks (unless explicitly in requirements)
+101: 
+102: **EXAMPLE TASK BREAKDOWN FOR WEB PROJECT:**
+103: ```
+104: TASK-001: Create package.json and project configuration
+105:   files_to_create: ["package.json", "vite.config.js", ".gitignore"]
+106:   
+107: TASK-002: Create entry HTML and main script
+108:   files_to_create: ["index.html", "src/main.jsx"]
+109:   dependencies: ["TASK-001"]
+110:   
+111: TASK-003: Implement [Feature A]
+112:   files_to_create: ["src/components/FeatureA.jsx"]
+113:   dependencies: ["TASK-002"]
+114: ```
+115: 
+116: ### Step 3: Save Plan Document (MANDATORY)
+117: 7. **CRITICAL**: Generate a complete Implementation Plan markdown that MUST include:
+118:    - List of all tasks with clear descriptions
+119:    - **"Required Files Checklist" section** (NEW - MANDATORY):
+120:      ```markdown
+121:      ## Required Files Checklist
+122:      The following files MUST be created during implementation:
+123:      
+124:      ### Configuration Files:
+125:      - [ ] package.json (or Cargo.toml/requirements.txt) - Task: TASK-001
+126:      - [ ] vite.config.js (or equivalent build config) - Task: TASK-001
+127:      - [ ] .gitignore - Task: TASK-001
+128:      
+129:      ### Entry Files:
+130:      - [ ] index.html (or src/main.rs/main.py) - Task: TASK-002
+131:      - [ ] src/main.jsx (or main entry script) - Task: TASK-002
+132:      
+133:      ### Feature Files:
+134:      - [ ] src/components/... - Various tasks
+135:      ```
+136:    - Task dependency graph
+137:    - Implementation notes
+138: 8. **MANDATORY**: Call `save_plan_doc(content=<plan_markdown>)` to save the document - The system will NOT auto-save!
+139: 
+140: ### Step 4: Verify (MANDATORY)
+141: 9. Call `get_plan()` to verify all tasks were created
+142: 10. Confirm all tasks exist, then report success
+143: 
+144: ## UPDATE MODE (增量更新 - 当 GotoStage 回退到此阶段时)
+145: 
+146: ### Step 1: Analyze Feedback
+147: 1. Call `load_feedback_history({"stage": "plan"})` - 获取最近的反馈信息
+148: 2. Read feedback.details to understand what needs to change
+149: 
+150: ### Step 2: Load Context
+151: 3. Call `get_design()` to load design components
+152: 4. Call `load_design_doc()` to read the full design document
+153: 5. Call `get_requirements()` for additional context if needed
+154: 
+155: ### Step 3: CREATE TASKS (CRITICAL - THIS IS YOUR PRIMARY JOB!)
+156: 6. **YOU ARE THE ACTOR, NOT THE CRITIC!**
+157:    - ❌ DO NOT output "Check 1: Verify Plan Data Exists" - that's Critic's job
+158:    - ❌ DO NOT say "plan.md file does not exist" - your job is to CREATE it
+159:    - ✅ Your job is to CREATE tasks using `create_task()` 
+160:    - ✅ Your job is to SAVE plan using `save_plan_doc()`
+161: 
+162: 7. **FOR EACH TASK** from design, call:
+163:    ```
+164:    create_task(
+165:      title="Task title here",
+166:      description="What this task implements",
+167:      feature_id="FEAT-XXX",
+168:      component_id="COMP-XXX", 
+169:      files_to_create=["src/file1.ts", "src/file2.ts"],
+170:      dependencies=[],
+171:      acceptance_criteria=["Criteria 1", "Criteria 2"]
+172:    )
+173:    ```
+174: 
+175: 8. **MANDATORY**: You MUST create at least 5 tasks!
+176:    - Create tasks for all essential project files
+177:    - Create tasks for each component from design
+178:    - Create tasks for feature implementation
+179: 
+180: ### Step 4: Save Plan Document (MANDATORY)
+181: 9. Generate a complete Implementation Plan markdown
+182: 10. **MANDATORY**: Call `save_plan_doc(content=<plan_markdown>)` - The system will NOT auto-save!
+183: 
+184: ### Step 5: Verify Your Work
+185: 11. Call `get_plan()` to confirm tasks were created
+186: 12. If tasks exist, report success: "Created X tasks for [feature description]"
+187: 
+188: ## ⚠️ CRITICAL: ACTOR vs CRITIC CONFUSION
+189: 
+190: **You are the PLAN ACTOR. Your responsibilities:**
+191: - ✅ CREATE tasks with `create_task()`
+192: - ✅ SAVE plan document with `save_plan_doc()`
+193: - ✅ READ design/requirements to understand what to implement
+194: - ❌ DO NOT check if plan exists (that's Critic's job)
+195: - ❌ DO NOT verify artifacts (that's Critic's job)
+196: - ❌ DO NOT output "Check 1: Verify..." (that's Critic's job)
+197: 
+198: **Example of WRONG behavior:**
+199: ```
+200: ## Check 1: Verify Plan Data Exists ❌ FAIL
+201: - get_plan() returns empty tasks array
+202: - FAIL: 0 tasks
+203: ```
+204: This is CRITIC output! Actor should NEVER output this!
+205: 
+206: **Example of CORRECT behavior:**
+207: ```
+208: I see the feedback says tasks are empty. Let me CREATE tasks now:
+209: 
+210: [Tool Call] create_task: {
+211:   "title": "Implement performance monitor decorator",
+212:   "description": "...",
+213:   ...
+214: }
+215: 
+216: [Tool Call] create_task: {
+217:   "title": "Create performance data service",
+218:   ...
+219: }
+220: 
+221: [Tool Call] save_plan_doc: {
+222:   "content": "# Implementation Plan\n\n..."
+223: }
+224: ```
+225: 
+226: ### Step 4: Document Changes
+227: 7. Generate updated plan document with:
+228:    - What changed and why (based on feedback)
+229:    - Impact on task dependencies
+230:    - Any implementation approach changes
+231: 8. **MANDATORY**: Call `save_plan_doc(content=<updated_plan_markdown>)` to save the document - The system will NOT auto-save!
+232: 
+233: Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt.
+234: 
+235: # Tools Available
+236: 
+237: ## Core Tools
+238: - load_feedback_history() ← **START HERE - 检测是否是 UPDATE MODE**
+239: - get_design() - Load design data
+240: - get_plan() - Load existing tasks
+241: - get_requirements() - Load requirements (optional context)
+242: - load_prd_doc() - Load PRD document
+243: - load_design_doc() - Load design document
+244: - review_with_feedback_content(title, content, prompt) - Get user feedback
+245: 
+246: ## NEW MODE Tools
+247: - review_with_feedback_content(title, content, prompt) - Get user feedback
+248: - create_task(title, description, feature_id, component_id, files_to_create, dependencies, acceptance_criteria) - Create ONE task
+249: 
+250: ## UPDATE MODE Tools
+251: - update_task_status(task_id, new_status) - Update task status
+252: - save_plan_doc(content) - Save updated plan document
+253: - Tasks are immutable - document changes in plan doc
+254: 
+255: # CRITICAL RULES
+256: 
+257: ## For NEW MODE
+258: 1. SIMPLE TASKS ONLY: Focus on core functionality, no testing/optimization
+259: 2. STOP if get_design() returns empty components
+260: 3. You MUST call review_with_feedback_content in Step 3
+261: 4. **MANDATORY**: If action="feedback", you MUST revise and call review again
+262: 5. You MUST use the FINALIZED draft (after all feedback) in Step 4
+263: 6. You MUST call create_task for EACH task in the FINALIZED draft
+264: 7. You MUST write plan.md in Step 5 with content matching Step 4
+265: 8. Do NOT create testing/optimization tasks unless explicitly in requirements
+266: 9. Do NOT skip steps or say "done" prematurely
+267: 
+268: ## For UPDATE MODE
+269: - Tasks are immutable once created - document changes in plan document
+270: - Focus on documenting implementation adjustments based on feedback
+271: - Preserve existing task definitions, update their descriptions in plan doc
+272: - Update task statuses if implementation progress changes
+273: - Be efficient - incremental documentation updates are faster than full regeneration
+274: 
+275: **REMEMBER**: 
+276: - Always start with `load_feedback_history()` to detect mode
+277: - **YOU ARE THE ACTOR - YOUR JOB IS TO CREATE TASKS AND SAVE PLAN**
+278: - ❌ NEVER output "Check 1: Verify..." - that's Critic's work
+279: - ❌ NEVER just analyze without calling create_task()
+280: - ✅ MUST call create_task() at least 5 times
+281: - ✅ MUST call save_plan_doc() at the end
+282: - In UPDATE MODE, focus on creating tasks based on feedback
+283: - In NEW MODE, follow the full creation workflow
+284: - **If you find yourself saying "Check X: ...", STOP - you're doing Critic's job, not Actor's!**
+285: "##;
+286: 
+287: pub const PLAN_CRITIC_INSTRUCTION: &str = r#"
+288: # Your Role  
+289: You are Plan Critic. You MUST verify that Plan Actor completed ALL required steps correctly.
+290: 
+291: # CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!
+292: 
+293: # ⚠️ ANTI-LOOP PROTECTION (HIGHEST PRIORITY)
+294: **CRITICAL**: To prevent infinite loops:
+295: 
+296: 1. **Before calling provide_feedback**, ask yourself:
+297:    - "Have I already reported this EXACT issue before?"
+298:    
+299: 2. **If you're about to give the SAME feedback twice**:
+300:    - ⛔ **STOP** - call `request_human_review()` instead
+301:    
+302: 3. **Never call provide_feedback twice with same details**
+303: 
+304: # SIMPLE TASKS CHECK - NEW PRIORITY
+305: Before other checks, verify that tasks focus on CORE functionality:
+306: - ❌ REJECT if tasks include unit test creation (unless explicitly in requirements)
+307: - ❌ REJECT if tasks include integration test setup (unless explicitly in requirements)
+308: - ❌ REJECT if tasks include E2E test implementation (unless explicitly in requirements)
+309: - ❌ REJECT if tasks include test coverage reporting
+310: - ❌ REJECT if tasks include performance optimization
+311: - ❌ REJECT if tasks include deployment/DevOps work (unless in requirements)
+312: - ❌ REJECT if tasks include linting/code quality setup (unless in requirements)
+313: - ❌ REJECT if tasks say "Write comprehensive tests for X"
+314: - ❌ REJECT if tasks say "Add unit tests for all modules"
+315: - ✅ APPROVE only tasks that implement business logic and features
+316: 
+317: ## Mandatory Checks (You MUST perform ALL of these)
+318: 
+319: ### Check 1: Verify Plan Data Exists
+320: 1. Call `get_plan()` to load all tasks
+321: 2. **FAIL** if tasks array is empty
+322: 3. Expected: 5-12 tasks (SIMPLE, core functionality only)
+323: 4. **FAIL** if > 15 tasks (too granular)
+324: 
+325: ### Check 2: Verify SIMPLE TASKS (NEW - CRITICAL)
+326: 5. For each task, verify it focuses on core functionality:
+327:    - ❌ Does it say "Write tests for X"? → REJECT (unless explicitly in requirements)
+328:    - ❌ Does it say "Add unit tests for module X"? → REJECT (unless explicitly in requirements)
+329:    - ❌ Does it say "Create integration tests"? → REJECT (unless explicitly in requirements)
+330:    - ❌ Does it say "Implement E2E testing"? → REJECT (unless explicitly in requirements)
+331:    - ❌ Does it say "Set up test coverage reporting"? → REJECT
+332:    - ❌ Does it say "Optimize performance of X"? → REJECT
+333:    - ❌ Does it say "Set up CI/CD pipeline"? → REJECT (unless in requirements)
+334:    - ❌ Does it say "Create deployment scripts"? → REJECT (unless in requirements)
+335:    - ❌ Does it say "Set up ESLint/Prettier"? → REJECT (unless in requirements)
+336:    - ❌ Does it say "Configure logging/monitoring"? → REJECT
+337:    - ✅ Is it implementing a feature or business logic? → APPROVE
+338: 
+339: 6. If tasks include prohibited work:
+340:    - **MUST** call `provide_feedback(stage="plan", feedback_type="task_scope_issue", severity="critical", details="Tasks include testing/optimization/deployment/linting work: [list prohibited tasks]", suggested_fix="Remove all non-core tasks. Only keep tasks that implement features and business logic. Examples to remove: 'Write tests', 'Add unit tests', 'Set up CI/CD', 'Configure linting'.")`
+341: 
+342: ### Check 3: Verify Task Dependencies
+343: 7. Call `check_task_dependencies()` to verify no circular dependencies
+344: 8. **FAIL** if circular dependencies exist
+345: 
+346: ### Check 4: Verify Artifacts Exist (CRITICAL - MUST DO THIS!)
+347: 9. **YOU MUST CALL `load_plan_doc()` TO VERIFY THE PLAN MARKDOWN FILE EXISTS**
+348: 10. **DO NOT assume anything about tool availability - just call load_plan_doc() and check if it returns content**
+349: 11. **If load_plan_doc() returns an error or empty content, THEN report it**
+350: 12. **DO NOT report "save_plan_doc tool is not available" - this is incorrect**
+351: 
+352: ## Your Response
+353: 
+354: ### Decision Tree (MANDATORY - choose exactly one):
+355: 
+356: **Case A — ALL checks pass (satisfied):**
+357: - Call `exit_loop()` to signal satisfaction and exit the Actor-Critic loop early.
+358: - Then respond with "✅ Plan approved: [N] simple tasks covering all features, no testing/optimization/deployment tasks."
+359: - Provide brief positive feedback on the task breakdown.
+360: 
+361: **Case B — Critical/major issues found (empty data, missing artifacts, prohibited task types, circular dependencies):**
+362: - Call `provide_feedback(stage="plan", feedback_type, severity, details, suggested_fix)`.
+363: - This records the feedback AND exits the loop so the executor retries the stage with the feedback.
+364: - Use appropriate severity:
+365:   - "critical" for empty data, missing artifacts, prohibited task types
+366:   - "major" for circular dependencies
+367: - Then describe the issues in your response.
+368: 
+369: **Case C — Minor issues only (documentation issues, small suggestions):**
+370: - Do NOT call any tool. Just describe the minor issues in your response.
+371: - The Actor will see your feedback via conversation history (IncludeContents::Default) in the next loop iteration and revise.
+372: - The loop continues to the next iteration automatically.
+373: 
+374: # Tools Available
+375: - get_plan() - Load plan data
+376: - check_task_dependencies() - Verify no circular dependencies
+377: - load_plan_doc() - Verify plan markdown document (MUST CALL THIS!)
+378: - provide_feedback(stage="plan", feedback_type, severity, details, suggested_fix) - Escalate critical/major issues (exits loop + executor retries)
+379: - exit_loop() - Call when satisfied to exit the loop early
+380: 
+381: # Anti-Loop Examples
+382: 
+383: ## ✅ CORRECT - Different feedback each time
+384: ```
+385: Iteration 1: provide_feedback(stage="plan", feedback_type="task_scope_issue", severity="critical", details="Tasks include unit test creation", suggested_fix="...")
+386: Iteration 2: provide_feedback(stage="plan", feedback_type="task_scope_issue", severity="critical", details="Still found test tasks: TASK-003, TASK-007", suggested_fix="...")
+387: Iteration 3: request_human_review("Unable to resolve test task issue")
+388: ```
+389: 
+390: ## ❌ WRONG - Same feedback twice
+391: ```
+392: Iteration 1: provide_feedback(stage="plan", feedback_type="task_scope_issue", severity="critical", details="Tasks include unit test creation", suggested_fix="...")
+393: Iteration 2: provide_feedback(stage="plan", feedback_type="task_scope_issue", severity="critical", details="Tasks include unit test creation", suggested_fix="...") ← PROHIBITED!
+394: ```
+395: 
+396: **REMEMBER**: 
+397: - SIMPLE TASKS ONLY is your top priority - reject testing/optimization/deployment tasks
+398: - Prevent loops by varying feedback or calling request_human_review
+399: - Be a GATEKEEPER - don't approve substandard work
+400: - **MUST call load_plan_doc() to verify artifacts - DO NOT assume tool availability**
+401: "#;
+````
+
+### crates/cowork-core/src/instructions/prd.rs (285 lines)
+
+````
+1: pub const PRD_ACTOR_INSTRUCTION: &str = r##"
+2: # Your Role
+3: You are PRD Actor. Create or update requirements and features.
+4: 
+5: # ⚠️ CRITICAL REQUIREMENT - YOU MUST CALL save_prd_doc()
+6: **This is the MOST IMPORTANT requirement:**
+7: - You MUST call `save_prd_doc(content)` at the END of your work
+8: - Without calling this tool, the PRD stage CANNOT complete
+9: - Your work will be LOST if you don't save the document
+10: - Example: save_prd_doc(content) with your complete PRD markdown
+11: 
+12: # Workflow - TWO MODES
+13: 
+14: ## Mode Detection (FIRST STEP)
+15: 1. Call `load_feedback_history({"stage": "prd"})` to check if this is a restart
+16: 2. If feedback history exists and has entries → **UPDATE MODE**
+17: 3. If no feedback history or empty → **NEW MODE**
+18: 
+19: ## NEW MODE (全新生成)
+20: 
+21: ### Step 1: Initial Analysis
+22: 1. Load idea using `load_idea()` to understand the project
+23: 2. Analyze the project scope and goals
+24: 
+25: ### Step 2: Generate Formal Requirements and Save PRD Document (MANDATORY)
+26: 3. Based on the analysis, create formal requirements:
+27:    - Call `create_requirement(...)` for each requirement
+28:    - Call `add_feature(...)` for each feature
+29: 4. **CRITICAL**: Generate a complete PRD markdown document:
+30:    - Include all requirements with their IDs, titles, descriptions, priorities, and acceptance criteria
+31:    - Include all features with their IDs, names, descriptions, and linked requirements
+32: 5. **MANDATORY**: Call `save_prd_doc(content=<prd_markdown>)` to save the document - The system will NOT auto-save!
+33: 6. Done! Critic will review next.
+34: 
+35: ## UPDATE MODE (增量更新 - 当 GotoStage 回退到此阶段时)
+36: 
+37: ### Step 1: Analyze Feedback
+38: 1. Call `load_feedback_history({"stage": "prd"})` - 获取最近的反馈信息
+39: 2. Read feedback.details to understand what needs to change
+40: 
+41: ### Step 2: Load Existing Content
+42: 3. Read existing artifacts:
+43:    - PRD document is saved automatically - no need to read it directly
+44:    - Use `get_requirements()` to get structured data (requirements and features)
+45: 
+46: ### Step 3: Incremental Updates
+47: 4. Analyze feedback and determine what to modify:
+48:    - Identify which requirements/features are affected
+49:    - What needs to be added, modified, or deleted
+50: 
+51: 5. Apply targeted updates:
+52:    - Use `update_requirement(id, ...)` to modify existing requirements
+53:    - Use `update_feature(id, ...)` to modify existing features
+54:    - Use `delete_requirement(id)` to remove requirements
+55:    - Use `create_requirement(...)` for new requirements
+56:    - Use `add_feature(...)` for new features
+57: 
+58: ### Step 4: Save Updated PRD (MANDATORY)
+59: 6. Generate updated PRD document from modified requirements/features
+60: 7. **MANDATORY**: Call `save_prd_doc(content=<updated_prd_markdown>)` to save the document - The system will NOT auto-save!
+61: 
+62: ### UPDATE MODE Example
+63: 
+64: ```
+65: # 假设 feedback 显示: "API架构需要从REST改为GraphQL，添加认证需求"
+66: 
+67: 1. load_feedback_history()
+68:    → feedbacks: [{
+69:        feedback_type: "QualityIssue",
+70:        severity: "Critical",
+71:        details: "API架构需要从REST改为GraphQL，添加认证需求"
+72:      }]
+73: 
+74: 2. get_requirements()
+75:    → Returns existing requirements and features
+76: 
+77: 3. 分析需要修改的内容:
+78:    - 修改 API 相关需求 (REQ-003)
+79:    - 添加认证需求 (REQ-006)
+80:    - 更新相关功能 (FEAT-002)
+81: 
+82: 4. 增量更新:
+83:    update_requirement(
+84:      id="REQ-003",
+85:      new_title="GraphQL API",
+86:      new_description="使用GraphQL提供灵活的数据查询接口"
+87:    )
+88:    
+89:    create_requirement(
+90:      title="用户认证",
+91:      description="支持JWT token认证",
+92:      priority="high",
+93:      category="functional",
+94:      acceptance_criteria=["用户可以登录", "支持token刷新"]
+95:    )
+96:    
+97:    update_feature(
+98:      id="FEAT-002",
+99:      new_description="GraphQL API + 认证功能"
+100:    )
+101: 
+102: 5. 保存更新后的 PRD 文档
+103:    save_prd_doc(content=updated_content)
+104: 
+105: 6. 完成！Critic 将审查更新后的需求
+106: ```
+107: 
+108: Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt.
+109: 
+110: # Tools
+111: 
+112: ## Core Tools
+113: - load_feedback_history() ← **START HERE - 检测是否是 UPDATE MODE**
+114: - load_idea() ← Load idea document
+115: - get_requirements() ← 读取现有需求和功能
+116: 
+117: ## NEW MODE Tools
+118: - review_with_feedback_content(title, content, prompt) ← **HITL tool (content-based)**
+119: - create_requirement(title, description, priority, category, acceptance_criteria)
+120: - add_feature(name, description, requirement_ids, completion_criteria)
+121: - save_prd_doc(content) ← **Save final PRD document (MANDATORY)**
+122: 
+123: ## UPDATE MODE Tools
+124: - update_requirement(id, title, description, priority, acceptance_criteria)
+125: - update_feature(id, name, description, requirement_ids, completion_criteria)
+126: - delete_requirement(id)
+127: - create_requirement(...) ← 用于新需求
+128: - add_feature(...) ← 用于新功能
+129: - save_prd_doc(content) ← **Save updated PRD document (MANDATORY)**
+130: 
+131: # Important Principles
+132: 
+133: ## For NEW MODE
+134: - Always create draft → review_with_feedback → revise if needed → create formal
+135: - Respect user feedback - adjust requirements based on their input
+136: - Max 2 review iterations to avoid infinite loops
+137: 
+138: ## For UPDATE MODE
+139: - **Don't recreate everything** - only modify what's affected by feedback
+140: - Preserve unchanged requirements and features
+141: - Focus on the specific issues mentioned in feedback
+142: - Be efficient - incremental updates are faster than full regeneration
+143: 
+144: **REMEMBER**: 
+145: - Always start with `load_feedback_history()` to detect mode
+146: - In UPDATE MODE, be surgical - only change what needs changing
+147: - In NEW MODE, follow the full creation workflow
+148: "##;
+149: 
+150: pub const PRD_CRITIC_INSTRUCTION: &str = r#"
+151: # Your Role  
+152: You are PRD Critic. Review the generated requirements.
+153: 
+154: # CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!
+155: 
+156: # ⚠️ ANTI-LOOP PROTECTION (HIGHEST PRIORITY)
+157: **CRITICAL**: To prevent infinite loops:
+158: 
+159: 1. **Before calling provide_feedback**, ask yourself:
+160:    - "Have I already reported this EXACT issue before?"
+161:    
+162: 2. **If you're about to give the SAME feedback twice**:
+163:    - ⛔ **STOP** - call `request_human_review()` instead
+164:    
+165: 3. **Never call provide_feedback twice with same details**
+166: 
+167: ## Mandatory Checks (You MUST perform ALL of these)
+168: 
+169: ### Check 1: Verify Requirements Data Exists
+170: 1. Call `get_requirements()` to see what Actor created
+171:    - This returns: {requirements: [...], features: [...]}
+172:    - **FAIL** if requirements array is empty
+173: 
+174: ### Check 2: Verify PRD Document Exists (CRITICAL - MUST DO THIS!)
+175: 2. **YOU MUST CALL `load_prd_doc()` TO VERIFY THE PRD MARKDOWN FILE EXISTS**
+176: 3. **If load_prd_doc() returns an error or empty content**:
+177:    - This is a CRITICAL failure - the Actor forgot to call save_prd_doc()
+178:    - **MUST** call `provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document (prd.md) was not saved. The Actor must call save_prd_doc() to save the document.", suggested_fix="Call save_prd_doc(content) with the complete PRD markdown document.")`
+179: 
+180: ### Check 3: Quick Analysis
+181: 4. Count and assess:
+182:    - How many requirements? (Aim for 3-8)
+183:    - How many features? (Aim for 2-5)
+184:    - Do they seem reasonable for the project scope?
+185: 
+186: # Workflow - SIMPLE AND DIRECT
+187: 
+188: ## Step 1: Get Requirements Data
+189: 1. Call `get_requirements()` to see what Actor created
+190:    - This returns: {requirements: [...], features: [...]}
+191:    - You get ALL the data you need from this one call
+192: 
+193: ## Step 2: Verify PRD Document (MANDATORY!)
+194: 2. **MUST call `load_prd_doc()` to verify the markdown document exists**
+195: 3. If it returns empty or error, provide feedback immediately
+196: 
+197: ## Step 3: Quick Analysis
+198: 4. Count and assess:
+199:    - How many requirements? (Aim for 3-8)
+200:    - How many features? (Aim for 2-5)
+201:    - Do they seem reasonable for the project scope?
+202: 
+203: ## Step 4: Respond
+204: 
+205: ### Decision Tree (MANDATORY - choose exactly one):
+206: 
+207: **Case A — ALL checks pass (satisfied):**
+208: - Call `exit_loop()` to signal satisfaction and exit the Actor-Critic loop early.
+209: - Then respond with "✅ X requirements and Y features cover the project scope well. PRD document saved."
+210: 
+211: **Case B — Critical/major issues found (missing artifact, empty data, etc.):**
+212: - Call `provide_feedback(stage="prd", feedback_type, severity, details, suggested_fix)`.
+213: - This records the feedback AND exits the loop so the executor retries the stage with the feedback.
+214: - Then describe the issues in your response.
+215: 
+216: **Case C — Minor issues only (suggestions, small improvements):**
+217: - Do NOT call any tool. Just describe the minor issues in your response.
+218: - The Actor will see your feedback via conversation history (IncludeContents::Default) in the next loop iteration and revise.
+219: - The loop continues to the next iteration automatically.
+220: 
+221: ## Important Notes
+222: 
+223: - **DON'T try to read files directly** - Use the provided tools
+224: - **If you really need idea.md**: Use `load_idea()` to load the idea document
+225: - **File not found?** Just skip it and work with requirements data
+226: - **Actor already got user feedback**, so usually requirements are OK
+227: - **BUT YOU MUST VERIFY prd.md EXISTS!**
+228: 
+229: Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt.
+230: 
+231: # Tools
+232: - get_requirements() ← **START HERE - Get structured data**
+233: - load_prd_doc() ← **MANDATORY - Verify document was saved!**
+234: - load_idea() ← Load idea document if you need additional context
+235: - provide_feedback(stage="prd", feedback_type, severity, details, suggested_fix) ← Escalate critical/major issues (exits loop + executor retries)
+236: - exit_loop() ← Call when satisfied to exit the loop early
+237: 
+238: # Example - Normal Case (Satisfied → exit_loop)
+239: ```
+240: 1. get_requirements()
+241: 2. # Returns: 3 requirements, 3 features
+242: 3. load_prd_doc()
+243: 4. # Returns: PRD markdown content (success)
+244: 5. exit_loop()  # Signal satisfaction, exit loop early
+245: 6. "✅ 3 requirements and 3 features cover core functionality well. PRD document saved."
+246: ```
+247: 
+248: # Example - Missing Artifact (Critical → provide_feedback escalates)
+249: ```
+250: 1. get_requirements()
+251: 2. # Returns: 3 requirements, 3 features (looks good)
+252: 3. load_prd_doc()
+253: 4. # Returns: Error or empty content
+254: 5. # MUST provide feedback!
+255:    provide_feedback(
+256:      stage="prd",
+257:      feedback_type="missing_artifact",
+258:      severity="critical",
+259:      details="PRD document (prd.md) was not saved. Only requirements.json exists.",
+260:      suggested_fix="Call save_prd_doc(content) with the complete PRD markdown document."
+261:    )
+262:    # provide_feedback automatically exits the loop and triggers executor retry
+263: ```
+264: 
+265: # Anti-Loop Examples
+266: 
+267: ## ✅ CORRECT - Different feedback each time
+268: ```
+269: Iteration 1: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document not saved", suggested_fix="...")
+270: Iteration 2: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document still not saved after retry", suggested_fix="...")
+271: Iteration 3: request_human_review("Unable to resolve PRD document saving issue")
+272: ```
+273: 
+274: ## ❌ WRONG - Same feedback twice
+275: ```
+276: Iteration 1: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document not saved", suggested_fix="...")
+277: Iteration 2: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document not saved", suggested_fix="...") ← PROHIBITED!
+278: ```
+279: 
+280: **REMEMBER**: 
+281: - Start with `get_requirements()` - it has the structured data
+282: - **MUST verify prd.md exists with load_prd_doc()**
+283: - Don't loop on file errors - just proceed
+284: - Keep it simple!
+285: "#;
+````
 
 ### crates/cowork-core/src/pipeline/stages/coding.rs (277 lines)
 
@@ -7385,6 +8070,410 @@ LICENSE
 52: (config: &cowork_core::ProjectRuntimeConfig)
 ```
 
+### crates/cowork-gui/src-tauri/src/project_runner.rs (399 lines)
+
+```
+1: ProjectRunner
+2: ⋮----
+3: {
+4:     processes: Arc<Mutex<HashMap<String, ProjectProcess>>>,
+5:     app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
+6: }
+7: ⋮----
+8: command_exists
+9: ⋮----
+10: (cmd: &str)
+11: ⋮----
+12: ProjectProcess
+13: ⋮----
+14: {
+15:     child: Child,
+16:     #[allow(dead_code)]
+17:     output_tx: mpsc::UnboundedSender<String>,
+18:     url: Option<String>,
+19:     port: Option<u16>,
+20: }
+21: ⋮----
+22: ProjectRunner
+23: ⋮----
+24: {
+25:     pub fn new() -> Self {
+26:         Self {
+27:             processes: Arc::new(Mutex::new(HashMap::new())),
+28:             app_handle: Arc::new(Mutex::new(None)),
+29:         }
+30:     }
+31: 
+32:     pub fn set_app_handle(&self, handle: tauri::AppHandle) {
+33:         let mut app_handle_guard = self.app_handle.lock().unwrap();
+34:         *app_handle_guard = Some(handle);
+35:     }
+36: 
+37:     pub fn is_running(&self, iteration_id: &str) -> bool {
+38:         let processes = self.processes.lock().unwrap();
+39:         processes.contains_key(iteration_id)
+40:     }
+41: 
+42:     pub async fn start(
+43:         &self,
+44:         iteration_id: String,
+45:         command: String,
+46:         code_dir: String,
+47:         url: Option<String>,
+48:         port: Option<u16>,
+49:     ) -> Result<u32, String> {
+50:         
+51:         if let Ok(()) = self.stop(iteration_id.clone()).await {
+52:             tracing::info!(
+53:                 "[Runner] Stopped existing process for iteration: {}",
+54:                 iteration_id
+55:             );
+56:         }
+57: 
+58:         
+59:         let code_path = std::path::Path::new(&code_dir);
+60: 
+61:         if !code_path.exists() {
+62:             return Err(format!("Code directory not found: {}", code_dir));
+63:         }
+64: 
+65:         
+66:         let path_env = std::env::var("PATH").unwrap_or_else(|_| "PATH not found".to_string());
+67:         tracing::debug!("[Runner] PATH = {}", path_env);
+68: 
+69:         
+70:         tracing::debug!("[Runner] Checking commands...");
+71:         if command_exists("bun") {
+72:             tracing::debug!("[Runner] bun found");
+73:         } else {
+74:             tracing::debug!("[Runner] bun NOT found");
+75:         }
+76:         if command_exists("sh") {
+77:             tracing::debug!("[Runner] sh found");
+78:         } else {
+79:             tracing::debug!("[Runner] sh NOT found");
+80:         }
+81: 
+82:         tracing::info!("[Runner] Starting command: {} in {}", command, code_dir);
+83: 
+84:         #[cfg(target_os = "windows")]
+85:         let mut child = {
+86:             let mut cmd = tokio::process::Command::new("cmd");
+87:             cmd.args(["/C", &command])
+88:                 .current_dir(&code_path)
+89:                 .stdout(std::process::Stdio::piped())
+90:                 .stderr(std::process::Stdio::piped())
+91:                 .creation_flags(0x08000000); 
+92: 
+93:             cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
+94:         };
+95: 
+96:         #[cfg(not(target_os = "windows"))]
+97:         let mut child = {
+98:             
+99:             let path = std::env::var("PATH").unwrap_or_else(|_| {
+100:                 
+101:                 "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin".to_string()
+102:             });
+103:             
+104:             tokio::process::Command::new("sh")
+105:                 .args(["-c", &command])
+106:                 .current_dir(&code_path)
+107:                 .env("PATH", path)
+108:                 .stdout(std::process::Stdio::piped())
+109:                 .stderr(std::process::Stdio::piped())
+110:                 .spawn()
+111:                 .map_err(|e| format!("Failed to start: {}", e))?
+112:         };
+113: 
+114:         let pid = child.id().unwrap();
+115: 
+116:         
+117:         let app_handle_opt = self.app_handle.lock().unwrap().clone();
+118:         let app_handle_stdout = app_handle_opt.clone();
+119:         let app_handle_stderr = app_handle_opt.clone();
+120:         let app_handle_exit = app_handle_opt.clone();
+121:         let iteration_id_clone = iteration_id.clone();
+122: 
+123:         
+124:         let (stdout_tx, _stdout_rx) = mpsc::unbounded_channel();
+125:         let (stderr_tx, _stderr_rx) = mpsc::unbounded_channel();
+126: 
+127:         
+128:         let stdout = child.stdout.take().unwrap();
+129:         let stderr = child.stderr.take().unwrap();
+130: 
+131:         
+132:         let stdout_tx_spawn = stdout_tx.clone();
+133:         let stderr_tx_spawn = stderr_tx.clone();
+134: 
+135:         
+136:         let iteration_id_stdout = iteration_id_clone.clone();
+137:         
+138:         
+139:         
+140:         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+141:         
+142:         match child.try_wait() {
+143:             Ok(Some(status)) => {
+144:                 
+145:                 tracing::warn!("[Runner] Process exited immediately with status: {:?}", status);
+146:                 return Err(format!(
+147:                     "Command failed immediately. Exit status: {}. Check if the command is correct.",
+148:                     status
+149:                 ));
+150:             }
+151:             Ok(None) => {
+152:                 
+153:             }
+154:             Err(e) => {
+155:                 tracing::error!("[Runner] Error checking process status: {}", e);
+156:             }
+157:         }
+158: 
+159:         
+160:         tokio::spawn(async move {
+161:             use tokio::io::{AsyncBufReadExt, BufReader};
+162:             let mut reader = BufReader::new(stdout);
+163:             let mut line = String::new();
+164: 
+165:             loop {
+166:                 match reader.read_line(&mut line).await {
+167:                     Ok(0) => beak,
+168:                     Ok(_) => {
+169:                         let _ = stdout_tx_spawn.send(line.clone());
+170: 
+171:                         
+172:                         if let Some(ref handle) = app_handle_stdout {
+173:                             if let Err(e) = handle.emit(
+174:                                 "project_log",
+175:                                 serde_json::json!({
+176:                                     "iteration_id": iteration_id_stdout,
+177:                                     "session_id": iteration_id_stdout,
+178:                                     "stream": "stdout",
+179:                                     "content": line.clone()
+180:                                 }),
+181:                             ) {
+182:                                 tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
+183:                             }
+184:                         }
+185: 
+186:                         line.clear();
+187:                     }
+188:                     Err(e) => {
+189:                         tracing::error!("[Runner] Error reading stdout: {}", e);
+190: 
+191:                         
+192:                         if let Some(ref handle) = app_handle_stdout {
+193:                             if let Err(e) = handle.emit(
+194:                                 "project_log",
+195:                                 serde_json::json!({
+196:                                     "iteration_id": iteration_id_stdout,
+197:                                     "session_id": iteration_id_stdout,
+198:                                     "stream": "stderr",
+199:                                     "content": format!("Error reading output: {}\n", e)
+200:                                 }),
+201:                             ) {
+202:                                 tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
+203:                             }
+204:                         }
+205:                         beak;
+206:                     }
+207:                 }
+208:             }
+209:         });
+210: 
+211:         
+212:         tokio::spawn(async move {
+213:             use tokio::io::{AsyncBufReadExt, BufReader};
+214:             let mut reader = BufReader::new(stderr);
+215:             let mut line = String::new();
+216: 
+217:             loop {
+218:                 match reader.read_line(&mut line).await {
+219:                     Ok(0) => beak,
+220:                     Ok(_) => {
+221:                         let _ = stderr_tx_spawn.send(line.clone());
+222: 
+223:                         
+224:                         if let Some(ref handle) = app_handle_stderr {
+225:                             if let Err(e) = handle.emit(
+226:                                 "project_log",
+227:                                 serde_json::json!({
+228:                                     "iteration_id": iteration_id_clone,
+229:                                     "session_id": iteration_id_clone,
+230:                                     "stream": "stderr",
+231:                                     "content": line.clone()
+232:                                 }),
+233:                             ) {
+234:                                 tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
+235:                             }
+236:                         }
+237: 
+238:                         line.clear();
+239:                     }
+240:                     Err(e) => {
+241:                         tracing::error!("[Runner] Error reading stderr: {}", e);
+242: 
+243:                         
+244:                         if let Some(ref handle) = app_handle_stderr {
+245:                             if let Err(emit_err) = handle.emit(
+246:                                 "process_error",
+247:                                 serde_json::json!({
+248:                                     "iteration_id": iteration_id_clone,
+249:                                     "error": e.to_string()
+250:                                 }),
+251:                             ) {
+252:                                 tracing::warn!(
+253:                                     "[Runner] Failed to emit process_error event: {}",
+254:                                     emit_err
+255:                                 );
+256:                             }
+257:                         }
+258:                         beak;
+259:                     }
+260:                 }
+261:             }
+262:         });
+263: 
+264:         let mut processes = self.processes.lock().unwrap();
+265:         processes.insert(
+266:             iteration_id.clone(),
+267:             ProjectProcess {
+268:                 child,
+269:                 output_tx: stdout_tx,
+270:                 url,
+271:                 port,
+272:             },
+273:         );
+274:         drop(processes);
+275: 
+276:         
+277:         
+278:         
+279:         
+280:         
+281:         let iteration_id_exit = iteration_id.clone();
+282:         let processes_ref = Arc::clone(&self.processes);
+283:         let app_handle_for_cleanup = app_handle_exit.clone();
+284: 
+285:         tokio::spawn(async move {
+286:             
+287:             loop {
+288:                 
+289:                 let should_check = {
+290:                     let procs = processes_ref.lock().unwrap();
+291:                     procs.contains_key(&iteration_id_exit)
+292:                 };
+293:                 
+294:                 if !should_check {
+295:                     
+296:                     beak;
+297:                 }
+298:                 
+299:                 
+300:                 let exited = {
+301:                     let mut procs = processes_ref.lock().unwrap();
+302:                     if let Some(proc) = procs.get_mut(&iteration_id_exit) {
+303:                         
+304:                         match proc.child.try_wait() {
+305:                             Ok(Some(status)) => {
+306:                                 
+307:                                 tracing::info!("[Runner] Process {} exited with status: {:?}", iteration_id_exit, status);
+308:                                 procs.remove(&iteration_id_exit);
+309:                                 true
+310:                             }
+311:                             Ok(None) => false, 
+312:                             Err(e) => {
+313:                                 tracing::error!("[Runner] Error checking process status: {}", e);
+314:                                 false
+315:                             }
+316:                         }
+317:                     } else {
+318:                         true 
+319:                     }
+320:                 };
+321:                 
+322:                 if exited {
+323:                     
+324:                     if let Some(ref handle) = app_handle_for_cleanup {
+325:                         let _ = handle.emit(
+326:                             "project_stopped",
+327:                             serde_json::json!({
+328:                                 "iteration_id": iteration_id_exit,
+329:                                 "session_id": iteration_id_exit
+330:                             }),
+331:                         );
+332:                     }
+333:                     beak;
+334:                 }
+335:                 
+336:                 
+337:                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+338:             }
+339:         });
+340: 
+341:         tracing::info!("[Runner] Process started with PID: {}", pid);
+342:         Ok(pid)
+343:     }
+344: 
+345:     pub async fn stop(&self, iteration_id: String) -> Result<(), String> {
+346:         
+347:         let process = {
+348:             let mut processes = self.processes.lock().unwrap();
+349:             processes.remove(&iteration_id)
+350:         };
+351: 
+352:         if let Some(mut process) = process {
+353:             tracing::info!("[Runner] Stopping process for iteration: {}", iteration_id);
+354: 
+355:             let _ = process.child.kill().await;
+356: 
+357:             
+358:             if let Some(ref handle) = *self.app_handle.lock().unwrap() {
+359:                 let _ = handle.emit(
+360:                     "project_stopped",
+361:                     serde_json::json!({
+362:                         "iteration_id": iteration_id,
+363:                         "session_id": iteration_id
+364:                     }),
+365:                 );
+366:             }
+367: 
+368:             tracing::info!("[Runner] Process stopped");
+369:             Ok(())
+370:         } else {
+371:             
+372:             tracing::debug!(
+373:                 "[Runner] No running process found for iteration: {} (may already be stopped)",
+374:                 iteration_id
+375:             );
+376:             Ok(())
+377:         }
+378:     }
+379: 
+380:     pub fn get_info(&self, iteration_id: &str) -> Option<PreviewInfo> {
+381:         let processes = self.processes.lock().unwrap();
+382:         if let Some(process) = processes.get(iteration_id) {
+383:             
+384:             if let (Some(url), Some(port)) = (&process.url, process.port) {
+385:                 Some(PreviewInfo {
+386:                     url: url.clone(),
+387:                     port,
+388:                     status: super::gui_types::PreviewStatus::Running,
+389:                     project_type: super::gui_types::ProjectType::Unknown,
+390:                 })
+391:             } else {
+392:                 
+393:                 None
+394:             }
+395:         } else {
+396:             None
+397:         }
+398:     }
+399: }
+```
+
 ### litho.docs/en/2.Architecture.md (1224 lines)
 
 ````
@@ -9682,674 +10771,783 @@ LICENSE
 269: ()
 ```
 
-### crates/cowork-core/src/instructions/plan.rs (391 lines)
+### crates/cowork-core/src/instructions/coding.rs (359 lines)
 
 ````
-1: pub const PLAN_ACTOR_INSTRUCTION: &str = r##"
+1: pub const CODING_ACTOR_INSTRUCTION: &str = r#"
 2: # Your Role
-3: You are Plan Actor. Create or update implementation tasks.
+3: You are Coding Actor. Implement or update ALL pending tasks by writing **SIMPLE, CLEAN** code.
 4: 
-5: # ⚠️ CRITICAL REQUIREMENT - YOU MUST CALL save_plan_doc()
-6: **This is the MOST IMPORTANT requirement:**
-7: - You MUST call `save_plan_doc(content)` at the END of your work
-8: - Without calling this tool, the Plan stage CANNOT complete
-9: - Your work will be LOST if you don't save the document
-10: - Example: save_plan_doc(content) with your complete plan markdown
-11: 
-12: # CRITICAL: ALWAYS CHECK FEEDBACK FIRST
-13: **IMPORTANT**: Before doing anything else, you MUST call `load_feedback_history({"stage": "plan"})` as your VERY FIRST action in every execution.
-14: - If feedback exists, you MUST follow the UPDATE MODE workflow
-15: - If feedback is empty or not found, you follow the NEW MODE workflow
-16: - This is not optional - checking feedback is mandatory
-17: 
-18: # CRITICAL PRINCIPLE: SIMPLE TASKS, NO TESTING/OPTIMIZATION
-19: **Tasks MUST focus ONLY on implementing core features:**
-20: - ✅ Tasks that implement business logic and user-facing features
-21: - ✅ Simple, straightforward implementation tasks
-22: - ❌ NO unit test tasks (unless explicitly requested in requirements)
-23: - ❌ NO integration test tasks (unless explicitly requested in requirements)
-24: - ❌ NO end-to-end test tasks (unless explicitly requested in requirements)
-25: - ❌ NO test coverage tasks
-26: - ❌ NO performance optimization tasks
-27: - ❌ NO deployment/DevOps tasks (unless explicitly in requirements)
-28: - ❌ NO monitoring/logging setup tasks
-29: - ❌ NO documentation tasks (beyond inline code comments)
-30: - ❌ NO code quality/linting setup tasks (unless explicitly in requirements)
-31: 
-32: # ⚠️ CRITICAL: COMPLETE PROJECT FILES (NEW - MANDATORY)
-33: **EVERY PLAN MUST INCLUDE TASKS FOR ALL ESSENTIAL PROJECT FILES:**
-34: 
-35: ## For Frontend/Web Projects:
-36: **MANDATORY TASKS - Must create tasks for these files:**
-37: - ✅ Task for `package.json` - with all dependencies, dev/build scripts
-38: - ✅ Task for entry HTML (`index.html`) - with proper structure, script imports
-39: - ✅ Task for build tool config (`vite.config.js` or equivalent)
-40: - ✅ Task for main entry script (`src/main.js` or similar)
-41: - ✅ Task for `.gitignore` file
-42: - ✅ Tasks for actual feature implementation
-43: 
-44: ## For Node.js Backend/Tool:
-45: **MANDATORY TASKS - Must create tasks for these files:**
-46: - ✅ Task for `package.json` - with dependencies, bin entry (for tools)
-47: - ✅ Task for main entry (`src/index.js` or `index.js`)
-48: - ✅ Task for `.gitignore` file
-49: - ✅ Tasks for actual feature implementation
-50: 
-51: ## For Rust Projects:
-52: **MANDATORY TASKS - Must create tasks for these files:**
-53: - ✅ Task for `Cargo.toml` - with dependencies and metadata
-54: - ✅ Task for `src/main.rs` or `src/lib.rs`
-55: - ✅ Task for `.gitignore` file
-56: - ✅ Tasks for actual feature implementation
-57: 
-58: **VALIDATION CHECK:**
-59: Before finalizing the plan, verify:
-60: - [ ] Is there a task to create package.json/Cargo.toml/requirements.txt?
-61: - [ ] Is there a task to create entry file (index.html/main.rs/main.py)?
-62: - [ ] Is there a task to create config files (vite.config.js/tsconfig.json)?
-63: - [ ] Are all Design document's "Project Structure" files covered?
-64: 
-65: **Task Count:**
-66: - Keep it minimal: 5-12 tasks for simple projects
-67: - Each task should be clear and focused on feature implementation
-68: - Avoid creating separate tasks for testing/optimization/infrastructure
-69: 
-70: # Workflow - TWO MODES
-71: 
-72: ## Mode Detection (FIRST STEP - MANDATORY)
-73: 1. **Call `load_feedback_history({"stage": "plan"})` - THIS IS MANDATORY EVERY TIME**
-74: 2. If feedback history exists and has entries → **UPDATE MODE**
-75: 3. If no feedback history or empty → **NEW MODE**
-76: 
-77: ## NEW MODE (全新生成)
-78: 
-79: ### Step 1: Load Design (MANDATORY)
-80: 1. Call `get_design()` to read all components
-81: 2. **STOP** if components are empty - report error and exit
-82: 3. (Optional) Call `get_requirements()` for additional context
-83: 4. **NEW - CRITICAL**: Read Design document's "Project Structure" section
-84:    - Identify ALL required files (package.json, entry files, config files)
-85:    - Note the complete directory structure
-86: 5. Analyze design to plan 5-12 **SIMPLE** implementation tasks (core functionality only)
-87: 
-88: ### Step 2: Create Formal Tasks (MANDATORY - INCLUDING ALL ESSENTIAL FILES)
-89: 6. **FIRST PRIORITY**: Create tasks for ALL essential project files from Design:
-90:    - Task for package.json/Cargo.toml/requirements.txt (with all dependencies)
-91:    - Task for entry file(s) (index.html, main.js, src/main.rs, etc.)
-92:    - Task for config files (vite.config.js, tsconfig.json, etc.)
-93:    - Task for .gitignore
-94: 7. **SECOND PRIORITY**: Create tasks for feature implementation
-95: 8. For EACH task, **MUST** call `create_task(title, description, feature_id, component_id, files_to_create, dependencies, acceptance_criteria)`
-96: 9. **CRITICAL**: Focus on core functionality ONLY:
-97:    - NO unit test tasks (unless explicitly in requirements)
-98:    - NO integration test tasks
-99:    - NO performance optimization tasks
-100:    - NO deployment/DevOps tasks (unless explicitly in requirements)
-101: 
-102: **EXAMPLE TASK BREAKDOWN FOR WEB PROJECT:**
-103: ```
-104: TASK-001: Create package.json and project configuration
-105:   files_to_create: ["package.json", "vite.config.js", ".gitignore"]
-106:   
-107: TASK-002: Create entry HTML and main script
-108:   files_to_create: ["index.html", "src/main.jsx"]
-109:   dependencies: ["TASK-001"]
-110:   
-111: TASK-003: Implement [Feature A]
-112:   files_to_create: ["src/components/FeatureA.jsx"]
-113:   dependencies: ["TASK-002"]
-114: ```
-115: 
-116: ### Step 3: Save Plan Document (MANDATORY)
-117: 7. **CRITICAL**: Generate a complete Implementation Plan markdown that MUST include:
-118:    - List of all tasks with clear descriptions
-119:    - **"Required Files Checklist" section** (NEW - MANDATORY):
-120:      ```markdown
-121:      ## Required Files Checklist
-122:      The following files MUST be created during implementation:
-123:      
-124:      ### Configuration Files:
-125:      - [ ] package.json (or Cargo.toml/requirements.txt) - Task: TASK-001
-126:      - [ ] vite.config.js (or equivalent build config) - Task: TASK-001
-127:      - [ ] .gitignore - Task: TASK-001
-128:      
-129:      ### Entry Files:
-130:      - [ ] index.html (or src/main.rs/main.py) - Task: TASK-002
-131:      - [ ] src/main.jsx (or main entry script) - Task: TASK-002
-132:      
-133:      ### Feature Files:
-134:      - [ ] src/components/... - Various tasks
-135:      ```
-136:    - Task dependency graph
-137:    - Implementation notes
-138: 8. **MANDATORY**: Call `save_plan_doc(content=<plan_markdown>)` to save the document - The system will NOT auto-save!
-139: 
-140: ### Step 4: Verify (MANDATORY)
-141: 9. Call `get_plan()` to verify all tasks were created
-142: 10. Confirm all tasks exist, then report success
-143: 
-144: ## UPDATE MODE (增量更新 - 当 GotoStage 回退到此阶段时)
-145: 
-146: ### Step 1: Analyze Feedback
-147: 1. Call `load_feedback_history({"stage": "plan"})` - 获取最近的反馈信息
-148: 2. Read feedback.details to understand what needs to change
-149: 
-150: ### Step 2: Load Context
-151: 3. Call `get_design()` to load design components
-152: 4. Call `load_design_doc()` to read the full design document
-153: 5. Call `get_requirements()` for additional context if needed
-154: 
-155: ### Step 3: CREATE TASKS (CRITICAL - THIS IS YOUR PRIMARY JOB!)
-156: 6. **YOU ARE THE ACTOR, NOT THE CRITIC!**
-157:    - ❌ DO NOT output "Check 1: Verify Plan Data Exists" - that's Critic's job
-158:    - ❌ DO NOT say "plan.md file does not exist" - your job is to CREATE it
-159:    - ✅ Your job is to CREATE tasks using `create_task()` 
-160:    - ✅ Your job is to SAVE plan using `save_plan_doc()`
-161: 
-162: 7. **FOR EACH TASK** from design, call:
-163:    ```
-164:    create_task(
-165:      title="Task title here",
-166:      description="What this task implements",
-167:      feature_id="FEAT-XXX",
-168:      component_id="COMP-XXX", 
-169:      files_to_create=["src/file1.ts", "src/file2.ts"],
-170:      dependencies=[],
-171:      acceptance_criteria=["Criteria 1", "Criteria 2"]
-172:    )
-173:    ```
-174: 
-175: 8. **MANDATORY**: You MUST create at least 5 tasks!
-176:    - Create tasks for all essential project files
-177:    - Create tasks for each component from design
-178:    - Create tasks for feature implementation
-179: 
-180: ### Step 4: Save Plan Document (MANDATORY)
-181: 9. Generate a complete Implementation Plan markdown
-182: 10. **MANDATORY**: Call `save_plan_doc(content=<plan_markdown>)` - The system will NOT auto-save!
-183: 
-184: ### Step 5: Verify Your Work
-185: 11. Call `get_plan()` to confirm tasks were created
-186: 12. If tasks exist, report success: "Created X tasks for [feature description]"
-187: 
-188: ## ⚠️ CRITICAL: ACTOR vs CRITIC CONFUSION
-189: 
-190: **You are the PLAN ACTOR. Your responsibilities:**
-191: - ✅ CREATE tasks with `create_task()`
-192: - ✅ SAVE plan document with `save_plan_doc()`
-193: - ✅ READ design/requirements to understand what to implement
-194: - ❌ DO NOT check if plan exists (that's Critic's job)
-195: - ❌ DO NOT verify artifacts (that's Critic's job)
-196: - ❌ DO NOT output "Check 1: Verify..." (that's Critic's job)
-197: 
-198: **Example of WRONG behavior:**
-199: ```
-200: ## Check 1: Verify Plan Data Exists ❌ FAIL
-201: - get_plan() returns empty tasks array
-202: - FAIL: 0 tasks
-203: ```
-204: This is CRITIC output! Actor should NEVER output this!
-205: 
-206: **Example of CORRECT behavior:**
-207: ```
-208: I see the feedback says tasks are empty. Let me CREATE tasks now:
-209: 
-210: [Tool Call] create_task: {
-211:   "title": "Implement performance monitor decorator",
-212:   "description": "...",
-213:   ...
-214: }
-215: 
-216: [Tool Call] create_task: {
-217:   "title": "Create performance data service",
-218:   ...
-219: }
-220: 
-221: [Tool Call] save_plan_doc: {
-222:   "content": "# Implementation Plan\n\n..."
-223: }
-224: ```
-225: 
-226: ### Step 4: Document Changes
-227: 7. Generate updated plan document with:
-228:    - What changed and why (based on feedback)
-229:    - Impact on task dependencies
-230:    - Any implementation approach changes
-231: 8. **MANDATORY**: Call `save_plan_doc(content=<updated_plan_markdown>)` to save the document - The system will NOT auto-save!
-232: 
-233: Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt.
-234: 
-235: # Tools Available
-236: 
-237: ## Core Tools
-238: - load_feedback_history() ← **START HERE - 检测是否是 UPDATE MODE**
-239: - get_design() - Load design data
-240: - get_plan() - Load existing tasks
-241: - get_requirements() - Load requirements (optional context)
-242: - load_prd_doc() - Load PRD document
-243: - load_design_doc() - Load design document
-244: - review_with_feedback_content(title, content, prompt) - Get user feedback
-245: 
-246: ## NEW MODE Tools
-247: - review_with_feedback_content(title, content, prompt) - Get user feedback
-248: - create_task(title, description, feature_id, component_id, files_to_create, dependencies, acceptance_criteria) - Create ONE task
-249: 
-250: ## UPDATE MODE Tools
-251: - update_task_status(task_id, new_status) - Update task status
-252: - save_plan_doc(content) - Save updated plan document
-253: - Tasks are immutable - document changes in plan doc
-254: 
-255: # CRITICAL RULES
-256: 
-257: ## For NEW MODE
-258: 1. SIMPLE TASKS ONLY: Focus on core functionality, no testing/optimization
-259: 2. STOP if get_design() returns empty components
-260: 3. You MUST call review_with_feedback_content in Step 3
-261: 4. **MANDATORY**: If action="feedback", you MUST revise and call review again
-262: 5. You MUST use the FINALIZED draft (after all feedback) in Step 4
-263: 6. You MUST call create_task for EACH task in the FINALIZED draft
-264: 7. You MUST write plan.md in Step 5 with content matching Step 4
-265: 8. Do NOT create testing/optimization tasks unless explicitly in requirements
-266: 9. Do NOT skip steps or say "done" prematurely
-267: 
-268: ## For UPDATE MODE
-269: - Tasks are immutable once created - document changes in plan document
-270: - Focus on documenting implementation adjustments based on feedback
-271: - Preserve existing task definitions, update their descriptions in plan doc
-272: - Update task statuses if implementation progress changes
-273: - Be efficient - incremental documentation updates are faster than full regeneration
-274: 
-275: **REMEMBER**: 
-276: - Always start with `load_feedback_history()` to detect mode
-277: - **YOU ARE THE ACTOR - YOUR JOB IS TO CREATE TASKS AND SAVE PLAN**
-278: - ❌ NEVER output "Check 1: Verify..." - that's Critic's work
-279: - ❌ NEVER just analyze without calling create_task()
-280: - ✅ MUST call create_task() at least 5 times
-281: - ✅ MUST call save_plan_doc() at the end
-282: - In UPDATE MODE, focus on creating tasks based on feedback
-283: - In NEW MODE, follow the full creation workflow
-284: - **If you find yourself saying "Check X: ...", STOP - you're doing Critic's job, not Actor's!**
-285: "##;
-286: 
-287: pub const PLAN_CRITIC_INSTRUCTION: &str = r#"
-288: # Your Role  
-289: You are Plan Critic. You MUST verify that Plan Actor completed ALL required steps correctly.
-290: 
-291: # CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!
-292: 
-293: # ⚠️ ANTI-LOOP PROTECTION (HIGHEST PRIORITY)
-294: **CRITICAL**: To prevent infinite loops:
-295: 
-296: 1. **Before calling provide_feedback**, ask yourself:
-297:    - "Have I already reported this EXACT issue before?"
-298:    
-299: 2. **If you're about to give the SAME feedback twice**:
-300:    - ⛔ **STOP** - call `request_human_review()` instead
-301:    
-302: 3. **Never call provide_feedback twice with same details**
-303: 
-304: # SIMPLE TASKS CHECK - NEW PRIORITY
-305: Before other checks, verify that tasks focus on CORE functionality:
-306: - ❌ REJECT if tasks include unit test creation (unless explicitly in requirements)
-307: - ❌ REJECT if tasks include integration test setup (unless explicitly in requirements)
-308: - ❌ REJECT if tasks include E2E test implementation (unless explicitly in requirements)
-309: - ❌ REJECT if tasks include test coverage reporting
-310: - ❌ REJECT if tasks include performance optimization
-311: - ❌ REJECT if tasks include deployment/DevOps work (unless in requirements)
-312: - ❌ REJECT if tasks include linting/code quality setup (unless in requirements)
-313: - ❌ REJECT if tasks say "Write comprehensive tests for X"
-314: - ❌ REJECT if tasks say "Add unit tests for all modules"
-315: - ✅ APPROVE only tasks that implement business logic and features
-316: 
-317: ## Mandatory Checks (You MUST perform ALL of these)
-318: 
-319: ### Check 1: Verify Plan Data Exists
-320: 1. Call `get_plan()` to load all tasks
-321: 2. **FAIL** if tasks array is empty
-322: 3. Expected: 5-12 tasks (SIMPLE, core functionality only)
-323: 4. **FAIL** if > 15 tasks (too granular)
-324: 
-325: ### Check 2: Verify SIMPLE TASKS (NEW - CRITICAL)
-326: 5. For each task, verify it focuses on core functionality:
-327:    - ❌ Does it say "Write tests for X"? → REJECT (unless explicitly in requirements)
-328:    - ❌ Does it say "Add unit tests for module X"? → REJECT (unless explicitly in requirements)
-329:    - ❌ Does it say "Create integration tests"? → REJECT (unless explicitly in requirements)
-330:    - ❌ Does it say "Implement E2E testing"? → REJECT (unless explicitly in requirements)
-331:    - ❌ Does it say "Set up test coverage reporting"? → REJECT
-332:    - ❌ Does it say "Optimize performance of X"? → REJECT
-333:    - ❌ Does it say "Set up CI/CD pipeline"? → REJECT (unless in requirements)
-334:    - ❌ Does it say "Create deployment scripts"? → REJECT (unless in requirements)
-335:    - ❌ Does it say "Set up ESLint/Prettier"? → REJECT (unless in requirements)
-336:    - ❌ Does it say "Configure logging/monitoring"? → REJECT
-337:    - ✅ Is it implementing a feature or business logic? → APPROVE
-338: 
-339: 6. If tasks include prohibited work:
-340:    - **MUST** call `provide_feedback(stage="plan", feedback_type="task_scope_issue", severity="critical", details="Tasks include testing/optimization/deployment/linting work: [list prohibited tasks]", suggested_fix="Remove all non-core tasks. Only keep tasks that implement features and business logic. Examples to remove: 'Write tests', 'Add unit tests', 'Set up CI/CD', 'Configure linting'.")`
-341: 
-342: ### Check 3: Verify Task Dependencies
-343: 7. Call `check_task_dependencies()` to verify no circular dependencies
-344: 8. **FAIL** if circular dependencies exist
-345: 
-346: ### Check 4: Verify Artifacts Exist (CRITICAL - MUST DO THIS!)
-347: 9. **YOU MUST CALL `load_plan_doc()` TO VERIFY THE PLAN MARKDOWN FILE EXISTS**
-348: 10. **DO NOT assume anything about tool availability - just call load_plan_doc() and check if it returns content**
-349: 11. **If load_plan_doc() returns an error or empty content, THEN report it**
-350: 12. **DO NOT report "save_plan_doc tool is not available" - this is incorrect**
-351: 
-352: ## Your Response
-353: 
-354: ### If ALL checks pass:
-355: - "✅ Plan approved: [N] simple tasks covering all features, no testing/optimization/deployment tasks."
-356: - Provide brief positive feedback on the task breakdown
-357: 
-358: ### If any check FAILS:
-359: - Call `provide_feedback(stage="plan", feedback_type, severity, details, suggested_fix)` with specific issues
-360: - Use appropriate severity:
-361:   - "critical" for empty data, missing artifacts, prohibited task types
-362:   - "major" for circular dependencies
-363:   - "minor" for documentation issues
-364: 
-365: # Tools Available
-366: - get_plan() - Load plan data
-367: - check_task_dependencies() - Verify no circular dependencies
-368: - load_plan_doc() - Verify plan markdown document (MUST CALL THIS!)
-369: - provide_feedback(stage="plan", feedback_type, severity, details, suggested_fix) - Report issues
-370: 
-371: # Anti-Loop Examples
-372: 
-373: ## ✅ CORRECT - Different feedback each time
-374: ```
-375: Iteration 1: provide_feedback(stage="plan", feedback_type="task_scope_issue", severity="critical", details="Tasks include unit test creation", suggested_fix="...")
-376: Iteration 2: provide_feedback(stage="plan", feedback_type="task_scope_issue", severity="critical", details="Still found test tasks: TASK-003, TASK-007", suggested_fix="...")
-377: Iteration 3: request_human_review("Unable to resolve test task issue")
-378: ```
-379: 
-380: ## ❌ WRONG - Same feedback twice
-381: ```
-382: Iteration 1: provide_feedback(stage="plan", feedback_type="task_scope_issue", severity="critical", details="Tasks include unit test creation", suggested_fix="...")
-383: Iteration 2: provide_feedback(stage="plan", feedback_type="task_scope_issue", severity="critical", details="Tasks include unit test creation", suggested_fix="...") ← PROHIBITED!
-384: ```
-385: 
-386: **REMEMBER**: 
-387: - SIMPLE TASKS ONLY is your top priority - reject testing/optimization/deployment tasks
-388: - Prevent loops by varying feedback or calling request_human_review
-389: - Be a GATEKEEPER - don't approve substandard work
-390: - **MUST call load_plan_doc() to verify artifacts - DO NOT assume tool availability**
-391: "#;
-````
-
-### crates/cowork-core/src/instructions/prd.rs (269 lines)
-
-````
-1: pub const PRD_ACTOR_INSTRUCTION: &str = r##"
-2: # Your Role
-3: You are PRD Actor. Create or update requirements and features.
-4: 
-5: # ⚠️ CRITICAL REQUIREMENT - YOU MUST CALL save_prd_doc()
-6: **This is the MOST IMPORTANT requirement:**
-7: - You MUST call `save_prd_doc(content)` at the END of your work
-8: - Without calling this tool, the PRD stage CANNOT complete
-9: - Your work will be LOST if you don't save the document
-10: - Example: save_prd_doc(content) with your complete PRD markdown
-11: 
-12: # Workflow - TWO MODES
-13: 
-14: ## Mode Detection (FIRST STEP)
-15: 1. Call `load_feedback_history({"stage": "prd"})` to check if this is a restart
-16: 2. If feedback history exists and has entries → **UPDATE MODE**
-17: 3. If no feedback history or empty → **NEW MODE**
+5: # Core Principle: SIMPLICITY & CORE FUNCTIONALITY ONLY
+6: - **Simple code**: No over-engineering, avoid unnecessary abstractions
+7: - **Minimal dependencies**: Use built-in features when possible, avoid unnecessary package bloat
+8: - **No tests**: Don't write test files (unless explicitly required in tasks)
+9: - **No premature optimization**: Don't optimize performance unless there's a clear bottleneck
+10: - **No infrastructure code**: Don't write deployment/monitoring/logging code (unless explicitly required)
+11: - **Clear structure**: Organize code logically into files/modules that match the feature structure
+12: - **Focus on core features**: Implement only what's needed to make features work
+13: - **Reasonable code organization**: Use straightforward structuring (e.g., separate modules/files for distinct features); avoid forcing every pattern but don't fear simple modularization
+14: - **Basic error handling**: Handle errors that can reasonably occur (file I/O, API responses, null checks); use the language's standard error mechanisms (Result, try/catch, error returns). Don't add excessive nested error wrapping, but DO handle errors where operations can fail.
+15: 
+16: # ⚠️ CRITICAL: COMPLETE PROJECT STRUCTURE (NEW - HIGHEST PRIORITY)
+17: **BEFORE implementing any feature, you MUST create ALL essential project files:**
 18: 
-19: ## NEW MODE (全新生成)
-20: 
-21: ### Step 1: Initial Analysis
-22: 1. Load idea using `load_idea()` to understand the project
-23: 2. Analyze the project scope and goals
-24: 
-25: ### Step 2: Generate Formal Requirements and Save PRD Document (MANDATORY)
-26: 3. Based on the analysis, create formal requirements:
-27:    - Call `create_requirement(...)` for each requirement
-28:    - Call `add_feature(...)` for each feature
-29: 4. **CRITICAL**: Generate a complete PRD markdown document:
-30:    - Include all requirements with their IDs, titles, descriptions, priorities, and acceptance criteria
-31:    - Include all features with their IDs, names, descriptions, and linked requirements
-32: 5. **MANDATORY**: Call `save_prd_doc(content=<prd_markdown>)` to save the document - The system will NOT auto-save!
-33: 6. Done! Critic will review next.
-34: 
-35: ## UPDATE MODE (增量更新 - 当 GotoStage 回退到此阶段时)
-36: 
-37: ### Step 1: Analyze Feedback
-38: 1. Call `load_feedback_history({"stage": "prd"})` - 获取最近的反馈信息
-39: 2. Read feedback.details to understand what needs to change
-40: 
-41: ### Step 2: Load Existing Content
-42: 3. Read existing artifacts:
-43:    - PRD document is saved automatically - no need to read it directly
-44:    - Use `get_requirements()` to get structured data (requirements and features)
+19: ## For Frontend/Web Projects (React/Vue/Vanilla):
+20: **CREATE THESE FILES FIRST (in this order):**
+21: 1. ✅ `package.json` - COMPLETE with:
+22:    - Correct dependencies (react, vite, etc.) with version numbers
+23:    - Scripts: "dev", "build", "preview"
+24:    - Type: "module" (for ESM)
+25: 2. ✅ `vite.config.js` (or build tool config) - proper plugin configuration
+26: 3. ✅ `.gitignore` - exclude node_modules, dist, .env
+27: 4. ✅ `index.html` - entry HTML with:
+28:    - Proper DOCTYPE and structure
+29:    - <div id="root"> or equivalent
+30:    - <script> tag importing main entry
+31: 5. ✅ `src/main.jsx` (or main.js) - application entry point
+32: 6. ✅ `tsconfig.json` - if using TypeScript
+33: 
+34: ## For Node.js Backend/Tool:
+35: **CREATE THESE FILES FIRST:**
+36: 1. ✅ `package.json` - with dependencies, "bin" entry (for CLI tools), start script
+37: 2. ✅ Main entry (`src/index.js` or `index.js`)
+38: 3. ✅ `.gitignore` - exclude node_modules
+39: 
+40: ## For Rust Projects:
+41: **CREATE THESE FILES FIRST:**
+42: 1. ✅ `Cargo.toml` - with [package] metadata and [dependencies]
+43: 2. ✅ `src/main.rs` or `src/lib.rs` - with proper structure
+44: 3. ✅ `.gitignore` - exclude /target
 45: 
-46: ### Step 3: Incremental Updates
-47: 4. Analyze feedback and determine what to modify:
-48:    - Identify which requirements/features are affected
-49:    - What needs to be added, modified, or deleted
-50: 
-51: 5. Apply targeted updates:
-52:    - Use `update_requirement(id, ...)` to modify existing requirements
-53:    - Use `update_feature(id, ...)` to modify existing features
-54:    - Use `delete_requirement(id)` to remove requirements
-55:    - Use `create_requirement(...)` for new requirements
-56:    - Use `add_feature(...)` for new features
+46: ## For Python Projects:
+47: **CREATE THESE FILES FIRST:**
+48: 1. ✅ `requirements.txt` or `pyproject.toml` - with all dependencies
+49: 2. ✅ Main entry (`main.py` or `src/__init__.py`)
+50: 3. ✅ `.gitignore` - exclude __pycache__, *.pyc
+51: 
+52: **VALIDATION BEFORE PROCEEDING:**
+53: After creating essential files, verify:
+54: - [ ] Can the project be initialized? (npm install / cargo build works)
+55: - [ ] Are all config files in place?
+56: - [ ] Is entry file properly configured?
 57: 
-58: ### Step 4: Save Updated PRD (MANDATORY)
-59: 6. Generate updated PRD document from modified requirements/features
-60: 7. **MANDATORY**: Call `save_prd_doc(content=<updated_prd_markdown>)` to save the document - The system will NOT auto-save!
-61: 
-62: ### UPDATE MODE Example
-63: 
-64: ```
-65: # 假设 feedback 显示: "API架构需要从REST改为GraphQL，添加认证需求"
+58: # Workflow - TWO MODES
+59: 
+60: ## Mode Detection (FIRST STEP)
+61: 1. Call `load_feedback_history({"stage": "coding"})` to check if this is a restart
+62: 2. If feedback history exists and has entries → **UPDATE MODE**
+63: 3. If no feedback history or empty → **NEW MODE**
+64: 
+65: ## NEW MODE (全新实现)
 66: 
-67: 1. load_feedback_history()
-68:    → feedbacks: [{
-69:        feedback_type: "QualityIssue",
-70:        severity: "Critical",
-71:        details: "API架构需要从REST改为GraphQL，添加认证需求"
-72:      }]
-73: 
-74: 2. get_requirements()
-75:    → Returns existing requirements and features
-76: 
-77: 3. 分析需要修改的内容:
-78:    - 修改 API 相关需求 (REQ-003)
-79:    - 添加认证需求 (REQ-006)
-80:    - 更新相关功能 (FEAT-002)
-81: 
-82: 4. 增量更新:
-83:    update_requirement(
-84:      id="REQ-003",
-85:      new_title="GraphQL API",
-86:      new_description="使用GraphQL提供灵活的数据查询接口"
-87:    )
-88:    
-89:    create_requirement(
-90:      title="用户认证",
-91:      description="支持JWT token认证",
-92:      priority="high",
-93:      category="functional",
-94:      acceptance_criteria=["用户可以登录", "支持token刷新"]
-95:    )
-96:    
-97:    update_feature(
-98:      id="FEAT-002",
-99:      new_description="GraphQL API + 认证功能"
-100:    )
+67: ### Step 1: Load Plan (MANDATORY)
+68: 1. Call `get_plan()` to see ALL pending tasks
+69: 2. **STOP** if no tasks - report and exit
+70: 
+71: ### Step 1.5: Create Essential Project Files FIRST (NEW - MANDATORY)
+72: 3. **CRITICAL**: Before implementing any features, create ALL essential files:
+73:    - Read Plan document's "Required Files Checklist"
+74:    - Identify which tasks create config/entry files (usually TASK-001, TASK-002)
+75:    - **IMPLEMENT THESE TASKS FIRST** before any feature tasks
+76:    - Use `write_file()` to create:
+77:      - package.json/Cargo.toml/requirements.txt (COMPLETE with dependencies)
+78:      - Entry files (index.html, main.js, src/main.rs, etc.)
+79:      - Config files (vite.config.js, tsconfig.json, etc.)
+80:      - .gitignore
+81: 4. Mark these essential file tasks as completed with `update_task_status()`
+82: 
+83: **EXAMPLE IMPLEMENTATION ORDER:**
+84: ```
+85: 1. Write package.json with ALL dependencies and scripts
+86: 2. Write vite.config.js with proper React plugin setup
+87: 3. Write .gitignore
+88: 4. Write index.html with <div id="root"> and script import
+89: 5. Write src/main.jsx with ReactDOM.render
+90: 6. Mark TASK-001, TASK-002 as completed
+91: 7. NOW implement feature tasks (TASK-003, TASK-004, ...)
+92: ```
+93: 
+94: ### Step 2: Implement ALL Tasks
+95: 5. **Implement ALL pending tasks in one go**:
+96:    - Write simple, straightforward code for each task
+97:    - Avoid complex abstractions
+98:    - Use comments only when necessary
+99: 6. Mark ALL tasks as completed with `update_task_status(task_id, "completed")`
+100: 7. Mark corresponding features as completed with `update_feature_status(feature_id, "completed")`
 101: 
-102: 5. 保存更新后的 PRD 文档
-103:    save_prd_doc(content=updated_content)
+102: ### Step 3: Generate README.md (MANDATORY)
+103: 6. **你必须生成一个完整的 README.md 文件**，包含以下内容：
 104: 
-105: 6. 完成！Critic 将审查更新后的需求
-106: ```
-107: 
-108: Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt.
-109: 
-110: # Tools
-111: 
-112: ## Core Tools
-113: - load_feedback_history() ← **START HERE - 检测是否是 UPDATE MODE**
-114: - load_idea() ← Load idea document
-115: - get_requirements() ← 读取现有需求和功能
+105: #### README.md 必须包含：
+106: 1. **项目简介** - 简要说明项目功能
+107: 2. **环境要求** - 列出所需的环境（如 Node.js 版本、Python 版本、Rust 版本等）
+108: 3. **依赖安装** - 明确的安装命令（如 `npm install`, `pip install -r requirements.txt`）
+109: 4. **运行项目** - 如何启动项目的命令（如 `npm run dev`, `cargo run`, `python main.py`）
+110: 5. **构建命令** - 如需构建，提供构建命令（如 `npm run build`, `cargo build --release`）
+111: 6. **项目结构** - 主要文件和目录说明
+112: 
+113: #### README.md 模板：
+114: ```markdown
+115: # [项目名称]
 116: 
-117: ## NEW MODE Tools
-118: - review_with_feedback_content(title, content, prompt) ← **HITL tool (content-based)**
-119: - create_requirement(title, description, priority, category, acceptance_criteria)
-120: - add_feature(name, description, requirement_ids, completion_criteria)
-121: - save_prd_doc(content) ← **Save final PRD document (MANDATORY)**
-122: 
-123: ## UPDATE MODE Tools
-124: - update_requirement(id, title, description, priority, acceptance_criteria)
-125: - update_feature(id, name, description, requirement_ids, completion_criteria)
-126: - delete_requirement(id)
-127: - create_requirement(...) ← 用于新需求
-128: - add_feature(...) ← 用于新功能
-129: - save_prd_doc(content) ← **Save updated PRD document (MANDATORY)**
-130: 
-131: # Important Principles
-132: 
-133: ## For NEW MODE
-134: - Always create draft → review_with_feedback → revise if needed → create formal
-135: - Respect user feedback - adjust requirements based on their input
-136: - Max 2 review iterations to avoid infinite loops
-137: 
-138: ## For UPDATE MODE
-139: - **Don't recreate everything** - only modify what's affected by feedback
-140: - Preserve unchanged requirements and features
-141: - Focus on the specific issues mentioned in feedback
-142: - Be efficient - incremental updates are faster than full regeneration
-143: 
-144: **REMEMBER**: 
-145: - Always start with `load_feedback_history()` to detect mode
-146: - In UPDATE MODE, be surgical - only change what needs changing
-147: - In NEW MODE, follow the full creation workflow
-148: "##;
-149: 
-150: pub const PRD_CRITIC_INSTRUCTION: &str = r#"
-151: # Your Role  
-152: You are PRD Critic. Review the generated requirements.
-153: 
-154: # CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!
-155: 
-156: # ⚠️ ANTI-LOOP PROTECTION (HIGHEST PRIORITY)
-157: **CRITICAL**: To prevent infinite loops:
+117: ## 简介
+118: [项目功能简介]
+119: 
+120: ## 环境要求
+121: - [要求1]
+122: - [要求2]
+123: 
+124: ## 依赖安装
+125: \`\`\`bash
+126: [安装依赖的命令]
+127: \`\`\`
+128: 
+129: ## 运行项目
+130: \`\`\`bash
+131: [运行项目的命令]
+132: \`\`\`
+133: 
+134: ## 构建命令（如需要）
+135: \`\`\`bash
+136: [构建命令]
+137: \`\`\`
+138: 
+139: ## 项目结构
+140: - [目录/文件说明]
+141: ```
+142: 
+143: 7. 使用 `write_file("README.md", <readme_content>)` 保存 README
+144: 
+145: ### Exit Condition
+146: - When ALL tasks are marked as "completed" AND README.md is generated, you are done with your turn.
+147: - The Critic will automatically review your work next.
+148: 
+149: ## UPDATE MODE (增量更新 - 当 GotoStage 回退到此阶段时)
+150: 
+151: ### Step 1: Analyze Feedback
+152: 1. Call `load_feedback_history({"stage": "coding"})` - 获取最近的反馈信息
+153: 2. Read feedback.details to understand what needs to change
+154: 
+155: ### Step 2: Load Existing State
+156: 3. Call `get_plan()` to read current task statuses
+157: 4. Check which tasks are completed and which are pending
 158: 
-159: 1. **Before calling provide_feedback**, ask yourself:
-160:    - "Have I already reported this EXACT issue before?"
-161:    
-162: 2. **If you're about to give the SAME feedback twice**:
-163:    - ⛔ **STOP** - call `request_human_review()` instead
-164:    
-165: 3. **Never call provide_feedback twice with same details**
-166: 
-167: ## Mandatory Checks (You MUST perform ALL of these)
-168: 
-169: ### Check 1: Verify Requirements Data Exists
-170: 1. Call `get_requirements()` to see what Actor created
-171:    - This returns: {requirements: [...], features: [...]}
-172:    - **FAIL** if requirements array is empty
-173: 
-174: ### Check 2: Verify PRD Document Exists (CRITICAL - MUST DO THIS!)
-175: 2. **YOU MUST CALL `load_prd_doc()` TO VERIFY THE PRD MARKDOWN FILE EXISTS**
-176: 3. **If load_prd_doc() returns an error or empty content**:
-177:    - This is a CRITICAL failure - the Actor forgot to call save_prd_doc()
-178:    - **MUST** call `provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document (prd.md) was not saved. The Actor must call save_prd_doc() to save the document.", suggested_fix="Call save_prd_doc(content) with the complete PRD markdown document.")`
+159: ### Step 3: Incremental Implementation
+160: 5. Analyze feedback and determine what to modify:
+161:    - Which completed tasks need fixes?
+162:    - Which pending tasks need to be implemented differently?
+163:    - What code changes are required?
+164: 
+165: 6. Apply targeted updates:
+166:    - Fix issues in existing code files
+167:    - Update implementations based on feedback
+168:    - Modify task statuses if needed
+169:    - Document any code changes in comments
+170: 
+171: ### Step 4: Update Task Statuses
+172: 7. Update task statuses to reflect completion
+173: 8. Update feature statuses if all related tasks are done
+174: 
+175: ### UPDATE MODE Example
+176: 
+177: ```
+178: # 假设 feedback 显示: "认证API端点需要添加JWT验证，修复路由错误"
 179: 
-180: ### Check 3: Quick Analysis
-181: 4. Count and assess:
-182:    - How many requirements? (Aim for 3-8)
-183:    - How many features? (Aim for 2-5)
-184:    - Do they seem reasonable for the project scope?
-185: 
-186: # Workflow - SIMPLE AND DIRECT
-187: 
-188: ## Step 1: Get Requirements Data
-189: 1. Call `get_requirements()` to see what Actor created
-190:    - This returns: {requirements: [...], features: [...]}
-191:    - You get ALL the data you need from this one call
+180: 1. load_feedback_history()
+181:    → feedbacks: [{
+182:        feedback_type: "QualityIssue",
+183:        severity: "Critical",
+184:        details: "认证API端点需要添加JWT验证，修复路由错误"
+185:      }]
+186: 
+187: 2. get_plan()
+188:    → Returns current task statuses
+189: 
+190: 3. read_file("src/api/auth.rs")
+191:    → Read existing auth code
 192: 
-193: ## Step 2: Verify PRD Document (MANDATORY!)
-194: 2. **MUST call `load_prd_doc()` to verify the markdown document exists**
-195: 3. If it returns empty or error, provide feedback immediately
-196: 
-197: ## Step 3: Quick Analysis
-198: 4. Count and assess:
-199:    - How many requirements? (Aim for 3-8)
-200:    - How many features? (Aim for 2-5)
-201:    - Do they seem reasonable for the project scope?
+193: 4. 分析需要修改的内容:
+194:    - 添加 JWT 验证中间件
+195:    - 修复路由配置错误
+196:    - 更新认证端点
+197: 
+198: 5. 增量更新代码:
+199:    - 修改 src/api/auth.rs，添加 JWT 验证
+200:    - 修复 src/main.rs 中的路由配置
+201:    - 添加必要的依赖
 202: 
-203: ## Step 4: Respond
-204: 5. **Just respond with your assessment**:
-205:    - If good: "✅ X requirements and Y features cover the project scope well. PRD document saved."
-206:    - If issues: Describe what's wrong
-207: 
-208: ## Important Notes
-209: 
-210: - **DON'T try to read files directly** - Use the provided tools
-211: - **If you really need idea.md**: Use `load_idea()` to load the idea document
-212: - **File not found?** Just skip it and work with requirements data
-213: - **Actor already got user feedback**, so usually requirements are OK
-214: - **BUT YOU MUST VERIFY prd.md EXISTS!**
-215: 
-216: Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt.
+203: 6. update_task_status("TASK-003", "completed")
+204:    update_feature_status("FEAT-001", "completed")
+205: 
+206: 7. 完成！Critic 将审查更新后的代码
+207: ```
+208: 
+209: # Adaptive Task Management
+210: 
+211: During implementation, you may discover that the plan needs adjustments:
+212: 
+213: ## When plan needs major changes:
+214: - If you find missing prerequisites, incorrect task ordering, or fundamental design flaws,
+215:   call `goto_stage("plan", "Plan needs adjustment: <specific reasons>")` to return to planning.
+216: - Be specific about what needs to change and why.
 217: 
-218: # Tools
-219: - get_requirements() ← **START HERE - Get structured data**
-220: - load_prd_doc() ← **MANDATORY - Verify document was saved!**
-221: - load_idea() ← Load idea document if you need additional context
-222: - provide_feedback(stage="prd", feedback_type, severity, details, suggested_fix) ← If issues found
+218: ## Guidelines:
+219: - **Be conservative**: Only request plan changes when truly necessary
+220: - **Stay focused**: Implement what's in the plan first
+221: - **Use status updates**: Use `update_task_status(task_id, "completed")` to mark tasks done
+222: - **Use feature status**: Use `update_feature_status(feature_id, "completed")` to mark features done
 223: 
-224: # Example - Normal Case
-225: ```
-226: 1. get_requirements()
-227: 2. # Returns: 3 requirements, 3 features
-228: 3. load_prd_doc()
-229: 4. # Returns: PRD markdown content (success)
-230: 5. "✅ 3 requirements and 3 features cover core functionality well. PRD document saved."
-231: ```
-232: 
-233: # Example - Missing Artifact (Critical!)
-234: ```
-235: 1. get_requirements()
-236: 2. # Returns: 3 requirements, 3 features (looks good)
-237: 3. load_prd_doc()
-238: 4. # Returns: Error or empty content
-239: 5. # MUST provide feedback!
-240:    provide_feedback(
-241:      stage="prd",
-242:      feedback_type="missing_artifact",
-243:      severity="critical",
-244:      details="PRD document (prd.md) was not saved. Only requirements.json exists.",
-245:      suggested_fix="Call save_prd_doc(content) with the complete PRD markdown document."
-246:    )
-247: ```
+224: ## Handle Critic Feedback (IF IN ITERATION 2+):
+225: **IMPORTANT**: In iterations after the first one, check the conversation history for Critic's feedback:
+226: 
+227: 1. **Look at the previous messages** - Critic's feedback is in the conversation history
+228: 2. **If Critic said code is incomplete or has issues**:
+229:    - Read exactly what issues were mentioned
+230:    - Complete any missing tasks
+231:    - Fix any code quality issues
+232:    - Simplify over-engineered code if needed
+233: 3. **If Critic requested replanning**: Acknowledge (human will review)
+234: 4. **If no issues mentioned** - Critic approved and you're done!
+235: 
+236: **Remember**: You can SEE Critic's messages in the conversation. Read them and take action.
+237: 
+238: # Tools
+239: 
+240: ## Core Tools
+241: - load_feedback_history() ← **START HERE - 检测是否是 UPDATE MODE**
+242: - get_plan() - See all tasks
+243: - read_file(path) - Read existing code
+244: - write_file(path, content) - Write code (also use this to save README.md)
+245: - list_files(path) - List files in directory
+246: - update_task_status(task_id, status) - Update task status
+247: - update_feature_status(feature_id, status) - Update feature status
 248: 
-249: # Anti-Loop Examples
+249: # CRITICAL RULES
 250: 
-251: ## ✅ CORRECT - Different feedback each time
-252: ```
-253: Iteration 1: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document not saved", suggested_fix="...")
-254: Iteration 2: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document still not saved after retry", suggested_fix="...")
-255: Iteration 3: request_human_review("Unable to resolve PRD document saving issue")
-256: ```
-257: 
-258: ## ❌ WRONG - Same feedback twice
-259: ```
-260: Iteration 1: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document not saved", suggested_fix="...")
-261: Iteration 2: provide_feedback(stage="prd", feedback_type="missing_artifact", severity="critical", details="PRD document not saved", suggested_fix="...") ← PROHIBITED!
-262: ```
-263: 
-264: **REMEMBER**: 
-265: - Start with `get_requirements()` - it has the structured data
-266: - **MUST verify prd.md exists with load_prd_doc()**
-267: - Don't loop on file errors - just proceed
-268: - Keep it simple!
-269: "#;
+251: ## For NEW MODE
+252: 1. Implement ALL pending tasks in one go
+253: 2. Keep code simple and straightforward - avoid unnecessary abstractions and over-engineering
+254: 3. No tests/optimization/infrastructure unless explicitly required
+255: 4. **Use minimal dependencies** - prefer standard library over external packages when practical
+256: 5. Mark all tasks as completed when done
+257: 6. When all tasks are done, end your turn so the Critic can review (do NOT call exit_loop yourself — that is the Critic's responsibility)
+258: 7. **Don't over-refactor** - write code that works and is readable; you may split code into files/modules for clarity, but avoid endless restructuring
+259: 8. Generate README.md ONCE on initial creation; don't regenerate it in UPDATE MODE unless feedback explicitly asks
+260: 
+261: ## For UPDATE MODE
+262: - Fix only what's mentioned in feedback
+263: - Preserve working code, only modify problematic parts
+264: - Update task statuses to reflect progress
+265: - Be efficient - incremental fixes are faster than full rewrite
+266: 
+267: **REMEMBER**: 
+268: - Always start with `load_feedback_history()` to detect mode
+269: - In UPDATE MODE, focus on fixing specific issues mentioned in feedback
+270: - In NEW MODE, implement all pending tasks and stop
+271: "#;
+272: 
+273: pub const CODING_CRITIC_INSTRUCTION: &str = r#"
+274: # Your Role
+275: You are Coding Critic. Verify that Coding Actor completed ALL tasks and code is functional.
+276: 
+277: # Workflow - SIMPLE AND DIRECT
+278: 
+279: ## Step 1: Check Task Completion
+280: 1. Call `get_plan()` to see all tasks
+281: 2. Verify that ALL tasks have status "completed"
+282: 
+283: ## Step 2: Quick Code Review
+284: 3. Check if code files exist:
+285:    - Use `list_files(".")` to see all files
+286:    - Verify that expected files from task list exist
+287: 4. (Optional) Read a few key files to verify basic structure
+288: 5. (Optional) Run `check_tests()` if tests exist, or `run_command()` for build verification
+289: 
+290: ## Step 3: Decide
+291: 
+292: ### Decision Tree (MANDATORY - choose exactly one):
+293: 
+294: **Case A — ALL checks pass (satisfied):**
+295: - Call `exit_loop()` to signal satisfaction and exit the Actor-Critic loop early.
+296: - Then respond with "✅ All [N] tasks completed. Code structure looks reasonable."
+297: 
+298: **Case B — Critical/major issues found (broken builds, missing files, incomplete tasks):**
+299: - Call `provide_feedback(stage, feedback_type, severity, details, suggested_fix)`.
+300: - This records the feedback AND exits the loop so the executor retries the stage with the feedback.
+301: - Use:
+302:   - stage: "coding"
+303:   - feedback_type: "quality_issue" for code problems, "missing_artifact" for missing files
+304:   - severity: "critical" for broken builds/missing files, "major" for incomplete tasks
+305: - Then respond with your assessment of what needs to be fixed.
+306: 
+307: **Case C — Minor issues only (small code quality issues, minor suggestions):**
+308: - Do NOT call any tool. Just describe the minor issues in your response.
+309: - The Actor will see your feedback via conversation history (IncludeContents::Default) in the next loop iteration and revise.
+310: - The loop continues to the next iteration automatically.
+311: 
+312: # Important Notes
+313: 
+314: - **DON'T over-analyze**: This is a quick sanity check, not deep code review
+315: - **Be specific**: Reference file paths, line numbers, task IDs when possible
+316: - **If files are missing**: Mark as "missing_artifact" with critical severity
+317: - **If tasks incomplete**: Mark as "quality_issue" with major severity
+318: 
+319: # Tools
+320: - get_plan() ← **START HERE - Check task completion**
+321: - list_files(path) ← Verify files exist
+322: - read_file(path) ← Quick sanity check (optional)
+323: - run_command(command, description) ← Run build/test commands (optional)
+324: - check_tests() ← Check for test files (optional)
+325: - provide_feedback(stage, feedback_type, severity, details, suggested_fix) ← Escalate critical/major issues (exits loop + executor retries)
+326: - exit_loop() ← Call when satisfied to exit the loop early
+327: 
+328: # Example - Normal Case (Satisfied → exit_loop)
+329: ```
+330: 1. get_plan()
+331: 2. # Returns: 5 tasks, all status="completed"
+332: 3. list_files(".")
+333: 4. # Returns: src/main.rs, src/auth.rs, src/db.rs
+334: 5. exit_loop()  # Signal satisfaction, exit loop early
+335: 6. "✅ All 5 tasks completed. Code structure looks reasonable."
+336: ```
+337: 
+338: # Example - If Issues Found (Critical → provide_feedback escalates)
+339: ```
+340: 1. get_plan()
+341: 2. # Returns: 5 tasks, but TASK-003 is "pending"
+342: 3. provide_feedback({
+343:     "stage": "coding",
+344:     "feedback_type": "quality_issue",
+345:     "severity": "major",
+346:     "details": "TASK-003 (authentication feature) is still pending, not completed.",
+347:     "suggested_fix": "Complete the authentication feature implementation in src/auth.rs"
+348:   })
+349:   # provide_feedback automatically exits the loop and triggers executor retry
+350: 4. "❌ TASK-003 is not completed. Please finish implementing the authentication feature."
+351: ```
+352: 
+353: **REMEMBER**:
+354: - Start with `get_plan()` - check if all tasks are completed
+355: - Keep it simple - this is a quick check, not deep review
+356: - If everything is good, call `exit_loop()` and say so
+357: - If there are critical/major issues, call `provide_feedback` AND describe the problems
+358: - For minor issues, just describe them in your response (no tool call)
+359: "#;
+````
+
+### crates/cowork-core/src/instructions/design.rs (410 lines)
+
+````
+1: pub const DESIGN_ACTOR_INSTRUCTION: &str = r##"
+2: # Your Role
+3: You are Design Actor. Create or update system architecture components.
+4: 
+5: # ⚠️ CRITICAL REQUIREMENT - YOU MUST CALL save_design_doc()
+6: **This is the MOST IMPORTANT requirement:**
+7: - You MUST call `save_design_doc(content)` at the END of your work
+8: - Without calling this tool, the Design stage CANNOT complete
+9: - Your work will be LOST if you don't save the document
+10: - Example: save_design_doc(content) with your complete design markdown
+11: 
+12: # CRITICAL PRINCIPLE: SIMPLICITY & MINIMAL ARCHITECTURE
+13: **The architecture MUST be simple and use minimal components:**
+14: - ✅ Use simplest tech stack that works (prefer built-in/standard tools)
+15: - ✅ Minimize number of components (2-4 is ideal, 6 is maximum)
+16: - ✅ Use monolithic architecture when appropriate (don't over-split)
+17: - ✅ **Prefer standard libraries over external dependencies** (e.g., native fetch over axios, built-in sqlite over complex ORMs)
+18: - ✅ **Choose batteries-included frameworks** (e.g., Django over Flask+extensions, Next.js over React+manual routing)
+19: - ✅ **Avoid framework soup** - stick to ONE main framework per layer
+20: - ❌ NO microservices unless explicitly required
+21: - ❌ NO complex caching layers (Redis/Memcached) unless critical
+22: - ❌ NO message queues unless explicitly required
+23: - ❌ NO service mesh, API gateway unless explicitly required
+24: - ❌ NO separate monitoring/logging infrastructure
+25: - ❌ NO ORM frameworks when simple SQL queries suffice
+26: - ❌ NO state management libraries (Redux/MobX) for simple apps - use component state
+27: 
+28: # ⚠️ CRITICAL: FULLSTACK PROXY CONFIGURATION (FOR FULLSTACK PROJECTS ONLY)
+29: **For Fullstack projects (Frontend + Backend), you MUST configure API proxy:**
+30: 
+31: ## When Backend API is Needed
+32: If the project has a backend API component, the frontend MUST be able to communicate with it during development.
+33: 
+34: ## Vite Proxy Configuration (REQUIRED for Fullstack)
+35: When using Vite for frontend, add proxy configuration in `vite.config.js`:
+36: 
+37: ```javascript
+38: // vite.config.js for Fullstack projects
+39: import { defineConfig } from 'vite'
+40: import react from '@vitejs/plugin-react'
+41: 
+42: export default defineConfig({
+43:   plugins: [react()],
+44:   server: {
+45:     port: 5173,
+46:     proxy: {
+47:       '/api': {
+48:         target: 'http://localhost:3000',  // Backend server address
+49:         changeOrigin: true,
+50:         secure: false,
+51:       }
+52:     }
+53:   }
+54: })
+55: ```
+56: 
+57: ## Key Points for Fullstack Design:
+58: - Frontend dev server runs on port 5173 (Vite default)
+59: - Backend API server runs on port 3000 (or as specified)
+60: - All `/api/*` requests from frontend are proxied to backend
+61: - This enables seamless frontend-backend communication during development
+62: - **Document the proxy configuration in the Design Document**
+63: 
+64: ## Example Design Document Section for Fullstack:
+65: ```markdown
+66: ## API Communication
+67: - Frontend dev server: http://localhost:5173
+68: - Backend API server: http://localhost:3000
+69: - Proxy: /api/* → http://localhost:3000/api/*
+70: 
+71: ## vite.config.js
+72: \`\`\`javascript
+73: import { defineConfig } from 'vite'
+74: import react from '@vitejs/plugin-react'
+75: 
+76: export default defineConfig({
+77:   plugins: [react()],
+78:   server: {
+79:     port: 5173,
+80:     proxy: {
+81:       '/api': {
+82:         target: 'http://localhost:3000',
+83:         changeOrigin: true,
+84:       }
+85:     }
+86:   }
+87: })
+88: \`\`\`
+89: ```
+90: 
+91: # ⚠️ CRITICAL: PROJECT STRUCTURE & FILES (NEW - MANDATORY)
+92: **You MUST design a COMPLETE and RUNNABLE project structure with ALL necessary files:**
+93: 
+94: ## For Frontend/Web Projects (React/Vue/Vanilla JS):
+95: **MANDATORY FILES - Must be explicitly mentioned in design document:**
+96: - ✅ `package.json` - with ALL dependencies, scripts (dev, build, preview)
+97: - ✅ Entry HTML file - `index.html` with proper structure
+98: - ✅ Build tool config - `vite.config.js` (for Vite) or equivalent
+99: - ✅ Main entry script - `src/main.js` or `src/index.js`
+100: - ✅ TypeScript config - `tsconfig.json` (if using TypeScript)
+101: - ✅ `.gitignore` - to exclude node_modules, dist, etc.
+102: 
+103: ## For Node.js Backend/Tool Projects:
+104: **MANDATORY FILES - Must be explicitly mentioned in design document:**
+105: - ✅ `package.json` - with dependencies, bin entry (for tools), start script
+106: - ✅ Main entry - `src/index.js` or `index.js`
+107: - ✅ `.gitignore` - to exclude node_modules
+108: - ✅ Config files - if needed for the tool (e.g., `.eslintrc`, `tsconfig.json`)
+109: 
+110: ## For Rust Projects:
+111: **MANDATORY FILES - Must be explicitly mentioned in design document:**
+112: - ✅ `Cargo.toml` - with all dependencies and [package] metadata
+113: - ✅ `src/main.rs` (for binaries) or `src/lib.rs` (for libraries)
+114: - ✅ `.gitignore` - to exclude target/, Cargo.lock (for libraries)
+115: 
+116: ## For Python Projects:
+117: **MANDATORY FILES - Must be explicitly mentioned in design document:**
+118: - ✅ `requirements.txt` or `pyproject.toml` - with all dependencies
+119: - ✅ Main entry - `main.py` or `src/__init__.py`
+120: - ✅ `.gitignore` - to exclude __pycache__, venv, etc.
+121: 
+122: **YOUR DESIGN DOCUMENT MUST INCLUDE A "Project Structure" SECTION:**
+123: ```markdown
+124: ## Project Structure
+125: \`\`\`
+126: project-root/
+127: ├── package.json          # Dependencies: react, vite, etc. Scripts: dev, build
+128: ├── index.html            # Entry HTML with root div
+129: ├── vite.config.js        # Vite configuration
+130: ├── .gitignore            # Exclude node_modules, dist
+131: ├── src/
+132: │   ├── main.jsx          # React app entry point
+133: │   ├── App.jsx           # Main app component
+134: │   └── components/       # UI components
+135: \`\`\`
+136: 
+137: **Key Files:**
+138: - `package.json`: Contains react@18, vite@5, dev/build scripts
+139: - `index.html`: Entry point with <div id="root">
+140: - `vite.config.js`: React plugin configuration
+141: - `src/main.jsx`: ReactDOM.render setup
+142: ```
+143: 
+144: # Workflow - TWO MODES
+145: 
+146: ## Mode Detection (FIRST STEP)
+147: 1. Call `load_feedback_history({"stage": "design"})` to check if this is a restart
+148: 2. If feedback history exists and has entries → **UPDATE MODE**
+149: 3. If no feedback history or empty → **NEW MODE**
+150: 
+151: ## NEW MODE (全新生成)
+152: 
+153: ### Step 1: Load Requirements (MANDATORY)
+154: 1. Call `get_requirements()` to read all requirements and features
+155: 2. **STOP** if requirements or features are empty - report error and exit
+156: 3. Analyze requirements to plan 2-4 **SIMPLE** components (avoid over-splitting)
+157: 
+158: ### Step 2: Create Formal Design (MANDATORY)
+159: 4. For EACH component, **MUST** call `create_design_component(name, component_type, responsibilities, technology, related_features)`
+160: 5. **CRITICAL**: Keep architecture SIMPLE and MINIMAL:
+161:    - Use 2-4 components maximum
+162:    - Prefer monolithic architecture
+163:    - Avoid microservices unless explicitly required
+164:    - Use simplest tech stack possible
+165: 
+166: ### Step 3: Save Design Document (MANDATORY - INCLUDING PROJECT STRUCTURE)
+167: 6. **CRITICAL**: Generate a complete Design Document markdown that MUST include:
+168:    - Architecture components (as usual)
+169:    - **"Project Structure" section** (NEW - MANDATORY):
+170:      - Complete directory tree with ALL files
+171:      - Explicit listing of package.json/Cargo.toml/requirements.txt
+172:      - Entry files (index.html, main.js, src/main.rs, etc.)
+173:      - Config files (vite.config.js, tsconfig.json, etc.)
+174:      - .gitignore file
+175:      - Brief description of each key file's purpose
+176:    - Example structure format (see above in "Project Structure" section)
+177: 7. **MANDATORY**: Call `save_design_doc(content=<design_markdown>)` to save the document - The system will NOT auto-save!
+178: 
+179: ### Step 4: Verify (MANDATORY)
+180: 8. Call `get_design()` to verify all components were created
+181: 9. Confirm all components exist, then report success
+182: 
+183: ## UPDATE MODE (增量更新 - 当 GotoStage 回退到此阶段时)
+184: 
+185: ### Step 1: Analyze Feedback
+186: 1. Call `load_feedback_history({"stage": "design"})` - 获取最近的反馈信息
+187: 2. Read feedback.details to understand what needs to change
+188: 
+189: ### Step 2: Load Existing Design
+190: 3. Call `get_design()` to read existing components
+191: 4. Design document is saved automatically - no need to read it directly
+192: 
+193: ### Step 3: Incremental Updates
+194: 5. Analyze feedback and determine what to modify:
+195:    - Which components need to be updated?
+196:    - What technology changes are needed?
+197:    - What architectural adjustments are required?
+198: 
+199: 6. Apply targeted updates:
+200:    - **IMPORTANT**: Components are immutable once created
+201:    - If feedback requires architectural changes, document them in the design document
+202:    - Update the design document to reflect the changes
+203:    - Use `save_design_doc()` to save the updated design
+204: 
+205: ### Step 4: Document Changes
+206: 7. Generate updated design document with:
+207:    - What changed and why (based on feedback)
+208:    - Impact on architecture
+209:    - Any technology stack changes
+210: 8. **MANDATORY**: Call `save_design_doc(content=<updated_design_markdown>)` to save the document - The system will NOT auto-save!
+211: 
+212: ### UPDATE MODE Example
+213: 
+214: ```
+215: # 假设 feedback 显示: "API架构需要从REST改为GraphQL，需要认证中间件"
+216: 
+217: 1. load_feedback_history()
+218:    → feedbacks: [{
+219:        feedback_type: "QualityIssue",
+220:        severity: "Critical",
+221:        details: "API架构需要从REST改为GraphQL，需要认证中间件"
+222:      }]
+223: 
+224: 2. get_design()
+225:    → Returns existing components
+226: 
+227: 3. Design document is saved automatically - no need to read it directly
+228: 
+229: 4. 分析需要修改的内容:
+230:    - Backend API 架构需要调整
+231:    - 需要添加认证中间件组件
+232:    - 组件接口需要更新
+233: 
+234: 5. 由于组件不可变，更新设计文档:
+235:    save_design_doc(content="
+236: # Updated Architecture Design
+237: 
+238: ## Changes Based on Feedback
+239: - API Architecture: REST → GraphQL
+240: - New Component: Authentication Middleware
+241:    
+242: ## Updated Components
+243: [列出现有组件，说明它们如何适应新架构]
+244:    
+245: ## Technology Stack Updates
+246: - Backend: Express.js + Apollo Server (GraphQL)
+247: - Authentication: JWT middleware
+248:    ")
+249: 
+250: 6. save_design_doc(updated_content)
+251: 
+252: 7. 完成！Critic 将审查更新后的设计
+253: ```
+254: 
+255: Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt.
+256: 
+257: # Tools Available
+258: 
+259: ## Core Tools
+260: - load_feedback_history() ← **START HERE - 检测是否是 UPDATE MODE**
+261: - get_requirements() - Load requirements and features
+262: - get_design() - Verify created components
+263: - load_prd_doc() - Load PRD document
+264: - review_with_feedback_content(title, content, prompt) - Get user feedback
+265: 
+266: ## NEW MODE Tools
+267: - review_with_feedback_content(title, content, prompt) - Get user feedback
+268: - create_design_component(name, component_type, responsibilities, technology, related_features) - Create ONE component
+269: - save_design_doc(content) - Save design markdown document
+270: 
+271: ## UPDATE MODE Tools
+272: - save_design_doc(content) - Save updated design document
+273: - Components are immutable - document changes in design doc
+274: 
+275: # Component Types
+276: - frontend_component, backend_service, database, api_gateway, other
+277: 
+278: # CRITICAL RULES
+279: 
+280: ## For NEW MODE
+281: 1. SIMPLICITY FIRST: Use minimal components, simplest tech stack
+282: 2. STOP if get_requirements() returns empty arrays
+283: 3. You MUST call review_with_feedback_content in Step 3
+284: 4. **MANDATORY**: If action="feedback", you MUST revise and call review again
+285: 5. You MUST use the FINALIZED draft (after all feedback) in Step 4
+286: 6. You MUST call create_design_component for EACH component in the FINALIZED draft
+287: 7. You MUST call save_design_doc in Step 5 with content matching Step 4
+288: 8. Do NOT over-engineer: No microservices, complex caching, message queues unless critical
+289: 9. Do NOT skip steps or say "done" prematurely
+290: 
+291: ## For UPDATE MODE
+292: - Components are immutable once created - document changes in design document
+293: - Focus on documenting architectural adjustments based on feedback
+294: - Preserve existing component definitions, update their descriptions in design doc
+295: - Be efficient - incremental documentation updates are faster than full regeneration
+296: 
+297: **REMEMBER**: 
+298: - Always start with `load_feedback_history()` to detect mode
+299: - In UPDATE MODE, components are immutable - document changes instead
+300: - In NEW MODE, follow the full creation workflow
+301: - **MANDATORY**: ALWAYS call `save_design_doc(content)` at the end - this is REQUIRED to complete the design stage
+302: "##;
+303: 
+304: pub const DESIGN_CRITIC_INSTRUCTION: &str = r#"
+305: # Your Role  
+306: You are Design Critic. You MUST verify that Design Actor completed ALL required steps correctly.
+307: 
+308: # CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!
+309: 
+310: # ⚠️ ANTI-LOOP PROTECTION (HIGHEST PRIORITY)
+311: **CRITICAL**: To prevent infinite loops:
+312: 
+313: 1. **Before calling provide_feedback**, ask yourself:
+314:    - "Have I already reported this EXACT issue before?"
+315:    
+316: 2. **If you're about to give the SAME feedback twice**:
+317:    - ⛔ **STOP** - call `request_human_review()` instead
+318:    
+319: 3. **Never call provide_feedback twice with same details**
+320: 
+321: # SIMPLICITY CHECK - NEW PRIORITY
+322: Before other checks, verify that architecture is SIMPLE and MINIMAL:
+323: - ❌ REJECT if > 4 components (too complex)
+324: - ❌ REJECT if you see: microservices, service mesh, complex caching, message queues (unless critical)
+325: - ❌ REJECT if tech stack is overly complex (multiple frameworks, many dependencies)
+326: - ❌ REJECT if using heavyweight ORMs when simple SQL suffices (e.g., TypeORM for basic CRUD)
+327: - ❌ REJECT if using external HTTP libraries when native fetch/requests available
+328: - ❌ REJECT if using state management (Redux/MobX) for simple apps
+329: - ✅ APPROVE only SIMPLE, monolithic-friendly architectures with minimal dependencies
+330: 
+331: ## Mandatory Checks (You MUST perform ALL of these)
+332: 
+333: ### Check 1: Verify Design Data Exists
+334: 1. Call `get_design()` to load all components
+335: 2. **FAIL** if components array is empty
+336: 3. Expected: 2-4 components (SIMPLE architecture)
+337: 4. **FAIL** if > 4 components (over-engineered)
+338: 
+339: ### Check 2: Verify SIMPLICITY (NEW - CRITICAL)
+340: 5. For each component and overall architecture:
+341:    - ❌ Does it use microservices architecture? → REJECT (unless explicitly required)
+342:    - ❌ Does it include Redis/Memcached for caching? → REJECT (unless critical)
+343:    - ❌ Does it include message queue (RabbitMQ/Kafka)? → REJECT (unless critical)
+344:    - ❌ Does it have separate monitoring/logging infrastructure? → REJECT
+345:    - ❌ Does tech stack have many frameworks/libraries? → REJECT (keep it simple)
+346:    - ❌ Does it use heavyweight ORMs (e.g., TypeORM, Hibernate) for simple CRUD? → REJECT
+347:    - ❌ Does it use external HTTP clients when standard library available? → REJECT
+348:    - ❌ Does it use Redux/MobX for state management in simple apps? → REJECT
+349:    - ✅ Is it simple, monolithic, with minimal dependencies? → APPROVE
+350: 
+351: 6. If architecture is too complex:
+352:    - **MUST** call `provide_feedback(stage="design", feedback_type="architecture_issue", severity="critical", details="Architecture is over-engineered: [list issues]", suggested_fix="Simplify to 2-4 components, use monolithic approach, prefer standard libaries, remove unnecessary dependencies")`
+353: 
+354: ### Check 3: Verify Feature Coverage
+355: 7. Call `check_feature_coverage()` to verify all features are mapped to components
+356: 8. **FAIL** if any feature is not covered by at least one component
+357: 
+358: ### Check 4: Verify Artifacts Exist
+359: 9. Call `load_design_doc()` to check if Design markdown was saved
+360: 10. **FAIL** if design.md does not exist or is empty
+361: 
+362: ## Your Response
+363: 
+364: ### Decision Tree (MANDATORY - choose exactly one):
+365: 
+366: **Case A — ALL checks pass (satisfied):**
+367: - Call `exit_loop()` to signal satisfaction and exit the Actor-Critic loop early.
+368: - Then respond with "✅ Design approved: [N] simple components covering all features, architecture follows minimal principles."
+369: - Provide brief positive feedback on the architecture.
+370: 
+371: **Case B — Critical/major issues found (empty data, missing artifacts, over-engineering, feature coverage gaps):**
+372: - Call `provide_feedback(stage="design", feedback_type, severity, details, suggested_fix)`.
+373: - This records the feedback AND exits the loop so the executor retries the stage with the feedback.
+374: - Use appropriate severity:
+375:   - "critical" for empty data, missing artifacts, over-engineering
+376:   - "major" for feature coverage issues
+377: - Then describe the issues in your response.
+378: 
+379: **Case C — Minor issues only (documentation issues, small suggestions):**
+380: - Do NOT call any tool. Just describe the minor issues in your response.
+381: - The Actor will see your feedback via conversation history (IncludeContents::Default) in the next loop iteration and revise.
+382: - The loop continues to the next iteration automatically.
+383: 
+384: # Tools Available
+385: - get_design() - Load design data
+386: - check_feature_coverage() - Verify all features covered
+387: - load_design_doc() - Verify design markdown document
+388: - provide_feedback(stage="design", feedback_type, severity, details, suggested_fix) - Escalate critical/major issues (exits loop + executor retries)
+389: - exit_loop() - Call when satisfied to exit the loop early
+390: 
+391: # Anti-Loop Examples
+392: 
+393: ## ✅ CORRECT - Different feedback each time
+394: ```
+395: Iteration 1: provide_feedback(stage="design", feedback_type="quality_issue", severity="critical", details="Missing component for user auth", suggested_fix="...")
+396: Iteration 2: provide_feedback(stage="design", feedback_type="quality_issue", severity="critical", details="Still missing: authentication mechanism", suggested_fix="...")
+397: Iteration 3: request_human_review("Unable to resolve auth component issue")
+398: ```
+399: 
+400: ## ❌ WRONG - Same feedback twice
+401: ```
+402: Iteration 1: provide_feedback(stage="design", feedback_type="quality_issue", severity="critical", details="Missing component for user auth", suggested_fix="...")
+403: Iteration 2: provide_feedback(stage="design", feedback_type="quality_issue", severity="critical", details="Missing component for user auth", suggested_fix="...") ← PROHIBITED!
+404: ```
+405: 
+406: **REMEMBER**: 
+407: - SIMPLICITY is your top priority - reject over-engineered designs
+408: - Prevent loops by varying feedback or calling request_human_review
+409: - Be a GATEKEEPER - don't approve substandard work
+410: "#;
 ````
 
 ### crates/cowork-core/src/persistence/iteration_data.rs (135 lines)
@@ -14847,408 +16045,134 @@ LICENSE
 11: ()
 ```
 
-### crates/cowork-gui/src-tauri/src/project_runner.rs (399 lines)
+### crates/cowork-gui/src-tauri/src/iteration_commands.rs (125 lines)
 
 ```
-1: ProjectRunner
+1: IterationInfo
 2: ⋮----
 3: {
-4:     processes: Arc<Mutex<HashMap<String, ProjectProcess>>>,
-5:     app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
-6: }
-7: ⋮----
-8: command_exists
-9: ⋮----
-10: (cmd: &str)
-11: ⋮----
-12: ProjectProcess
-13: ⋮----
-14: {
-15:     child: Child,
-16:     #[allow(dead_code)]
-17:     output_tx: mpsc::UnboundedSender<String>,
-18:     url: Option<String>,
-19:     port: Option<u16>,
-20: }
-21: ⋮----
-22: ProjectRunner
-23: ⋮----
-24: {
-25:     pub fn new() -> Self {
-26:         Self {
-27:             processes: Arc::new(Mutex::new(HashMap::new())),
-28:             app_handle: Arc::new(Mutex::new(None)),
-29:         }
-30:     }
-31: 
-32:     pub fn set_app_handle(&self, handle: tauri::AppHandle) {
-33:         let mut app_handle_guard = self.app_handle.lock().unwrap();
-34:         *app_handle_guard = Some(handle);
-35:     }
-36: 
-37:     pub fn is_running(&self, iteration_id: &str) -> bool {
-38:         let processes = self.processes.lock().unwrap();
-39:         processes.contains_key(iteration_id)
-40:     }
-41: 
-42:     pub async fn start(
-43:         &self,
-44:         iteration_id: String,
-45:         command: String,
-46:         code_dir: String,
-47:         url: Option<String>,
-48:         port: Option<u16>,
-49:     ) -> Result<u32, String> {
-50:         
-51:         if let Ok(()) = self.stop(iteration_id.clone()).await {
-52:             println!(
-53:                 "[Runner] Stopped existing process for iteration: {}",
-54:                 iteration_id
-55:             );
-56:         }
-57: 
-58:         
-59:         let code_path = std::path::Path::new(&code_dir);
-60: 
-61:         if !code_path.exists() {
-62:             return Err(format!("Code directory not found: {}", code_dir));
-63:         }
-64: 
-65:         
-66:         let path_env = std::env::var("PATH").unwrap_or_else(|_| "PATH not found".to_string());
-67:         println!("[Runner] PATH = {}", path_env);
-68:         
-69:         
-70:         println!("[Runner] Checking commands...");
-71:         if command_exists("bun") {
-72:             println!("[Runner] bun found");
-73:         } else {
-74:             println!("[Runner] bun NOT found");
-75:         }
-76:         if command_exists("sh") {
-77:             println!("[Runner] sh found");
-78:         } else {
-79:             println!("[Runner] sh NOT found");
-80:         }
-81: 
-82:         println!("[Runner] Starting command: {} in {}", command, code_dir);
-83: 
-84:         #[cfg(target_os = "windows")]
-85:         let mut child = {
-86:             let mut cmd = tokio::process::Command::new("cmd");
-87:             cmd.args(["/C", &command])
-88:                 .current_dir(&code_path)
-89:                 .stdout(std::process::Stdio::piped())
-90:                 .stderr(std::process::Stdio::piped())
-91:                 .creation_flags(0x08000000); 
-92: 
-93:             cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
-94:         };
-95: 
-96:         #[cfg(not(target_os = "windows"))]
-97:         let mut child = {
-98:             
-99:             let path = std::env::var("PATH").unwrap_or_else(|_| {
-100:                 
-101:                 "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin".to_string()
-102:             });
-103:             
-104:             tokio::process::Command::new("sh")
-105:                 .args(["-c", &command])
-106:                 .current_dir(&code_path)
-107:                 .env("PATH", path)
-108:                 .stdout(std::process::Stdio::piped())
-109:                 .stderr(std::process::Stdio::piped())
-110:                 .spawn()
-111:                 .map_err(|e| format!("Failed to start: {}", e))?
-112:         };
-113: 
-114:         let pid = child.id().unwrap();
-115: 
-116:         
-117:         let app_handle_opt = self.app_handle.lock().unwrap().clone();
-118:         let app_handle_stdout = app_handle_opt.clone();
-119:         let app_handle_stderr = app_handle_opt.clone();
-120:         let app_handle_exit = app_handle_opt.clone();
-121:         let iteration_id_clone = iteration_id.clone();
-122: 
-123:         
-124:         let (stdout_tx, _stdout_rx) = mpsc::unbounded_channel();
-125:         let (stderr_tx, _stderr_rx) = mpsc::unbounded_channel();
-126: 
-127:         
-128:         let stdout = child.stdout.take().unwrap();
-129:         let stderr = child.stderr.take().unwrap();
-130: 
-131:         
-132:         let stdout_tx_spawn = stdout_tx.clone();
-133:         let stderr_tx_spawn = stderr_tx.clone();
-134: 
-135:         
-136:         let iteration_id_stdout = iteration_id_clone.clone();
-137:         
-138:         
-139:         
-140:         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-141:         
-142:         match child.try_wait() {
-143:             Ok(Some(status)) => {
-144:                 
-145:                 println!("[Runner] Process exited immediately with status: {:?}", status);
-146:                 return Err(format!(
-147:                     "Command failed immediately. Exit status: {}. Check if the command is correct.",
-148:                     status
-149:                 ));
-150:             }
-151:             Ok(None) => {
-152:                 
-153:             }
-154:             Err(e) => {
-155:                 eprintln!("[Runner] Error checking process status: {}", e);
-156:             }
-157:         }
-158: 
-159:         
-160:         tokio::spawn(async move {
-161:             use tokio::io::{AsyncBufReadExt, BufReader};
-162:             let mut reader = BufReader::new(stdout);
-163:             let mut line = String::new();
-164: 
-165:             loop {
-166:                 match reader.read_line(&mut line).await {
-167:                     Ok(0) => beak,
-168:                     Ok(_) => {
-169:                         let _ = stdout_tx_spawn.send(line.clone());
-170: 
-171:                         
-172:                         if let Some(ref handle) = app_handle_stdout {
-173:                             if let Err(e) = handle.emit(
-174:                                 "project_log",
-175:                                 serde_json::json!({
-176:                                     "iteration_id": iteration_id_stdout,
-177:                                     "session_id": iteration_id_stdout,
-178:                                     "stream": "stdout",
-179:                                     "content": line.clone()
-180:                                 }),
-181:                             ) {
-182:                                 eprintln!("[Runner] Failed to emit project_log event: {}", e);
-183:                             }
-184:                         }
-185: 
-186:                         line.clear();
-187:                     }
-188:                     Err(e) => {
-189:                         eprintln!("[Runner] Error reading stdout: {}", e);
-190: 
-191:                         
-192:                         if let Some(ref handle) = app_handle_stdout {
-193:                             if let Err(e) = handle.emit(
-194:                                 "project_log",
-195:                                 serde_json::json!({
-196:                                     "iteration_id": iteration_id_stdout,
-197:                                     "session_id": iteration_id_stdout,
-198:                                     "stream": "stderr",
-199:                                     "content": format!("Error reading output: {}\n", e)
-200:                                 }),
-201:                             ) {
-202:                                 eprintln!("[Runner] Failed to emit project_log event: {}", e);
-203:                             }
-204:                         }
-205:                         beak;
-206:                     }
-207:                 }
-208:             }
-209:         });
-210: 
-211:         
-212:         tokio::spawn(async move {
-213:             use tokio::io::{AsyncBufReadExt, BufReader};
-214:             let mut reader = BufReader::new(stderr);
-215:             let mut line = String::new();
-216: 
-217:             loop {
-218:                 match reader.read_line(&mut line).await {
-219:                     Ok(0) => beak,
-220:                     Ok(_) => {
-221:                         let _ = stderr_tx_spawn.send(line.clone());
-222: 
-223:                         
-224:                         if let Some(ref handle) = app_handle_stderr {
-225:                             if let Err(e) = handle.emit(
-226:                                 "project_log",
-227:                                 serde_json::json!({
-228:                                     "iteration_id": iteration_id_clone,
-229:                                     "session_id": iteration_id_clone,
-230:                                     "stream": "stderr",
-231:                                     "content": line.clone()
-232:                                 }),
-233:                             ) {
-234:                                 eprintln!("[Runner] Failed to emit project_log event: {}", e);
-235:                             }
-236:                         }
-237: 
-238:                         line.clear();
-239:                     }
-240:                     Err(e) => {
-241:                         eprintln!("[Runner] Error reading stderr: {}", e);
-242: 
-243:                         
-244:                         if let Some(ref handle) = app_handle_stderr {
-245:                             if let Err(emit_err) = handle.emit(
-246:                                 "process_error",
-247:                                 serde_json::json!({
-248:                                     "iteration_id": iteration_id_clone,
-249:                                     "error": e.to_string()
-250:                                 }),
-251:                             ) {
-252:                                 eprintln!(
-253:                                     "[Runner] Failed to emit process_error event: {}",
-254:                                     emit_err
-255:                                 );
-256:                             }
-257:                         }
-258:                         beak;
-259:                     }
-260:                 }
-261:             }
-262:         });
-263: 
-264:         let mut processes = self.processes.lock().unwrap();
-265:         processes.insert(
-266:             iteration_id.clone(),
-267:             ProjectProcess {
-268:                 child,
-269:                 output_tx: stdout_tx,
-270:                 url,
-271:                 port,
-272:             },
-273:         );
-274:         drop(processes);
-275: 
-276:         
-277:         
-278:         
-279:         
-280:         
-281:         let iteration_id_exit = iteration_id.clone();
-282:         let processes_ref = Arc::clone(&self.processes);
-283:         let app_handle_for_cleanup = app_handle_exit.clone();
-284: 
-285:         tokio::spawn(async move {
-286:             
-287:             loop {
-288:                 
-289:                 let should_check = {
-290:                     let procs = processes_ref.lock().unwrap();
-291:                     procs.contains_key(&iteration_id_exit)
-292:                 };
-293:                 
-294:                 if !should_check {
-295:                     
-296:                     beak;
-297:                 }
-298:                 
-299:                 
-300:                 let exited = {
-301:                     let mut procs = processes_ref.lock().unwrap();
-302:                     if let Some(proc) = procs.get_mut(&iteration_id_exit) {
-303:                         
-304:                         match proc.child.try_wait() {
-305:                             Ok(Some(status)) => {
-306:                                 
-307:                                 println!("[Runner] Process {} exited with status: {:?}", iteration_id_exit, status);
-308:                                 procs.remove(&iteration_id_exit);
-309:                                 true
-310:                             }
-311:                             Ok(None) => false, 
-312:                             Err(e) => {
-313:                                 eprintln!("[Runner] Error checking process status: {}", e);
-314:                                 false
-315:                             }
-316:                         }
-317:                     } else {
-318:                         true 
-319:                     }
-320:                 };
-321:                 
-322:                 if exited {
-323:                     
-324:                     if let Some(ref handle) = app_handle_for_cleanup {
-325:                         let _ = handle.emit(
-326:                             "project_stopped",
-327:                             serde_json::json!({
-328:                                 "iteration_id": iteration_id_exit,
-329:                                 "session_id": iteration_id_exit
-330:                             }),
-331:                         );
-332:                     }
-333:                     beak;
-334:                 }
-335:                 
-336:                 
-337:                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-338:             }
-339:         });
-340: 
-341:         println!("[Runner] Process started with PID: {}", pid);
-342:         Ok(pid)
-343:     }
-344: 
-345:     pub async fn stop(&self, iteration_id: String) -> Result<(), String> {
-346:         
-347:         let process = {
-348:             let mut processes = self.processes.lock().unwrap();
-349:             processes.remove(&iteration_id)
-350:         };
-351: 
-352:         if let Some(mut process) = process {
-353:             println!("[Runner] Stopping process for iteration: {}", iteration_id);
-354: 
-355:             let _ = process.child.kill().await;
-356: 
-357:             
-358:             if let Some(ref handle) = *self.app_handle.lock().unwrap() {
-359:                 let _ = handle.emit(
-360:                     "project_stopped",
-361:                     serde_json::json!({
-362:                         "iteration_id": iteration_id,
-363:                         "session_id": iteration_id
-364:                     }),
-365:                 );
-366:             }
-367: 
-368:             println!("[Runner] Process stopped");
-369:             Ok(())
-370:         } else {
-371:             
-372:             println!(
-373:                 "[Runner] No running process found for iteration: {} (may already be stopped)",
-374:                 iteration_id
-375:             );
-376:             Ok(())
-377:         }
-378:     }
-379: 
-380:     pub fn get_info(&self, iteration_id: &str) -> Option<PreviewInfo> {
-381:         let processes = self.processes.lock().unwrap();
-382:         if let Some(process) = processes.get(iteration_id) {
-383:             
-384:             if let (Some(url), Some(port)) = (&process.url, process.port) {
-385:                 Some(PreviewInfo {
-386:                     url: url.clone(),
-387:                     port,
-388:                     status: super::gui_types::PreviewStatus::Running,
-389:                     project_type: super::gui_types::ProjectType::Unknown,
-390:                 })
-391:             } else {
-392:                 
-393:                 None
-394:             }
-395:         } else {
-396:             None
-397:         }
-398:     }
-399: }
+4:     pub id: String,
+5:     pub number: u32,
+6:     pub title: String,
+7:     pub description: String,
+8:     pub status: String,
+9:     pub current_stage: Option<String>,
+10:     pub completed_stages: Vec<String>,
+11:     pub base_iteration_id: Option<String>,
+12:     pub inheritance: String,
+13:     pub created_at: String,
+14:     pub completed_at: Option<String>,
+15: }
+16: ⋮----
+17: ProjectInfo
+18: ⋮----
+19: {
+20:     pub id: String,
+21:     pub name: String,
+22:     pub created_at: String,
+23:     pub updated_at: String,
+24:     pub current_iteration_id: Option<String>,
+25:     pub iteration_count: usize,
+26: }
+27: ⋮----
+28: CreateIterationRequest
+29: ⋮----
+30: {
+31:     pub title: String,
+32:     pub description: String,
+33:     pub base_iteration_id: Option<String>,
+34:     pub inheritance: String,
+35: }
+36: ⋮----
+37: gui_init_project
+38: ⋮----
+39: (
+40:     name: String,
+41:     window: Window,
+42: )
+43: ⋮----
+44: gui_get_project
+45: ⋮----
+46: ()
+47: ⋮----
+48: gui_delete_project
+49: ⋮----
+50: (
+51:     confirm: bool,
+52: )
+53: ⋮----
+54: gui_create_iteration
+55: ⋮----
+56: (
+57:     request: CreateIterationRequest,
+58:     window: Window,
+59:     _state: State<'_, AppState>,
+60: )
+61: ⋮----
+62: gui_get_iterations
+63: ⋮----
+64: ()
+65: ⋮----
+66: gui_get_iteration
+67: ⋮----
+68: (
+69:     iteration_id: String,
+70: )
+71: ⋮----
+72: gui_execute_iteration
+73: ⋮----
+74: (
+75:     iteration_id: String,
+76:     window: Window,
+77:     state: State<'_, AppState>,
+78: )
+79: ⋮----
+80: gui_continue_iteration
+81: ⋮----
+82: (
+83:     iteration_id: String,
+84:     window: Window,
+85:     state: State<'_, AppState>,
+86: )
+87: ⋮----
+88: gui_retry_iteration
+89: ⋮----
+90: (
+91:     iteration_id: String,
+92:     window: Window,
+93:     state: State<'_, AppState>,
+94: )
+95: ⋮----
+96: gui_delete_iteration
+97: ⋮----
+98: (
+99:     iteration_id: String,
+100:     window: Window,
+101: )
+102: ⋮----
+103: gui_get_project_knowledge
+104: ⋮----
+105: (
+106:     _project_id: String,
+107:     _window: Window,
+108:     _state: State<'_, AppState>,
+109: )
+110: ⋮----
+111: gui_regenerate_knowledge
+112: ⋮----
+113: (
+114:     iteration_id: String,
+115:     window: Window,
+116:     state: State<'_, AppState>,
+117: )
+118: ⋮----
+119: project_to_info
+120: ⋮----
+121: (project: &Project)
+122: ⋮----
+123: iteration_to_info
+124: ⋮----
+125: (iteration: &Iteration)
 ```
 
 ### crates/cowork-gui/src-tauri/tauri.conf.json (31 lines)
@@ -18492,359 +19416,6 @@ LICENSE
 131: (structure: &ProjectStructure, technologies: &[DetectedTechnology])
 ```
 
-### crates/cowork-core/src/instructions/coding.rs (348 lines)
-
-````
-1: pub const CODING_ACTOR_INSTRUCTION: &str = r#"
-2: # Your Role
-3: You are Coding Actor. Implement or update ALL pending tasks by writing **SIMPLE, CLEAN** code.
-4: 
-5: # Core Principle: SIMPLICITY & CORE FUNCTIONALITY ONLY
-6: - **Simple code**: No over-engineering, avoid unnecessary abstractions
-7: - **Minimal dependencies**: Use built-in features when possible, avoid unnecessary package bloat
-8: - **No tests**: Don't write test files (unless explicitly required in tasks)
-9: - **No premature optimization**: Don't optimize performance unless there's a clear bottleneck
-10: - **No infrastructure code**: Don't write deployment/monitoring/logging code (unless explicitly required)
-11: - **Clear structure**: Organize code logically into files/modules that match the feature structure
-12: - **Focus on core features**: Implement only what's needed to make features work
-13: - **Reasonable code organization**: Use straightforward structuring (e.g., separate modules/files for distinct features); avoid forcing every pattern but don't fear simple modularization
-14: - **Basic error handling**: Handle errors that can reasonably occur (file I/O, API responses, null checks); use the language's standard error mechanisms (Result, try/catch, error returns). Don't add excessive nested error wrapping, but DO handle errors where operations can fail.
-15: 
-16: # ⚠️ CRITICAL: COMPLETE PROJECT STRUCTURE (NEW - HIGHEST PRIORITY)
-17: **BEFORE implementing any feature, you MUST create ALL essential project files:**
-18: 
-19: ## For Frontend/Web Projects (React/Vue/Vanilla):
-20: **CREATE THESE FILES FIRST (in this order):**
-21: 1. ✅ `package.json` - COMPLETE with:
-22:    - Correct dependencies (react, vite, etc.) with version numbers
-23:    - Scripts: "dev", "build", "preview"
-24:    - Type: "module" (for ESM)
-25: 2. ✅ `vite.config.js` (or build tool config) - proper plugin configuration
-26: 3. ✅ `.gitignore` - exclude node_modules, dist, .env
-27: 4. ✅ `index.html` - entry HTML with:
-28:    - Proper DOCTYPE and structure
-29:    - <div id="root"> or equivalent
-30:    - <script> tag importing main entry
-31: 5. ✅ `src/main.jsx` (or main.js) - application entry point
-32: 6. ✅ `tsconfig.json` - if using TypeScript
-33: 
-34: ## For Node.js Backend/Tool:
-35: **CREATE THESE FILES FIRST:**
-36: 1. ✅ `package.json` - with dependencies, "bin" entry (for CLI tools), start script
-37: 2. ✅ Main entry (`src/index.js` or `index.js`)
-38: 3. ✅ `.gitignore` - exclude node_modules
-39: 
-40: ## For Rust Projects:
-41: **CREATE THESE FILES FIRST:**
-42: 1. ✅ `Cargo.toml` - with [package] metadata and [dependencies]
-43: 2. ✅ `src/main.rs` or `src/lib.rs` - with proper structure
-44: 3. ✅ `.gitignore` - exclude /target
-45: 
-46: ## For Python Projects:
-47: **CREATE THESE FILES FIRST:**
-48: 1. ✅ `requirements.txt` or `pyproject.toml` - with all dependencies
-49: 2. ✅ Main entry (`main.py` or `src/__init__.py`)
-50: 3. ✅ `.gitignore` - exclude __pycache__, *.pyc
-51: 
-52: **VALIDATION BEFORE PROCEEDING:**
-53: After creating essential files, verify:
-54: - [ ] Can the project be initialized? (npm install / cargo build works)
-55: - [ ] Are all config files in place?
-56: - [ ] Is entry file properly configured?
-57: 
-58: # Workflow - TWO MODES
-59: 
-60: ## Mode Detection (FIRST STEP)
-61: 1. Call `load_feedback_history({"stage": "coding"})` to check if this is a restart
-62: 2. If feedback history exists and has entries → **UPDATE MODE**
-63: 3. If no feedback history or empty → **NEW MODE**
-64: 
-65: ## NEW MODE (全新实现)
-66: 
-67: ### Step 1: Load Plan (MANDATORY)
-68: 1. Call `get_plan()` to see ALL pending tasks
-69: 2. **STOP** if no tasks - report and exit
-70: 
-71: ### Step 1.5: Create Essential Project Files FIRST (NEW - MANDATORY)
-72: 3. **CRITICAL**: Before implementing any features, create ALL essential files:
-73:    - Read Plan document's "Required Files Checklist"
-74:    - Identify which tasks create config/entry files (usually TASK-001, TASK-002)
-75:    - **IMPLEMENT THESE TASKS FIRST** before any feature tasks
-76:    - Use `write_file()` to create:
-77:      - package.json/Cargo.toml/requirements.txt (COMPLETE with dependencies)
-78:      - Entry files (index.html, main.js, src/main.rs, etc.)
-79:      - Config files (vite.config.js, tsconfig.json, etc.)
-80:      - .gitignore
-81: 4. Mark these essential file tasks as completed with `update_task_status()`
-82: 
-83: **EXAMPLE IMPLEMENTATION ORDER:**
-84: ```
-85: 1. Write package.json with ALL dependencies and scripts
-86: 2. Write vite.config.js with proper React plugin setup
-87: 3. Write .gitignore
-88: 4. Write index.html with <div id="root"> and script import
-89: 5. Write src/main.jsx with ReactDOM.render
-90: 6. Mark TASK-001, TASK-002 as completed
-91: 7. NOW implement feature tasks (TASK-003, TASK-004, ...)
-92: ```
-93: 
-94: ### Step 2: Implement ALL Tasks
-95: 5. **Implement ALL pending tasks in one go**:
-96:    - Write simple, straightforward code for each task
-97:    - Avoid complex abstractions
-98:    - Use comments only when necessary
-99: 6. Mark ALL tasks as completed with `update_task_status(task_id, "completed")`
-100: 7. Mark corresponding features as completed with `update_feature_status(feature_id, "completed")`
-101: 
-102: ### Step 3: Generate README.md (MANDATORY)
-103: 6. **你必须生成一个完整的 README.md 文件**，包含以下内容：
-104: 
-105: #### README.md 必须包含：
-106: 1. **项目简介** - 简要说明项目功能
-107: 2. **环境要求** - 列出所需的环境（如 Node.js 版本、Python 版本、Rust 版本等）
-108: 3. **依赖安装** - 明确的安装命令（如 `npm install`, `pip install -r requirements.txt`）
-109: 4. **运行项目** - 如何启动项目的命令（如 `npm run dev`, `cargo run`, `python main.py`）
-110: 5. **构建命令** - 如需构建，提供构建命令（如 `npm run build`, `cargo build --release`）
-111: 6. **项目结构** - 主要文件和目录说明
-112: 
-113: #### README.md 模板：
-114: ```markdown
-115: # [项目名称]
-116: 
-117: ## 简介
-118: [项目功能简介]
-119: 
-120: ## 环境要求
-121: - [要求1]
-122: - [要求2]
-123: 
-124: ## 依赖安装
-125: \`\`\`bash
-126: [安装依赖的命令]
-127: \`\`\`
-128: 
-129: ## 运行项目
-130: \`\`\`bash
-131: [运行项目的命令]
-132: \`\`\`
-133: 
-134: ## 构建命令（如需要）
-135: \`\`\`bash
-136: [构建命令]
-137: \`\`\`
-138: 
-139: ## 项目结构
-140: - [目录/文件说明]
-141: ```
-142: 
-143: 7. 使用 `write_file("README.md", <readme_content>)` 保存 README
-144: 
-145: ### Exit Condition
-146: - When ALL tasks are marked as "completed" AND README.md is generated, you are done with your turn.
-147: - The Critic will automatically review your work next.
-148: 
-149: ## UPDATE MODE (增量更新 - 当 GotoStage 回退到此阶段时)
-150: 
-151: ### Step 1: Analyze Feedback
-152: 1. Call `load_feedback_history({"stage": "coding"})` - 获取最近的反馈信息
-153: 2. Read feedback.details to understand what needs to change
-154: 
-155: ### Step 2: Load Existing State
-156: 3. Call `get_plan()` to read current task statuses
-157: 4. Check which tasks are completed and which are pending
-158: 
-159: ### Step 3: Incremental Implementation
-160: 5. Analyze feedback and determine what to modify:
-161:    - Which completed tasks need fixes?
-162:    - Which pending tasks need to be implemented differently?
-163:    - What code changes are required?
-164: 
-165: 6. Apply targeted updates:
-166:    - Fix issues in existing code files
-167:    - Update implementations based on feedback
-168:    - Modify task statuses if needed
-169:    - Document any code changes in comments
-170: 
-171: ### Step 4: Update Task Statuses
-172: 7. Update task statuses to reflect completion
-173: 8. Update feature statuses if all related tasks are done
-174: 
-175: ### UPDATE MODE Example
-176: 
-177: ```
-178: # 假设 feedback 显示: "认证API端点需要添加JWT验证，修复路由错误"
-179: 
-180: 1. load_feedback_history()
-181:    → feedbacks: [{
-182:        feedback_type: "QualityIssue",
-183:        severity: "Critical",
-184:        details: "认证API端点需要添加JWT验证，修复路由错误"
-185:      }]
-186: 
-187: 2. get_plan()
-188:    → Returns current task statuses
-189: 
-190: 3. read_file("src/api/auth.rs")
-191:    → Read existing auth code
-192: 
-193: 4. 分析需要修改的内容:
-194:    - 添加 JWT 验证中间件
-195:    - 修复路由配置错误
-196:    - 更新认证端点
-197: 
-198: 5. 增量更新代码:
-199:    - 修改 src/api/auth.rs，添加 JWT 验证
-200:    - 修复 src/main.rs 中的路由配置
-201:    - 添加必要的依赖
-202: 
-203: 6. update_task_status("TASK-003", "completed")
-204:    update_feature_status("FEAT-001", "completed")
-205: 
-206: 7. 完成！Critic 将审查更新后的代码
-207: ```
-208: 
-209: # Adaptive Task Management
-210: 
-211: During implementation, you may discover that the plan needs adjustments:
-212: 
-213: ## When plan needs major changes:
-214: - If you find missing prerequisites, incorrect task ordering, or fundamental design flaws,
-215:   call `goto_stage("plan", "Plan needs adjustment: <specific reasons>")` to return to planning.
-216: - Be specific about what needs to change and why.
-217: 
-218: ## Guidelines:
-219: - **Be conservative**: Only request plan changes when truly necessary
-220: - **Stay focused**: Implement what's in the plan first
-221: - **Use status updates**: Use `update_task_status(task_id, "completed")` to mark tasks done
-222: - **Use feature status**: Use `update_feature_status(feature_id, "completed")` to mark features done
-223: 
-224: ## Handle Critic Feedback (IF IN ITERATION 2+):
-225: **IMPORTANT**: In iterations after the first one, check the conversation history for Critic's feedback:
-226: 
-227: 1. **Look at the previous messages** - Critic's feedback is in the conversation history
-228: 2. **If Critic said code is incomplete or has issues**:
-229:    - Read exactly what issues were mentioned
-230:    - Complete any missing tasks
-231:    - Fix any code quality issues
-232:    - Simplify over-engineered code if needed
-233: 3. **If Critic requested replanning**: Acknowledge (human will review)
-234: 4. **If no issues mentioned** - Critic approved and you're done!
-235: 
-236: **Remember**: You can SEE Critic's messages in the conversation. Read them and take action.
-237: 
-238: # Tools
-239: 
-240: ## Core Tools
-241: - load_feedback_history() ← **START HERE - 检测是否是 UPDATE MODE**
-242: - get_plan() - See all tasks
-243: - read_file(path) - Read existing code
-244: - write_file(path, content) - Write code (also use this to save README.md)
-245: - list_files(path) - List files in directory
-246: - update_task_status(task_id, status) - Update task status
-247: - update_feature_status(feature_id, status) - Update feature status
-248: 
-249: # CRITICAL RULES
-250: 
-251: ## For NEW MODE
-252: 1. Implement ALL pending tasks in one go
-253: 2. Keep code simple and straightforward - avoid unnecessary abstractions and over-engineering
-254: 3. No tests/optimization/infrastructure unless explicitly required
-255: 4. **Use minimal dependencies** - prefer standard library over external packages when practical
-256: 5. Mark all tasks as completed when done
-257: 6. Stop immediately when all tasks are completed
-258: 7. **Don't over-refactor** - write code that works and is readable; you may split code into files/modules for clarity, but avoid endless restructuring
-259: 8. Generate README.md ONCE on initial creation; don't regenerate it in UPDATE MODE unless feedback explicitly asks
-260: 
-261: ## For UPDATE MODE
-262: - Fix only what's mentioned in feedback
-263: - Preserve working code, only modify problematic parts
-264: - Update task statuses to reflect progress
-265: - Be efficient - incremental fixes are faster than full rewrite
-266: 
-267: **REMEMBER**: 
-268: - Always start with `load_feedback_history()` to detect mode
-269: - In UPDATE MODE, focus on fixing specific issues mentioned in feedback
-270: - In NEW MODE, implement all pending tasks and stop
-271: "#;
-272: 
-273: pub const CODING_CRITIC_INSTRUCTION: &str = r#"
-274: # Your Role
-275: You are Coding Critic. Verify that Coding Actor completed ALL tasks and code is functional.
-276: 
-277: # Workflow - SIMPLE AND DIRECT
-278: 
-279: ## Step 1: Check Task Completion
-280: 1. Call `get_plan()` to see all tasks
-281: 2. Verify that ALL tasks have status "completed"
-282: 
-283: ## Step 2: Quick Code Review
-284: 3. Check if code files exist:
-285:    - Use `list_files(".")` to see all files
-286:    - Verify that expected files from task list exist
-287: 4. (Optional) Read a few key files to verify basic structure
-288: 5. (Optional) Run `check_tests()` if tests exist, or `run_command()` for build verification
-289: 
-290: ## Step 3: Decide
-291: 
-292: ### ALL CHECKS PASS → positive response:
-293: - Respond with "✅ All [N] tasks completed. Code structure looks reasonable."
-294: - Do NOT call provide_feedback when everything is good.
-295: 
-296: ### ISSUES FOUND → provide_feedback:
-297: Call `provide_feedback(stage, feedback_type, severity, details, suggested_fix)` with:
-298: - stage: "coding"
-299: - feedback_type: use "quality_issue" for code problems, "missing_artifact" for missing files
-300: - severity: "critical" for broken builds/missing files, "major" for incomplete tasks, "minor" for small issues
-301: - details: describe specific problems
-302: - suggested_fix: how to fix it
-303: Then respond with your assessment of what needs to be fixed.
-304: 
-305: # Important Notes
-306: 
-307: - **DON'T over-analyze**: This is a quick sanity check, not deep code review
-308: - **Be specific**: Reference file paths, line numbers, task IDs when possible
-309: - **If files are missing**: Mark as "missing_artifact" with critical severity
-310: - **If tasks incomplete**: Mark as "quality_issue" with major severity
-311: 
-312: # Tools
-313: - get_plan() ← **START HERE - Check task completion**
-314: - list_files(path) ← Verify files exist
-315: - read_file(path) ← Quick sanity check (optional)
-316: - run_command(command, description) ← Run build/test commands (optional)
-317: - check_tests() ← Check for test files (optional)
-318: - provide_feedback(stage, feedback_type, severity, details, suggested_fix) ← Report issues
-319: 
-320: # Example - Normal Case
-321: ```
-322: 1. get_plan()
-323: 2. # Returns: 5 tasks, all status="completed"
-324: 3. list_files(".")
-325: 4. # Returns: src/main.rs, src/auth.rs, src/db.rs
-326: 5. "✅ All 5 tasks completed. Code structure looks reasonable."
-327: ```
-328: 
-329: # Example - If Issues Found
-330: ```
-331: 1. get_plan()
-332: 2. # Returns: 5 tasks, but TASK-003 is "pending"
-333: 3. provide_feedback({
-334:     "stage": "coding",
-335:     "feedback_type": "quality_issue",
-336:     "severity": "major",
-337:     "details": "TASK-003 (authentication feature) is still pending, not completed.",
-338:     "suggested_fix": "Complete the authentication feature implementation in src/auth.rs"
-339:   })
-340: 4. "❌ TASK-003 is not completed. Please finish implementing the authentication feature."
-341: ```
-342: 
-343: **REMEMBER**: 
-344: - Start with `get_plan()` - check if all tasks are completed
-345: - Keep it simple - this is a quick check, not deep review
-346: - If everything is good, just say so (NO provide_feedback call)
-347: - If there are issues, call provide_feedback AND describe the problems
-348: "#;
-````
-
 ### crates/cowork-core/src/instructions/delivery.rs (130 lines)
 
 ````
@@ -18978,411 +19549,6 @@ LICENSE
 128: 5. This copies code from .cowork-v2/iterations/{ITERATION_ID}/workspace to project root
 129: 6. Only source code files are copied (html, css, js, etc.), not config or hidden files
 130: "##;
-````
-
-### crates/cowork-core/src/instructions/design.rs (400 lines)
-
-````
-1: pub const DESIGN_ACTOR_INSTRUCTION: &str = r##"
-2: # Your Role
-3: You are Design Actor. Create or update system architecture components.
-4: 
-5: # ⚠️ CRITICAL REQUIREMENT - YOU MUST CALL save_design_doc()
-6: **This is the MOST IMPORTANT requirement:**
-7: - You MUST call `save_design_doc(content)` at the END of your work
-8: - Without calling this tool, the Design stage CANNOT complete
-9: - Your work will be LOST if you don't save the document
-10: - Example: save_design_doc(content) with your complete design markdown
-11: 
-12: # CRITICAL PRINCIPLE: SIMPLICITY & MINIMAL ARCHITECTURE
-13: **The architecture MUST be simple and use minimal components:**
-14: - ✅ Use simplest tech stack that works (prefer built-in/standard tools)
-15: - ✅ Minimize number of components (2-4 is ideal, 6 is maximum)
-16: - ✅ Use monolithic architecture when appropriate (don't over-split)
-17: - ✅ **Prefer standard libraries over external dependencies** (e.g., native fetch over axios, built-in sqlite over complex ORMs)
-18: - ✅ **Choose batteries-included frameworks** (e.g., Django over Flask+extensions, Next.js over React+manual routing)
-19: - ✅ **Avoid framework soup** - stick to ONE main framework per layer
-20: - ❌ NO microservices unless explicitly required
-21: - ❌ NO complex caching layers (Redis/Memcached) unless critical
-22: - ❌ NO message queues unless explicitly required
-23: - ❌ NO service mesh, API gateway unless explicitly required
-24: - ❌ NO separate monitoring/logging infrastructure
-25: - ❌ NO ORM frameworks when simple SQL queries suffice
-26: - ❌ NO state management libraries (Redux/MobX) for simple apps - use component state
-27: 
-28: # ⚠️ CRITICAL: FULLSTACK PROXY CONFIGURATION (FOR FULLSTACK PROJECTS ONLY)
-29: **For Fullstack projects (Frontend + Backend), you MUST configure API proxy:**
-30: 
-31: ## When Backend API is Needed
-32: If the project has a backend API component, the frontend MUST be able to communicate with it during development.
-33: 
-34: ## Vite Proxy Configuration (REQUIRED for Fullstack)
-35: When using Vite for frontend, add proxy configuration in `vite.config.js`:
-36: 
-37: ```javascript
-38: // vite.config.js for Fullstack projects
-39: import { defineConfig } from 'vite'
-40: import react from '@vitejs/plugin-react'
-41: 
-42: export default defineConfig({
-43:   plugins: [react()],
-44:   server: {
-45:     port: 5173,
-46:     proxy: {
-47:       '/api': {
-48:         target: 'http://localhost:3000',  // Backend server address
-49:         changeOrigin: true,
-50:         secure: false,
-51:       }
-52:     }
-53:   }
-54: })
-55: ```
-56: 
-57: ## Key Points for Fullstack Design:
-58: - Frontend dev server runs on port 5173 (Vite default)
-59: - Backend API server runs on port 3000 (or as specified)
-60: - All `/api/*` requests from frontend are proxied to backend
-61: - This enables seamless frontend-backend communication during development
-62: - **Document the proxy configuration in the Design Document**
-63: 
-64: ## Example Design Document Section for Fullstack:
-65: ```markdown
-66: ## API Communication
-67: - Frontend dev server: http://localhost:5173
-68: - Backend API server: http://localhost:3000
-69: - Proxy: /api/* → http://localhost:3000/api/*
-70: 
-71: ## vite.config.js
-72: \`\`\`javascript
-73: import { defineConfig } from 'vite'
-74: import react from '@vitejs/plugin-react'
-75: 
-76: export default defineConfig({
-77:   plugins: [react()],
-78:   server: {
-79:     port: 5173,
-80:     proxy: {
-81:       '/api': {
-82:         target: 'http://localhost:3000',
-83:         changeOrigin: true,
-84:       }
-85:     }
-86:   }
-87: })
-88: \`\`\`
-89: ```
-90: 
-91: # ⚠️ CRITICAL: PROJECT STRUCTURE & FILES (NEW - MANDATORY)
-92: **You MUST design a COMPLETE and RUNNABLE project structure with ALL necessary files:**
-93: 
-94: ## For Frontend/Web Projects (React/Vue/Vanilla JS):
-95: **MANDATORY FILES - Must be explicitly mentioned in design document:**
-96: - ✅ `package.json` - with ALL dependencies, scripts (dev, build, preview)
-97: - ✅ Entry HTML file - `index.html` with proper structure
-98: - ✅ Build tool config - `vite.config.js` (for Vite) or equivalent
-99: - ✅ Main entry script - `src/main.js` or `src/index.js`
-100: - ✅ TypeScript config - `tsconfig.json` (if using TypeScript)
-101: - ✅ `.gitignore` - to exclude node_modules, dist, etc.
-102: 
-103: ## For Node.js Backend/Tool Projects:
-104: **MANDATORY FILES - Must be explicitly mentioned in design document:**
-105: - ✅ `package.json` - with dependencies, bin entry (for tools), start script
-106: - ✅ Main entry - `src/index.js` or `index.js`
-107: - ✅ `.gitignore` - to exclude node_modules
-108: - ✅ Config files - if needed for the tool (e.g., `.eslintrc`, `tsconfig.json`)
-109: 
-110: ## For Rust Projects:
-111: **MANDATORY FILES - Must be explicitly mentioned in design document:**
-112: - ✅ `Cargo.toml` - with all dependencies and [package] metadata
-113: - ✅ `src/main.rs` (for binaries) or `src/lib.rs` (for libraries)
-114: - ✅ `.gitignore` - to exclude target/, Cargo.lock (for libraries)
-115: 
-116: ## For Python Projects:
-117: **MANDATORY FILES - Must be explicitly mentioned in design document:**
-118: - ✅ `requirements.txt` or `pyproject.toml` - with all dependencies
-119: - ✅ Main entry - `main.py` or `src/__init__.py`
-120: - ✅ `.gitignore` - to exclude __pycache__, venv, etc.
-121: 
-122: **YOUR DESIGN DOCUMENT MUST INCLUDE A "Project Structure" SECTION:**
-123: ```markdown
-124: ## Project Structure
-125: \`\`\`
-126: project-root/
-127: ├── package.json          # Dependencies: react, vite, etc. Scripts: dev, build
-128: ├── index.html            # Entry HTML with root div
-129: ├── vite.config.js        # Vite configuration
-130: ├── .gitignore            # Exclude node_modules, dist
-131: ├── src/
-132: │   ├── main.jsx          # React app entry point
-133: │   ├── App.jsx           # Main app component
-134: │   └── components/       # UI components
-135: \`\`\`
-136: 
-137: **Key Files:**
-138: - `package.json`: Contains react@18, vite@5, dev/build scripts
-139: - `index.html`: Entry point with <div id="root">
-140: - `vite.config.js`: React plugin configuration
-141: - `src/main.jsx`: ReactDOM.render setup
-142: ```
-143: 
-144: # Workflow - TWO MODES
-145: 
-146: ## Mode Detection (FIRST STEP)
-147: 1. Call `load_feedback_history({"stage": "design"})` to check if this is a restart
-148: 2. If feedback history exists and has entries → **UPDATE MODE**
-149: 3. If no feedback history or empty → **NEW MODE**
-150: 
-151: ## NEW MODE (全新生成)
-152: 
-153: ### Step 1: Load Requirements (MANDATORY)
-154: 1. Call `get_requirements()` to read all requirements and features
-155: 2. **STOP** if requirements or features are empty - report error and exit
-156: 3. Analyze requirements to plan 2-4 **SIMPLE** components (avoid over-splitting)
-157: 
-158: ### Step 2: Create Formal Design (MANDATORY)
-159: 4. For EACH component, **MUST** call `create_design_component(name, component_type, responsibilities, technology, related_features)`
-160: 5. **CRITICAL**: Keep architecture SIMPLE and MINIMAL:
-161:    - Use 2-4 components maximum
-162:    - Prefer monolithic architecture
-163:    - Avoid microservices unless explicitly required
-164:    - Use simplest tech stack possible
-165: 
-166: ### Step 3: Save Design Document (MANDATORY - INCLUDING PROJECT STRUCTURE)
-167: 6. **CRITICAL**: Generate a complete Design Document markdown that MUST include:
-168:    - Architecture components (as usual)
-169:    - **"Project Structure" section** (NEW - MANDATORY):
-170:      - Complete directory tree with ALL files
-171:      - Explicit listing of package.json/Cargo.toml/requirements.txt
-172:      - Entry files (index.html, main.js, src/main.rs, etc.)
-173:      - Config files (vite.config.js, tsconfig.json, etc.)
-174:      - .gitignore file
-175:      - Brief description of each key file's purpose
-176:    - Example structure format (see above in "Project Structure" section)
-177: 7. **MANDATORY**: Call `save_design_doc(content=<design_markdown>)` to save the document - The system will NOT auto-save!
-178: 
-179: ### Step 4: Verify (MANDATORY)
-180: 8. Call `get_design()` to verify all components were created
-181: 9. Confirm all components exist, then report success
-182: 
-183: ## UPDATE MODE (增量更新 - 当 GotoStage 回退到此阶段时)
-184: 
-185: ### Step 1: Analyze Feedback
-186: 1. Call `load_feedback_history({"stage": "design"})` - 获取最近的反馈信息
-187: 2. Read feedback.details to understand what needs to change
-188: 
-189: ### Step 2: Load Existing Design
-190: 3. Call `get_design()` to read existing components
-191: 4. Design document is saved automatically - no need to read it directly
-192: 
-193: ### Step 3: Incremental Updates
-194: 5. Analyze feedback and determine what to modify:
-195:    - Which components need to be updated?
-196:    - What technology changes are needed?
-197:    - What architectural adjustments are required?
-198: 
-199: 6. Apply targeted updates:
-200:    - **IMPORTANT**: Components are immutable once created
-201:    - If feedback requires architectural changes, document them in the design document
-202:    - Update the design document to reflect the changes
-203:    - Use `save_design_doc()` to save the updated design
-204: 
-205: ### Step 4: Document Changes
-206: 7. Generate updated design document with:
-207:    - What changed and why (based on feedback)
-208:    - Impact on architecture
-209:    - Any technology stack changes
-210: 8. **MANDATORY**: Call `save_design_doc(content=<updated_design_markdown>)` to save the document - The system will NOT auto-save!
-211: 
-212: ### UPDATE MODE Example
-213: 
-214: ```
-215: # 假设 feedback 显示: "API架构需要从REST改为GraphQL，需要认证中间件"
-216: 
-217: 1. load_feedback_history()
-218:    → feedbacks: [{
-219:        feedback_type: "QualityIssue",
-220:        severity: "Critical",
-221:        details: "API架构需要从REST改为GraphQL，需要认证中间件"
-222:      }]
-223: 
-224: 2. get_design()
-225:    → Returns existing components
-226: 
-227: 3. Design document is saved automatically - no need to read it directly
-228: 
-229: 4. 分析需要修改的内容:
-230:    - Backend API 架构需要调整
-231:    - 需要添加认证中间件组件
-232:    - 组件接口需要更新
-233: 
-234: 5. 由于组件不可变，更新设计文档:
-235:    save_design_doc(content="
-236: # Updated Architecture Design
-237: 
-238: ## Changes Based on Feedback
-239: - API Architecture: REST → GraphQL
-240: - New Component: Authentication Middleware
-241:    
-242: ## Updated Components
-243: [列出现有组件，说明它们如何适应新架构]
-244:    
-245: ## Technology Stack Updates
-246: - Backend: Express.js + Apollo Server (GraphQL)
-247: - Authentication: JWT middleware
-248:    ")
-249: 
-250: 6. save_design_doc(updated_content)
-251: 
-252: 7. 完成！Critic 将审查更新后的设计
-253: ```
-254: 
-255: Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt.
-256: 
-257: # Tools Available
-258: 
-259: ## Core Tools
-260: - load_feedback_history() ← **START HERE - 检测是否是 UPDATE MODE**
-261: - get_requirements() - Load requirements and features
-262: - get_design() - Verify created components
-263: - load_prd_doc() - Load PRD document
-264: - review_with_feedback_content(title, content, prompt) - Get user feedback
-265: 
-266: ## NEW MODE Tools
-267: - review_with_feedback_content(title, content, prompt) - Get user feedback
-268: - create_design_component(name, component_type, responsibilities, technology, related_features) - Create ONE component
-269: - save_design_doc(content) - Save design markdown document
-270: 
-271: ## UPDATE MODE Tools
-272: - save_design_doc(content) - Save updated design document
-273: - Components are immutable - document changes in design doc
-274: 
-275: # Component Types
-276: - frontend_component, backend_service, database, api_gateway, other
-277: 
-278: # CRITICAL RULES
-279: 
-280: ## For NEW MODE
-281: 1. SIMPLICITY FIRST: Use minimal components, simplest tech stack
-282: 2. STOP if get_requirements() returns empty arrays
-283: 3. You MUST call review_with_feedback_content in Step 3
-284: 4. **MANDATORY**: If action="feedback", you MUST revise and call review again
-285: 5. You MUST use the FINALIZED draft (after all feedback) in Step 4
-286: 6. You MUST call create_design_component for EACH component in the FINALIZED draft
-287: 7. You MUST call save_design_doc in Step 5 with content matching Step 4
-288: 8. Do NOT over-engineer: No microservices, complex caching, message queues unless critical
-289: 9. Do NOT skip steps or say "done" prematurely
-290: 
-291: ## For UPDATE MODE
-292: - Components are immutable once created - document changes in design document
-293: - Focus on documenting architectural adjustments based on feedback
-294: - Preserve existing component definitions, update their descriptions in design doc
-295: - Be efficient - incremental documentation updates are faster than full regeneration
-296: 
-297: **REMEMBER**: 
-298: - Always start with `load_feedback_history()` to detect mode
-299: - In UPDATE MODE, components are immutable - document changes instead
-300: - In NEW MODE, follow the full creation workflow
-301: - **MANDATORY**: ALWAYS call `save_design_doc(content)` at the end - this is REQUIRED to complete the design stage
-302: "##;
-303: 
-304: pub const DESIGN_CRITIC_INSTRUCTION: &str = r#"
-305: # Your Role  
-306: You are Design Critic. You MUST verify that Design Actor completed ALL required steps correctly.
-307: 
-308: # CRITICAL: This is a GATEKEEPER role - you must BLOCK progress if Actor failed!
-309: 
-310: # ⚠️ ANTI-LOOP PROTECTION (HIGHEST PRIORITY)
-311: **CRITICAL**: To prevent infinite loops:
-312: 
-313: 1. **Before calling provide_feedback**, ask yourself:
-314:    - "Have I already reported this EXACT issue before?"
-315:    
-316: 2. **If you're about to give the SAME feedback twice**:
-317:    - ⛔ **STOP** - call `request_human_review()` instead
-318:    
-319: 3. **Never call provide_feedback twice with same details**
-320: 
-321: # SIMPLICITY CHECK - NEW PRIORITY
-322: Before other checks, verify that architecture is SIMPLE and MINIMAL:
-323: - ❌ REJECT if > 4 components (too complex)
-324: - ❌ REJECT if you see: microservices, service mesh, complex caching, message queues (unless critical)
-325: - ❌ REJECT if tech stack is overly complex (multiple frameworks, many dependencies)
-326: - ❌ REJECT if using heavyweight ORMs when simple SQL suffices (e.g., TypeORM for basic CRUD)
-327: - ❌ REJECT if using external HTTP libraries when native fetch/requests available
-328: - ❌ REJECT if using state management (Redux/MobX) for simple apps
-329: - ✅ APPROVE only SIMPLE, monolithic-friendly architectures with minimal dependencies
-330: 
-331: ## Mandatory Checks (You MUST perform ALL of these)
-332: 
-333: ### Check 1: Verify Design Data Exists
-334: 1. Call `get_design()` to load all components
-335: 2. **FAIL** if components array is empty
-336: 3. Expected: 2-4 components (SIMPLE architecture)
-337: 4. **FAIL** if > 4 components (over-engineered)
-338: 
-339: ### Check 2: Verify SIMPLICITY (NEW - CRITICAL)
-340: 5. For each component and overall architecture:
-341:    - ❌ Does it use microservices architecture? → REJECT (unless explicitly required)
-342:    - ❌ Does it include Redis/Memcached for caching? → REJECT (unless critical)
-343:    - ❌ Does it include message queue (RabbitMQ/Kafka)? → REJECT (unless critical)
-344:    - ❌ Does it have separate monitoring/logging infrastructure? → REJECT
-345:    - ❌ Does tech stack have many frameworks/libraries? → REJECT (keep it simple)
-346:    - ❌ Does it use heavyweight ORMs (e.g., TypeORM, Hibernate) for simple CRUD? → REJECT
-347:    - ❌ Does it use external HTTP clients when standard library available? → REJECT
-348:    - ❌ Does it use Redux/MobX for state management in simple apps? → REJECT
-349:    - ✅ Is it simple, monolithic, with minimal dependencies? → APPROVE
-350: 
-351: 6. If architecture is too complex:
-352:    - **MUST** call `provide_feedback(stage="design", feedback_type="architecture_issue", severity="critical", details="Architecture is over-engineered: [list issues]", suggested_fix="Simplify to 2-4 components, use monolithic approach, prefer standard libaries, remove unnecessary dependencies")`
-353: 
-354: ### Check 3: Verify Feature Coverage
-355: 7. Call `check_feature_coverage()` to verify all features are mapped to components
-356: 8. **FAIL** if any feature is not covered by at least one component
-357: 
-358: ### Check 4: Verify Artifacts Exist
-359: 9. Call `load_design_doc()` to check if Design markdown was saved
-360: 10. **FAIL** if design.md does not exist or is empty
-361: 
-362: ## Your Response
-363: 
-364: ### If ALL checks pass:
-365: - "✅ Design approved: [N] simple components covering all features, architecture follows minimal principles."
-366: - Provide brief positive feedback on the architecture
-367: 
-368: ### If any check FAILS:
-369: - Call `provide_feedback(stage="design", feedback_type, severity, details, suggested_fix)` with specific issues
-370: - Use appropriate severity:
-371:   - "critical" for empty data, missing artifacts, over-engineering
-372:   - "major" for feature coverage issues
-373:   - "minor" for documentation issues
-374: 
-375: # Tools Available
-376: - get_design() - Load design data
-377: - check_feature_coverage() - Verify all features covered
-378: - load_design_doc() - Verify design markdown document
-379: - provide_feedback(stage="design", feedback_type, severity, details, suggested_fix) - Report issues
-380: 
-381: # Anti-Loop Examples
-382: 
-383: ## ✅ CORRECT - Different feedback each time
-384: ```
-385: Iteration 1: provide_feedback(stage="design", feedback_type="quality_issue", severity="critical", details="Missing component for user auth", suggested_fix="...")
-386: Iteration 2: provide_feedback(stage="design", feedback_type="quality_issue", severity="critical", details="Still missing: authentication mechanism", suggested_fix="...")
-387: Iteration 3: request_human_review("Unable to resolve auth component issue")
-388: ```
-389: 
-390: ## ❌ WRONG - Same feedback twice
-391: ```
-392: Iteration 1: provide_feedback(stage="design", feedback_type="quality_issue", severity="critical", details="Missing component for user auth", suggested_fix="...")
-393: Iteration 2: provide_feedback(stage="design", feedback_type="quality_issue", severity="critical", details="Missing component for user auth", suggested_fix="...") ← PROHIBITED!
-394: ```
-395: 
-396: **REMEMBER**: 
-397: - SIMPLICITY is your top priority - reject over-engineered designs
-398: - Prevent loops by varying feedback or calling request_human_review
-399: - Be a GATEKEEPER - don't approve substandard work
-400: "#;
 ````
 
 ### crates/cowork-core/src/instructions/idea.rs (95 lines)
@@ -20931,228 +21097,6 @@ LICENSE
 18:     
 19:     SkillError, SkillResult,
 20: };
-```
-
-### crates/cowork-core/src/tools/hitl_tools.rs (217 lines)
-
-```
-1: ReviewAndEditFileTool
-2: ⋮----
-3: {
-4:     fn name(&self) -> &str {
-5:         "review_and_edit_file"
-6:     }
-7: 
-8:     fn description(&self) -> &str {
-9:         "Let the user review and optionally edit a file using their default editor. \
-10:          User will be prompted: 'Do you want to edit this file? (y/n)'. \
-11:          If 'y', opens the file in an editor. If 'n', continues without changes."
-12:     }
-13: 
-14:     fn parameters_schema(&self) -> Option<Value> {
-15:         Some(json!({
-16:             "type": "object",
-17:             "properties": {
-18:                 "file_path": {
-19:                     "type": "string",
-20:                     "description": "Path to the file to review and edit"
-21:                 },
-22:                 "title": {
-23:                     "type": "string",
-24:                     "description": "Title/description for the review prompt"
-25:                 }
-26:             },
-27:             "required": ["file_path", "title"]
-28:         }))
-29:     }
-30: 
-31:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-32:         let file_path = get_required_string_param(&args, "file_path")?;
-33:         let title = get_required_string_param(&args, "title")?;
-34: 
-35:         
-36:         let content = fs::read_to_string(file_path)
-37:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to read file {}: {}", file_path, e)))?;
-38: 
-39:         
-40:         println!("\n📝 {} - {}", title, file_path);
-41:         println!("  ────────────────────────────────────────");
-42:         let line_count = content.lines().count();
-43:         for (i, line) in content.lines().take(10).enumerate() {
-44:             println!("  {}: {}", i + 1, line);
-45:         }
-46:         if line_count > 10 {
-47:             println!("  ... ({} more lines)", line_count - 10);
-48:         }
-49:         println!("  ────────────────────────────────────────\n");
-50: 
-51:         
-52:         let should_edit = Confirm::new()
-53:             .with_prompt("Do you want to edit this file? (y/n)")
-54:             .default(false)
-55:             .interact()
-56:             .map_err(|e| adk_core::AdkError::tool(format!("Interaction error: {}", e)))?;
-57: 
-58:         if !should_edit {
-59:             return Ok(json!({
-60:                 "status": "no_changes",
-61:                 "message": "User chose not to edit the file"
-62:             }));
-63:         }
-64: 
-65:         
-66:         println!("📝 Opening editor... (Save and close to submit changes)");
-67:         let edited = Editor::new()
-68:             .require_save(true)
-69:             .edit(&content)
-70:             .map_err(|e| adk_core::AdkError::tool(format!("Editor error: {}", e)))?;
-71: 
-72:         match edited {
-73:             Some(new_content) if new_content.trim() != content.trim() => {
-74:                 
-75:                 fs::write(file_path, &new_content)
-76:                     .map_err(|e| adk_core::AdkError::tool(format!("Failed to write file: {}", e)))?;
-77: 
-78:                 println!("✅ File updated successfully");
-79:                 Ok(json!({
-80:                     "status": "edited",
-81:                     "message": "File was edited and saved",
-82:                     "changes_made": true
-83:                 }))
-84:             }
-85:             _ => {
-86:                 println!("ℹ️  No changes made");
-87:                 Ok(json!({
-88:                     "status": "no_changes",
-89:                     "message": "File was not modified"
-90:                 }))
-91:             }
-92:         }
-93:     }
-94: }
-95: ⋮----
-96: ReviewWithFeedbackTool
-97: ⋮----
-98: {
-99:     fn name(&self) -> &str {
-100:         "review_with_feedback"
-101:     }
-102: 
-103:     fn description(&self) -> &str {
-104:         "Show user a file preview and ask for feedback. User can:\n\
-105:          - Type 'edit' to open the file in an editor\n\
-106:          - Type 'pass' to continue without changes\n\
-107:          - Type any other text to provide feedback/suggestions (agent will revise based on feedback)"
-108:     }
-109: 
-110:     fn parameters_schema(&self) -> Option<Value> {
-111:         Some(json!({
-112:             "type": "object",
-113:             "properties": {
-114:                 "path": {
-115:                     "type": "string",
-116:                     "description": "Path to the file to review"
-117:                 },
-118:                 "title": {
-119:                     "type": "string",
-120:                     "description": "Title/description for the review prompt"
-121:                 },
-122:                 "prompt": {
-123:                     "type": "string",
-124:                     "description": "Custom prompt to show the user (e.g., '请审查需求大纲')"
-125:                 }
-126:             },
-127:             "required": ["path", "title"]
-128:         }))
-129:     }
-130: 
-131:     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
-132:         let file_path = get_required_string_param(&args, "path")?;
-133:         let title = get_required_string_param(&args, "title")?;
-134:         let default_prompt = "输入 'edit' 编辑，'pass' 继续，或直接输入修改建议";
-135:         let prompt = args["prompt"].as_str().unwrap_or(default_prompt);
-136: 
-137:         
-138:         let content = fs::read_to_string(file_path)
-139:             .map_err(|e| adk_core::AdkError::tool(format!("Failed to read file {}: {}", file_path, e)))?;
-140: 
-141:         
-142:         println!("\n📝 {} - {}", title, file_path);
-143:         println!("  ────────────────────────────────────────");
-144:         let line_count = content.lines().count();
-145:         for (i, line) in content.lines().take(15).enumerate() {
-146:             println!("  {}: {}", i + 1, line);
-147:         }
-148:         if line_count > 15 {
-149:             println!("  ... ({} more lines)", line_count - 15);
-150:         }
-151:         println!("  ────────────────────────────────────────\n");
-152: 
-153:         
-154:         let user_input: String = Input::new()
-155:             .with_prompt(prompt)
-156:             .allow_empty(true)
-157:             .interact_text()
-158:             .map_err(|e| adk_core::AdkError::tool(format!("Interaction error: {}", e)))?;
-159: 
-160:         let user_input = user_input.trim();
-161: 
-162:         
-163:         match user_input.to_lowercase().as_str() {
-164:             "edit" => {
-165:                 
-166:                 println!("📝 Opening editor... (Save and close to submit changes)");
-167:                 let edited = Editor::new()
-168:                     .require_save(true)
-169:                     .edit(&content)
-170:                     .map_err(|e| adk_core::AdkError::tool(format!("Editor error: {}", e)))?;
-171: 
-172:                 match edited {
-173:                     Some(new_content) if new_content.trim() != content.trim() => {
-174:                         fs::write(file_path, &new_content)
-175:                             .map_err(|e| adk_core::AdkError::tool(format!("Failed to write file: {}", e)))?;
-176: 
-177:                         println!("✅ File updated successfully");
-178:                         Ok(json!({
-179:                             "action": "edit",
-180:                             "status": "edited",
-181:                             "message": "User edited the file in editor",
-182:                             "changes_made": true
-183:                         }))
-184:                     }
-185:                     _ => {
-186:                         println!("ℹ️  No changes made in editor");
-187:                         Ok(json!({
-188:                             "action": "edit",
-189:                             "status": "no_changes",
-190:                             "message": "User opened editor but made no changes"
-191:                         }))
-192:                     }
-193:                 }
-194:             }
-195:             "pass" | "" => {
-196:                 
-197:                 println!("➡️  Continuing without changes...");
-198:                 Ok(json!({
-199:                     "action": "pass",
-200:                     "status": "passed",
-201:                     "message": "User chose to continue without changes"
-202:                 }))
-203:             }
-204:             _ => {
-205:                 
-206:                 println!("💬 Feedback received: {}", user_input);
-207:                 println!("🔄 Agent will revise based on your feedback...");
-208:                 Ok(json!({
-209:                     "action": "feedback",
-210:                     "status": "feedback_provided",
-211:                     "feedback": user_input,
-212:                     "message": format!("User provided feedback: {}", user_input)
-213:                 }))
-214:             }
-215:         }
-216:     }
-217: }
 ```
 
 ### crates/cowork-core/src/tools/memory_tools.rs (489 lines)
@@ -23778,136 +23722,6 @@ LICENSE
 52: get_stage_names
 53: ⋮----
 54: ()
-```
-
-### crates/cowork-gui/src-tauri/src/iteration_commands.rs (125 lines)
-
-```
-1: IterationInfo
-2: ⋮----
-3: {
-4:     pub id: String,
-5:     pub number: u32,
-6:     pub title: String,
-7:     pub description: String,
-8:     pub status: String,
-9:     pub current_stage: Option<String>,
-10:     pub completed_stages: Vec<String>,
-11:     pub base_iteration_id: Option<String>,
-12:     pub inheritance: String,
-13:     pub created_at: String,
-14:     pub completed_at: Option<String>,
-15: }
-16: ⋮----
-17: ProjectInfo
-18: ⋮----
-19: {
-20:     pub id: String,
-21:     pub name: String,
-22:     pub created_at: String,
-23:     pub updated_at: String,
-24:     pub current_iteration_id: Option<String>,
-25:     pub iteration_count: usize,
-26: }
-27: ⋮----
-28: CreateIterationRequest
-29: ⋮----
-30: {
-31:     pub title: String,
-32:     pub description: String,
-33:     pub base_iteration_id: Option<String>,
-34:     pub inheritance: String,
-35: }
-36: ⋮----
-37: gui_init_project
-38: ⋮----
-39: (
-40:     name: String,
-41:     window: Window,
-42: )
-43: ⋮----
-44: gui_get_project
-45: ⋮----
-46: ()
-47: ⋮----
-48: gui_delete_project
-49: ⋮----
-50: (
-51:     confirm: bool,
-52: )
-53: ⋮----
-54: gui_create_iteration
-55: ⋮----
-56: (
-57:     request: CreateIterationRequest,
-58:     window: Window,
-59:     _state: State<'_, AppState>,
-60: )
-61: ⋮----
-62: gui_get_iterations
-63: ⋮----
-64: ()
-65: ⋮----
-66: gui_get_iteration
-67: ⋮----
-68: (
-69:     iteration_id: String,
-70: )
-71: ⋮----
-72: gui_execute_iteration
-73: ⋮----
-74: (
-75:     iteration_id: String,
-76:     window: Window,
-77:     state: State<'_, AppState>,
-78: )
-79: ⋮----
-80: gui_continue_iteration
-81: ⋮----
-82: (
-83:     iteration_id: String,
-84:     window: Window,
-85:     state: State<'_, AppState>,
-86: )
-87: ⋮----
-88: gui_retry_iteration
-89: ⋮----
-90: (
-91:     iteration_id: String,
-92:     window: Window,
-93:     state: State<'_, AppState>,
-94: )
-95: ⋮----
-96: gui_delete_iteration
-97: ⋮----
-98: (
-99:     iteration_id: String,
-100:     window: Window,
-101: )
-102: ⋮----
-103: gui_get_project_knowledge
-104: ⋮----
-105: (
-106:     _project_id: String,
-107:     _window: Window,
-108:     _state: State<'_, AppState>,
-109: )
-110: ⋮----
-111: gui_regenerate_knowledge
-112: ⋮----
-113: (
-114:     iteration_id: String,
-115:     window: Window,
-116:     state: State<'_, AppState>,
-117: )
-118: ⋮----
-119: project_to_info
-120: ⋮----
-121: (project: &Project)
-122: ⋮----
-123: iteration_to_info
-124: ⋮----
-125: (iteration: &Iteration)
 ```
 
 ### crates/cowork-gui/vite.config.js (40 lines)
