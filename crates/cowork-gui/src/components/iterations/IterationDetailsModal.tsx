@@ -74,7 +74,7 @@ const IterationDetailsModal: React.FC<IterationDetailsModalProps> = ({
       <div>
         <div style={{ marginBottom: "20px", paddingBottom: "16px", borderBottom: "1px solid var(--border-color)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-            <span style={{ fontSize: "13px", fontWeight: 600, background: "var(--bg-elevated)", color: "var(--text-primary)", padding: "2px 10px", borderRadius: "4px", border: "1px solid var(--border-light)" }}>
+            <span style={{ fontSize: "13px", fontWeight: 600, background: "var(--bg-elevated)", color: "var(--text-primary)", padding: "2px 10px", borderRadius: "2px", border: "1px solid var(--border-light)" }}>
               #{iteration.number}
             </span>
             <Badge status={getStatusColor(iteration.status)} text={iteration.status} />
@@ -88,7 +88,7 @@ const IterationDetailsModal: React.FC<IterationDetailsModalProps> = ({
         </div>
 
         <div style={{ marginBottom: "16px" }}>
-          <div style={{ padding: "12px", background: "var(--bg-container)", borderRadius: "6px", lineHeight: "1.5", fontSize: "14px", color: "var(--text-secondary)", border: "1px solid var(--border-light)" }}>
+          <div style={{ padding: "12px", background: "var(--bg-container)", borderRadius: "3px", lineHeight: "1.5", fontSize: "14px", color: "var(--text-secondary)", border: "1px solid var(--border-light)" }}>
             {iteration.description}
           </div>
         </div>
@@ -96,7 +96,7 @@ const IterationDetailsModal: React.FC<IterationDetailsModalProps> = ({
         {iteration.base_iteration_id && (
           <div style={{ marginBottom: "16px" }}>
             <div style={{ fontSize: "13px", color: "var(--text-tertiary)", marginBottom: "4px" }}>
-              Based on: <code style={{ background: "var(--bg-elevated)", padding: "2px 6px", borderRadius: "3px", fontSize: "11px", color: "var(--text-secondary)", border: "1px solid var(--border-light)" }}>
+              Based on: <code style={{ background: "var(--bg-elevated)", padding: "2px 6px", borderRadius: "2px", fontSize: "11px", color: "var(--text-secondary)", border: "1px solid var(--border-light)" }}>
                 {iteration.base_iteration_id.substring(0, 20)}...
               </code>
               <Tag style={{ marginLeft: "6px", fontSize: "11px" }}>{iteration.inheritance}</Tag>
@@ -122,7 +122,7 @@ const IterationDetailsModal: React.FC<IterationDetailsModalProps> = ({
                 <Tag
                   key={stage.key}
                   color={isCompleted ? "success" : isCurrent ? "processing" : "default"}
-                  style={{ margin: 0, fontSize: "12px", borderRadius: "4px", opacity: isCompleted || isCurrent ? 1 : 0.4 }}
+                  style={{ margin: 0, fontSize: "12px", borderRadius: "2px", opacity: isCompleted || isCurrent ? 1 : 0.4 }}
                 >
                   {stage.label}
                 </Tag>

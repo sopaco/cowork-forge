@@ -1610,6 +1610,45 @@ LICENSE
 31: (tool_name: &str, result: &Result<Value, AdkError>)
 ```
 
+### crates/cowork-gui/src/components/chat/MessageList.tsx (34 lines)
+
+```
+1: ToolCallMessage
+2: ⋮----
+3: {
+4:   toolName: string;
+5:   arguments: Record<string, unknown>;
+6:   agentName: string;
+7: }
+8: ⋮----
+9: ToolResultMessage
+10: ⋮----
+11: {
+12:   toolName: string;
+13:   result: string;
+14:   success: boolean;
+15:   agentName: string;
+16: }
+17: ⋮----
+18: PMAgentMessage
+19: ⋮----
+20: {
+21:   actions?: PMAction[];
+22: }
+23: ⋮----
+24: MessageListProps
+25: ⋮----
+26: {
+27:   messages: ChatMessage[];
+28:   pmMessages?: (ChatMessage & { type: 'user' | 'pm_agent' })[];
+29:   mode: 'pipeline' | 'pm_agent';
+30:   isProcessing: boolean;
+31:   currentAgent: string | null;
+32:   onToggleThinking: (index: number) => void;
+33:   onActionClick?: (action: PMAction) => void;
+34: }
+```
+
 ### crates/cowork-core/src/acp/client.rs (309 lines)
 
 ```
@@ -2958,43 +2997,469 @@ LICENSE
 18: }
 ```
 
-### crates/cowork-gui/src/components/chat/MessageList.tsx (34 lines)
+### crates/cowork-gui/src/hooks/useAppEvents.ts (460 lines)
 
 ```
-1: ToolCallMessage
-2: ⋮----
-3: {
-4:   toolName: string;
-5:   arguments: Record<string, unknown>;
-6:   agentName: string;
-7: }
-8: ⋮----
-9: ToolResultMessage
-10: ⋮----
-11: {
-12:   toolName: string;
-13:   result: string;
-14:   success: boolean;
-15:   agentName: string;
-16: }
-17: ⋮----
-18: PMAgentMessage
-19: ⋮----
-20: {
-21:   actions?: PMAction[];
-22: }
-23: ⋮----
-24: MessageListProps
-25: ⋮----
-26: {
-27:   messages: ChatMessage[];
-28:   pmMessages?: (ChatMessage & { type: 'user' | 'pm_agent' })[];
-29:   mode: 'pipeline' | 'pm_agent';
-30:   isProcessing: boolean;
-31:   currentAgent: string | null;
-32:   onToggleThinking: (index: number) => void;
-33:   onActionClick?: (action: PMAction) => void;
-34: }
+1: function useAppEvents(userInput: string, setUserInput: (input: string) => void) {
+2: 	const { message } = AntApp.useApp();
+3: 	const listenersRegistered = useRef(false);
+4: 
+5: 	
+6: 	const projectActions = useProjectStore(
+7: 		useShallow(s => ({
+8: 			loadProject: s.loadProject,
+9: 			loadIterations: s.loadIterations,
+10: 			setCurrentIteration: s.setCurrentIteration,
+11: 			updateCurrentIterationStatus: s.updateCurrentIterationStatus,
+12: 			setIsExecuting: s.setIsExecuting,
+13: 		}))
+14: 	);
+15: 
+16: 	
+17: 	const agentActions = useAgentStore(
+18: 		useShallow(s => ({
+19: 			setMessages: s.setMessages,
+20: 			clearMessages: s.clearMessages,
+21: 			setPMMessages: s.setPMMessages,
+22: 			clearPMMessages: s.clearPMMessages,
+23: 			setProcessing: s.setProcessing,
+24: 			setCurrentAgent: s.setCurrentAgent,
+25: 			setCurrentStage: s.setCurrentStage,
+26: 			setInputRequest: s.setInputRequest,
+27: 			setPmProcessing: s.setPmProcessing,
+28: 			submitInput: s.submitInput,
+29: 			loadPMWelcomeMessage: s.loadPMWelcomeMessage,
+30: 			appendLastMessageContent: s.appendLastMessageContent,
+31: 			appendLastPMMessageContent: s.appendLastPMMessageContent,
+32: 			addMessage: s.addMessage,
+33: 		}))
+34: 	);
+35: 
+36: 	
+37: 	const uiState = useUIStore(
+38: 		useShallow(s => ({
+39: 			commandPaletteVisible: s.commandPaletteVisible,
+40: 			setActiveView: s.setActiveView,
+41: 			setCommandPaletteVisible: s.setCommandPaletteVisible,
+42: 			setActiveArtifactTab: s.setActiveArtifactTab,
+43: 			triggerArtifactsRefresh: s.triggerArtifactsRefresh,
+44: 			triggerCodeRefresh: s.triggerCodeRefresh,
+45: 			triggerMemoryRefresh: s.triggerMemoryRefresh,
+46: 			triggerKnowledgeRefresh: s.triggerKnowledgeRefresh,
+47: 		}))
+48: 	);
+49: 
+50: 	useEffect(() => {
+51: 		const setupListeners = async () => {
+52: 			if (listenersRegistered.current) return;
+53: 			listenersRegistered.current = true;
+54: 
+55: 			
+56: 			
+57: 			let pipelineBuffer = '';
+58: 			let pipelineLastMeta: { isLast?: boolean; agentName?: string; msgType?: string } | null = null;
+59: 			let pipelineRafId: number | null = null;
+60: 			
+61: 			let pmBuffer = '';
+62: 			let pmLastMeta: { isLast?: boolean } | null = null;
+63: 			let pmRafId: number | null = null;
+64: 
+65: 			const flushPipeline = () => {
+66: 				pipelineRafId = null;
+67: 				if (!pipelineBuffer) {
+68: 					
+69: 					if (pipelineLastMeta?.isLast && pipelineLastMeta.agentName) {
+70: 						
+71: 						agentActions.appendLastMessageContent('', { isLast: true, agentName: pipelineLastMeta.agentName, msgType: pipelineLastMeta.msgType });
+72: 					}
+73: 					pipelineLastMeta = null;
+74: 					return;
+75: 				}
+76: 				agentActions.appendLastMessageContent(pipelineBuffer, {
+77: 					isLast: pipelineLastMeta?.isLast,
+78: 					agentName: pipelineLastMeta?.agentName,
+79: 					msgType: pipelineLastMeta?.msgType,
+80: 				});
+81: 				pipelineBuffer = '';
+82: 				pipelineLastMeta = null;
+83: 			};
+84: 
+85: 			const flushPM = () => {
+86: 				pmRafId = null;
+87: 				if (!pmBuffer) {
+88: 					if (pmLastMeta?.isLast) {
+89: 						agentActions.appendLastPMMessageContent('', { isLast: true });
+90: 					}
+91: 					pmLastMeta = null;
+92: 					return;
+93: 				}
+94: 				agentActions.appendLastPMMessageContent(pmBuffer, { isLast: pmLastMeta?.isLast });
+95: 				pmBuffer = '';
+96: 				pmLastMeta = null;
+97: 			};
+98: 
+99: 			const schedulePipelineFlush = () => {
+100: 				if (pipelineRafId == null) {
+101: 					pipelineRafId = requestAnimationFrame(flushPipeline);
+102: 				}
+103: 			};
+104: 			const schedulePMFlush = () => {
+105: 				if (pmRafId == null) {
+106: 					pmRafId = requestAnimationFrame(flushPM);
+107: 				}
+108: 			};
+109: 
+110: 			
+111: 			const listenerPromises = [
+112: 				
+113: 				listen('iteration_created', () => {
+114: 					projectActions.loadProject();
+115: 					message.success('Iteration created');
+116: 				}),
+117: 
+118: 				listen('iteration_started', () => {
+119: 					agentActions.setProcessing(true);
+120: 					projectActions.setIsExecuting(true);
+121: 					projectActions.updateCurrentIterationStatus('Running');
+122: 					uiState.setActiveView('chat');
+123: 					message.info('Iteration started');
+124: 				}),
+125: 
+126: 				listen('iteration_continued', () => {
+127: 					agentActions.setProcessing(true);
+128: 					projectActions.setIsExecuting(true);
+129: 					projectActions.updateCurrentIterationStatus('Running');
+130: 					uiState.setActiveView('chat');
+131: 					message.info('Iteration continued');
+132: 				}),
+133: 
+134: 				listen('iteration_retrying', () => {
+135: 					agentActions.setProcessing(true);
+136: 					projectActions.setIsExecuting(true);
+137: 					projectActions.updateCurrentIterationStatus('Running');
+138: 					uiState.setActiveView('chat');
+139: 					message.info('Retrying iteration...');
+140: 				}),
+141: 
+142: 				listen('iteration_completed', (event) => {
+143: 					const iterationId = event.payload as string;
+144: 					agentActions.setProcessing(false);
+145: 					projectActions.setIsExecuting(false);
+146: 					agentActions.setCurrentAgent(null);
+147: 					agentActions.setCurrentStage(null);
+148: 					agentActions.setInputRequest(null);
+149: 					projectActions.updateCurrentIterationStatus('Completed');
+150: 					projectActions.loadProject();
+151: 					uiState.triggerMemoryRefresh();
+152: 					uiState.triggerKnowledgeRefresh();
+153: 					agentActions.clearPMMessages();
+154: 					uiState.setActiveView('chat');
+155: 					agentActions.loadPMWelcomeMessage(iterationId);
+156: 					message.success('Iteration completed');
+157: 				}),
+158: 
+159: 				listen('iteration_failed', (event) => {
+160: 					const [, error] = event.payload as [string, string];
+161: 					agentActions.setProcessing(false);
+162: 					projectActions.setIsExecuting(false);
+163: 					agentActions.setCurrentAgent(null);
+164: 					agentActions.setCurrentStage(null);
+165: 					agentActions.setInputRequest(null);
+166: 					projectActions.updateCurrentIterationStatus('Failed');
+167: 					projectActions.loadProject();
+168: 					message.error('Iteration failed: ' + error);
+169: 				}),
+170: 
+171: 				
+172: 				listen('agent_event', (event) => {
+173: 					const { content, agent_name, message_type, stage_name, level } = event.payload as {
+174: 						content?: string;
+175: 						agent_name?: string;
+176: 						message_type?: string;
+177: 						stage_name?: string;
+178: 						level?: string;
+179: 					};
+180: 
+181: 					if (agent_name) agentActions.setCurrentAgent(agent_name);
+182: 					if (stage_name) agentActions.setCurrentStage(stage_name);
+183: 					if (!content) return;
+184: 
+185: 					
+186: 					agentActions.setMessages((prev) => {
+187: 						const lastMsg = prev[prev.length - 1];
+188: 						const isThinking = message_type === 'thinking';
+189: 
+190: 						if (isThinking) {
+191: 							if (
+192: 								lastMsg?.type === 'thinking' &&
+193: 								(lastMsg as ThinkingMessage).isStreaming &&
+194: 								(lastMsg as ThinkingMessage).agentName === agent_name
+195: 							) {
+196: 								return [
+197: 									...prev.slice(0, -1),
+198: 									{
+199: 										...lastMsg,
+200: 										content: (lastMsg as ThinkingMessage).content + content
+201: 									} as ChatMessage
+202: 								];
+203: 							}
+204: 							return [
+205: 								...prev,
+206: 								{
+207: 									type: 'thinking',
+208: 									content,
+209: 									agentName: agent_name || 'AI Agent',
+210: 									stageName: stage_name,
+211: 									isStreaming: true,
+212: 									isExpanded: false,
+213: 									timestamp: new Date().toISOString()
+214: 								} as ThinkingMessage
+215: 							] as ChatMessage[];
+216: 						} else {
+217: 							if (
+218: 								lastMsg?.type === 'agent' &&
+219: 								(lastMsg as { isStreaming?: boolean }).isStreaming &&
+220: 								(lastMsg as { agentName?: string }).agentName === agent_name
+221: 							) {
+222: 								return [
+223: 									...prev.slice(0, -1),
+224: 									{
+225: 										...lastMsg,
+226: 										content: (lastMsg as { content: string }).content + content
+227: 									} as ChatMessage
+228: 								];
+229: 							}
+230: 							return [
+231: 								...prev,
+232: 								{
+233: 									type: 'agent',
+234: 									content,
+235: 									agentName: agent_name || 'AI Agent',
+236: 									stageName: stage_name,
+237: 									level,
+238: 									isStreaming: true,
+239: 									timestamp: new Date().toISOString()
+240: 								} as ChatMessage
+241: 							] as ChatMessage[];
+242: 						}
+243: 					});
+244: 				}),
+245: 
+246: 				
+247: 				listen('agent_streaming', (event) => {
+248: 					const { content, agent_name, is_thinking, is_first, is_last } = event.payload as {
+249: 						content?: string;
+250: 						agent_name?: string;
+251: 						is_thinking?: boolean;
+252: 						is_first?: boolean;
+253: 						is_last?: boolean;
+254: 					};
+255: 
+256: 					
+257: 					if (agent_name === 'PM Agent') {
+258: 						if (is_last && !content) {
+259: 							
+260: 							
+261: 							agentActions.setPMMessages((prev) => {
+262: 								const lastMsg = prev[prev.length - 1];
+263: 								if (lastMsg?.type === 'pm_agent') {
+264: 									return [...prev.slice(0, -1), { ...lastMsg, isStreaming: false } as PMAgentMessage];
+265: 								}
+266: 								return prev;
+267: 							});
+268: 							agentActions.setPmProcessing(false);
+269: 							return;
+270: 						}
+271: 
+272: 						if (!content) return;
+273: 
+274: 						
+275: 						if (is_first && pmBuffer) {
+276: 							flushPM();
+277: 						}
+278: 
+279: 						pmBuffer += content;
+280: 						pmLastMeta = { isLast: is_last };
+281: 						schedulePMFlush();
+282: 						return;
+283: 					}
+284: 
+285: 					
+286: 					if (!content) return;
+287: 					const msgType = is_thinking ? 'thinking' : 'agent';
+288: 
+289: 					
+290: 					if (is_first && pipelineBuffer) {
+291: 						flushPipeline();
+292: 					}
+293: 
+294: 					pipelineBuffer += content;
+295: 					pipelineLastMeta = { isLast: is_last, agentName: agent_name, msgType };
+296: 					schedulePipelineFlush();
+297: 				}),
+298: 
+299: 				
+300: 				listen('tool_call', (event) => {
+301: 					const { tool_name, arguments: args, agent_name } = event.payload as {
+302: 						tool_name: string;
+303: 						arguments: Record<string, unknown>;
+304: 						agent_name?: string;
+305: 					};
+306: 					
+307: 					if (pipelineBuffer) flushPipeline();
+308: 					agentActions.addMessage({
+309: 						type: 'tool_call',
+310: 						toolName: tool_name,
+311: 						arguments: args,
+312: 						agentName: agent_name || 'AI Agent',
+313: 						timestamp: new Date().toISOString()
+314: 					} as ChatMessage);
+315: 				}),
+316: 
+317: 				listen('tool_result', (event) => {
+318: 					const { tool_name, result, success, agent_name } = event.payload as {
+319: 						tool_name: string;
+320: 						result: string;
+321: 						success: boolean;
+322: 						agent_name?: string;
+323: 					};
+324: 					if (pipelineBuffer) flushPipeline();
+325: 					agentActions.addMessage({
+326: 						type: 'tool_result',
+327: 						toolName: tool_name,
+328: 						result,
+329: 						success,
+330: 						agentName: agent_name || 'AI Agent',
+331: 						timestamp: new Date().toISOString()
+332: 					} as ChatMessage);
+333: 				}),
+334: 
+335: 				
+336: 				listen('pm_actions', (event) => {
+337: 					const { actions } = event.payload as { actions: PMAction[] };
+338: 					agentActions.setPMMessages((prev) => {
+339: 						const lastMsg = prev[prev.length - 1];
+340: 						if (lastMsg?.type === 'pm_agent') {
+341: 							return [
+342: 								...prev.slice(0, -1),
+343: 								{
+344: 									...lastMsg,
+345: 									actions: [...((lastMsg as PMAgentMessage).actions || []), ...actions],
+346: 									
+347: 									
+348: 									isStreaming: false,
+349: 								} as PMAgentMessage
+350: 							];
+351: 						}
+352: 						return prev;
+353: 					});
+354: 				}),
+355: 
+356: 				
+357: 				listen('input_request', async (event) => {
+358: 					const [requestId, prompt, options] = event.payload as [string, string, InputOption[]];
+359: 					projectActions.updateCurrentIterationStatus('Paused');
+360: 
+361: 					const artifactMatch = prompt.match(/\[ARTIFACT_TYPE:(\w+)\]$/);
+362: 					if (artifactMatch) {
+363: 						const artifactType = artifactMatch[1];
+364: 						const cleanPrompt = prompt.replace(/\[ARTIFACT_TYPE:\w+\]$/, '').trim();
+365: 
+366: 						
+367: 						try {
+368: 							await projectActions.loadIterations();
+369: 							const latestIterations = useProjectStore.getState().iterations;
+370: 							if (latestIterations && latestIterations.length > 0) {
+371: 								const latestIteration = latestIterations[latestIterations.length - 1];
+372: 								const fullIteration = await API.iteration.get(latestIteration.id);
+373: 								projectActions.setCurrentIteration(fullIteration);
+374: 							}
+375: 						} catch (err) {
+376: 							console.error('[App] Failed to refresh iteration before confirmation:', err);
+377: 						}
+378: 
+379: 						agentActions.setInputRequest({
+380: 							requestId,
+381: 							prompt: cleanPrompt,
+382: 							options,
+383: 							isArtifactConfirmation: true,
+384: 							artifactType
+385: 						});
+386: 					} else {
+387: 						agentActions.setInputRequest({ requestId, prompt, options });
+388: 					}
+389: 					setUserInput('');
+390: 				}),
+391: 
+392: 				
+393: 				listen('project_loaded', async () => {
+394: 					agentActions.setProcessing(false);
+395: 					agentActions.setCurrentAgent(null);
+396: 					agentActions.setInputRequest(null);
+397: 					agentActions.clearMessages();
+398: 					projectActions.setCurrentIteration(null);
+399: 					await projectActions.loadProject();
+400: 					uiState.setActiveView('iterations');
+401: 					message.success('Project loaded');
+402: 				}),
+403: 
+404: 				listen('project_initialized', async () => {
+405: 					agentActions.setProcessing(false);
+406: 					agentActions.setCurrentAgent(null);
+407: 					agentActions.setInputRequest(null);
+408: 					agentActions.clearMessages();
+409: 					projectActions.setCurrentIteration(null);
+410: 					await projectActions.loadProject();
+411: 					uiState.setActiveView('iterations');
+412: 					message.success('Project initialized');
+413: 				}),
+414: 
+415: 				
+416: 				listen('knowledge_regeneration_completed', () => {
+417: 					uiState.triggerKnowledgeRefresh();
+418: 					message.success('Knowledge updated');
+419: 				}),
+420: 
+421: 				listen<[string, string]>('knowledge_regeneration_failed', (event) => {
+422: 					const [iterationId, error] = event.payload;
+423: 					console.error('[App] Knowledge regeneration failed:', iterationId, error);
+424: 					message.error('Knowledge generation failed: ' + error);
+425: 				}),
+426: 			];
+427: 
+428: 			
+429: 			await Promise.all(listenerPromises);
+430: 
+431: 			
+432: 			try {
+433: 				const hasOpenProject = await API.workspace.hasOpen();
+434: 				if (hasOpenProject) {
+435: 					await projectActions.loadProject();
+436: 					uiState.setActiveView('iterations');
+437: 				}
+438: 			} catch (error) {
+439: 				console.error('[App] Failed to check for open project:', error);
+440: 			}
+441: 		};
+442: 
+443: 		setupListeners();
+444: 
+445: 		
+446: 		const handleKeyDown = (e: KeyboardEvent) => {
+447: 			if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+448: 				e.preventDefault();
+449: 				uiState.setCommandPaletteVisible(!uiState.commandPaletteVisible);
+450: 			}
+451: 		};
+452: 
+453: 		window.addEventListener('keydown', handleKeyDown);
+454: 		return () => window.removeEventListener('keydown', handleKeyDown);
+455: 	}, []);
+456: 
+457: 	return {
+458: 		
+459: 	};
+460: }
 ```
 
 ### crates/cowork-core/src/lib.rs (109 lines)
@@ -3406,467 +3871,6 @@ LICENSE
 22:   onToggleThinking: (index: number) => void;
 23:   onActionClick?: (action: PMAction) => void;
 24: }
-```
-
-### crates/cowork-gui/src/hooks/useAppEvents.ts (456 lines)
-
-```
-1: function useAppEvents(userInput: string, setUserInput: (input: string) => void) {
-2: 	const { message } = AntApp.useApp();
-3: 	const listenersRegistered = useRef(false);
-4: 
-5: 	
-6: 	const projectActions = useProjectStore(
-7: 		useShallow(s => ({
-8: 			loadProject: s.loadProject,
-9: 			loadIterations: s.loadIterations,
-10: 			setCurrentIteration: s.setCurrentIteration,
-11: 			updateCurrentIterationStatus: s.updateCurrentIterationStatus,
-12: 			setIsExecuting: s.setIsExecuting,
-13: 		}))
-14: 	);
-15: 
-16: 	
-17: 	const agentActions = useAgentStore(
-18: 		useShallow(s => ({
-19: 			setMessages: s.setMessages,
-20: 			clearMessages: s.clearMessages,
-21: 			setPMMessages: s.setPMMessages,
-22: 			clearPMMessages: s.clearPMMessages,
-23: 			setProcessing: s.setProcessing,
-24: 			setCurrentAgent: s.setCurrentAgent,
-25: 			setCurrentStage: s.setCurrentStage,
-26: 			setInputRequest: s.setInputRequest,
-27: 			setPmProcessing: s.setPmProcessing,
-28: 			submitInput: s.submitInput,
-29: 			loadPMWelcomeMessage: s.loadPMWelcomeMessage,
-30: 			appendLastMessageContent: s.appendLastMessageContent,
-31: 			appendLastPMMessageContent: s.appendLastPMMessageContent,
-32: 			addMessage: s.addMessage,
-33: 		}))
-34: 	);
-35: 
-36: 	
-37: 	const uiState = useUIStore(
-38: 		useShallow(s => ({
-39: 			commandPaletteVisible: s.commandPaletteVisible,
-40: 			setActiveView: s.setActiveView,
-41: 			setCommandPaletteVisible: s.setCommandPaletteVisible,
-42: 			setActiveArtifactTab: s.setActiveArtifactTab,
-43: 			triggerArtifactsRefresh: s.triggerArtifactsRefresh,
-44: 			triggerCodeRefresh: s.triggerCodeRefresh,
-45: 			triggerMemoryRefresh: s.triggerMemoryRefresh,
-46: 			triggerKnowledgeRefresh: s.triggerKnowledgeRefresh,
-47: 		}))
-48: 	);
-49: 
-50: 	useEffect(() => {
-51: 		const setupListeners = async () => {
-52: 			if (listenersRegistered.current) return;
-53: 			listenersRegistered.current = true;
-54: 
-55: 			
-56: 			
-57: 			let pipelineBuffer = '';
-58: 			let pipelineLastMeta: { isLast?: boolean; agentName?: string; msgType?: string } | null = null;
-59: 			let pipelineRafId: number | null = null;
-60: 			
-61: 			let pmBuffer = '';
-62: 			let pmLastMeta: { isLast?: boolean } | null = null;
-63: 			let pmRafId: number | null = null;
-64: 
-65: 			const flushPipeline = () => {
-66: 				pipelineRafId = null;
-67: 				if (!pipelineBuffer) {
-68: 					
-69: 					if (pipelineLastMeta?.isLast && pipelineLastMeta.agentName) {
-70: 						
-71: 						agentActions.appendLastMessageContent('', { isLast: true, agentName: pipelineLastMeta.agentName, msgType: pipelineLastMeta.msgType });
-72: 					}
-73: 					pipelineLastMeta = null;
-74: 					return;
-75: 				}
-76: 				agentActions.appendLastMessageContent(pipelineBuffer, {
-77: 					isLast: pipelineLastMeta?.isLast,
-78: 					agentName: pipelineLastMeta?.agentName,
-79: 					msgType: pipelineLastMeta?.msgType,
-80: 				});
-81: 				pipelineBuffer = '';
-82: 				pipelineLastMeta = null;
-83: 			};
-84: 
-85: 			const flushPM = () => {
-86: 				pmRafId = null;
-87: 				if (!pmBuffer) {
-88: 					if (pmLastMeta?.isLast) {
-89: 						agentActions.appendLastPMMessageContent('', { isLast: true });
-90: 					}
-91: 					pmLastMeta = null;
-92: 					return;
-93: 				}
-94: 				agentActions.appendLastPMMessageContent(pmBuffer, { isLast: pmLastMeta?.isLast });
-95: 				pmBuffer = '';
-96: 				pmLastMeta = null;
-97: 			};
-98: 
-99: 			const schedulePipelineFlush = () => {
-100: 				if (pipelineRafId == null) {
-101: 					pipelineRafId = requestAnimationFrame(flushPipeline);
-102: 				}
-103: 			};
-104: 			const schedulePMFlush = () => {
-105: 				if (pmRafId == null) {
-106: 					pmRafId = requestAnimationFrame(flushPM);
-107: 				}
-108: 			};
-109: 
-110: 			
-111: 			const listenerPromises = [
-112: 				
-113: 				listen('iteration_created', () => {
-114: 					projectActions.loadProject();
-115: 					message.success('Iteration created');
-116: 				}),
-117: 
-118: 				listen('iteration_started', () => {
-119: 					agentActions.setProcessing(true);
-120: 					projectActions.setIsExecuting(true);
-121: 					projectActions.updateCurrentIterationStatus('Running');
-122: 					uiState.setActiveView('chat');
-123: 					message.info('Iteration started');
-124: 				}),
-125: 
-126: 				listen('iteration_continued', () => {
-127: 					agentActions.setProcessing(true);
-128: 					projectActions.setIsExecuting(true);
-129: 					projectActions.updateCurrentIterationStatus('Running');
-130: 					uiState.setActiveView('chat');
-131: 					message.info('Iteration continued');
-132: 				}),
-133: 
-134: 				listen('iteration_retrying', () => {
-135: 					agentActions.setProcessing(true);
-136: 					projectActions.setIsExecuting(true);
-137: 					projectActions.updateCurrentIterationStatus('Running');
-138: 					uiState.setActiveView('chat');
-139: 					message.info('Retrying iteration...');
-140: 				}),
-141: 
-142: 				listen('iteration_completed', (event) => {
-143: 					const iterationId = event.payload as string;
-144: 					agentActions.setProcessing(false);
-145: 					projectActions.setIsExecuting(false);
-146: 					agentActions.setCurrentAgent(null);
-147: 					agentActions.setCurrentStage(null);
-148: 					agentActions.setInputRequest(null);
-149: 					projectActions.updateCurrentIterationStatus('Completed');
-150: 					projectActions.loadProject();
-151: 					uiState.triggerMemoryRefresh();
-152: 					uiState.triggerKnowledgeRefresh();
-153: 					agentActions.clearPMMessages();
-154: 					uiState.setActiveView('chat');
-155: 					agentActions.loadPMWelcomeMessage(iterationId);
-156: 					message.success('Iteration completed');
-157: 				}),
-158: 
-159: 				listen('iteration_failed', (event) => {
-160: 					const [, error] = event.payload as [string, string];
-161: 					agentActions.setProcessing(false);
-162: 					projectActions.setIsExecuting(false);
-163: 					agentActions.setCurrentAgent(null);
-164: 					agentActions.setCurrentStage(null);
-165: 					agentActions.setInputRequest(null);
-166: 					projectActions.updateCurrentIterationStatus('Failed');
-167: 					projectActions.loadProject();
-168: 					message.error('Iteration failed: ' + error);
-169: 				}),
-170: 
-171: 				
-172: 				listen('agent_event', (event) => {
-173: 					const { content, agent_name, message_type, stage_name, level } = event.payload as {
-174: 						content?: string;
-175: 						agent_name?: string;
-176: 						message_type?: string;
-177: 						stage_name?: string;
-178: 						level?: string;
-179: 					};
-180: 
-181: 					if (agent_name) agentActions.setCurrentAgent(agent_name);
-182: 					if (stage_name) agentActions.setCurrentStage(stage_name);
-183: 					if (!content) return;
-184: 
-185: 					
-186: 					agentActions.setMessages((prev) => {
-187: 						const lastMsg = prev[prev.length - 1];
-188: 						const isThinking = message_type === 'thinking';
-189: 
-190: 						if (isThinking) {
-191: 							if (
-192: 								lastMsg?.type === 'thinking' &&
-193: 								(lastMsg as ThinkingMessage).isStreaming &&
-194: 								(lastMsg as ThinkingMessage).agentName === agent_name
-195: 							) {
-196: 								return [
-197: 									...prev.slice(0, -1),
-198: 									{
-199: 										...lastMsg,
-200: 										content: (lastMsg as ThinkingMessage).content + content
-201: 									} as ChatMessage
-202: 								];
-203: 							}
-204: 							return [
-205: 								...prev,
-206: 								{
-207: 									type: 'thinking',
-208: 									content,
-209: 									agentName: agent_name || 'AI Agent',
-210: 									stageName: stage_name,
-211: 									isStreaming: true,
-212: 									isExpanded: false,
-213: 									timestamp: new Date().toISOString()
-214: 								} as ThinkingMessage
-215: 							] as ChatMessage[];
-216: 						} else {
-217: 							if (
-218: 								lastMsg?.type === 'agent' &&
-219: 								(lastMsg as { isStreaming?: boolean }).isStreaming &&
-220: 								(lastMsg as { agentName?: string }).agentName === agent_name
-221: 							) {
-222: 								return [
-223: 									...prev.slice(0, -1),
-224: 									{
-225: 										...lastMsg,
-226: 										content: (lastMsg as { content: string }).content + content
-227: 									} as ChatMessage
-228: 								];
-229: 							}
-230: 							return [
-231: 								...prev,
-232: 								{
-233: 									type: 'agent',
-234: 									content,
-235: 									agentName: agent_name || 'AI Agent',
-236: 									stageName: stage_name,
-237: 									level,
-238: 									isStreaming: true,
-239: 									timestamp: new Date().toISOString()
-240: 								} as ChatMessage
-241: 							] as ChatMessage[];
-242: 						}
-243: 					});
-244: 				}),
-245: 
-246: 				
-247: 				listen('agent_streaming', (event) => {
-248: 					const { content, agent_name, is_thinking, is_first, is_last } = event.payload as {
-249: 						content?: string;
-250: 						agent_name?: string;
-251: 						is_thinking?: boolean;
-252: 						is_first?: boolean;
-253: 						is_last?: boolean;
-254: 					};
-255: 
-256: 					
-257: 					if (agent_name === 'PM Agent') {
-258: 						if (is_last && !content) {
-259: 							
-260: 							agentActions.setPMMessages((prev) => {
-261: 								const lastMsg = prev[prev.length - 1];
-262: 								if (lastMsg?.type === 'pm_agent') {
-263: 									return [...prev.slice(0, -1), { ...lastMsg } as PMAgentMessage];
-264: 								}
-265: 								return prev;
-266: 							});
-267: 							agentActions.setPmProcessing(false);
-268: 							return;
-269: 						}
-270: 
-271: 						if (!content) return;
-272: 
-273: 						
-274: 						if (is_first && pmBuffer) {
-275: 							flushPM();
-276: 						}
-277: 
-278: 						pmBuffer += content;
-279: 						pmLastMeta = { isLast: is_last };
-280: 						schedulePMFlush();
-281: 						return;
-282: 					}
-283: 
-284: 					
-285: 					if (!content) return;
-286: 					const msgType = is_thinking ? 'thinking' : 'agent';
-287: 
-288: 					
-289: 					if (is_first && pipelineBuffer) {
-290: 						flushPipeline();
-291: 					}
-292: 
-293: 					pipelineBuffer += content;
-294: 					pipelineLastMeta = { isLast: is_last, agentName: agent_name, msgType };
-295: 					schedulePipelineFlush();
-296: 				}),
-297: 
-298: 				
-299: 				listen('tool_call', (event) => {
-300: 					const { tool_name, arguments: args, agent_name } = event.payload as {
-301: 						tool_name: string;
-302: 						arguments: Record<string, unknown>;
-303: 						agent_name?: string;
-304: 					};
-305: 					
-306: 					if (pipelineBuffer) flushPipeline();
-307: 					agentActions.addMessage({
-308: 						type: 'tool_call',
-309: 						toolName: tool_name,
-310: 						arguments: args,
-311: 						agentName: agent_name || 'AI Agent',
-312: 						timestamp: new Date().toISOString()
-313: 					} as ChatMessage);
-314: 				}),
-315: 
-316: 				listen('tool_result', (event) => {
-317: 					const { tool_name, result, success, agent_name } = event.payload as {
-318: 						tool_name: string;
-319: 						result: string;
-320: 						success: boolean;
-321: 						agent_name?: string;
-322: 					};
-323: 					if (pipelineBuffer) flushPipeline();
-324: 					agentActions.addMessage({
-325: 						type: 'tool_result',
-326: 						toolName: tool_name,
-327: 						result,
-328: 						success,
-329: 						agentName: agent_name || 'AI Agent',
-330: 						timestamp: new Date().toISOString()
-331: 					} as ChatMessage);
-332: 				}),
-333: 
-334: 				
-335: 				listen('pm_actions', (event) => {
-336: 					const { actions } = event.payload as { actions: PMAction[] };
-337: 					agentActions.setPMMessages((prev) => {
-338: 						const lastMsg = prev[prev.length - 1];
-339: 						if (lastMsg?.type === 'pm_agent') {
-340: 							return [
-341: 								...prev.slice(0, -1),
-342: 								{
-343: 									...lastMsg,
-344: 									actions: [...((lastMsg as PMAgentMessage).actions || []), ...actions]
-345: 								} as PMAgentMessage
-346: 							];
-347: 						}
-348: 						return prev;
-349: 					});
-350: 				}),
-351: 
-352: 				
-353: 				listen('input_request', async (event) => {
-354: 					const [requestId, prompt, options] = event.payload as [string, string, InputOption[]];
-355: 					projectActions.updateCurrentIterationStatus('Paused');
-356: 
-357: 					const artifactMatch = prompt.match(/\[ARTIFACT_TYPE:(\w+)\]$/);
-358: 					if (artifactMatch) {
-359: 						const artifactType = artifactMatch[1];
-360: 						const cleanPrompt = prompt.replace(/\[ARTIFACT_TYPE:\w+\]$/, '').trim();
-361: 
-362: 						
-363: 						try {
-364: 							await projectActions.loadIterations();
-365: 							const latestIterations = useProjectStore.getState().iterations;
-366: 							if (latestIterations && latestIterations.length > 0) {
-367: 								const latestIteration = latestIterations[latestIterations.length - 1];
-368: 								const fullIteration = await API.iteration.get(latestIteration.id);
-369: 								projectActions.setCurrentIteration(fullIteration);
-370: 							}
-371: 						} catch (err) {
-372: 							console.error('[App] Failed to refresh iteration before confirmation:', err);
-373: 						}
-374: 
-375: 						agentActions.setInputRequest({
-376: 							requestId,
-377: 							prompt: cleanPrompt,
-378: 							options,
-379: 							isArtifactConfirmation: true,
-380: 							artifactType
-381: 						});
-382: 					} else {
-383: 						agentActions.setInputRequest({ requestId, prompt, options });
-384: 					}
-385: 					setUserInput('');
-386: 				}),
-387: 
-388: 				
-389: 				listen('project_loaded', async () => {
-390: 					agentActions.setProcessing(false);
-391: 					agentActions.setCurrentAgent(null);
-392: 					agentActions.setInputRequest(null);
-393: 					agentActions.clearMessages();
-394: 					projectActions.setCurrentIteration(null);
-395: 					await projectActions.loadProject();
-396: 					uiState.setActiveView('iterations');
-397: 					message.success('Project loaded');
-398: 				}),
-399: 
-400: 				listen('project_initialized', async () => {
-401: 					agentActions.setProcessing(false);
-402: 					agentActions.setCurrentAgent(null);
-403: 					agentActions.setInputRequest(null);
-404: 					agentActions.clearMessages();
-405: 					projectActions.setCurrentIteration(null);
-406: 					await projectActions.loadProject();
-407: 					uiState.setActiveView('iterations');
-408: 					message.success('Project initialized');
-409: 				}),
-410: 
-411: 				
-412: 				listen('knowledge_regeneration_completed', () => {
-413: 					uiState.triggerKnowledgeRefresh();
-414: 					message.success('Knowledge updated');
-415: 				}),
-416: 
-417: 				listen<[string, string]>('knowledge_regeneration_failed', (event) => {
-418: 					const [iterationId, error] = event.payload;
-419: 					console.error('[App] Knowledge regeneration failed:', iterationId, error);
-420: 					message.error('Knowledge generation failed: ' + error);
-421: 				}),
-422: 			];
-423: 
-424: 			
-425: 			await Promise.all(listenerPromises);
-426: 
-427: 			
-428: 			try {
-429: 				const hasOpenProject = await API.workspace.hasOpen();
-430: 				if (hasOpenProject) {
-431: 					await projectActions.loadProject();
-432: 					uiState.setActiveView('iterations');
-433: 				}
-434: 			} catch (error) {
-435: 				console.error('[App] Failed to check for open project:', error);
-436: 			}
-437: 		};
-438: 
-439: 		setupListeners();
-440: 
-441: 		
-442: 		const handleKeyDown = (e: KeyboardEvent) => {
-443: 			if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-444: 				e.preventDefault();
-445: 				uiState.setCommandPaletteVisible(!uiState.commandPaletteVisible);
-446: 			}
-447: 		};
-448: 
-449: 		window.addEventListener('keydown', handleKeyDown);
-450: 		return () => window.removeEventListener('keydown', handleKeyDown);
-451: 	}, []);
-452: 
-453: 	return {
-454: 		
-455: 	};
-456: }
 ```
 
 ### litho.docs/en/1.Overview.md (296 lines)
@@ -4419,6 +4423,98 @@ LICENSE
 88:         }))
 89:     }
 90: }
+```
+
+### crates/cowork-gui/src/components/ArtifactsViewer.tsx (34 lines)
+
+```
+1: ArtifactsData
+2: ⋮----
+3: {
+4:   iteration_id?: string;
+5:   idea?: string;
+6:   requirements?: string;
+7:   design?: unknown;
+8:   design_raw?: string;
+9:   plan?: unknown;
+10:   plan_raw?: string;
+11:   code_files?: FileInfo[];
+12:   check_report?: string;
+13:   delivery_report?: string;
+14: }
+15: ⋮----
+16: FileInfo
+17: ⋮----
+18: {
+19:   path: string;
+20:   name: string;
+21:   size: number;
+22:   is_dir: boolean;
+23:   language?: string;
+24:   modified_at?: string;
+25: }
+26: ⋮----
+27: ArtifactsViewerProps
+28: ⋮----
+29: {
+30:   iterationId: string;
+31:   activeTab?: string;
+32:   onTabChange?: (key: string) => void;
+33:   refreshTrigger?: number;
+34: }
+```
+
+### crates/cowork-gui/src/components/MemoryPanel.tsx (48 lines)
+
+```
+1: Memory
+2: ⋮----
+3: {
+4:   id: string;
+5:   title: string;
+6:   summary: string;
+7:   category: string;
+8:   stage?: string;
+9:   created_at: string;
+10:   impact?: string;
+11:   tags?: string[];
+12:   file?: string;
+13:   _ts?: number;
+14: }
+15: ⋮----
+16: MemoryDetail
+17: ⋮----
+18: {
+19:   content: string;
+20: }
+21: ⋮----
+22: MemoryQueryResult
+23: ⋮----
+24: {
+25:   results: Memory[];
+26:   total: number;
+27: }
+28: ⋮----
+29: MemoryPanelProps
+30: ⋮----
+31: {
+32:   currentSession?: string;
+33:   refreshTrigger?: number;
+34: }
+35: ⋮----
+36: getCategoryColor
+37: ⋮----
+38: (memory.category)
+39: ⋮----
+40: getCategoryColor
+41: ⋮----
+42: (
+43:                               selectedMemory?.category || "",
+44:                             )
+45: ⋮----
+46: getImpactColor
+47: ⋮----
+48: (selectedMemory.impact)
 ```
 
 ### crates/cowork-gui/src/components/common/MarkdownMessage.tsx (7 lines)
@@ -6881,96 +6977,489 @@ LICENSE
 324: }
 ```
 
-### crates/cowork-gui/src/components/ArtifactsViewer.tsx (34 lines)
+### crates/cowork-gui/package.json (43 lines)
 
 ```
-1: ArtifactsData
-2: ⋮----
-3: {
-4:   iteration_id?: string;
-5:   idea?: string;
-6:   requirements?: string;
-7:   design?: unknown;
-8:   design_raw?: string;
-9:   plan?: unknown;
-10:   plan_raw?: string;
-11:   code_files?: FileInfo[];
-12:   check_report?: string;
-13:   delivery_report?: string;
-14: }
-15: ⋮----
-16: FileInfo
-17: ⋮----
-18: {
-19:   path: string;
-20:   name: string;
-21:   size: number;
-22:   is_dir: boolean;
-23:   language?: string;
-24:   modified_at?: string;
-25: }
-26: ⋮----
-27: ArtifactsViewerProps
-28: ⋮----
-29: {
-30:   iterationId: string;
-31:   activeTab?: string;
-32:   onTabChange?: (key: string) => void;
-33:   refreshTrigger?: number;
-34: }
+1: {
+2:   "name": "cowork-gui",
+3:   "private": true,
+4:   "type": "module",
+5:   "version": "2.6.0",
+6:   "scripts": {
+7:     "dev": "vite --port 15173",
+8:     "build": "tsc && vite build",
+9:     "tauri": "tauri",
+10:     "tauri:dev": "tauri dev --port 15173",
+11:     "tauri:build": "tauri build",
+12:     "typecheck": "tsc --noEmit"
+13:   },
+14:   "dependencies": {
+15:     "@ant-design/icons": "^6.3.2",
+16:     "@monaco-editor/react": "^4.7.0",
+17:     "@tauri-apps/api": "^2.11.1",
+18:     "@tauri-apps/plugin-dialog": "^2.7.1",
+19:     "antd": "^6.5.0",
+20:     "react": "^19.2.6",
+21:     "react-dom": "^19.2.6",
+22:     "react-markdown": "^10.1.0",
+23:     "react-window": "^1.8.11",
+24:     "rehype-highlight": "^7.0.2",
+25:     "rehype-raw": "^7.0.0",
+26:     "remark-gfm": "^4.0.1",
+27:     "zustand": "^5.0.14"
+28:   },
+29:   "devDependencies": {
+30:     "@babel/core": "^8.0.0",
+31:     "@rolldown/plugin-babel": "^0.2.3",
+32:     "@tauri-apps/cli": "^2.11.4",
+33:     "@types/babel__core": "^7.20.5",
+34:     "@types/node": "^20.0.0",
+35:     "@types/react": "^19.2.0",
+36:     "@types/react-dom": "^19.2.0",
+37:     "@types/react-window": "1.8.8",
+38:     "@vitejs/plugin-react": "^6.0.3",
+39:     "babel-plugin-react-compiler": "^1.0.0",
+40:     "typescript": "^5.7.0",
+41:     "vite": "^8.1.3"
+42:   }
+43: }
 ```
 
-### crates/cowork-gui/src/components/MemoryPanel.tsx (48 lines)
+### crates/cowork-gui/src/styles/chat.css (432 lines)
 
 ```
-1: Memory
-2: ⋮----
-3: {
-4:   id: string;
-5:   title: string;
-6:   summary: string;
-7:   category: string;
-8:   stage?: string;
-9:   created_at: string;
-10:   impact?: string;
-11:   tags?: string[];
-12:   file?: string;
-13:   _ts?: number;
-14: }
-15: ⋮----
-16: MemoryDetail
-17: ⋮----
-18: {
-19:   content: string;
-20: }
-21: ⋮----
-22: MemoryQueryResult
-23: ⋮----
-24: {
-25:   results: Memory[];
-26:   total: number;
+1: .chat-messages {
+2:   overflow-y: auto;
+3:   padding: 0;
+4:   flex: 1;
+5:   display: flex;
+6:   flex-direction: column;
+7: }
+8: 
+9: 
+10: .chat-msg-row {
+11:   padding: 16px 24px;
+12:   animation: msgFadeIn 0.25s ease-out;
+13: }
+14: 
+15: .chat-msg-row + .chat-msg-row {
+16:   border-top: 1px solid var(--border-light);
+17: }
+18: 
+19: @keyframes msgFadeIn {
+20:   from { opacity: 0; transform: translateY(6px); }
+21:   to { opacity: 1; transform: translateY(0); }
+22: }
+23: 
+24: 
+25: .chat-msg-agent {
+26:   background: var(--bg-base);
 27: }
-28: ⋮----
-29: MemoryPanelProps
-30: ⋮----
-31: {
-32:   currentSession?: string;
-33:   refreshTrigger?: number;
+28: 
+29: .chat-msg-agent .chat-msg-header {
+30:   display: flex;
+31:   align-items: center;
+32:   gap: 8px;
+33:   margin-bottom: 8px;
 34: }
-35: ⋮----
-36: getCategoryColor
-37: ⋮----
-38: (memory.category)
-39: ⋮----
-40: getCategoryColor
-41: ⋮----
-42: (
-43:                               selectedMemory?.category || "",
-44:                             )
-45: ⋮----
-46: getImpactColor
-47: ⋮----
-48: (selectedMemory.impact)
+35: 
+36: .chat-msg-agent .chat-agent-avatar {
+37:   width: 24px;
+38:   height: 24px;
+39:   border-radius: 3px;
+40:   object-fit: cover;
+41:   flex-shrink: 0;
+42: }
+43: 
+44: .chat-msg-agent .chat-agent-name {
+45:   font-size: 13px;
+46:   font-weight: 600;
+47:   color: var(--text-primary);
+48: }
+49: 
+50: .chat-msg-agent .chat-agent-stage {
+51:   font-size: 11px;
+52:   color: var(--text-tertiary);
+53:   background: var(--bg-elevated);
+54:   padding: 1px 8px;
+55:   border-radius: 2px;
+56: }
+57: 
+58: 
+59: .chat-msg-user {
+60:   background: var(--primary-lighter);
+61: }
+62: 
+63: .chat-msg-user .chat-msg-content {
+64:   display: flex;
+65:   justify-content: flex-end;
+66: }
+67: 
+68: .chat-msg-user .chat-user-bubble {
+69:   background: var(--primary);
+70:   color: #fff;
+71:   padding: 10px 16px;
+72:   border-radius: 12px 12px 4px 12px;
+73:   max-width: 75%;
+74:   word-break: break-word;
+75:   line-height: 1.6;
+76:   font-size: 14px;
+77:   box-shadow: 0 1px 4px rgba(37, 99, 235, 0.15);
+78: }
+79: 
+80: 
+81: .chat-msg-thinking {
+82:   background: var(--bg-container);
+83: }
+84: 
+85: .chat-msg-thinking .chat-thinking-toggle {
+86:   display: flex;
+87:   align-items: center;
+88:   gap: 8px;
+89:   cursor: pointer;
+90:   user-select: none;
+91:   font-size: 13px;
+92:   color: var(--text-tertiary);
+93:   padding: 4px 0;
+94:   transition: color 0.15s;
+95: }
+96: 
+97: .chat-msg-thinking .chat-thinking-toggle:hover {
+98:   color: var(--text-secondary);
+99: }
+100: 
+101: .chat-msg-thinking .chat-agent-avatar {
+102:   width: 24px;
+103:   height: 24px;
+104:   border-radius: 3px;
+105:   object-fit: cover;
+106:   flex-shrink: 0;
+107:   opacity: 0.7;
+108: }
+109: 
+110: .chat-msg-thinking .chat-thinking-label {
+111:   font-style: italic;
+112: }
+113: 
+114: .chat-msg-thinking .chat-thinking-chevron {
+115:   font-size: 10px;
+116:   transition: transform 0.2s;
+117:   margin-left: auto;
+118: }
+119: 
+120: .chat-msg-thinking.chat-thinking-expanded .chat-thinking-chevron {
+121:   transform: rotate(90deg);
+122: }
+123: 
+124: .chat-msg-thinking .chat-thinking-body {
+125:   margin-top: 8px;
+126:   padding: 10px 14px;
+127:   background: var(--bg-elevated);
+128:   border-radius: 4px;
+129:   border: 1px solid var(--border-light);
+130:   font-size: 13px;
+131:   line-height: 1.6;
+132:   color: var(--text-secondary);
+133:   font-style: italic;
+134:   white-space: pre-wrap;
+135:   word-break: break-word;
+136:   max-height: 200px;
+137:   overflow-y: auto;
+138: }
+139: 
+140: 
+141: .chat-msg-tool-call {
+142:   background: var(--bg-base);
+143:   padding: 12px 24px !important;
+144: }
+145: 
+146: .chat-msg-tool-call .chat-tool-bar {
+147:   display: flex;
+148:   align-items: center;
+149:   gap: 8px;
+150:   font-size: 13px;
+151: }
+152: 
+153: .chat-msg-tool-call .chat-tool-icon {
+154:   width: 20px;
+155:   height: 20px;
+156:   border-radius: 2px;
+157:   background: var(--warning-light);
+158:   display: flex;
+159:   align-items: center;
+160:   justify-content: center;
+161:   font-size: 11px;
+162:   flex-shrink: 0;
+163: }
+164: 
+165: .chat-msg-tool-call .chat-tool-name {
+166:   font-weight: 500;
+167:   color: var(--text-primary);
+168:   font-family: 'JetBrains Mono', 'Consolas', monospace;
+169:   font-size: 12px;
+170: }
+171: 
+172: .chat-msg-tool-call .chat-tool-args {
+173:   margin-top: 6px;
+174:   padding: 8px 12px;
+175:   background: var(--bg-elevated);
+176:   border-radius: 3px;
+177:   font-family: 'JetBrains Mono', 'Consolas', monospace;
+178:   font-size: 12px;
+179:   color: var(--text-secondary);
+180:   overflow-x: auto;
+181:   max-height: 80px;
+182:   overflow-y: auto;
+183:   line-height: 1.5;
+184: }
+185: 
+186: 
+187: .chat-msg-tool-result {
+188:   background: var(--bg-base);
+189:   padding: 8px 24px !important;
+190: }
+191: 
+192: .chat-msg-tool-result .chat-tool-result-bar {
+193:   display: flex;
+194:   align-items: center;
+195:   gap: 6px;
+196:   font-size: 12px;
+197:   color: var(--text-tertiary);
+198: }
+199: 
+200: .chat-msg-tool-result .chat-tool-result-icon {
+201:   font-size: 13px;
+202: }
+203: 
+204: .chat-msg-tool-result.chat-tool-success .chat-tool-result-icon {
+205:   color: var(--success);
+206: }
+207: 
+208: .chat-msg-tool-result.chat-tool-fail .chat-tool-result-icon {
+209:   color: var(--error);
+210: }
+211: 
+212: .chat-msg-tool-result .chat-tool-result-name {
+213:   font-family: 'JetBrains Mono', 'Consolas', monospace;
+214:   font-size: 11px;
+215:   color: var(--text-tertiary);
+216: }
+217: 
+218: 
+219: .chat-msg-pm-agent {
+220:   background: var(--bg-base);
+221: }
+222: 
+223: .chat-msg-pm-agent .chat-pm-header {
+224:   display: flex;
+225:   align-items: center;
+226:   gap: 8px;
+227:   margin-bottom: 8px;
+228: }
+229: 
+230: .chat-msg-pm-agent .chat-agent-avatar {
+231:   width: 24px;
+232:   height: 24px;
+233:   border-radius: 3px;
+234:   object-fit: cover;
+235:   flex-shrink: 0;
+236: }
+237: 
+238: .chat-msg-pm-agent .chat-pm-name {
+239:   font-size: 13px;
+240:   font-weight: 600;
+241:   color: var(--success);
+242: }
+243: 
+244: .chat-msg-pm-agent .chat-pm-actions {
+245:   display: flex;
+246:   flex-wrap: wrap;
+247:   gap: 8px;
+248:   margin-top: 12px;
+249: }
+250: 
+251: .chat-msg-pm-agent .chat-pm-action {
+252:   cursor: pointer;
+253:   padding: 5px 12px;
+254:   border-radius: 3px;
+255:   display: inline-flex;
+256:   align-items: center;
+257:   gap: 6px;
+258:   font-size: 12px;
+259:   font-weight: 500;
+260:   border: 1px solid var(--border-color);
+261:   background: var(--bg-container);
+262:   color: var(--text-secondary);
+263:   transition: all 0.15s ease;
+264: }
+265: 
+266: .chat-msg-pm-agent .chat-pm-action:hover {
+267:   border-color: var(--primary);
+268:   color: var(--primary);
+269:   background: var(--primary-lighter);
+270:   box-shadow: 0 1px 4px rgba(37, 99, 235, 0.1);
+271: }
+272: 
+273: 
+274: .chat-processing-bar {
+275:   padding: 12px 24px;
+276:   background: var(--primary-lighter);
+277:   border-bottom: 1px solid var(--primary-light);
+278:   display: flex;
+279:   align-items: center;
+280:   gap: 10px;
+281:   font-size: 13px;
+282:   color: var(--primary);
+283:   font-weight: 500;
+284: }
+285: 
+286: .chat-processing-bar .chat-processing-stage {
+287:   font-size: 11px;
+288:   color: var(--text-secondary);
+289:   font-weight: 400;
+290: }
+291: 
+292: 
+293: .chat-msg-error {
+294:   background: var(--error-light);
+295: }
+296: 
+297: .chat-msg-error .chat-error-content {
+298:   color: var(--error);
+299:   font-size: 13px;
+300:   line-height: 1.5;
+301: }
+302: 
+303: 
+304: .chat-header {
+305:   padding: 16px 24px;
+306:   border-bottom: 1px solid var(--border-color);
+307:   background: var(--bg-base);
+308: }
+309: 
+310: .chat-header-title {
+311:   font-size: 15px;
+312:   font-weight: 600;
+313:   color: var(--text-primary);
+314:   margin: 0;
+315: }
+316: 
+317: .chat-header-desc {
+318:   font-size: 12px;
+319:   color: var(--text-tertiary);
+320:   margin: 4px 0 0 0;
+321:   display: -webkit-box;
+322:   -webkit-line-clamp: 2;
+323:   -webkit-box-orient: vertical;
+324:   overflow: hidden;
+325:   text-overflow: ellipsis;
+326:   line-height: 1.4;
+327: }
+328: 
+329: 
+330: .chat-input-wrapper {
+331:   padding: 16px 24px;
+332:   background: var(--bg-base);
+333:   border-top: 1px solid var(--border-color);
+334: }
+335: 
+336: 
+337: .chat-input-request {
+338:   padding: 16px;
+339:   background: var(--primary-lighter);
+340:   border: 1px solid var(--primary-light);
+341:   border-radius: 10px;
+342:   margin-bottom: 16px;
+343: }
+344: 
+345: .chat-input-request-title {
+346:   font-size: 14px;
+347:   font-weight: 600;
+348:   color: var(--primary);
+349:   margin-bottom: 8px;
+350: }
+351: 
+352: .chat-input-request-prompt {
+353:   font-size: 13px;
+354:   color: var(--text-secondary);
+355:   margin-bottom: 12px;
+356:   line-height: 1.5;
+357: }
+358: 
+359: 
+360: .chat-empty-state {
+361:   display: flex;
+362:   flex-direction: column;
+363:   align-items: center;
+364:   justify-content: center;
+365:   height: 100%;
+366:   color: var(--text-tertiary);
+367:   text-align: center;
+368:   padding: 40px;
+369: }
+370: 
+371: .chat-empty-state h3 {
+372:   font-size: 16px;
+373:   color: var(--text-secondary);
+374:   margin: 16px 0 8px;
+375:   font-weight: 500;
+376: }
+377: 
+378: .chat-empty-state p {
+379:   font-size: 13px;
+380:   line-height: 1.6;
+381:   max-width: 400px;
+382: }
+383: 
+384: 
+385: .chat-pm-welcome {
+386:   display: flex;
+387:   flex-direction: column;
+388:   align-items: center;
+389:   justify-content: center;
+390:   padding: 48px 24px;
+391:   text-align: center;
+392: }
+393: 
+394: .chat-pm-welcome-icon {
+395:   font-size: 40px;
+396:   margin-bottom: 16px;
+397: }
+398: 
+399: .chat-pm-welcome h3 {
+400:   font-size: 18px;
+401:   color: var(--text-primary);
+402:   margin: 0 0 8px;
+403:   font-weight: 600;
+404: }
+405: 
+406: .chat-pm-welcome p {
+407:   font-size: 13px;
+408:   color: var(--text-secondary);
+409:   line-height: 1.6;
+410:   max-width: 400px;
+411:   margin: 0;
+412: }
+413: 
+414: .chat-pm-welcome ul {
+415:   list-style: none;
+416:   padding: 0;
+417:   margin: 16px 0 0;
+418:   text-align: left;
+419: }
+420: 
+421: .chat-pm-welcome li {
+422:   font-size: 13px;
+423:   color: var(--text-secondary);
+424:   padding: 4px 0;
+425: }
+426: 
+427: .chat-pm-welcome li::before {
+428:   content: '·';
+429:   margin-right: 8px;
+430:   color: var(--primary);
+431:   font-weight: bold;
+432: }
 ```
 
 ### crates/cowork-gui/src-tauri/Cargo.toml (50 lines)
@@ -13073,55 +13562,6 @@ LICENSE
 167:     )
 ```
 
-### crates/cowork-gui/package.json (44 lines)
-
-```
-1: {
-2:   "name": "cowork-gui",
-3:   "private": true,
-4:   "type": "module",
-5:   "version": "2.6.0",
-6:   "scripts": {
-7:     "dev": "vite --port 15173",
-8:     "build": "tsc && vite build",
-9:     "tauri": "tauri",
-10:     "tauri:dev": "tauri dev --port 15173",
-11:     "tauri:build": "tauri build",
-12:     "typecheck": "tsc --noEmit"
-13:   },
-14:   "dependencies": {
-15:     "@ant-design/icons": "^6.3.2",
-16:     "@monaco-editor/react": "^4.7.0",
-17:     "@tauri-apps/api": "^2.11.1",
-18:     "@tauri-apps/plugin-dialog": "^2.7.1",
-19:     "antd": "^6.5.0",
-20:     "react": "^19.2.6",
-21:     "react-dom": "^19.2.6",
-22:     "react-json-view": "^1.21.3",
-23:     "react-markdown": "^10.1.0",
-24:     "react-window": "^1.8.11",
-25:     "rehype-highlight": "^7.0.2",
-26:     "rehype-raw": "^7.0.0",
-27:     "remark-gfm": "^4.0.1",
-28:     "zustand": "^5.0.14"
-29:   },
-30:   "devDependencies": {
-31:     "@babel/core": "^8.0.0",
-32:     "@rolldown/plugin-babel": "^0.2.3",
-33:     "@tauri-apps/cli": "^2.11.4",
-34:     "@types/babel__core": "^7.20.5",
-35:     "@types/node": "^20.0.0",
-36:     "@types/react": "^19.2.0",
-37:     "@types/react-dom": "^19.2.0",
-38:     "@types/react-window": "1.8.8",
-39:     "@vitejs/plugin-react": "^6.0.3",
-40:     "babel-plugin-react-compiler": "^1.0.0",
-41:     "typescript": "^5.7.0",
-42:     "vite": "^8.1.3"
-43:   }
-44: }
-```
-
 ### crates/cowork-gui/src/App.tsx (419 lines)
 
 ```
@@ -13544,6 +13984,97 @@ LICENSE
 417: }
 418: 
 419: export default App;
+```
+
+### crates/cowork-gui/src/components/CodeEditor.tsx (40 lines)
+
+```
+1: FileTreeNode
+2: ⋮----
+3: {
+4:   name: string;
+5:   path: string;
+6:   is_dir: boolean;
+7:   children?: FileTreeNode[];
+8:   is_expanded?: boolean;
+9:   language?: string;
+10: }
+11: ⋮----
+12: FlatFileTreeNode
+13: ⋮----
+14: {
+15:   depth: number;
+16:   key: string;
+17: }
+18: ⋮----
+19: FileReadResult
+20: ⋮----
+21: {
+22:   content: string;
+23:   is_partial: boolean;
+24:   offset: number;
+25:   total_size: number;
+26: }
+27: ⋮----
+28: FormatResult
+29: ⋮----
+30: {
+31:   success: boolean;
+32:   formatted_files: string[];
+33: }
+34: ⋮----
+35: CodeEditorProps
+36: ⋮----
+37: {
+38:   iterationId: string;
+39:   refreshTrigger?: number;
+40: }
+```
+
+### crates/cowork-gui/src/components/KnowledgePanel.tsx (41 lines)
+
+```
+1: Knowledge
+2: ⋮----
+3: {
+4:   iteration_id: string;
+5:   title: string;
+6:   idea_summary?: string;
+7:   design_summary?: string;
+8:   plan_summary?: string;
+9:   code_structure?: string;
+10:   created_at: string;
+11:   tech_stack?: string[];
+12:   key_decisions?: string[];
+13:   key_patterns?: string[];
+14:   known_issues?: string[];
+15: }
+16: ⋮----
+17: KnowledgeListResult
+18: ⋮----
+19: {
+20:   knowledge_list: Knowledge[];
+21: }
+22: ⋮----
+23: IterationInfo
+24: ⋮----
+25: {
+26:   id: string;
+27:   number: number;
+28:   title: string;
+29:   description: string;
+30:   status: string;
+31:   current_stage: string | null;
+32:   created_at: string;
+33: }
+34: ⋮----
+35: KnowledgePanelProps
+36: ⋮----
+37: {
+38:   currentSession?: string;
+39:   currentIterationId?: string | null;
+40:   refreshTrigger?: number;
+41: }
 ```
 
 ### crates/cowork-gui/src/components/ProjectsPanel.tsx (348 lines)
@@ -14719,441 +15250,716 @@ LICENSE
 98: }
 ```
 
-### crates/cowork-gui/src/styles/chat.css (432 lines)
+### crates/cowork-gui/src/stores/agentStore.ts (117 lines)
 
 ```
-1: .chat-messages {
-2:   overflow-y: auto;
-3:   padding: 0;
-4:   flex: 1;
-5:   display: flex;
-6:   flex-direction: column;
-7: }
-8: 
+1: ThinkingMessage
+2: ⋮----
+3: {
+4:   type: 'thinking';
+5:   content: string;
+6:   agentName: string;
+7:   stageName?: string;
+8:   isStreaming?: boolean;
+9:   isExpanded: boolean;
+10:   timestamp: string;
+11: }
+12: ⋮----
+13: ChatMessage
+14: ⋮----
+15: {
+16:   type: string;
+17:   content: string;
+18:   agentName?: string;
+19:   stageName?: string;
+20:   level?: string;
+21:   isStreaming?: boolean;
+22:   isExpanded?: boolean;
+23:   timestamp: string;
+24:   toolName?: string;
+25:   arguments?: Record<string, unknown>;
+26:   result?: string;
+27:   success?: boolean;
+28:   actions?: PMAction[];
+29: }
+30: ⋮----
+31: UserMessage
+32: ⋮----
+33: {
+34:   type: 'user';
+35:   content: string;
+36:   timestamp: string;
+37: }
+38: ⋮----
+39: PMAgentMessage
+40: ⋮----
+41: {
+42:   type: 'pm_agent';
+43:   content: string;
+44:   actions?: PMAction[];
+45:   timestamp: string;
+46: }
+47: ⋮----
+48: PMAction
+49: ⋮----
+50: {
+51:   action_type: 'pm_goto_stage' | 'pm_create_iteration' | 'pm_start_app' | 'pm_open_folder' | 'pm_view_knowledge' | 'pm_view_artifacts' | 'pm_view_code';
+52:   target_stage?: string;
+53:   iteration_id?: string;
+54:   title?: string;
+55:   description?: string;
+56:   label: string;
+57: }
+58: ⋮----
+59: InputRequest
+60: ⋮----
+61: {
+62:   requestId: string;
+63:   prompt: string;
+64:   options: InputOption[];
+65:   isArtifactConfirmation?: boolean;
+66:   artifactType?: string;
+67:   isFeedbackMode?: boolean;
+68:   feedbackPrompt?: string;
+69: }
+70: ⋮----
+71: InputOption
+72: ⋮----
+73: {
+74:   id: string;
+75:   label: string;
+76:   description?: string;
+77: }
+78: ⋮----
+79: ChatMode
+80: ⋮----
+81: 'disabled' | 'pipeline' | 'pm_agent'
+82: ⋮----
+83: AgentState
+84: ⋮----
+85: {
+86:   messages: ChatMessage[];
+87:   pmMessages: (UserMessage | PMAgentMessage)[];
+88:   isProcessing: boolean;
+89:   currentAgent: string | null;
+90:   currentStage: string | null;
+91:   inputRequest: InputRequest | null;
+92:   chatMode: ChatMode;
+93:   pmProcessing: boolean;
+94: 
+95:   addMessage: (message: ChatMessage) => void;
+96:   setMessages: (messages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
+97:   
+98:   appendLastMessageContent: (chunk: string, opts?: { isLast?: boolean; agentName?: string; msgType?: string }) => void;
+99:   clearMessages: () => void;
+100: 
+101:   addPMMessage: (message: UserMessage | PMAgentMessage) => void;
+102:   setPMMessages: (messages: (UserMessage | PMAgentMessage)[] | ((prev: (UserMessage | PMAgentMessage)[]) => (UserMessage | PMAgentMessage)[])) => void;
+103:   
+104:   appendLastPMMessageContent: (chunk: string, opts?: { isLast?: boolean }) => void;
+105:   clearPMMessages: () => void;
+106: 
+107:   setProcessing: (isProcessing: boolean) => void;
+108:   setCurrentAgent: (agent: string | null) => void;
+109:   setCurrentStage: (stage: string | null) => void;
+110:   setInputRequest: (request: InputRequest | null) => void;
+111:   setChatMode: (mode: ChatMode) => void;
+112:   setPmProcessing: (processing: boolean) => void;
+113: 
+114:   submitInput: (response: string, responseType: string) => Promise<void>;
+115:   sendPMMessage: (iterationId: string, message: string) => Promise<void>;
+116:   loadPMWelcomeMessage: (iterationId: string) => Promise<void>;
+117: }
+```
+
+### crates/cowork-gui/src/styles/components.css (368 lines)
+
+```
+1: .artifact-content {
+2:   padding: 24px;
+3:   background: var(--bg-container);
+4:   color: var(--text-primary);
+5:   flex: 1;
+6:   min-height: 0;
+7:   overflow: auto;
+8: }
 9: 
-10: .chat-msg-row {
-11:   padding: 16px 24px;
-12:   animation: msgFadeIn 0.25s ease-out;
-13: }
-14: 
-15: .chat-msg-row + .chat-msg-row {
-16:   border-top: 1px solid var(--border-light);
-17: }
-18: 
-19: @keyframes msgFadeIn {
-20:   from { opacity: 0; transform: translateY(6px); }
-21:   to { opacity: 1; transform: translateY(0); }
-22: }
+10: .artifact-content h3 {
+11:   color: var(--text-primary);
+12:   margin-bottom: 16px;
+13:   font-size: 18px;
+14: }
+15: 
+16: 
+17: .markdown-content {
+18:   color: var(--text-primary);
+19:   font-size: 14px;
+20:   line-height: 1.8;
+21: }
+22: 
 23: 
-24: 
-25: .chat-msg-agent {
-26:   background: var(--bg-base);
-27: }
-28: 
-29: .chat-msg-agent .chat-msg-header {
-30:   display: flex;
-31:   align-items: center;
-32:   gap: 8px;
-33:   margin-bottom: 8px;
-34: }
-35: 
-36: .chat-msg-agent .chat-agent-avatar {
-37:   width: 24px;
-38:   height: 24px;
-39:   border-radius: 6px;
-40:   object-fit: cover;
-41:   flex-shrink: 0;
+24: .markdown-content h1,
+25: .markdown-content h2,
+26: .markdown-content h3,
+27: .markdown-content h4,
+28: .markdown-content h5,
+29: .markdown-content h6 {
+30:   color: var(--text-primary);
+31:   margin-top: 28px;
+32:   margin-bottom: 12px;
+33:   font-weight: 600;
+34:   line-height: 1.35;
+35: }
+36: 
+37: .markdown-content h1 { font-size: 1.5em; }
+38: .markdown-content h2 {
+39:   font-size: 1.25em;
+40:   border-bottom: 1px solid var(--border-light);
+41:   padding-bottom: 8px;
 42: }
-43: 
-44: .chat-msg-agent .chat-agent-name {
-45:   font-size: 13px;
-46:   font-weight: 600;
-47:   color: var(--text-primary);
-48: }
-49: 
-50: .chat-msg-agent .chat-agent-stage {
-51:   font-size: 11px;
-52:   color: var(--text-tertiary);
-53:   background: var(--bg-elevated);
-54:   padding: 1px 8px;
-55:   border-radius: 4px;
-56: }
-57: 
-58: 
-59: .chat-msg-user {
-60:   background: var(--primary-lighter);
-61: }
-62: 
-63: .chat-msg-user .chat-msg-content {
-64:   display: flex;
-65:   justify-content: flex-end;
-66: }
-67: 
-68: .chat-msg-user .chat-user-bubble {
-69:   background: var(--primary);
-70:   color: #fff;
-71:   padding: 10px 16px;
-72:   border-radius: 12px 12px 4px 12px;
-73:   max-width: 75%;
-74:   word-break: break-word;
-75:   line-height: 1.6;
-76:   font-size: 14px;
-77:   box-shadow: 0 1px 4px rgba(37, 99, 235, 0.15);
-78: }
-79: 
-80: 
-81: .chat-msg-thinking {
-82:   background: var(--bg-container);
+43: .markdown-content h3 { font-size: 1.15em; }
+44: .markdown-content h4 { font-size: 1.05em; }
+45: 
+46: 
+47: .markdown-content > :first-child,
+48: .markdown-content > h1:first-child,
+49: .markdown-content > h2:first-child,
+50: .markdown-content > h3:first-child,
+51: .markdown-content > h4:first-child {
+52:   margin-top: 0;
+53: }
+54: 
+55: 
+56: .markdown-content p {
+57:   margin-bottom: 14px;
+58: }
+59: 
+60: .markdown-content p:last-child {
+61:   margin-bottom: 0;
+62: }
+63: 
+64: 
+65: .markdown-content strong {
+66:   color: var(--text-primary);
+67:   font-weight: 600;
+68: }
+69: 
+70: .markdown-content em {
+71:   color: var(--text-secondary);
+72: }
+73: 
+74: 
+75: .markdown-content code:not(pre code) {
+76:   background: var(--bg-elevated);
+77:   color: var(--primary);
+78:   padding: 2px 7px;
+79:   border-radius: 2px;
+80:   font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+81:   font-size: 0.88em;
+82:   border: 1px solid var(--border-light);
 83: }
 84: 
-85: .chat-msg-thinking .chat-thinking-toggle {
-86:   display: flex;
-87:   align-items: center;
-88:   gap: 8px;
-89:   cursor: pointer;
-90:   user-select: none;
-91:   font-size: 13px;
-92:   color: var(--text-tertiary);
-93:   padding: 4px 0;
-94:   transition: color 0.15s;
+85: 
+86: .markdown-content ul,
+87: .markdown-content ol {
+88:   margin: 16px 0;
+89:   padding-left: 26px;
+90: }
+91: 
+92: .markdown-content li {
+93:   margin-bottom: 8px;
+94:   line-height: 1.75;
 95: }
 96: 
-97: .chat-msg-thinking .chat-thinking-toggle:hover {
-98:   color: var(--text-secondary);
+97: .markdown-content li:last-child {
+98:   margin-bottom: 0;
 99: }
 100: 
-101: .chat-msg-thinking .chat-agent-avatar {
-102:   width: 24px;
-103:   height: 24px;
-104:   border-radius: 6px;
-105:   object-fit: cover;
-106:   flex-shrink: 0;
-107:   opacity: 0.7;
-108: }
-109: 
-110: .chat-msg-thinking .chat-thinking-label {
-111:   font-style: italic;
-112: }
-113: 
-114: .chat-msg-thinking .chat-thinking-chevron {
-115:   font-size: 10px;
-116:   transition: transform 0.2s;
-117:   margin-left: auto;
-118: }
-119: 
-120: .chat-msg-thinking.chat-thinking-expanded .chat-thinking-chevron {
-121:   transform: rotate(90deg);
-122: }
-123: 
-124: .chat-msg-thinking .chat-thinking-body {
-125:   margin-top: 8px;
-126:   padding: 10px 14px;
-127:   background: var(--bg-elevated);
-128:   border-radius: 8px;
-129:   border: 1px solid var(--border-light);
-130:   font-size: 13px;
-131:   line-height: 1.6;
-132:   color: var(--text-secondary);
-133:   font-style: italic;
-134:   white-space: pre-wrap;
-135:   word-break: break-word;
-136:   max-height: 200px;
-137:   overflow-y: auto;
+101: .markdown-content ul li::marker {
+102:   color: var(--primary);
+103:   font-weight: 500;
+104: }
+105: 
+106: .markdown-content ol li::marker {
+107:   color: var(--primary);
+108:   font-weight: 600;
+109: }
+110: 
+111: 
+112: .markdown-content li > ul,
+113: .markdown-content li > ol {
+114:   margin: 6px 0;
+115: }
+116: 
+117: 
+118: .markdown-content blockquote {
+119:   border-left: 3px solid var(--primary);
+120:   padding: 10px 18px;
+121:   margin: 16px 0;
+122:   background: var(--bg-elevated);
+123:   border-radius: 0 4px 4px 0;
+124:   color: var(--text-secondary);
+125:   line-height: 1.7;
+126: }
+127: 
+128: .markdown-content blockquote p {
+129:   margin: 0;
+130: }
+131: 
+132: 
+133: .markdown-content a {
+134:   color: var(--primary);
+135:   text-decoration: none;
+136:   border-bottom: 1px solid transparent;
+137:   transition: all 0.15s;
 138: }
 139: 
-140: 
-141: .chat-msg-tool-call {
-142:   background: var(--bg-base);
-143:   padding: 12px 24px !important;
-144: }
-145: 
-146: .chat-msg-tool-call .chat-tool-bar {
-147:   display: flex;
-148:   align-items: center;
-149:   gap: 8px;
-150:   font-size: 13px;
-151: }
-152: 
-153: .chat-msg-tool-call .chat-tool-icon {
-154:   width: 20px;
-155:   height: 20px;
-156:   border-radius: 4px;
-157:   background: var(--warning-light);
-158:   display: flex;
-159:   align-items: center;
-160:   justify-content: center;
-161:   font-size: 11px;
-162:   flex-shrink: 0;
+140: .markdown-content a:hover {
+141:   border-bottom-color: var(--primary);
+142: }
+143: 
+144: 
+145: .markdown-content table {
+146:   width: 100%;
+147:   border-collapse: collapse;
+148:   margin: 16px 0;
+149:   font-size: 13px;
+150:   border: 1px solid var(--border-color);
+151:   border-radius: 4px;
+152:   overflow: hidden;
+153: }
+154: 
+155: .markdown-content th {
+156:   background: var(--bg-elevated);
+157:   color: var(--text-primary);
+158:   font-weight: 600;
+159:   text-align: left;
+160:   padding: 10px 14px;
+161:   border-bottom: 1px solid var(--border-color);
+162:   font-size: 12px;
 163: }
 164: 
-165: .chat-msg-tool-call .chat-tool-name {
-166:   font-weight: 500;
-167:   color: var(--text-primary);
-168:   font-family: 'JetBrains Mono', 'Consolas', monospace;
-169:   font-size: 12px;
-170: }
-171: 
-172: .chat-msg-tool-call .chat-tool-args {
-173:   margin-top: 6px;
-174:   padding: 8px 12px;
-175:   background: var(--bg-elevated);
-176:   border-radius: 6px;
-177:   font-family: 'JetBrains Mono', 'Consolas', monospace;
-178:   font-size: 12px;
-179:   color: var(--text-secondary);
-180:   overflow-x: auto;
-181:   max-height: 80px;
-182:   overflow-y: auto;
-183:   line-height: 1.5;
-184: }
+165: .markdown-content td {
+166:   padding: 9px 14px;
+167:   border-bottom: 1px solid var(--border-light);
+168: }
+169: 
+170: .markdown-content tr:last-child td {
+171:   border-bottom: none;
+172: }
+173: 
+174: .markdown-content tr:hover td {
+175:   background: var(--bg-container);
+176: }
+177: 
+178: 
+179: .markdown-content hr {
+180:   border: none;
+181:   border-top: 1px solid var(--border-light);
+182:   margin: 24px 0;
+183: }
+184: 
 185: 
-186: 
-187: .chat-msg-tool-result {
-188:   background: var(--bg-base);
-189:   padding: 8px 24px !important;
+186: .markdown-content img {
+187:   max-width: 100%;
+188:   border-radius: 4px;
+189:   margin: 16px 0;
 190: }
 191: 
-192: .chat-msg-tool-result .chat-tool-result-bar {
-193:   display: flex;
-194:   align-items: center;
-195:   gap: 6px;
-196:   font-size: 12px;
-197:   color: var(--text-tertiary);
-198: }
-199: 
-200: .chat-msg-tool-result .chat-tool-result-icon {
-201:   font-size: 13px;
-202: }
-203: 
-204: .chat-msg-tool-result.chat-tool-success .chat-tool-result-icon {
-205:   color: var(--success);
-206: }
-207: 
-208: .chat-msg-tool-result.chat-tool-fail .chat-tool-result-icon {
-209:   color: var(--error);
-210: }
-211: 
-212: .chat-msg-tool-result .chat-tool-result-name {
-213:   font-family: 'JetBrains Mono', 'Consolas', monospace;
-214:   font-size: 11px;
-215:   color: var(--text-tertiary);
+192: 
+193: .markdown-content pre {
+194:   margin: 16px 0;
+195:   border-radius: 4px;
+196:   overflow: hidden;
+197:   border: 1px solid var(--border-color);
+198:   background: #1e293b;
+199:   padding: 14px 16px;
+200: }
+201: 
+202: .markdown-content pre code {
+203:   background: transparent !important;
+204:   border: none !important;
+205:   padding: 0 !important;
+206:   color: #e2e8f0 !important;
+207:   font-size: 13px;
+208:   line-height: 1.65;
+209: }
+210: 
+211: .artifacts-tabs {
+212:   height: 100%;
+213:   display: flex;
+214:   flex-direction: column;
+215:   min-height: 0;
 216: }
 217: 
-218: 
-219: .chat-msg-pm-agent {
-220:   background: var(--bg-base);
+218: .artifacts-tabs > .ant-tabs-nav {
+219:   margin-bottom: 0;
+220:   flex-shrink: 0;
 221: }
 222: 
-223: .chat-msg-pm-agent .chat-pm-header {
-224:   display: flex;
-225:   align-items: center;
-226:   gap: 8px;
-227:   margin-bottom: 8px;
-228: }
-229: 
-230: .chat-msg-pm-agent .chat-agent-avatar {
-231:   width: 24px;
-232:   height: 24px;
-233:   border-radius: 6px;
-234:   object-fit: cover;
-235:   flex-shrink: 0;
-236: }
-237: 
-238: .chat-msg-pm-agent .chat-pm-name {
-239:   font-size: 13px;
-240:   font-weight: 600;
-241:   color: var(--success);
-242: }
-243: 
-244: .chat-msg-pm-agent .chat-pm-actions {
-245:   display: flex;
-246:   flex-wrap: wrap;
-247:   gap: 8px;
-248:   margin-top: 12px;
-249: }
-250: 
-251: .chat-msg-pm-agent .chat-pm-action {
-252:   cursor: pointer;
-253:   padding: 5px 12px;
-254:   border-radius: 6px;
-255:   display: inline-flex;
-256:   align-items: center;
-257:   gap: 6px;
-258:   font-size: 12px;
-259:   font-weight: 500;
-260:   border: 1px solid var(--border-color);
-261:   background: var(--bg-container);
-262:   color: var(--text-secondary);
-263:   transition: all 0.15s ease;
+223: .artifacts-tabs .ant-tabs-content-holder {
+224:   flex: 1;
+225:   overflow: hidden;
+226:   display: flex;
+227:   flex-direction: column;
+228:   min-height: 0;
+229: }
+230: 
+231: .artifacts-tabs .ant-tabs-content {
+232:   height: 100%;
+233:   overflow: hidden;
+234: }
+235: 
+236: .artifacts-tabs .ant-tabs-tabpane {
+237:   height: 100%;
+238:   overflow: hidden;
+239: }
+240: 
+241: .artifacts-tabs .ant-tabs-tabpane > div {
+242:   height: 100%;
+243: }
+244: 
+245: 
+246: .code-editor-tabs {
+247:   height: 100%;
+248:   display: flex;
+249:   flex-direction: column;
+250: }
+251: 
+252: .code-editor-tabs .ant-tabs-content {
+253:   flex: 1;
+254:   overflow: hidden;
+255:   display: flex;
+256:   flex-direction: column;
+257: }
+258: 
+259: .code-editor-tabs .ant-tabs-content-holder {
+260:   flex: 1;
+261:   overflow: hidden;
+262:   display: flex;
+263:   flex-direction: column;
 264: }
 265: 
-266: .chat-msg-pm-agent .chat-pm-action:hover {
-267:   border-color: var(--primary);
-268:   color: var(--primary);
-269:   background: var(--primary-lighter);
-270:   box-shadow: 0 1px 4px rgba(37, 99, 235, 0.1);
-271: }
-272: 
-273: 
-274: .chat-processing-bar {
-275:   padding: 12px 24px;
-276:   background: var(--primary-lighter);
-277:   border-bottom: 1px solid var(--primary-light);
-278:   display: flex;
-279:   align-items: center;
-280:   gap: 10px;
-281:   font-size: 13px;
-282:   color: var(--primary);
-283:   font-weight: 500;
-284: }
-285: 
-286: .chat-processing-bar .chat-processing-stage {
-287:   font-size: 11px;
-288:   color: var(--text-secondary);
-289:   font-weight: 400;
-290: }
-291: 
-292: 
-293: .chat-msg-error {
-294:   background: var(--error-light);
-295: }
-296: 
-297: .chat-msg-error .chat-error-content {
-298:   color: var(--error);
-299:   font-size: 13px;
-300:   line-height: 1.5;
-301: }
-302: 
+266: .code-editor-tabs .ant-tabs-tabpane {
+267:   height: 100% !important;
+268:   overflow: hidden !important;
+269:   display: none !important;
+270: }
+271: 
+272: .code-editor-tabs .ant-tabs-tabpane-active {
+273:   display: flex !important;
+274:   flex-direction: column !important;
+275: }
+276: 
+277: .code-editor-tabs .ant-tabs-tabpane > div {
+278:   height: 100% !important;
+279:   display: flex !important;
+280:   flex-direction: column !important;
+281:   position: relative;
+282: }
+283: 
+284: .code-editor-tabs .ant-tabs-tabpane > div > div {
+285:   flex: 1;
+286:   overflow: hidden;
+287:   position: relative;
+288: }
+289: 
+290: .code-editor-tabs .monaco-editor {
+291:   height: 100% !important;
+292: }
+293: 
+294: 
+295: .react-json-view {
+296:   background: var(--bg-container) !important;
+297:   padding: 20px;
+298:   border-radius: 12px;
+299:   border: 1px solid var(--border-color);
+300:   font-size: 14px;
+301:   line-height: 1.8;
+302: }
 303: 
-304: .chat-header {
-305:   padding: 16px 24px;
-306:   border-bottom: 1px solid var(--border-color);
-307:   background: var(--bg-base);
-308: }
-309: 
-310: .chat-header-title {
-311:   font-size: 15px;
-312:   font-weight: 600;
-313:   color: var(--text-primary);
-314:   margin: 0;
-315: }
-316: 
-317: .chat-header-desc {
-318:   font-size: 12px;
-319:   color: var(--text-tertiary);
-320:   margin: 4px 0 0 0;
-321:   display: -webkit-box;
-322:   -webkit-line-clamp: 2;
-323:   -webkit-box-orient: vertical;
-324:   overflow: hidden;
-325:   text-overflow: ellipsis;
-326:   line-height: 1.4;
-327: }
-328: 
-329: 
-330: .chat-input-wrapper {
-331:   padding: 16px 24px;
-332:   background: var(--bg-base);
-333:   border-top: 1px solid var(--border-color);
+304: .react-json-view .string-key {
+305:   color: var(--primary) !important;
+306:   font-weight: 600;
+307: }
+308: 
+309: .react-json-view .object-key {
+310:   color: var(--primary) !important;
+311:   font-weight: 600;
+312: }
+313: 
+314: .react-json-view .string-value {
+315:   color: #059669 !important;
+316: }
+317: 
+318: .react-json-view .variable-value {
+319:   color: #059669 !important;
+320: }
+321: 
+322: .react-json-view .number-value {
+323:   color: #2563eb !important;
+324: }
+325: 
+326: .react-json-view .boolean-value {
+327:   color: #d97706 !important;
+328:   font-weight: 500;
+329: }
+330: 
+331: .react-json-view .null-value {
+332:   color: #dc2626 !important;
+333:   font-weight: 500;
 334: }
 335: 
-336: 
-337: .chat-input-request {
-338:   padding: 16px;
-339:   background: var(--primary-lighter);
-340:   border: 1px solid var(--primary-light);
-341:   border-radius: 10px;
-342:   margin-bottom: 16px;
+336: .react-json-view .array-key {
+337:   color: var(--primary) !important;
+338:   font-weight: 600;
+339: }
+340: 
+341: .react-json-view .string-literal {
+342:   color: #059669 !important;
 343: }
 344: 
-345: .chat-input-request-title {
-346:   font-size: 14px;
+345: .react-json-view .object-name {
+346:   color: var(--primary) !important;
 347:   font-weight: 600;
-348:   color: var(--primary);
-349:   margin-bottom: 8px;
-350: }
-351: 
-352: .chat-input-request-prompt {
-353:   font-size: 13px;
-354:   color: var(--text-secondary);
-355:   margin-bottom: 12px;
-356:   line-height: 1.5;
-357: }
-358: 
+348: }
+349: 
+350: .react-json-view .array-name {
+351:   color: var(--primary) !important;
+352:   font-weight: 600;
+353: }
+354: 
+355: .react-json-view .br-row,
+356: .react-json-view .bracket {
+357:   color: var(--text-tertiary) !important;
+358: }
 359: 
-360: .chat-empty-state {
-361:   display: flex;
-362:   flex-direction: column;
-363:   align-items: center;
-364:   justify-content: center;
-365:   height: 100%;
-366:   color: var(--text-tertiary);
-367:   text-align: center;
-368:   padding: 40px;
-369: }
-370: 
-371: .chat-empty-state h3 {
-372:   font-size: 16px;
-373:   color: var(--text-secondary);
-374:   margin: 16px 0 8px;
-375:   font-weight: 500;
-376: }
-377: 
-378: .chat-empty-state p {
-379:   font-size: 13px;
-380:   line-height: 1.6;
-381:   max-width: 400px;
-382: }
-383: 
-384: 
-385: .chat-pm-welcome {
-386:   display: flex;
-387:   flex-direction: column;
-388:   align-items: center;
-389:   justify-content: center;
-390:   padding: 48px 24px;
-391:   text-align: center;
-392: }
-393: 
-394: .chat-pm-welcome-icon {
-395:   font-size: 40px;
-396:   margin-bottom: 16px;
-397: }
-398: 
-399: .chat-pm-welcome h3 {
-400:   font-size: 18px;
-401:   color: var(--text-primary);
-402:   margin: 0 0 8px;
-403:   font-weight: 600;
-404: }
-405: 
-406: .chat-pm-welcome p {
-407:   font-size: 13px;
-408:   color: var(--text-secondary);
-409:   line-height: 1.6;
-410:   max-width: 400px;
-411:   margin: 0;
-412: }
-413: 
-414: .chat-pm-welcome ul {
-415:   list-style: none;
-416:   padding: 0;
-417:   margin: 16px 0 0;
-418:   text-align: left;
-419: }
-420: 
-421: .chat-pm-welcome li {
-422:   font-size: 13px;
-423:   color: var(--text-secondary);
-424:   padding: 4px 0;
-425: }
-426: 
-427: .chat-pm-welcome li::before {
-428:   content: '·';
-429:   margin-right: 8px;
-430:   color: var(--primary);
-431:   font-weight: bold;
-432: }
+360: .react-json-view .colon {
+361:   color: var(--text-tertiary) !important;
+362: }
+363: 
+364: .react-json-view .arrow-icon,
+365: .react-json-view .expanded-icon,
+366: .react-json-view .collapsed-icon {
+367:   fill: var(--primary) !important;
+368: }
+```
+
+### crates/cowork-gui/src/styles/markdown.css (212 lines)
+
+```
+1: .markdown-body {
+2:   color: var(--text-primary);
+3:   line-height: 1.7;
+4:   font-size: 14px;
+5: }
+6: 
+7: 
+8: .markdown-body p {
+9:   margin: 0 0 12px;
+10: }
+11: 
+12: .markdown-body p:last-child {
+13:   margin-bottom: 0;
+14: }
+15: 
+16: 
+17: .markdown-body h1,
+18: .markdown-body h2,
+19: .markdown-body h3,
+20: .markdown-body h4,
+21: .markdown-body h5,
+22: .markdown-body h6 {
+23:   color: var(--text-primary);
+24:   margin: 20px 0 8px;
+25:   font-weight: 600;
+26:   line-height: 1.3;
+27: }
+28: 
+29: .markdown-body h1 { font-size: 1.4em; }
+30: .markdown-body h2 { font-size: 1.2em; border-bottom: 1px solid var(--border-light); padding-bottom: 6px; }
+31: .markdown-body h3 { font-size: 1.1em; }
+32: .markdown-body h4 { font-size: 1em; }
+33: 
+34: 
+35: .markdown-body strong {
+36:   color: var(--text-primary);
+37:   font-weight: 600;
+38: }
+39: 
+40: .markdown-body em {
+41:   color: var(--text-secondary);
+42: }
+43: 
+44: 
+45: .markdown-body code {
+46:   background: var(--bg-elevated);
+47:   color: var(--primary);
+48:   padding: 2px 6px;
+49:   border-radius: 4px;
+50:   font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+51:   font-size: 0.88em;
+52:   border: 1px solid var(--border-light);
+53: }
+54: 
+55: 
+56: .markdown-code-block {
+57:   position: relative;
+58:   margin: 12px 0;
+59:   border-radius: 4px;
+60:   overflow: hidden;
+61:   border: 1px solid var(--border-color);
+62:   background: #1e293b;
+63: }
+64: 
+65: .markdown-code-header {
+66:   display: flex;
+67:   align-items: center;
+68:   justify-content: space-between;
+69:   padding: 6px 12px;
+70:   background: rgba(0, 0, 0, 0.2);
+71:   font-size: 11px;
+72:   color: #94a3b8;
+73:   font-family: 'JetBrains Mono', 'Consolas', monospace;
+74: }
+75: 
+76: .markdown-code-copy {
+77:   background: none;
+78:   border: 1px solid rgba(148, 163, 184, 0.3);
+79:   color: #94a3b8;
+80:   padding: 2px 8px;
+81:   border-radius: 2px;
+82:   cursor: pointer;
+83:   font-size: 11px;
+84:   font-family: inherit;
+85:   transition: all 0.15s;
+86: }
+87: 
+88: .markdown-code-copy:hover {
+89:   background: rgba(148, 163, 184, 0.15);
+90:   color: #e2e8f0;
+91:   border-color: rgba(148, 163, 184, 0.5);
+92: }
+93: 
+94: .markdown-code-block pre {
+95:   margin: 0;
+96:   padding: 14px 16px;
+97:   overflow-x: auto;
+98:   background: transparent !important;
+99:   border: none !important;
+100:   border-radius: 0 !important;
+101: }
+102: 
+103: .markdown-code-block code {
+104:   background: transparent !important;
+105:   border: none !important;
+106:   padding: 0 !important;
+107:   color: #e2e8f0 !important;
+108:   font-size: 13px;
+109:   line-height: 1.6;
+110: }
+111: 
+112: 
+113: .markdown-body ul,
+114: .markdown-body ol {
+115:   margin: 8px 0;
+116:   padding-left: 24px;
+117: }
+118: 
+119: .markdown-body li {
+120:   margin-bottom: 4px;
+121:   color: var(--text-primary);
+122: }
+123: 
+124: .markdown-body ul li::marker {
+125:   color: var(--primary);
+126: }
+127: 
+128: .markdown-body ol li::marker {
+129:   color: var(--primary);
+130:   font-weight: 600;
+131: }
+132: 
+133: 
+134: .markdown-body blockquote {
+135:   border-left: 3px solid var(--primary);
+136:   padding: 8px 16px;
+137:   margin: 12px 0;
+138:   background: var(--primary-lighter);
+139:   border-radius: 0 4px 4px 0;
+140:   color: var(--text-secondary);
+141: }
+142: 
+143: .markdown-body blockquote p {
+144:   margin: 0;
+145: }
+146: 
+147: 
+148: .markdown-body a {
+149:   color: var(--primary);
+150:   text-decoration: none;
+151:   border-bottom: 1px solid transparent;
+152:   transition: all 0.15s;
+153: }
+154: 
+155: .markdown-body a:hover {
+156:   border-bottom-color: var(--primary);
+157: }
+158: 
+159: 
+160: .markdown-body table {
+161:   width: 100%;
+162:   border-collapse: collapse;
+163:   margin: 12px 0;
+164:   font-size: 13px;
+165:   border: 1px solid var(--border-color);
+166:   border-radius: 4px;
+167:   overflow: hidden;
+168: }
+169: 
+170: .markdown-body th {
+171:   background: var(--bg-elevated);
+172:   color: var(--text-primary);
+173:   font-weight: 600;
+174:   text-align: left;
+175:   padding: 10px 14px;
+176:   border-bottom: 1px solid var(--border-color);
+177:   font-size: 12px;
+178: }
+179: 
+180: .markdown-body td {
+181:   padding: 8px 14px;
+182:   border-bottom: 1px solid var(--border-light);
+183: }
+184: 
+185: .markdown-body tr:last-child td {
+186:   border-bottom: none;
+187: }
+188: 
+189: .markdown-body tr:hover td {
+190:   background: var(--bg-container);
+191: }
+192: 
+193: 
+194: .markdown-body hr {
+195:   border: none;
+196:   border-top: 1px solid var(--border-light);
+197:   margin: 20px 0;
+198: }
+199: 
+200: 
+201: .markdown-body img {
+202:   max-width: 100%;
+203:   border-radius: 4px;
+204:   margin: 12px 0;
+205: }
+206: 
+207: 
+208: .hljs {
+209:   background: transparent !important;
+210:   color: #e2e8f0 !important;
+211:   padding: 0 !important;
+212: }
 ```
 
 ### crates/cowork-gui/src/types/config.ts (291 lines)
@@ -22187,51 +22993,6 @@ LICENSE
 24: }
 ```
 
-### crates/cowork-gui/src/components/CodeEditor.tsx (40 lines)
-
-```
-1: FileTreeNode
-2: ⋮----
-3: {
-4:   name: string;
-5:   path: string;
-6:   is_dir: boolean;
-7:   children?: FileTreeNode[];
-8:   is_expanded?: boolean;
-9:   language?: string;
-10: }
-11: ⋮----
-12: FlatFileTreeNode
-13: ⋮----
-14: {
-15:   depth: number;
-16:   key: string;
-17: }
-18: ⋮----
-19: FileReadResult
-20: ⋮----
-21: {
-22:   content: string;
-23:   is_partial: boolean;
-24:   offset: number;
-25:   total_size: number;
-26: }
-27: ⋮----
-28: FormatResult
-29: ⋮----
-30: {
-31:   success: boolean;
-32:   formatted_files: string[];
-33: }
-34: ⋮----
-35: CodeEditorProps
-36: ⋮----
-37: {
-38:   iterationId: string;
-39:   refreshTrigger?: number;
-40: }
-```
-
 ### crates/cowork-gui/src/components/IterationsPanel.tsx (7 lines)
 
 ```
@@ -22242,52 +23003,6 @@ LICENSE
 5:   selectedIterationId?: string | null;
 6:   onExecuteStatusChange?: (iterationId: string, status: string) => void;
 7: }
-```
-
-### crates/cowork-gui/src/components/KnowledgePanel.tsx (41 lines)
-
-```
-1: Knowledge
-2: ⋮----
-3: {
-4:   iteration_id: string;
-5:   title: string;
-6:   idea_summary?: string;
-7:   design_summary?: string;
-8:   plan_summary?: string;
-9:   code_structure?: string;
-10:   created_at: string;
-11:   tech_stack?: string[];
-12:   key_decisions?: string[];
-13:   key_patterns?: string[];
-14:   known_issues?: string[];
-15: }
-16: ⋮----
-17: KnowledgeListResult
-18: ⋮----
-19: {
-20:   knowledge_list: Knowledge[];
-21: }
-22: ⋮----
-23: IterationInfo
-24: ⋮----
-25: {
-26:   id: string;
-27:   number: number;
-28:   title: string;
-29:   description: string;
-30:   status: string;
-31:   current_stage: string | null;
-32:   created_at: string;
-33: }
-34: ⋮----
-35: KnowledgePanelProps
-36: ⋮----
-37: {
-38:   currentSession?: string;
-39:   currentIterationId?: string | null;
-40:   refreshTrigger?: number;
-41: }
 ```
 
 ### crates/cowork-gui/src/components/RunnerPanel.tsx (36 lines)
@@ -22587,6 +23302,22 @@ LICENSE
 235: };
 236: 
 237: export default SkillManager;
+```
+
+### crates/cowork-gui/src/components/iterations/IterationDetailsModal.tsx (11 lines)
+
+```
+1: IterationDetailsModalProps
+2: ⋮----
+3: {
+4:   open: boolean;
+5:   onClose: () => void;
+6:   iteration: IterationInfo | null;
+7: }
+8: ⋮----
+9: getStatusColor
+10: ⋮----
+11: (iteration.status)
 ```
 
 ### crates/cowork-gui/src/components/projects/ImportProjectModal.tsx (37 lines)
@@ -23102,128 +23833,6 @@ LICENSE
 85: );
 ```
 
-### crates/cowork-gui/src/stores/agentStore.ts (117 lines)
-
-```
-1: ThinkingMessage
-2: ⋮----
-3: {
-4:   type: 'thinking';
-5:   content: string;
-6:   agentName: string;
-7:   stageName?: string;
-8:   isStreaming?: boolean;
-9:   isExpanded: boolean;
-10:   timestamp: string;
-11: }
-12: ⋮----
-13: ChatMessage
-14: ⋮----
-15: {
-16:   type: string;
-17:   content: string;
-18:   agentName?: string;
-19:   stageName?: string;
-20:   level?: string;
-21:   isStreaming?: boolean;
-22:   isExpanded?: boolean;
-23:   timestamp: string;
-24:   toolName?: string;
-25:   arguments?: Record<string, unknown>;
-26:   result?: string;
-27:   success?: boolean;
-28:   actions?: PMAction[];
-29: }
-30: ⋮----
-31: UserMessage
-32: ⋮----
-33: {
-34:   type: 'user';
-35:   content: string;
-36:   timestamp: string;
-37: }
-38: ⋮----
-39: PMAgentMessage
-40: ⋮----
-41: {
-42:   type: 'pm_agent';
-43:   content: string;
-44:   actions?: PMAction[];
-45:   timestamp: string;
-46: }
-47: ⋮----
-48: PMAction
-49: ⋮----
-50: {
-51:   action_type: 'pm_goto_stage' | 'pm_create_iteration' | 'pm_start_app' | 'pm_open_folder' | 'pm_view_knowledge' | 'pm_view_artifacts' | 'pm_view_code';
-52:   target_stage?: string;
-53:   iteration_id?: string;
-54:   title?: string;
-55:   description?: string;
-56:   label: string;
-57: }
-58: ⋮----
-59: InputRequest
-60: ⋮----
-61: {
-62:   requestId: string;
-63:   prompt: string;
-64:   options: InputOption[];
-65:   isArtifactConfirmation?: boolean;
-66:   artifactType?: string;
-67:   isFeedbackMode?: boolean;
-68:   feedbackPrompt?: string;
-69: }
-70: ⋮----
-71: InputOption
-72: ⋮----
-73: {
-74:   id: string;
-75:   label: string;
-76:   description?: string;
-77: }
-78: ⋮----
-79: ChatMode
-80: ⋮----
-81: 'disabled' | 'pipeline' | 'pm_agent'
-82: ⋮----
-83: AgentState
-84: ⋮----
-85: {
-86:   messages: ChatMessage[];
-87:   pmMessages: (UserMessage | PMAgentMessage)[];
-88:   isProcessing: boolean;
-89:   currentAgent: string | null;
-90:   currentStage: string | null;
-91:   inputRequest: InputRequest | null;
-92:   chatMode: ChatMode;
-93:   pmProcessing: boolean;
-94: 
-95:   addMessage: (message: ChatMessage) => void;
-96:   setMessages: (messages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
-97:   
-98:   appendLastMessageContent: (chunk: string, opts?: { isLast?: boolean; agentName?: string; msgType?: string }) => void;
-99:   clearMessages: () => void;
-100: 
-101:   addPMMessage: (message: UserMessage | PMAgentMessage) => void;
-102:   setPMMessages: (messages: (UserMessage | PMAgentMessage)[] | ((prev: (UserMessage | PMAgentMessage)[]) => (UserMessage | PMAgentMessage)[])) => void;
-103:   
-104:   appendLastPMMessageContent: (chunk: string, opts?: { isLast?: boolean }) => void;
-105:   clearPMMessages: () => void;
-106: 
-107:   setProcessing: (isProcessing: boolean) => void;
-108:   setCurrentAgent: (agent: string | null) => void;
-109:   setCurrentStage: (stage: string | null) => void;
-110:   setInputRequest: (request: InputRequest | null) => void;
-111:   setChatMode: (mode: ChatMode) => void;
-112:   setPmProcessing: (processing: boolean) => void;
-113: 
-114:   submitInput: (response: string, responseType: string) => Promise<void>;
-115:   sendPMMessage: (iterationId: string, message: string) => Promise<void>;
-116:   loadPMWelcomeMessage: (iterationId: string) => Promise<void>;
-117: }
-```
-
 ### crates/cowork-gui/src/stores/configStore.ts (49 lines)
 
 ```
@@ -23341,594 +23950,451 @@ LICENSE
 58: }
 ```
 
-### crates/cowork-gui/src/styles/components.css (368 lines)
+### crates/cowork-gui/src/styles/antd-overrides.css (267 lines)
 
 ```
-1: .artifact-content {
-2:   padding: 24px;
-3:   background: var(--bg-container);
-4:   color: var(--text-primary);
-5:   flex: 1;
-6:   min-height: 0;
-7:   overflow: auto;
-8: }
-9: 
-10: .artifact-content h3 {
-11:   color: var(--text-primary);
-12:   margin-bottom: 16px;
-13:   font-size: 18px;
+1: .ant-layout {
+2:   background: var(--bg-base) !important;
+3: }
+4: 
+5: .ant-layout-header {
+6:   background: var(--bg-base) !important;
+7:   border-bottom: 1px solid var(--border-color);
+8:   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+9: }
+10: 
+11: .ant-layout-sider {
+12:   background: var(--bg-sidebar) !important;
+13:   border-right: 1px solid var(--border-color);
 14: }
 15: 
 16: 
-17: .markdown-content {
-18:   color: var(--text-primary);
-19:   font-size: 14px;
-20:   line-height: 1.8;
-21: }
-22: 
-23: 
-24: .markdown-content h1,
-25: .markdown-content h2,
-26: .markdown-content h3,
-27: .markdown-content h4,
-28: .markdown-content h5,
-29: .markdown-content h6 {
-30:   color: var(--text-primary);
-31:   margin-top: 28px;
-32:   margin-bottom: 12px;
-33:   font-weight: 600;
-34:   line-height: 1.35;
-35: }
-36: 
-37: .markdown-content h1 { font-size: 1.5em; }
-38: .markdown-content h2 {
-39:   font-size: 1.25em;
-40:   border-bottom: 1px solid var(--border-light);
-41:   padding-bottom: 8px;
-42: }
-43: .markdown-content h3 { font-size: 1.15em; }
-44: .markdown-content h4 { font-size: 1.05em; }
-45: 
-46: 
-47: .markdown-content > :first-child,
-48: .markdown-content > h1:first-child,
-49: .markdown-content > h2:first-child,
-50: .markdown-content > h3:first-child,
-51: .markdown-content > h4:first-child {
-52:   margin-top: 0;
+17: .ant-menu {
+18:   background: transparent !important;
+19:   border-right: none !important;
+20: }
+21: 
+22: .ant-menu-item {
+23:   color: var(--text-secondary) !important;
+24:   border-radius: 4px !important;
+25:   margin: 4px 12px !important;
+26:   padding-left: 16px !important;
+27:   transition: all 0.2s ease !important;
+28: }
+29: 
+30: .ant-menu-item:hover {
+31:   background: var(--bg-elevated) !important;
+32:   color: var(--text-primary) !important;
+33: }
+34: 
+35: .ant-menu-item-selected {
+36:   background: var(--primary-light) !important;
+37:   color: var(--primary) !important;
+38:   font-weight: 500;
+39: }
+40: 
+41: .ant-menu-item-selected::after {
+42:   display: none !important;
+43: }
+44: 
+45: .ant-menu-item .anticon {
+46:   font-size: 18px;
+47:   margin-right: 12px;
+48: }
+49: 
+50: 
+51: .ant-tabs {
+52:   background: var(--bg-base);
 53: }
 54: 
-55: 
-56: .markdown-content p {
-57:   margin-bottom: 14px;
-58: }
-59: 
-60: .markdown-content p:last-child {
-61:   margin-bottom: 0;
-62: }
-63: 
+55: .ant-tabs-nav {
+56:   margin-bottom: 0 !important;
+57: }
+58: 
+59: .ant-tabs-tab {
+60:   color: var(--text-secondary) !important;
+61:   border-radius: 6px 6px 0 0 !important;
+62:   transition: all 0.2s ease !important;
+63: }
 64: 
-65: .markdown-content strong {
-66:   color: var(--text-primary);
-67:   font-weight: 600;
-68: }
-69: 
-70: .markdown-content em {
-71:   color: var(--text-secondary);
-72: }
-73: 
+65: .ant-tabs-tab:hover {
+66:   color: var(--text-primary) !important;
+67: }
+68: 
+69: .ant-tabs-tab-active {
+70:   color: var(--primary) !important;
+71:   background: var(--bg-base) !important;
+72:   font-weight: 500;
+73: }
 74: 
-75: .markdown-content code:not(pre code) {
-76:   background: var(--bg-elevated);
-77:   color: var(--primary);
-78:   padding: 2px 7px;
-79:   border-radius: 4px;
-80:   font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
-81:   font-size: 0.88em;
-82:   border: 1px solid var(--border-light);
+75: .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
+76:   background: var(--bg-container) !important;
+77:   border-color: var(--border-color) !important;
+78: }
+79: 
+80: .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab-active {
+81:   background: var(--bg-base) !important;
+82:   border-bottom-color: var(--bg-base) !important;
 83: }
 84: 
-85: 
-86: .markdown-content ul,
-87: .markdown-content ol {
-88:   margin: 16px 0;
-89:   padding-left: 26px;
-90: }
-91: 
-92: .markdown-content li {
-93:   margin-bottom: 8px;
-94:   line-height: 1.75;
-95: }
-96: 
-97: .markdown-content li:last-child {
-98:   margin-bottom: 0;
-99: }
-100: 
-101: .markdown-content ul li::marker {
+85: .ant-tabs-content-holder {
+86:   background: var(--bg-base);
+87: }
+88: 
+89: 
+90: .ant-btn {
+91:   background: var(--bg-base);
+92:   border-color: var(--border-color);
+93:   color: var(--text-primary);
+94:   border-radius: 8px;
+95:   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+96:   transition: all 0.2s ease;
+97: }
+98: 
+99: .ant-btn:hover {
+100:   background: var(--bg-elevated);
+101:   border-color: var(--primary);
 102:   color: var(--primary);
-103:   font-weight: 500;
-104: }
-105: 
-106: .markdown-content ol li::marker {
-107:   color: var(--primary);
-108:   font-weight: 600;
-109: }
-110: 
+103: }
+104: 
+105: .ant-btn-primary {
+106:   background: var(--primary) !important;
+107:   border-color: var(--primary) !important;
+108:   color: white !important;
+109:   box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+110: }
 111: 
-112: .markdown-content li > ul,
-113: .markdown-content li > ol {
-114:   margin: 6px 0;
-115: }
-116: 
+112: .ant-btn-primary:hover {
+113:   background: var(--primary-hover) !important;
+114:   border-color: var(--primary-hover) !important;
+115:   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+116: }
 117: 
-118: .markdown-content blockquote {
-119:   border-left: 3px solid var(--primary);
-120:   padding: 10px 18px;
-121:   margin: 16px 0;
-122:   background: var(--bg-elevated);
-123:   border-radius: 0 8px 8px 0;
-124:   color: var(--text-secondary);
-125:   line-height: 1.7;
+118: 
+119: .ant-input,
+120: .ant-input-affix-wrapper {
+121:   background: var(--bg-container) !important;
+122:   border-color: var(--border-color) !important;
+123:   color: var(--text-primary) !important;
+124:   border-radius: 10px !important;
+125:   transition: all 0.2s ease;
 126: }
 127: 
-128: .markdown-content blockquote p {
-129:   margin: 0;
-130: }
-131: 
+128: .ant-input:hover,
+129: .ant-input-affix-wrapper:hover {
+130:   border-color: var(--primary) !important;
+131: }
 132: 
-133: .markdown-content a {
-134:   color: var(--primary);
-135:   text-decoration: none;
-136:   border-bottom: 1px solid transparent;
-137:   transition: all 0.15s;
-138: }
-139: 
-140: .markdown-content a:hover {
-141:   border-bottom-color: var(--primary);
-142: }
-143: 
-144: 
-145: .markdown-content table {
-146:   width: 100%;
-147:   border-collapse: collapse;
-148:   margin: 16px 0;
-149:   font-size: 13px;
-150:   border: 1px solid var(--border-color);
-151:   border-radius: 8px;
-152:   overflow: hidden;
-153: }
-154: 
-155: .markdown-content th {
-156:   background: var(--bg-elevated);
-157:   color: var(--text-primary);
-158:   font-weight: 600;
-159:   text-align: left;
-160:   padding: 10px 14px;
-161:   border-bottom: 1px solid var(--border-color);
-162:   font-size: 12px;
-163: }
-164: 
-165: .markdown-content td {
-166:   padding: 9px 14px;
-167:   border-bottom: 1px solid var(--border-light);
-168: }
-169: 
-170: .markdown-content tr:last-child td {
-171:   border-bottom: none;
-172: }
-173: 
-174: .markdown-content tr:hover td {
-175:   background: var(--bg-container);
-176: }
-177: 
-178: 
-179: .markdown-content hr {
-180:   border: none;
-181:   border-top: 1px solid var(--border-light);
-182:   margin: 24px 0;
-183: }
+133: .ant-input:focus,
+134: .ant-input-affix-wrapper:focus,
+135: .ant-input-affix-wrapper-focused {
+136:   background: var(--bg-base) !important;
+137:   border-color: var(--primary) !important;
+138:   box-shadow: 0 0 0 3px var(--primary-light) !important;
+139: }
+140: 
+141: 
+142: .ant-select:not(.ant-select-customize-input) .ant-select-selector {
+143:   background: var(--bg-container) !important;
+144:   border-color: var(--border-color) !important;
+145:   color: var(--text-primary) !important;
+146:   border-radius: 4px !important;
+147: }
+148: 
+149: .ant-select:not(.ant-select-customize-input) .ant-select-selector:hover {
+150:   border-color: var(--primary) !important;
+151: }
+152: 
+153: .ant-select-focused .ant-select-selector {
+154:   border-color: var(--primary) !important;
+155:   box-shadow: 0 0 0 3px var(--primary-light) !important;
+156: }
+157: 
+158: 
+159: .ant-dropdown-menu {
+160:   background: var(--bg-base) !important;
+161:   border: 1px solid var(--border-color);
+162:   border-radius: 12px !important;
+163:   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1) !important;
+164:   padding: 8px !important;
+165: }
+166: 
+167: .ant-dropdown-menu-item {
+168:   border-radius: 4px !important;
+169:   color: var(--text-primary) !important;
+170: }
+171: 
+172: .ant-dropdown-menu-item:hover {
+173:   background: var(--bg-elevated) !important;
+174: }
+175: 
+176: 
+177: .ant-card {
+178:   background: var(--bg-base);
+179:   border-color: var(--border-color);
+180:   border-radius: 12px;
+181:   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+182: }
+183: 
 184: 
-185: 
-186: .markdown-content img {
-187:   max-width: 100%;
-188:   border-radius: 8px;
-189:   margin: 16px 0;
+185: .ant-modal-content {
+186:   background: var(--bg-base) !important;
+187:   border-radius: 4px !important;
+188:   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15) !important;
+189:   border: 1px solid var(--border-color);
 190: }
 191: 
-192: 
-193: .markdown-content pre {
-194:   margin: 16px 0;
-195:   border-radius: 8px;
-196:   overflow: hidden;
-197:   border: 1px solid var(--border-color);
-198:   background: #1e293b;
-199:   padding: 14px 16px;
-200: }
-201: 
-202: .markdown-content pre code {
-203:   background: transparent !important;
-204:   border: none !important;
-205:   padding: 0 !important;
-206:   color: #e2e8f0 !important;
-207:   font-size: 13px;
-208:   line-height: 1.65;
+192: .ant-modal-header {
+193:   background: var(--bg-base) !important;
+194:   border-bottom: 1px solid var(--border-color) !important;
+195:   border-radius: 4px 4px 0 0 !important;
+196:   padding: 16px 20px !important;
+197:   margin-bottom: 0 !important;
+198: }
+199: 
+200: .ant-modal-title {
+201:   color: var(--text-primary) !important;
+202:   font-weight: 600 !important;
+203:   font-size: 15px !important;
+204: }
+205: 
+206: .ant-modal-body {
+207:   padding: 20px !important;
+208:   color: var(--text-primary);
 209: }
 210: 
-211: .artifacts-tabs {
-212:   height: 100%;
-213:   display: flex;
-214:   flex-direction: column;
-215:   min-height: 0;
+211: .ant-modal-footer {
+212:   border-top: 1px solid var(--border-light) !important;
+213:   padding: 12px 20px !important;
+214:   background: var(--bg-base) !important;
+215:   border-radius: 0 0 4px 4px !important;
 216: }
 217: 
-218: .artifacts-tabs > .ant-tabs-nav {
-219:   margin-bottom: 0;
-220:   flex-shrink: 0;
-221: }
-222: 
-223: .artifacts-tabs .ant-tabs-content-holder {
-224:   flex: 1;
-225:   overflow: hidden;
-226:   display: flex;
-227:   flex-direction: column;
-228:   min-height: 0;
-229: }
-230: 
-231: .artifacts-tabs .ant-tabs-content {
-232:   height: 100%;
-233:   overflow: hidden;
-234: }
-235: 
-236: .artifacts-tabs .ant-tabs-tabpane {
-237:   height: 100%;
-238:   overflow: hidden;
-239: }
-240: 
-241: .artifacts-tabs .ant-tabs-tabpane > div {
-242:   height: 100%;
-243: }
-244: 
-245: 
-246: .code-editor-tabs {
-247:   height: 100%;
-248:   display: flex;
-249:   flex-direction: column;
-250: }
-251: 
-252: .code-editor-tabs .ant-tabs-content {
-253:   flex: 1;
-254:   overflow: hidden;
-255:   display: flex;
-256:   flex-direction: column;
-257: }
-258: 
-259: .code-editor-tabs .ant-tabs-content-holder {
-260:   flex: 1;
-261:   overflow: hidden;
-262:   display: flex;
-263:   flex-direction: column;
-264: }
-265: 
-266: .code-editor-tabs .ant-tabs-tabpane {
-267:   height: 100% !important;
-268:   overflow: hidden !important;
-269:   display: none !important;
-270: }
-271: 
-272: .code-editor-tabs .ant-tabs-tabpane-active {
-273:   display: flex !important;
-274:   flex-direction: column !important;
-275: }
-276: 
-277: .code-editor-tabs .ant-tabs-tabpane > div {
-278:   height: 100% !important;
-279:   display: flex !important;
-280:   flex-direction: column !important;
-281:   position: relative;
-282: }
-283: 
-284: .code-editor-tabs .ant-tabs-tabpane > div > div {
-285:   flex: 1;
-286:   overflow: hidden;
-287:   position: relative;
-288: }
-289: 
-290: .code-editor-tabs .monaco-editor {
-291:   height: 100% !important;
-292: }
-293: 
-294: 
-295: .react-json-view {
-296:   background: var(--bg-container) !important;
-297:   padding: 20px;
-298:   border-radius: 12px;
-299:   border: 1px solid var(--border-color);
-300:   font-size: 14px;
-301:   line-height: 1.8;
-302: }
-303: 
-304: .react-json-view .string-key {
-305:   color: var(--primary) !important;
-306:   font-weight: 600;
-307: }
-308: 
-309: .react-json-view .object-key {
-310:   color: var(--primary) !important;
-311:   font-weight: 600;
-312: }
-313: 
-314: .react-json-view .string-value {
-315:   color: #059669 !important;
-316: }
-317: 
-318: .react-json-view .variable-value {
-319:   color: #059669 !important;
-320: }
-321: 
-322: .react-json-view .number-value {
-323:   color: #2563eb !important;
-324: }
-325: 
-326: .react-json-view .boolean-value {
-327:   color: #d97706 !important;
-328:   font-weight: 500;
-329: }
-330: 
-331: .react-json-view .null-value {
-332:   color: #dc2626 !important;
-333:   font-weight: 500;
-334: }
-335: 
-336: .react-json-view .array-key {
-337:   color: var(--primary) !important;
-338:   font-weight: 600;
-339: }
-340: 
-341: .react-json-view .string-literal {
-342:   color: #059669 !important;
-343: }
-344: 
-345: .react-json-view .object-name {
-346:   color: var(--primary) !important;
-347:   font-weight: 600;
-348: }
-349: 
-350: .react-json-view .array-name {
-351:   color: var(--primary) !important;
-352:   font-weight: 600;
-353: }
-354: 
-355: .react-json-view .br-row,
-356: .react-json-view .bracket {
-357:   color: var(--text-tertiary) !important;
-358: }
-359: 
-360: .react-json-view .colon {
-361:   color: var(--text-tertiary) !important;
-362: }
-363: 
-364: .react-json-view .arrow-icon,
-365: .react-json-view .expanded-icon,
-366: .react-json-view .collapsed-icon {
-367:   fill: var(--primary) !important;
-368: }
+218: .ant-modal-close-icon {
+219:   color: var(--text-tertiary) !important;
+220: }
+221: 
+222: .ant-modal-close:hover .ant-modal-close-icon {
+223:   color: var(--text-primary) !important;
+224: }
+225: 
+226: 
+227: .ant-tag {
+228:   border-radius: 6px;
+229:   border: none;
+230:   padding: 4px 10px;
+231: }
+232: 
+233: 
+234: .ant-alert {
+235:   border-radius: 10px;
+236:   border: none;
+237: }
+238: 
+239: .ant-alert-success {
+240:   background: var(--success-light);
+241: }
+242: 
+243: .ant-alert-warning {
+244:   background: var(--warning-light);
+245: }
+246: 
+247: .ant-alert-error {
+248:   background: var(--error-light);
+249: }
+250: 
+251: .ant-alert-info {
+252:   background: var(--info-light);
+253: }
+254: 
+255: 
+256: .ant-spin {
+257:   color: var(--primary);
+258: }
+259: 
+260: .ant-spin-dot-item {
+261:   background-color: var(--primary);
+262: }
+263: 
+264: 
+265: .ant-empty-description {
+266:   color: var(--text-secondary);
+267: }
 ```
 
-### crates/cowork-gui/src/styles/markdown.css (212 lines)
+### crates/cowork-gui/src/styles/global.css (34 lines)
 
 ```
-1: .markdown-body {
-2:   color: var(--text-primary);
-3:   line-height: 1.7;
-4:   font-size: 14px;
+1: * {
+2:   margin: 0;
+3:   padding: 0;
+4:   box-sizing: border-box;
+5: }
+6: 
+7: body {
+8:   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+9:   background: var(--bg-base);
+10:   color: var(--text-primary);
+11:   height: 100vh;
+12:   overflow: hidden;
+13:   -webkit-font-smoothing: antialiased;
+14:   -moz-osx-font-smoothing: grayscale;
+15: }
+16: 
+17: 
+18: ::-webkit-scrollbar {
+19:   width: 8px;
+20:   height: 8px;
+21: }
+22: 
+23: ::-webkit-scrollbar-track {
+24:   background: transparent;
+25: }
+26: 
+27: ::-webkit-scrollbar-thumb {
+28:   background: var(--text-muted);
+29:   border-radius: 2px;
+30: }
+31: 
+32: ::-webkit-scrollbar-thumb:hover {
+33:   background: var(--text-tertiary);
+34: }
+```
+
+### crates/cowork-gui/src/styles/layout.css (131 lines)
+
+```
+1: .runner-panel,
+2: .preview-panel,
+3: .code-editor-container {
+4:   background: var(--bg-base);
 5: }
 6: 
 7: 
-8: .markdown-body p {
-9:   margin: 0 0 12px;
-10: }
-11: 
-12: .markdown-body p:last-child {
-13:   margin-bottom: 0;
-14: }
-15: 
+8: .app-header {
+9:   background: var(--bg-base);
+10:   border-bottom: 1px solid var(--border-color);
+11:   padding: 0 24px;
+12:   display: flex;
+13:   align-items: center;
+14:   justify-content: space-between;
+15: }
 16: 
-17: .markdown-body h1,
-18: .markdown-body h2,
-19: .markdown-body h3,
-20: .markdown-body h4,
-21: .markdown-body h5,
-22: .markdown-body h6 {
-23:   color: var(--text-primary);
-24:   margin: 20px 0 8px;
-25:   font-weight: 600;
-26:   line-height: 1.3;
-27: }
+17: .app-title {
+18:   font-size: 18px;
+19:   font-weight: 600;
+20:   color: var(--text-primary);
+21: }
+22: 
+23: 
+24: .iterations-panel {
+25:   background: var(--bg-sidebar);
+26: }
+27: 
 28: 
-29: .markdown-body h1 { font-size: 1.4em; }
-30: .markdown-body h2 { font-size: 1.2em; border-bottom: 1px solid var(--border-light); padding-bottom: 6px; }
-31: .markdown-body h3 { font-size: 1.1em; }
-32: .markdown-body h4 { font-size: 1em; }
-33: 
-34: 
-35: .markdown-body strong {
-36:   color: var(--text-primary);
-37:   font-weight: 600;
-38: }
-39: 
-40: .markdown-body em {
-41:   color: var(--text-secondary);
-42: }
-43: 
-44: 
-45: .markdown-body code {
-46:   background: var(--bg-elevated);
-47:   color: var(--primary);
-48:   padding: 2px 6px;
-49:   border-radius: 4px;
-50:   font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
-51:   font-size: 0.88em;
-52:   border: 1px solid var(--border-light);
-53: }
-54: 
-55: 
-56: .markdown-code-block {
-57:   position: relative;
-58:   margin: 12px 0;
-59:   border-radius: 8px;
-60:   overflow: hidden;
-61:   border: 1px solid var(--border-color);
-62:   background: #1e293b;
-63: }
-64: 
-65: .markdown-code-header {
-66:   display: flex;
-67:   align-items: center;
-68:   justify-content: space-between;
-69:   padding: 6px 12px;
-70:   background: rgba(0, 0, 0, 0.2);
-71:   font-size: 11px;
-72:   color: #94a3b8;
-73:   font-family: 'JetBrains Mono', 'Consolas', monospace;
-74: }
-75: 
-76: .markdown-code-copy {
-77:   background: none;
-78:   border: 1px solid rgba(148, 163, 184, 0.3);
-79:   color: #94a3b8;
-80:   padding: 2px 8px;
-81:   border-radius: 4px;
-82:   cursor: pointer;
-83:   font-size: 11px;
-84:   font-family: inherit;
-85:   transition: all 0.15s;
-86: }
-87: 
-88: .markdown-code-copy:hover {
-89:   background: rgba(148, 163, 184, 0.15);
-90:   color: #e2e8f0;
-91:   border-color: rgba(148, 163, 184, 0.5);
+29: .session-item {
+30:   padding: 12px 16px;
+31:   margin-bottom: 6px;
+32:   border-radius: 5px;
+33:   cursor: pointer;
+34:   transition: all 0.2s ease;
+35:   border: 1px solid transparent;
+36: }
+37: 
+38: .session-item:hover {
+39:   background: var(--bg-elevated);
+40:   border-color: var(--border-color);
+41: }
+42: 
+43: .session-item.active {
+44:   background: var(--primary-light);
+45:   border-color: var(--primary);
+46: }
+47: 
+48: .session-item-title {
+49:   color: var(--text-primary);
+50:   font-size: 14px;
+51:   font-weight: 500;
+52: }
+53: 
+54: .session-item-time {
+55:   color: var(--text-tertiary);
+56:   font-size: 12px;
+57:   margin-top: 4px;
+58: }
+59: 
+60: 
+61: .welcome-screen {
+62:   display: flex;
+63:   flex-direction: column;
+64:   align-items: center;
+65:   justify-content: center;
+66:   height: 100%;
+67:   color: var(--text-secondary);
+68:   text-align: center;
+69:   padding: 40px;
+70: }
+71: 
+72: .welcome-screen h2 {
+73:   color: var(--text-primary);
+74:   font-size: 32px;
+75:   margin-bottom: 16px;
+76:   font-weight: 600;
+77: }
+78: 
+79: .welcome-screen p {
+80:   font-size: 16px;
+81:   line-height: 1.6;
+82:   max-width: 500px;
+83:   margin: 0 auto;
+84: }
+85: 
+86: 
+87: .status-indicator {
+88:   width: 8px;
+89:   height: 8px;
+90:   border-radius: 50%;
+91:   display: inline-block;
 92: }
 93: 
-94: .markdown-code-block pre {
-95:   margin: 0;
-96:   padding: 14px 16px;
-97:   overflow-x: auto;
-98:   background: transparent !important;
-99:   border: none !important;
-100:   border-radius: 0 !important;
-101: }
-102: 
-103: .markdown-code-block code {
-104:   background: transparent !important;
-105:   border: none !important;
-106:   padding: 0 !important;
-107:   color: #e2e8f0 !important;
-108:   font-size: 13px;
-109:   line-height: 1.6;
-110: }
-111: 
-112: 
-113: .markdown-body ul,
-114: .markdown-body ol {
-115:   margin: 8px 0;
-116:   padding-left: 24px;
-117: }
-118: 
-119: .markdown-body li {
-120:   margin-bottom: 4px;
-121:   color: var(--text-primary);
-122: }
-123: 
-124: .markdown-body ul li::marker {
-125:   color: var(--primary);
-126: }
-127: 
-128: .markdown-body ol li::marker {
-129:   color: var(--primary);
-130:   font-weight: 600;
+94: .status-indicator.success {
+95:   background: var(--success);
+96:   box-shadow: 0 0 0 3px var(--success-light);
+97: }
+98: 
+99: .status-indicator.processing {
+100:   background: var(--primary);
+101:   box-shadow: 0 0 0 3px var(--primary-light);
+102:   animation: pulse 2s infinite;
+103: }
+104: 
+105: .status-indicator.error {
+106:   background: var(--error);
+107:   box-shadow: 0 0 0 3px var(--error-light);
+108: }
+109: 
+110: 
+111: @keyframes pulse {
+112:   0%, 100% {
+113:     opacity: 0.3;
+114:     transform: scale(0.8);
+115:   }
+116:   50% {
+117:     opacity: 1;
+118:     transform: scale(1);
+119:   }
+120: }
+121: 
+122: .agent-loading-indicator {
+123:   margin-left: 4px;
+124: }
+125: 
+126: 
+127: .divider {
+128:   height: 1px;
+129:   background: var(--border-color);
+130:   margin: 16px 0;
 131: }
-132: 
-133: 
-134: .markdown-body blockquote {
-135:   border-left: 3px solid var(--primary);
-136:   padding: 8px 16px;
-137:   margin: 12px 0;
-138:   background: var(--primary-lighter);
-139:   border-radius: 0 8px 8px 0;
-140:   color: var(--text-secondary);
-141: }
-142: 
-143: .markdown-body blockquote p {
-144:   margin: 0;
-145: }
-146: 
-147: 
-148: .markdown-body a {
-149:   color: var(--primary);
-150:   text-decoration: none;
-151:   border-bottom: 1px solid transparent;
-152:   transition: all 0.15s;
-153: }
-154: 
-155: .markdown-body a:hover {
-156:   border-bottom-color: var(--primary);
-157: }
-158: 
-159: 
-160: .markdown-body table {
-161:   width: 100%;
-162:   border-collapse: collapse;
-163:   margin: 12px 0;
-164:   font-size: 13px;
-165:   border: 1px solid var(--border-color);
-166:   border-radius: 8px;
-167:   overflow: hidden;
-168: }
-169: 
-170: .markdown-body th {
-171:   background: var(--bg-elevated);
-172:   color: var(--text-primary);
-173:   font-weight: 600;
-174:   text-align: left;
-175:   padding: 10px 14px;
-176:   border-bottom: 1px solid var(--border-color);
-177:   font-size: 12px;
-178: }
-179: 
-180: .markdown-body td {
-181:   padding: 8px 14px;
-182:   border-bottom: 1px solid var(--border-light);
-183: }
-184: 
-185: .markdown-body tr:last-child td {
-186:   border-bottom: none;
-187: }
-188: 
-189: .markdown-body tr:hover td {
-190:   background: var(--bg-container);
-191: }
-192: 
-193: 
-194: .markdown-body hr {
-195:   border: none;
-196:   border-top: 1px solid var(--border-light);
-197:   margin: 20px 0;
-198: }
-199: 
-200: 
-201: .markdown-body img {
-202:   max-width: 100%;
-203:   border-radius: 8px;
-204:   margin: 12px 0;
-205: }
-206: 
-207: 
-208: .hljs {
-209:   background: transparent !important;
-210:   color: #e2e8f0 !important;
-211:   padding: 0 !important;
-212: }
 ```
 
 ### crates/cowork-gui/src/styles.css (10 lines)
@@ -31731,22 +32197,6 @@ LICENSE
 7: }
 ```
 
-### crates/cowork-gui/src/components/iterations/IterationDetailsModal.tsx (11 lines)
-
-```
-1: IterationDetailsModalProps
-2: ⋮----
-3: {
-4:   open: boolean;
-5:   onClose: () => void;
-6:   iteration: IterationInfo | null;
-7: }
-8: ⋮----
-9: getStatusColor
-10: ⋮----
-11: (iteration.status)
-```
-
 ### crates/cowork-gui/src/components/iterations/index.ts (3 lines)
 
 ```
@@ -32311,424 +32761,6 @@ LICENSE
 31:   triggerMemoryRefresh: () => void;
 32:   triggerKnowledgeRefresh: () => void;
 33: }
-```
-
-### crates/cowork-gui/src/styles/antd-overrides.css (238 lines)
-
-```
-1: .ant-layout {
-2:   background: var(--bg-base) !important;
-3: }
-4: 
-5: .ant-layout-header {
-6:   background: var(--bg-base) !important;
-7:   border-bottom: 1px solid var(--border-color);
-8:   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-9: }
-10: 
-11: .ant-layout-sider {
-12:   background: var(--bg-sidebar) !important;
-13:   border-right: 1px solid var(--border-color);
-14: }
-15: 
-16: 
-17: .ant-menu {
-18:   background: transparent !important;
-19:   border-right: none !important;
-20: }
-21: 
-22: .ant-menu-item {
-23:   color: var(--text-secondary) !important;
-24:   border-radius: 8px !important;
-25:   margin: 4px 12px !important;
-26:   padding-left: 16px !important;
-27:   transition: all 0.2s ease !important;
-28: }
-29: 
-30: .ant-menu-item:hover {
-31:   background: var(--bg-elevated) !important;
-32:   color: var(--text-primary) !important;
-33: }
-34: 
-35: .ant-menu-item-selected {
-36:   background: var(--primary-light) !important;
-37:   color: var(--primary) !important;
-38:   font-weight: 500;
-39: }
-40: 
-41: .ant-menu-item-selected::after {
-42:   display: none !important;
-43: }
-44: 
-45: .ant-menu-item .anticon {
-46:   font-size: 18px;
-47:   margin-right: 12px;
-48: }
-49: 
-50: 
-51: .ant-tabs {
-52:   background: var(--bg-base);
-53: }
-54: 
-55: .ant-tabs-nav {
-56:   margin-bottom: 0 !important;
-57: }
-58: 
-59: .ant-tabs-tab {
-60:   color: var(--text-secondary) !important;
-61:   border-radius: 6px 6px 0 0 !important;
-62:   transition: all 0.2s ease !important;
-63: }
-64: 
-65: .ant-tabs-tab:hover {
-66:   color: var(--text-primary) !important;
-67: }
-68: 
-69: .ant-tabs-tab-active {
-70:   color: var(--primary) !important;
-71:   background: var(--bg-base) !important;
-72:   font-weight: 500;
-73: }
-74: 
-75: .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
-76:   background: var(--bg-container) !important;
-77:   border-color: var(--border-color) !important;
-78: }
-79: 
-80: .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab-active {
-81:   background: var(--bg-base) !important;
-82:   border-bottom-color: var(--bg-base) !important;
-83: }
-84: 
-85: .ant-tabs-content-holder {
-86:   background: var(--bg-base);
-87: }
-88: 
-89: 
-90: .ant-btn {
-91:   background: var(--bg-base);
-92:   border-color: var(--border-color);
-93:   color: var(--text-primary);
-94:   border-radius: 8px;
-95:   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-96:   transition: all 0.2s ease;
-97: }
-98: 
-99: .ant-btn:hover {
-100:   background: var(--bg-elevated);
-101:   border-color: var(--primary);
-102:   color: var(--primary);
-103: }
-104: 
-105: .ant-btn-primary {
-106:   background: var(--primary) !important;
-107:   border-color: var(--primary) !important;
-108:   color: white !important;
-109:   box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
-110: }
-111: 
-112: .ant-btn-primary:hover {
-113:   background: var(--primary-hover) !important;
-114:   border-color: var(--primary-hover) !important;
-115:   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
-116: }
-117: 
-118: 
-119: .ant-input,
-120: .ant-input-affix-wrapper {
-121:   background: var(--bg-container) !important;
-122:   border-color: var(--border-color) !important;
-123:   color: var(--text-primary) !important;
-124:   border-radius: 10px !important;
-125:   transition: all 0.2s ease;
-126: }
-127: 
-128: .ant-input:hover,
-129: .ant-input-affix-wrapper:hover {
-130:   border-color: var(--primary) !important;
-131: }
-132: 
-133: .ant-input:focus,
-134: .ant-input-affix-wrapper:focus,
-135: .ant-input-affix-wrapper-focused {
-136:   background: var(--bg-base) !important;
-137:   border-color: var(--primary) !important;
-138:   box-shadow: 0 0 0 3px var(--primary-light) !important;
-139: }
-140: 
-141: 
-142: .ant-select:not(.ant-select-customize-input) .ant-select-selector {
-143:   background: var(--bg-container) !important;
-144:   border-color: var(--border-color) !important;
-145:   color: var(--text-primary) !important;
-146:   border-radius: 8px !important;
-147: }
-148: 
-149: .ant-select:not(.ant-select-customize-input) .ant-select-selector:hover {
-150:   border-color: var(--primary) !important;
-151: }
-152: 
-153: .ant-select-focused .ant-select-selector {
-154:   border-color: var(--primary) !important;
-155:   box-shadow: 0 0 0 3px var(--primary-light) !important;
-156: }
-157: 
-158: 
-159: .ant-dropdown-menu {
-160:   background: var(--bg-base) !important;
-161:   border: 1px solid var(--border-color);
-162:   border-radius: 12px !important;
-163:   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1) !important;
-164:   padding: 8px !important;
-165: }
-166: 
-167: .ant-dropdown-menu-item {
-168:   border-radius: 8px !important;
-169:   color: var(--text-primary) !important;
-170: }
-171: 
-172: .ant-dropdown-menu-item:hover {
-173:   background: var(--bg-elevated) !important;
-174: }
-175: 
-176: 
-177: .ant-card {
-178:   background: var(--bg-base);
-179:   border-color: var(--border-color);
-180:   border-radius: 12px;
-181:   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-182: }
-183: 
-184: 
-185: .ant-modal-content {
-186:   background: var(--bg-base) !important;
-187:   border-radius: 16px !important;
-188:   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15) !important;
-189: }
-190: 
-191: .ant-modal-header {
-192:   background: var(--bg-base) !important;
-193:   border-bottom-color: var(--border-color) !important;
-194:   border-radius: 16px 16px 0 0 !important;
-195: }
-196: 
-197: 
-198: .ant-tag {
-199:   border-radius: 6px;
-200:   border: none;
-201:   padding: 4px 10px;
-202: }
-203: 
-204: 
-205: .ant-alert {
-206:   border-radius: 10px;
-207:   border: none;
-208: }
-209: 
-210: .ant-alert-success {
-211:   background: var(--success-light);
-212: }
-213: 
-214: .ant-alert-warning {
-215:   background: var(--warning-light);
-216: }
-217: 
-218: .ant-alert-error {
-219:   background: var(--error-light);
-220: }
-221: 
-222: .ant-alert-info {
-223:   background: var(--info-light);
-224: }
-225: 
-226: 
-227: .ant-spin {
-228:   color: var(--primary);
-229: }
-230: 
-231: .ant-spin-dot-item {
-232:   background-color: var(--primary);
-233: }
-234: 
-235: 
-236: .ant-empty-description {
-237:   color: var(--text-secondary);
-238: }
-```
-
-### crates/cowork-gui/src/styles/global.css (34 lines)
-
-```
-1: * {
-2:   margin: 0;
-3:   padding: 0;
-4:   box-sizing: border-box;
-5: }
-6: 
-7: body {
-8:   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-9:   background: var(--bg-base);
-10:   color: var(--text-primary);
-11:   height: 100vh;
-12:   overflow: hidden;
-13:   -webkit-font-smoothing: antialiased;
-14:   -moz-osx-font-smoothing: grayscale;
-15: }
-16: 
-17: 
-18: ::-webkit-scrollbar {
-19:   width: 8px;
-20:   height: 8px;
-21: }
-22: 
-23: ::-webkit-scrollbar-track {
-24:   background: transparent;
-25: }
-26: 
-27: ::-webkit-scrollbar-thumb {
-28:   background: var(--text-muted);
-29:   border-radius: 4px;
-30: }
-31: 
-32: ::-webkit-scrollbar-thumb:hover {
-33:   background: var(--text-tertiary);
-34: }
-```
-
-### crates/cowork-gui/src/styles/layout.css (131 lines)
-
-```
-1: .runner-panel,
-2: .preview-panel,
-3: .code-editor-container {
-4:   background: var(--bg-base);
-5: }
-6: 
-7: 
-8: .app-header {
-9:   background: var(--bg-base);
-10:   border-bottom: 1px solid var(--border-color);
-11:   padding: 0 24px;
-12:   display: flex;
-13:   align-items: center;
-14:   justify-content: space-between;
-15: }
-16: 
-17: .app-title {
-18:   font-size: 18px;
-19:   font-weight: 600;
-20:   color: var(--text-primary);
-21: }
-22: 
-23: 
-24: .iterations-panel {
-25:   background: var(--bg-sidebar);
-26: }
-27: 
-28: 
-29: .session-item {
-30:   padding: 12px 16px;
-31:   margin-bottom: 6px;
-32:   border-radius: 10px;
-33:   cursor: pointer;
-34:   transition: all 0.2s ease;
-35:   border: 1px solid transparent;
-36: }
-37: 
-38: .session-item:hover {
-39:   background: var(--bg-elevated);
-40:   border-color: var(--border-color);
-41: }
-42: 
-43: .session-item.active {
-44:   background: var(--primary-light);
-45:   border-color: var(--primary);
-46: }
-47: 
-48: .session-item-title {
-49:   color: var(--text-primary);
-50:   font-size: 14px;
-51:   font-weight: 500;
-52: }
-53: 
-54: .session-item-time {
-55:   color: var(--text-tertiary);
-56:   font-size: 12px;
-57:   margin-top: 4px;
-58: }
-59: 
-60: 
-61: .welcome-screen {
-62:   display: flex;
-63:   flex-direction: column;
-64:   align-items: center;
-65:   justify-content: center;
-66:   height: 100%;
-67:   color: var(--text-secondary);
-68:   text-align: center;
-69:   padding: 40px;
-70: }
-71: 
-72: .welcome-screen h2 {
-73:   color: var(--text-primary);
-74:   font-size: 32px;
-75:   margin-bottom: 16px;
-76:   font-weight: 600;
-77: }
-78: 
-79: .welcome-screen p {
-80:   font-size: 16px;
-81:   line-height: 1.6;
-82:   max-width: 500px;
-83:   margin: 0 auto;
-84: }
-85: 
-86: 
-87: .status-indicator {
-88:   width: 8px;
-89:   height: 8px;
-90:   border-radius: 50%;
-91:   display: inline-block;
-92: }
-93: 
-94: .status-indicator.success {
-95:   background: var(--success);
-96:   box-shadow: 0 0 0 3px var(--success-light);
-97: }
-98: 
-99: .status-indicator.processing {
-100:   background: var(--primary);
-101:   box-shadow: 0 0 0 3px var(--primary-light);
-102:   animation: pulse 2s infinite;
-103: }
-104: 
-105: .status-indicator.error {
-106:   background: var(--error);
-107:   box-shadow: 0 0 0 3px var(--error-light);
-108: }
-109: 
-110: 
-111: @keyframes pulse {
-112:   0%, 100% {
-113:     opacity: 0.3;
-114:     transform: scale(0.8);
-115:   }
-116:   50% {
-117:     opacity: 1;
-118:     transform: scale(1);
-119:   }
-120: }
-121: 
-122: .agent-loading-indicator {
-123:   margin-left: 4px;
-124: }
-125: 
-126: 
-127: .divider {
-128:   height: 1px;
-129:   background: var(--border-color);
-130:   margin: 16px 0;
-131: }
 ```
 
 ### crates/cowork-gui/src/styles/theme.css (34 lines)

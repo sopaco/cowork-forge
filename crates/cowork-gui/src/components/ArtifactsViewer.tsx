@@ -19,7 +19,7 @@ const renderJson = (data: unknown) => {
       padding: '14px 16px',
       background: '#1e293b',
       color: '#e2e8f0',
-      borderRadius: 6,
+      borderRadius: 3,
       fontSize: 13,
       lineHeight: 1.6,
       fontFamily: "'JetBrains Mono', 'Consolas', 'Monaco', monospace",

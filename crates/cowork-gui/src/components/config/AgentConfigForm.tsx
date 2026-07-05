@@ -506,7 +506,7 @@ const AgentConfigForm: React.FC = () => {
                               style={{
                                 background: '#fafafa',
                                 border: '1px solid #d9d9d9',
-                                borderRadius: 6,
+                                borderRadius: 3,
                                 padding: 12,
                                 maxHeight: 200,
                                 overflow: 'auto',
@@ -682,7 +682,7 @@ const AgentConfigForm: React.FC = () => {
             <Title level={5}>Instruction</Title>
             <Paragraph
               ellipsis={{ rows: 5, expandable: true, symbol: 'more' }}
-              style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}
+              style={{ background: '#f5f5f5', padding: 8, borderRadius: 2 }}
             >
               {selectedAgentData.instruction}
             </Paragraph>

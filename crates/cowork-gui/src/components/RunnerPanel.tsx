@@ -253,7 +253,7 @@ const RunnerPanel: React.FC<RunnerPanelProps> = ({ iterationId }) => {
         <span style={{ color: '#888', fontSize: '12px', marginLeft: 'auto' }}>{filteredLogs.length}/{logs.length} lines</span>
       </div>
 
-      <div ref={logContainerRef} style={{ flex: 1, backgroundColor: '#f5f5f5', color: '#333', fontFamily: 'Consolas, "Courier New", monospace', fontSize: '13px', padding: '10px', overflow: 'hidden', whiteSpace: 'pre-wrap', wordBreak: 'break-all', border: '1px solid #d9d9d9', margin: '8px', borderRadius: '4px' }}>
+      <div ref={logContainerRef} style={{ flex: 1, backgroundColor: '#f5f5f5', color: '#333', fontFamily: 'Consolas, "Courier New", monospace', fontSize: '13px', padding: '10px', overflow: 'hidden', whiteSpace: 'pre-wrap', wordBreak: 'break-all', border: '1px solid #d9d9d9', margin: '8px', borderRadius: '2px' }}>
         {logs.length === 0 ? (
           <div style={{ color: '#999', textAlign: 'center', marginTop: '50px' }}>Click "Start" to run your project</div>
         ) : filteredLogs.length === 0 ? (
@@ -291,10 +291,10 @@ const RunnerPanel: React.FC<RunnerPanelProps> = ({ iterationId }) => {
             <span style={{ fontSize: 13, color: '#1890ff', fontFamily: 'monospace', flex: 1 }}>{previewUrl}</span>
             <Button icon={<ReloadOutlined />} size="small" onClick={refreshPreview}>Refresh</Button>
           </div>
-          <iframe src={previewUrl} className="preview-iframe" style={{ flex: 1, width: '100%', border: 'none', backgroundColor: '#ffffff', margin: '8px', borderRadius: '4px' }} title="Preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
+          <iframe src={previewUrl} className="preview-iframe" style={{ flex: 1, width: '100%', border: 'none', backgroundColor: '#ffffff', margin: '8px', borderRadius: '2px' }} title="Preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
         </>
       ) : (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, backgroundColor: '#ffffff', margin: '8px', borderRadius: '4px', border: '1px solid #d9d9d9' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, backgroundColor: '#ffffff', margin: '8px', borderRadius: '2px', border: '1px solid #d9d9d9' }}>
           <EyeOutlined style={{ fontSize: 64, color: '#d9d9d9' }} />
           <div style={{ textAlign: 'center', color: '#666' }}>
             <div style={{ fontSize: 14, marginBottom: 8 }}>{!hasFrontend ? 'No frontend project detected' : 'Please start the project first'}</div>
@@ -306,7 +306,7 @@ const RunnerPanel: React.FC<RunnerPanelProps> = ({ iterationId }) => {
   );
 
   return (
-    <Card className="runner-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', margin: '8px', borderRadius: '8px' }} styles={{ body: { flex: 1, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' } }}>
+    <Card className="runner-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', margin: '8px', borderRadius: '4px' }} styles={{ body: { flex: 1, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' } }}>
       <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '16px', fontWeight: 500 }}>🚀 Run Center</span>

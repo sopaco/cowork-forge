@@ -300,7 +300,7 @@
 .react-json-view {
   background: var(--bg-container) !important;
   padding: 20px;
-  border-radius: 12px;
+  border-radius: 6px;
   border: 1px solid var(--border-color);
   font-size: 14px;
   line-height: 1.8;

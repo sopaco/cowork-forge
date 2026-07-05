@@ -2,8 +2,8 @@
   "project": "cowork-forge",
   "repo_path": ".",
   "output_file": "context.md",
-  "generated_at": "2026-07-05T13:51:15.263648500+00:00",
+  "generated_at": "2026-07-05T14:03:39.056649300+00:00",
   "section_count": 0,
-  "char_count": 166,
-  "baseline_git_head": "21abc8dfe90f5d459a24ff78bbc48c53a8cf35b8"
+  "char_count": 131,
+  "baseline_git_head": "6dd7c497f2982ac9985ff1dadbe782e2e89404fe"
 }

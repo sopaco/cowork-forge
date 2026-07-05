@@ -63,7 +63,7 @@
 
 .ant-tabs-tab {
   color: var(--text-secondary) !important;
-  border-radius: 6px 6px 0 0 !important;
+  border-radius: 3px 3px 0 0 !important;
   transition: all 0.2s ease !important;
 }
 
@@ -96,7 +96,7 @@
   background: var(--bg-base);
   border-color: var(--border-color);
   color: var(--text-primary);
-  border-radius: 8px;
+  border-radius: 4px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   transition: all 0.2s ease;
 }
@@ -126,7 +126,7 @@
   background: var(--bg-container) !important;
   border-color: var(--border-color) !important;
   color: var(--text-primary) !important;
-  border-radius: 10px !important;
+  border-radius: 5px !important;
   transition: all 0.2s ease;
 }
 
@@ -164,7 +164,7 @@
 .ant-dropdown-menu {
   background: var(--bg-base) !important;
   border: 1px solid var(--border-color);
-  border-radius: 12px !important;
+  border-radius: 6px !important;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1) !important;
   padding: 8px !important;
 }
@@ -182,7 +182,7 @@
 .ant-card {
   background: var(--bg-base);
   border-color: var(--border-color);
-  border-radius: 12px;
+  border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
@@ -230,14 +230,14 @@
 
 /* Tag */
 .ant-tag {
-  border-radius: 6px;
+  border-radius: 3px;
   border: none;
   padding: 4px 10px;
 }
 
 /* Alert */
 .ant-alert {
-  border-radius: 10px;
+  border-radius: 5px;
   border: none;
 }
 

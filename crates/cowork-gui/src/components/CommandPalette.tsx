@@ -110,7 +110,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ visible, onClose, onCom
           <List.Item
             key={item.id}
             onClick={() => { item.action(); handleClose(); }}
-            style={{ cursor: 'pointer', padding: '12px', backgroundColor: index === selectedIndex ? '#1890ff22' : 'transparent', borderRadius: '4px' }}
+            style={{ cursor: 'pointer', padding: '12px', backgroundColor: index === selectedIndex ? '#1890ff22' : 'transparent', borderRadius: '2px' }}
           >
             <List.Item.Meta
               avatar={item.icon as React.ReactElement}

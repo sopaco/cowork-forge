@@ -117,7 +117,7 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
         {mode === 'pm_agent' ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <img src={avatarPm} alt="PM" style={{ width: 20, height: 20, borderRadius: 4 }} />
+              <img src={avatarPm} alt="PM" style={{ width: 20, height: 20, borderRadius: 2 }} />
               <h3 className="chat-header-title">Project Manager</h3>
               <Tag color="green" style={{ marginLeft: '4px', fontSize: '11px' }}>Post-Delivery</Tag>
             </div>

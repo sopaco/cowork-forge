@@ -501,7 +501,7 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({
                         marginBottom: "16px",
                         padding: "16px 20px",
                         background: "var(--bg-elevated)",
-                        borderRadius: "6px",
+                        borderRadius: "3px",
                         border: "1px solid var(--border-light)",
                       }}
                     >
@@ -557,7 +557,7 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({
                         overflow: "auto",
                         padding: "16px 20px",
                         background: "var(--bg-container)",
-                        borderRadius: "6px",
+                        borderRadius: "3px",
                         border: "1px solid var(--border-light)",
                       }}
                     >
@@ -585,7 +585,7 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({
                         style={{
                           padding: "16px 20px",
                           background: "var(--bg-container)",
-                          borderRadius: "6px",
+                          borderRadius: "3px",
                           border: "1px solid var(--border-light)",
                           maxHeight: "60vh",
                           overflow: "auto",
