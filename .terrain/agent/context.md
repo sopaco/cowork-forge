@@ -7,199 +7,123 @@ source: .
 
 ## 项目概览
 
-Cowork Forge 是一个 **AI 原生的多 Agent 软件开发平台**，将自然语言想法通过 7 阶段流水线转化为可交付软件。系统内置 14+ 专业 AI Agent（产品经理、架构师、项目经理、工程师等），采用 Actor-Critic 自优化模式（LoopAgent），在关键节点设置 Human-in-the-Loop 验证门。核心价值：**一个人拥有完整虚拟开发团队**。运行在本地桌面环境，通过 OpenAI 兼容 API 驱动 LLM 推理，无外部数据库依赖（JSON 文件存储）。支持 Genesis（首次）和 Evolution（演化）两种迭代模式，具备跨迭代记忆累积能力。提供 CLI（clap+dialoguer）与 Tauri GUI（React 18）双界面。
+Cowork Forge 是一个 AI 原生的多 Agent 软件开发平台，通过 7 阶段流水线（Idea→PRD→Design→Plan→Coding→Check→Delivery）将自然语言想法转化为可交付软件。系统内置 10+ 专业 AI Agent（产品经理、架构师、项目经理、工程师），每个关键角色采用 Actor-Critic 自优化模式。支持 CLI（clap+dialoguer）和 GUI（Tauri+React）双界面，通过六边形架构保持核心域纯净。核心约束：LLM 限流 30 req/min、工作区严格路径隔离、无 unwrap() 生产代码。
 
 ## 架构设计
 
-### 六边形架构 + DDD 战术模式
-
-| 模式 | 应用 | 说明 |
+| 层级 | 容器 | 职责 |
 |------|------|------|
-| **六边形架构** | `cowork-core` 领域内核 + `cowork-cli`/`cowork-gui` 适配器 | 领域零外部依赖，UI 通过 `InteractiveBackend` trait 桥接 |
-| **DDD 聚合** | `Project` 聚合根、`Iteration` 实体、`InheritanceMode` 值对象 | 一致性边界明确，仓储模式抽象持久化 |
-| **Template Method** | Pipeline 控制器 | 7 阶段固定序列，各阶段通过 trait 自定义行为 |
-| **Strategy** | 阶段执行器 | 每个 Stage 是独立的策略实现 |
-| **Actor-Critic** | PRD/Design/Plan/Coding 阶段 | Actor 生成 → Critic 审查 → 迭代至阈值 (adk-rust LoopAgent) |
-| **事件驱动** | GUI 层 | Tauri Event 流式推送，Command 请求-响应 |
+| **表示层** | `cowork-cli`（CLI）、`cowork-gui`（Tauri+React） | 用户交互，命令路由，实时流展示 |
+| **应用层** | CLI/GUI Backend（InteractiveBackend 实现） | 适配核心域到具体界面，HITL 通道 |
+| **域层** | `cowork-core` | 纯业务逻辑：聚合、流程编排、工具系统 |
+| **基础设施** | Persistence（JSON 存储）、LLM Client、Security | 持久化、AI 集成、工作区安全 |
 
-### 容器拓扑
+**核心架构模式**：
+- **六边形架构**：`InteractiveBackend` 为入站端口，Repository/LLM Client 为出站端口
+- **DDD**：`Project`/`Iteration`/`ProjectMemory` 聚合，三继承模式（None/Partial/Full）
+- **Actor-Critic**：每阶段双 Agent 循环，Critic 用 `IncludeContents::None` 节省 token
+- **事件驱动**（GUI）：Tauri 事件系统实现 Agent/Tool/Progress 实时流
 
+**关键依赖链**：
 ```
-┌──────────────────────────────────────────────────────┐
-│                   Cowork Forge                        │
-│  ┌──────────────┐  ┌──────────────────────────────┐  │
-│  │ cowork-cli   │  │        cowork-gui             │  │
-│  │ clap v4 +    │  │  ┌────────┐ ┌──────────────┐ │  │
-│  │ dialoguer    │  │  │ Tauri  │ │ React 18 +   │ │  │
-│  │ 0.12         │  │  │ Backend│ │ Ant Design 5 │ │  │
-│  └──────┬───────┘  │  └───┬────┘ └──────┬───────┘ │  │
-│         │          │      │             │         │  │
-│         └──────────┼──────┼─────────────┘         │  │
-│                    │      │ InteractiveBackend     │  │
-│  ┌─────────────────┴──────┴────────────────────┐  │  │
-│  │               cowork-core                     │  │  │
-│  │  ┌──────────┐ ┌──────────┐ ┌────────────┐   │  │  │
-│  │  │ Pipeline │ │ Agents   │ │ Tools(40+) │   │  │  │
-│  │  │ (7-stage)│ │ LoopAgent│ │ ADK-based  │   │  │  │
-│  │  │ HITL门控  │ │ ExtAgent │ │ 12 modules │   │  │  │
-│  │  ├──────────┤ ├──────────┤ ├────────────┤   │  │  │
-│  │  │ Domain   │ │Persistence│ │ Config/LLM │   │  │  │
-│  │  │ Aggregts │ │JSON stores│ │ ACP/Skills │   │  │  │
-│  │  └──────────┘ └──────────┘ └────────────┘   │  │  │
-│  └─────────────────────────────────────────────┘  │  │
-│   LLM API (OpenAI-compatible) · adk-rust v1.0     │  │
-│   本地文件系统 (.cowork-v2/) · 30 req/min 限流     │  │
-└──────────────────────────────────────────────────────┘
+CLI/GUI → InteractiveBackend → Pipeline Controller → Stage Executor → ADK Agent → LLM
+                                                            ↓
+                                                     Tools Domain → File System / Shell / Persistence
 ```
-
-### 关键依赖链
-
-- Pipeline → `InteractiveBackend` trait → CLI/GUI 实现
-- Pipeline → StageExecutor → ADK Agent → ToolRegistry + LLM
-- Tools → Persistence (ProjectStore/IterationStore/MemoryStore)
-- Tools → Security (`validate_path()` 路径验证, 命令清洗)
-- Agents (Actor-Critic) → adk-rust `LoopAgent` + `LlmAgentBuilder` + `ExitLoopTool`
-- 全局 LLM Rate Limiter: `Semaphore(concurrency=1)` + 2s delay = 30 req/min
 
 ## 模块地图
 
 | 模块 | 职责 | 主要路径 |
 |------|------|----------|
-| **Pipeline** | 7 阶段编排 + StageExecutor + HITL 门控 + 工作区 | `crates/cowork-core/src/pipeline/` |
-| **Domain** | Project/Iteration/Memory 聚合根、InheritanceMode | `crates/cowork-core/src/domain/` |
-| **Agents** | IterativeAssistant (LoopAgent Actor-Critic)、ExternalCodingAgent (ACP)、LegacyAnalyzer | `crates/cowork-core/src/agents/` |
-| **Tools** | 40+ ADK 工具：文件/数据/HITL/PM/记忆/控制/验证/部署/Artifact/Load | `crates/cowork-core/src/tools/` |
-| **Config & Instructions** | 数据驱动注册表 (Agent/Stage/Flow) + 14 内置 Agent JSON + 指令库 | `crates/cowork-core/src/config_definition/` + `instructions/` |
-| **Data Models** | Requirements, FeatureList, Epic, UserStory, TechStack, Architecture, Plan, TestPlan | `crates/cowork-core/src/data/models.rs` |
-| **LLM** | OpenAI 兼容 API 封装 + 全局限流器 | `crates/cowork-core/src/llm/` |
-| **Interaction** | `InteractiveBackend` trait + CLI dialoguer 实现 | `crates/cowork-core/src/interaction/` |
-| **Persistence** | ProjectStore/IterationStore/MemoryStore (JSON, 增量序列化, 懒加载) | `crates/cowork-core/src/persistence/` |
-| **ACP & Skills** | Agent Client Protocol 客户端 + agentskills.io 技能管理器 | `crates/cowork-core/src/acp/` + `skills/` |
-| **Security & Runtime** | 路径验证 (UNC 正规化) + 命令清洗白名单 + Watchdog 偏离监控 | `crates/cowork-core/src/runtime_security.rs` + `runtime_analyzer.rs` |
-| **CLI & GUI** | clap 10 子命令 + Tauri 命令/事件 + React 18 面板 + 状态管理 | `crates/cowork-cli/src/commands/` + `crate/cowork-gui/` |
+| **Pipeline** | 7 阶段编排、Stage trait、Stage Executor | `crates/cowork-core/src/pipeline/` |
+| **Domain** | Project、Iteration、Memory 聚合与值对象 | `crates/cowork-core/src/domain/` |
+| **Tools** | 40+ ADK 工具（文件/数据/HITL/验证/部署/内存） | `crates/cowork-core/src/tools/` |
+| **Agents** | 迭代助手、PM Agent、遗留项目分析器、外部编码 Agent | `crates/cowork-core/src/agents/` |
+| **Instructions** | 各阶段 Actor/Critic 提示词（约 2000 行） | `crates/cowork-core/src/instructions/` |
+| **Interaction** | InteractiveBackend trait（CLI/GUI 抽象层） | `crates/cowork-core/src/interaction/` |
+| **Config Definition** | 数据驱动配置：Agent 定义、Flow、Stage 定义 | `crates/cowork-core/src/config_definition/` |
+| **Persistence** | JSON 存储：ProjectStore、IterationStore、MemoryStore | `crates/cowork-core/src/persistence/` |
+| **LLM** | 限流客户端工厂（30 req/min，concurrency=1） | `crates/cowork-core/src/llm/` |
+| **ACP** | Agent Client Protocol，外部 Agent 集成 | `crates/cowork-core/src/acp/` |
+| **Integration** | 钩子系统，外部集成管理器 | `crates/cowork-core/src/integration/` |
+| **Skills** | agentskills.io 标准技能系统 | `crates/cowork-core/src/skills/` |
 
 ## 核心流程
 
-### 1. Genesis 迭代 (完整 7 阶段)
+### 1. Genesis 迭代创建
+1. 用户通过 `cowork iter --project <name> <idea>` 触发
+2. Pipeline Controller 创建 Draft 状态迭代，初始化工作区 (`.cowork-v2/iterations/{id}/`)
+3. 按序执行 7 阶段，每阶段：Actor 生成 → Critic 审查 → HITL 确认（可选反馈循环）
+4. 阶段产物保存为 markdown/代码文件到迭代工作区
+5. 迭代完成后触发知识快照生成，更新 ProjectMemory
 
-```
-用户输入想法
-  → Stage 1: Idea (需求捕获 → idea.md) → [HITL]
-  → Stage 2: PRD (Actor→Critic 循环 → prd.md) → [HITL]
-  → Stage 3: Design (Actor→Critic → design.md) → [HITL]
-  → Stage 4: Plan (Actor→Critic → plan.md) → [HITL]
-  → Stage 5: Coding (Actor→Critic → 源文件) → [HITL]
-  → Stage 6: Check (质量验证 → check_report.md) → [HITL]
-  → Stage 7: Delivery (交付报告 → 部署)
-  → 知识快照: 决策/模式/技术栈 → MemoryStore
-```
+### 2. Evolution 迭代（增量演进）
+1. 用户输入变更描述，`analyze_change_scope()` 做 NLP 关键词分析
+2. 确定继承模式：Full（制品+代码）/ Partial（仅代码）/ None（全新）
+3. `LoadBaseKnowledgeTool` 加载历史决策、模式、已知问题
+4. 根据变更范围选择起始阶段（Idea/PRD/Design/Plan），跳过已完成阶段
+5. 继承模式下复制前序工作区文件到新迭代
 
-### 2. Evolution 迭代 (继承模式)
+### 3. HITL 验证流
+1. Agent 调用 HITL 工具（`ReviewAndEditContentTool` / `ReviewAndEditFileTool`）
+2. InteractiveBackend 弹出确认界面：CLI 用 dialoguer，GUI 用 `input_request` 事件
+3. 用户选择：Pass（继续）/ Edit（打开 `$EDITOR`）/ Feedback（文本反馈）
+4. Feedback → Agent 用反馈上下文重新生成 → 再次请求审查
+5. Edit → 编辑器保存后 Hash 比对检测变更
 
-```
-用户变更请求 → analyze_change_scope() 关键词分析:
-  "redesign/refactor" → Full (制品+代码继承)
-  "feature/add"      → Partial (仅代码, 重生成制品)
-  "fix/bug"          → None (全新, 仅参考上下文)
-→ 确定起始阶段 (Idea/PRD/Design/Plan/Coding)
-→ 加载基础迭代记忆 → 从选定阶段恢复流水线
-```
-
-### 3. Actor-Critic 自优化循环 (adk-rust LoopAgent)
-
-```
-LoopAgent(max_iterations=N):
-  1. Actor Agent 运行 → 生成产出 (写入共享 Session)
-  2. Critic Agent 读取 Session → 审查产出
-     - 通过 → ExitLoopTool, 循环终止
-     - 不通过 → 写入反馈, 继续下一轮
-  3. Actor 读取反馈 → 修改 → Critic 再审
-  关键: include_contents(IncludeContents::Default) 必须设置
-```
-
-### 4. HITL 验证门 + GUI 实时执行流
-
-```
-Agent 调用 review 工具 → InteractiveBackend.request_confirmation()
-  → CLI: dialoguer (Pass/Edit/Feedback)
-  → GUI: Tauri Event "input_request" → React Modal
-  用户选择: Pass → 继续 | Edit → $EDITOR | Feedback → 重新生成
-
-GUI 流: React Invoke Tauri Command → Core Pipeline
-  → Events: agent_event / agent_streaming / tool_call / tool_result / input_request
-  → 用户响应通过 Command 回传 → iteration_complete 事件
-```
+### 4. GUI 实时执行监控
+1. React 前端调用 Tauri Command 启动迭代执行
+2. Backend 异步执行 Pipeline，通过 `AppHandle.emit()` 发射事件流
+3. 事件类型：`agent_event` / `agent_streaming` / `tool_call` / `tool_result` / `progress` / `input_request` / `project_log`
+4. React 通过 `listen()` 接收事件，实时更新 UI 面板
 
 ## 技术选型
 
-### 后端
-- **语言**: Rust 2024 edition, stable toolchain
-- **异步**: Tokio (features = ["full"]), tokio-util
-- **Agent 框架**: adk-rust v1.0 (adk-core, adk-agent, adk-model[openai], adk-tool, adk-runner, adk-session, adk-skill)
-- **序列化**: serde + serde_json + toml
-- **错误处理**: anyhow (全局) + thiserror (领域)
-- **CLI 框架**: clap v4 (derive) + dialoguer v0.12 + console v0.16
-
-### GUI
-- **桌面框架**: Tauri (WebView2/WebKit)
-- **前端**: React 18 + TypeScript + Ant Design 5 + Vite
-- **通信**: Tauri Command (请求-响应) + Event (流式推送)
-
-### 存储
-- **格式**: JSON 文件，三个独立仓储 (Project/Iteration/Memory)
-- **位置**: `.cowork-v2/` 工作区目录
-- **策略**: 增量序列化，懒加载
-
-### 其他依赖
-- chrono + uuid (时间/标识)
-- walkdir + ignore (文件遍历)
-- tracing + tracing-subscriber (日志)
-- futures (异步组合)
-- agent-client-protocol v0.9 (ACP 外部 Agent)
+- **语言/运行时**：Rust（edition 2024）+ Tokio（async，features = ["full"]）
+- **AI 编排**：adk-rust（Agent trait、LlmAgentBuilder、LoopAgent）
+- **LLM 接口**：OpenAI 兼容 API（不限供应商）
+- **CLI 框架**：clap（参数解析）+ dialoguer（交互式提示）
+- **GUI 框架**：Tauri 2.x（桌面壳）+ React 18 + Ant Design（前端）
+- **状态管理**：React hooks + zustand 风格 stores
+- **持久化**：JSON + serde（`.cowork-v2/` 目录）
+- **限流**：Tokio Semaphore（concurrency=1）+ 2s 固定延迟
+- **安全**：路径验证（UNC 标准化）+ 危险命令拦截（`rm -rf`/`sudo` 等）
+- **外部集成**：MCP HTTP 客户端（Tavily/DeepWiki）
 
 ## 系统边界
 
-| 方向 | 外部系统 | 通信方式 | 约束 |
-|------|----------|----------|------|
-| **出站** | LLM Provider (OpenAI) | HTTPS, Streaming | 30 req/min, concurrency=1 |
-| **出站** | MCP 服务器 (Tavily/DeepWiki) | HTTP (MCP 协议) | 配置驱动, 启动时注入 |
-| **出站** | Shell (构建/测试) | `std::process` | 命令白名单清洗 |
-| **出站** | 编辑器 (vim/VS Code/nano) | `std::process::Command` | HITL Edit 模式 |
-| **入站** | 用户 (CLI) | stdin/stdout | dialoguer 交互式提示 |
-| **入站** | 用户 (GUI) | Tauri IPC (Command+Event) | WebView2/WebKit |
-| **文件** | 本地文件系统 | `std::fs` | `validate_path()` 边界检查 |
-| **入站** | 外部 Coding Agent | ACP 协议 v0.9 | 仅在 Coding 阶段启用 |
+| 外部系统 | 连接方式 | 信任边界 | 约束 |
+|----------|----------|----------|------|
+| LLM Provider API | HTTP（OpenAI 兼容） | 低（输入输出均受限流控制） | 30 req/min，concurrency=1 |
+| 本地文件系统 | std::fs（路径验证后） | 中（仅限工作区目录） | 禁止路径遍历、UNC 路径需标准化 |
+| Shell 命令 | std::process::Command | 低（命令白名单验证） | 禁止危险命令，仅项目工作区内执行 |
+| 外部编辑器 | `$EDITOR` 环境变量 | 中（文件 Hash 比对检测变更） | 仅编辑受控的临时文件 |
+| 开发服务器 | ProcessRunner（子进程管理） | 低（端口/进程隔离） | 仅 Vite/Webpack 等已知服务器 |
+| MCP 服务器 | MCP HTTP 协议 | 低（用户配置） | 通过 `config.toml` 的 `[mcp]` 段配置 |
+| 外部 Agent（ACP） | Agent Client Protocol | 中（协议层隔离） | 仅编码阶段可调用 |
 
-### 信任边界
-
-- **LLM 响应**: 不可信 — 所有工具/路径调用经过验证
-- **用户输入**: 可信但需清洗 — HITL 不绕过安全层
-- **工作区**: 受限 — 仅 `validate_path()` 批准的路径可访问
-
-### 安全机制
-
-| 机制 | 路径 |
-|------|------|
-| 路径验证 (UNC 正规化 + 边界检查) | `crates/cowork-core/src/runtime_security.rs` |
-| 命令清洗 (危险命令黑名单) | `crates/cowork-core/src/pipeline/executor/workspace.rs` |
-| 运行时监控 (Agent 目标偏离检测) | `crates/cowork-core/src/runtime_analyzer.rs` |
+**存储边界**（`.cowork-v2/` 目录结构）：
+- `project.json` → 项目元数据、技术栈、迭代摘要
+- `iterations/{id}/` → 阶段制品（idea.md、prd.md、design.md、plan.md、代码文件）
+- `memory.json` → 跨迭代架构决策、模式、已知问题
+- `artifacts/` → AI Agent 生成的源码和文档
 
 ## 代码映射索引
 
 | 概念 | 位置 | 说明 |
 |------|------|------|
-| Pipeline 编排 + StageExecutor | `crates/cowork-core/src/pipeline/mod.rs` + `stage_executor.rs` | 状态机 + ADK Agent 生命周期 |
-| 阶段实现 (7 个) | `crates/cowork-core/src/pipeline/stages/` | idea/prd/design/plan/coding/check/delivery |
-| 执行器扩展 | `crates/cowork-core/src/pipeline/executor/` | 交互/知识/工作区 |
-| Domain 聚合根 | `crates/cowork-core/src/domain/` | project.rs, iteration.rs, memory.rs |
-| Data Models | `crates/cowork-core/src/data/models.rs` | Requirements, FeatureList, Epic 等 |
-| Tool 实现 (40+, 14 模块) | `crates/cowork-core/src/tools/` | artifact, control, data, deployment, file, goto_stage, hitl, knowledge, legacy, load_artifacts, memory, pm, test_lint, validation |
-| Agent 工厂 | `crates/cowork-core/src/agents/` | iterative_assistant, external_coding_agent, legacy_analyzer |
-| InteractiveBackend + CLI | `crates/cowork-core/src/interaction/` | trait 定义 + dialoguer 实现 |
-| 配置注册表 + 内置 JSON | `crates/cowork-core/src/config_definition/` | 14 Agent + 7 Stage + 1 Flow |
-| 指令库 | `crates/cowork-core/src/instructions/` | 各阶段 Actor/Critic 提示词 |
-| 持久化仓储 | `crates/cowork-core/src/persistence/` | project_store, iteration_store, memory_store |
-| LLM 封装 + 限流器 | `crates/cowork-core/src/llm/` | OpenAI API + Semaphore(1) + 2s delay |
-| ACP + Skills | `crates/cowork-core/src/acp/client.rs` + `skills/manager.rs` | Agent Client Protocol + agentskills.io |
-| CLI 命令组 + GUI 后端 | `crates/cowork-cli/src/commands/` + `crates/cowork-gui/src-tauri/src/commands/` | 10 clap 子命令 + 8 Tauri 命令模块 |
-| Security + Runtime Monitor | `crates/cowork-core/src/runtime_security.rs` + `runtime_analyzer.rs` | 路径/命令验证 + Watchdog |
+| Pipeline 入口 | `crates/cowork-core/src/pipeline/mod.rs` | PipelineController，阶段编排 |
+| Stage trait | `crates/cowork-core/src/pipeline/stage_executor.rs` | 7 阶段统一执行框架 |
+| 7 阶段实现 | `crates/cowork-core/src/pipeline/stages/` | idea/prd/design/plan/coding/check/delivery |
+| 域实体 | `crates/cowork-core/src/domain/` | Project/Iteration/Memory 聚合 |
+| 工具系统 | `crates/cowork-core/src/tools/` | 40+ ADK 工具（按类别拆分） |
+| Agent 定义 | `crates/cowork-core/src/agents/` | 迭代助手、PM Agent、遗留分析器 |
+| 提示词库 | `crates/cowork-core/src/instructions/` | 各阶段 Actor/Critic 指令 |
+| 配置注册表 | `crates/cowork-core/src/config_definition/` | JSON 驱动的 Agent/Flow/Stage 定义 |
+| 默认配置 | `crates/cowork-core/src/config_definition/default_configs/` | 14 个内置 Agent + 7 阶段 + 默认 Flow |
+| InteractiveBackend | `crates/cowork-core/src/interaction/` | CLI/GUI 抽象端口 |
+| CLI 实现 | `crates/cowork-core/src/interaction/cli.rs` | dialoguer 实现 |
+| Tauri 后端 | `crates/cowork-gui/src-tauri/src/` | 命令处理、事件发射、进程管理 |
+| React 前端 | `crates/cowork-gui/src/` | 8 面板布局（项目/迭代/编辑器/运行器等） |
+| 限流器 | `crates/cowork-core/src/llm/rate_limiter.rs` | Semaphore + 延迟 |
+| ACP 客户端 | `crates/cowork-core/src/acp/client.rs` | 外部 Agent 协议 |

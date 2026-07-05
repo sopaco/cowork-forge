@@ -1609,6 +1609,320 @@ LICENSE
 31: (tool_name: &str, result: &Result<Value, AdkError>)
 ```
 
+### crates/cowork-core/src/acp/client.rs (309 lines)
+
+```
+1: AgentMessage
+2: ⋮----
+3: {
+4:     
+5:     Thinking(String),
+6:     
+7:     Output(String),
+8:     
+9:     Status(String),
+10:     
+11:     Error(String),
+12:     
+13:     Completed,
+14: }
+15: ⋮----
+16: CoworkClient
+17: ⋮----
+18: {
+19:     output: Arc<std::sync::Mutex<String>>,
+20:     message_tx: mpsc::UnboundedSender<AgentMessage>,
+21:     workspace: PathBuf,
+22: }
+23: ⋮----
+24: CoworkClient
+25: ⋮----
+26: {
+27:     
+28:     
+29:     fn validate_workspace_path(&self, abs_path: &Path) -> Result<PathBuf, acp::Error> {
+30:         let workspace_abs = self
+31:             .workspace
+32:             .canonicalize()
+33:             .map_err(acp::Error::into_internal_error)?;
+34:         let target_abs = abs_path
+35:             .canonicalize()
+36:             .or_else(|_| {
+37:                 
+38:                 let parent = abs_path.parent().unwrap_or(abs_path);
+39:                 let file_name = abs_path.file_name().ok_or_else(|| {
+40:                     acp::Error::invalid_params().data("path has no file name")
+41:                 })?;
+42:                 let parent_abs = parent.canonicalize().map_err(acp::Error::into_internal_error)?;
+43:                 Ok::<_, acp::Error>(parent_abs.join(file_name))
+44:             })
+45:             .map_err(acp::Error::into_internal_error)?;
+46: 
+47:         let workspace_stripped = strip_unc_prefix(&workspace_abs);
+48:         let target_stripped = strip_unc_prefix(&target_abs);
+49: 
+50:         if target_stripped.starts_with(&workspace_stripped) {
+51:             Ok(target_stripped)
+52:         } else {
+53:             Err(acp::Error::invalid_params().data(format!(
+54:                 "path '{}' is outside workspace '{}'",
+55:                 target_stripped.display(),
+56:                 workspace_stripped.display()
+57:             )))
+58:         }
+59:     }
+60: }
+61: ⋮----
+62: strip_unc_prefix
+63: ⋮----
+64: (path: &Path)
+65: ⋮----
+66: CoworkClient
+67: ⋮----
+68: {
+69:     async fn request_permission(
+70:         &self,
+71:         args: acp::RequestPermissionRequest,
+72:     ) -> acp::Result<acp::RequestPermissionResponse> {
+73:         tracing::info!(
+74:             session_id = %args.session_id,
+75:             "ACP permission request for tool call: {:?}",
+76:             args.tool_call
+77:         );
+78: 
+79:         
+80:         
+81:         let allow_option = args
+82:             .options
+83:             .into_iter()
+84:             .find(|o| matches!(o.kind, acp::PermissionOptionKind::AllowOnce | acp::PermissionOptionKind::AllowAlways));
+85: 
+86:         match allow_option {
+87:             Some(option) => {
+88:                 tracing::info!(option_id = %option.option_id.0, "Auto-approving ACP permission request");
+89:                 Ok(acp::RequestPermissionResponse::new(
+90:                     acp::RequestPermissionOutcome::Selected(
+91:                         acp::SelectedPermissionOutcome::new(option.option_id),
+92:                     ),
+93:                 ))
+94:             }
+95:             None => {
+96:                 tracing::warn!("ACP permission request had no allow option; cancelling");
+97:                 Ok(acp::RequestPermissionResponse::new(
+98:                     acp::RequestPermissionOutcome::Cancelled,
+99:                 ))
+100:             }
+101:         }
+102:     }
+103: 
+104:     async fn write_text_file(
+105:         &self,
+106:         args: acp::WriteTextFileRequest,
+107:     ) -> acp::Result<acp::WriteTextFileResponse> {
+108:         tracing::debug!(session_id = %args.session_id, path = %args.path.display(), "ACP write_text_file");
+109: 
+110:         let rel_path = self.validate_workspace_path(&args.path)?;
+111:         let full_path = self.workspace.join(&rel_path);
+112: 
+113:         if let Some(parent) = full_path.parent() {
+114:             std::fs::create_dir_all(parent).map_err(acp::Error::into_internal_error)?;
+115:         }
+116:         std::fs::write(&full_path, args.content).map_err(|e| {
+117:             tracing::error!(path = %full_path.display(), error = %e, "ACP write_text_file failed");
+118:             acp::Error::into_internal_error(e)
+119:         })?;
+120: 
+121:         tracing::info!(path = %full_path.display(), bytes = ?std::fs::metadata(&full_path).map(|m| m.len()).unwrap_or(0), "ACP write_text_file succeeded");
+122:         let _ = self.message_tx.send(AgentMessage::Status(format!(
+123:             "Wrote file {}",
+124:             rel_path.display()
+125:         )));
+126:         Ok(acp::WriteTextFileResponse::new())
+127:     }
+128: 
+129:     async fn read_text_file(
+130:         &self,
+131:         args: acp::ReadTextFileRequest,
+132:     ) -> acp::Result<acp::ReadTextFileResponse> {
+133:         tracing::debug!(session_id = %args.session_id, path = %args.path.display(), "ACP read_text_file");
+134: 
+135:         let rel_path = self.validate_workspace_path(&args.path)?;
+136:         let full_path = self.workspace.join(&rel_path);
+137: 
+138:         let content = std::fs::read_to_string(&full_path).map_err(|e| {
+139:             tracing::error!(path = %full_path.display(), error = %e, "ACP read_text_file failed");
+140:             if e.kind() == std::io::ErrorKind::NotFound {
+141:                 acp::Error::resource_not_found(Some(full_path.display().to_string()))
+142:             } else {
+143:                 acp::Error::into_internal_error(e)
+144:             }
+145:         })?;
+146: 
+147:         tracing::info!(path = %full_path.display(), len = content.len(), "ACP read_text_file succeeded");
+148:         Ok(acp::ReadTextFileResponse::new(content))
+149:     }
+150: 
+151:     async fn create_terminal(
+152:         &self,
+153:         _args: acp::CreateTerminalRequest,
+154:     ) -> Result<acp::CreateTerminalResponse, acp::Error> {
+155:         Err(acp::Error::method_not_found())
+156:     }
+157: 
+158:     async fn terminal_output(
+159:         &self,
+160:         _args: acp::TerminalOutputRequest,
+161:     ) -> acp::Result<acp::TerminalOutputResponse> {
+162:         Err(acp::Error::method_not_found())
+163:     }
+164: 
+165:     async fn release_terminal(
+166:         &self,
+167:         _args: acp::ReleaseTerminalRequest,
+168:     ) -> acp::Result<acp::ReleaseTerminalResponse> {
+169:         Err(acp::Error::method_not_found())
+170:     }
+171: 
+172:     async fn wait_for_terminal_exit(
+173:         &self,
+174:         _args: acp::WaitForTerminalExitRequest,
+175:     ) -> acp::Result<acp::WaitForTerminalExitResponse> {
+176:         Err(acp::Error::method_not_found())
+177:     }
+178: 
+179:     async fn kill_terminal_command(
+180:         &self,
+181:         _args: acp::KillTerminalCommandRequest,
+182:     ) -> acp::Result<acp::KillTerminalCommandResponse> {
+183:         Err(acp::Error::method_not_found())
+184:     }
+185: 
+186:     async fn session_notification(
+187:         &self,
+188:         args: acp::SessionNotification,
+189:     ) -> acp::Result<(), acp::Error> {
+190:         match args.update {
+191:             acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk {
+192:                 content: acp::ContentBlock::Text(text_content),
+193:                 ..
+194:             }) => {
+195:                 let text = text_content.text.clone();
+196:                 tracing::debug!(len = text.len(), "ACP agent message chunk");
+197:                 let _ = self.message_tx.send(AgentMessage::Output(text));
+198:                 if let Ok(mut out) = self.output.lock() {
+199:                     out.push_str(&text_content.text);
+200:                 }
+201:             }
+202:             acp::SessionUpdate::AgentThoughtChunk(acp::ContentChunk {
+203:                 content: acp::ContentBlock::Text(text_content),
+204:                 ..
+205:             }) => {
+206:                 let text = text_content.text.clone();
+207:                 tracing::debug!(len = text.len(), "ACP agent thought chunk");
+208:                 let _ = self.message_tx.send(AgentMessage::Thinking(text));
+209:             }
+210:             
+211:             _ => {}
+212:         }
+213:         Ok(())
+214:     }
+215: 
+216:     async fn ext_method(&self, _args: acp::ExtRequest) -> acp::Result<acp::ExtResponse> {
+217:         Err(acp::Error::method_not_found())
+218:     }
+219: 
+220:     async fn ext_notification(&self, _args: acp::ExtNotification) -> acp::Result<()> {
+221:         Err(acp::Error::method_not_found())
+222:     }
+223: }
+224: ⋮----
+225: AcpTaskResult
+226: ⋮----
+227: {
+228:     
+229:     pub content: String,
+230:     
+231:     pub completed: bool,
+232:     
+233:     pub error: Option<String>,
+234: }
+235: ⋮----
+236: AcpTaskResult
+237: ⋮----
+238: {
+239:     pub fn new(content: String, completed: bool) -> Self {
+240:         Self {
+241:             content,
+242:             completed,
+243:             error: None,
+244:         }
+245:     }
+246: 
+247:     pub fn error(msg: String) -> Self {
+248:         Self {
+249:             content: String::new(),
+250:             completed: false,
+251:             error: Some(msg),
+252:         }
+253:     }
+254: }
+255: ⋮----
+256: execute_with_external_agent
+257: ⋮----
+258: (
+259:     config: CodingAgentConfig,
+260:     workspace: PathBuf,
+261:     task: String,
+262: )
+263: ⋮----
+264: run_acp_in_thread
+265: ⋮----
+266: (
+267:     config: CodingAgentConfig,
+268:     workspace: PathBuf,
+269:     task: String,
+270:     message_tx: mpsc::UnboundedSender<AgentMessage>,
+271: )
+272: ⋮----
+273: AcpClient
+274: ⋮----
+275: {
+276:     config: CodingAgentConfig,
+277:     workspace: PathBuf,
+278: }
+279: ⋮----
+280: AcpClient
+281: ⋮----
+282: {
+283:     
+284:     pub async fn from_config(config: &CodingAgentConfig, workspace: &Path) -> Result<Self> {
+285:         Ok(Self {
+286:             config: config.clone(),
+287:             workspace: workspace.to_path_buf(),
+288:         })
+289:     }
+290: 
+291:     
+292:     pub fn execute_task_stream(
+293:         self,
+294:         task: String,
+295:     ) -> (mpsc::UnboundedReceiver<AgentMessage>, impl std::future::Future<Output = Result<Result<String>>>) {
+296:         execute_with_external_agent(self.config, self.workspace, task)
+297:     }
+298: 
+299:     
+300:     pub async fn execute_task(&mut self, task: &str) -> Result<String> {
+301:         let (_, result) = execute_with_external_agent(
+302:             self.config.clone(),
+303:             self.workspace.clone(),
+304:             task.to_string(),
+305:         );
+306:         
+307:         result.await?
+308:     }
+309: }
+```
+
 ### crates/cowork-core/src/lib.rs (109 lines)
 
 ```
@@ -2429,318 +2743,298 @@ LICENSE
 53: agent-client-protocol = "0.9"
 ```
 
-### crates/cowork-core/src/acp/client.rs (309 lines)
+### crates/cowork-core/src/pipeline/stages/coding.rs (289 lines)
 
 ```
-1: AgentMessage
+1: CodingStage
 2: ⋮----
 3: {
 4:     
-5:     Thinking(String),
-6:     
-7:     Output(String),
-8:     
-9:     Status(String),
-10:     
-11:     Error(String),
+5:     fn is_external_enabled() -> bool {
+6:         match load_config() {
+7:             Ok(config) => config.coding_agent.enabled,
+8:             Err(_) => false,
+9:         }
+10:     }
+11: 
 12:     
-13:     Completed,
-14: }
-15: ⋮----
-16: CoworkClient
-17: ⋮----
-18: {
-19:     output: Arc<std::sync::Mutex<String>>,
-20:     message_tx: mpsc::UnboundedSender<AgentMessage>,
-21:     workspace: PathBuf,
-22: }
-23: ⋮----
-24: CoworkClient
-25: ⋮----
-26: {
-27:     
-28:     
-29:     fn validate_workspace_path(&self, abs_path: &Path) -> Result<PathBuf, acp::Error> {
-30:         let workspace_abs = self
-31:             .workspace
-32:             .canonicalize()
-33:             .map_err(acp::Error::into_internal_error)?;
-34:         let target_abs = abs_path
-35:             .canonicalize()
-36:             .or_else(|_| {
-37:                 
-38:                 let parent = abs_path.parent().unwrap_or(abs_path);
-39:                 let file_name = abs_path.file_name().ok_or_else(|| {
-40:                     acp::Error::invalid_params().data("path has no file name")
-41:                 })?;
-42:                 let parent_abs = parent.canonicalize().map_err(acp::Error::into_internal_error)?;
-43:                 Ok::<_, acp::Error>(parent_abs.join(file_name))
-44:             })
-45:             .map_err(acp::Error::into_internal_error)?;
-46: 
-47:         let workspace_stripped = strip_unc_prefix(&workspace_abs);
-48:         let target_stripped = strip_unc_prefix(&target_abs);
-49: 
-50:         if target_stripped.starts_with(&workspace_stripped) {
-51:             Ok(target_stripped)
-52:         } else {
-53:             Err(acp::Error::invalid_params().data(format!(
-54:                 "path '{}' is outside workspace '{}'",
-55:                 target_stripped.display(),
-56:                 workspace_stripped.display()
-57:             )))
-58:         }
-59:     }
-60: }
-61: ⋮----
-62: strip_unc_prefix
-63: ⋮----
-64: (path: &Path)
-65: ⋮----
-66: CoworkClient
-67: ⋮----
-68: {
-69:     async fn request_permission(
-70:         &self,
-71:         args: acp::RequestPermissionRequest,
-72:     ) -> acp::Result<acp::RequestPermissionResponse> {
-73:         tracing::info!(
-74:             session_id = %args.session_id,
-75:             "ACP permission request for tool call: {:?}",
-76:             args.tool_call
-77:         );
-78: 
-79:         
-80:         
-81:         let allow_option = args
-82:             .options
-83:             .into_iter()
-84:             .find(|o| matches!(o.kind, acp::PermissionOptionKind::AllowOnce | acp::PermissionOptionKind::AllowAlways));
-85: 
-86:         match allow_option {
-87:             Some(option) => {
-88:                 tracing::info!(option_id = %option.option_id.0, "Auto-approving ACP permission request");
-89:                 Ok(acp::RequestPermissionResponse::new(
-90:                     acp::RequestPermissionOutcome::Selected(
-91:                         acp::SelectedPermissionOutcome::new(option.option_id),
-92:                     ),
-93:                 ))
-94:             }
-95:             None => {
-96:                 tracing::warn!("ACP permission request had no allow option; cancelling");
-97:                 Ok(acp::RequestPermissionResponse::new(
-98:                     acp::RequestPermissionOutcome::Cancelled,
-99:                 ))
-100:             }
-101:         }
-102:     }
-103: 
-104:     async fn write_text_file(
-105:         &self,
-106:         args: acp::WriteTextFileRequest,
-107:     ) -> acp::Result<acp::WriteTextFileResponse> {
-108:         tracing::debug!(session_id = %args.session_id, path = %args.path.display(), "ACP write_text_file");
-109: 
-110:         let rel_path = self.validate_workspace_path(&args.path)?;
-111:         let full_path = self.workspace.join(&rel_path);
+13:     async fn execute_external(
+14:         ctx: &PipelineContext,
+15:         interaction: Arc<dyn InteractiveBackend>,
+16:         feedback: Option<&str>,
+17:     ) -> StageResult {
+18:         
+19:         crate::persistence::set_iteration_id(ctx.iteration.id.clone());
+20:         
+21:         let workspace = ctx.workspace_path.clone();
+22:         
+23:         interaction
+24:             .show_message_with_context(
+25:                 MessageLevel::Info,
+26:                 "🚀 Using External Coding Agent (ACP)".to_string(),
+27:                 MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
+28:             )
+29:             .await;
+30: 
+31:         
+32:         
+33:         
+34:         let task_description = if let Some(fb) = feedback {
+35:             
+36:             tracing::debug!("using parameter feedback: {}", fb.chars().take(100).collect::<String>());
+37:             format!(
+38:                 "## ⚠️ USER REPORTED ISSUE - REQUIRES FIX\n\n\
+39:                 The user has reported the following problems with the project:\n\n\
+40:                 \"\"\"\n{}\n\"\"\"\n\n\
+41:                 ## Your Task\n\
+42:                 1. Read and understand the user's issues above\n\
+43:                 2. Find the relevant code files\n\
+44:                 3. Fix each issue one by one\n\
+45:                 4. Verify your fixes work correctly",
+46:                 fb
+47:             )
+48:         } else {
+49:             
+50:             let stored_feedback = crate::persistence::load_feedback_history()
+51:                 .ok()
+52:                 .and_then(|history| {
+53:                     history.feedbacks
+54:                         .into_iter()
+55:                         .filter(|f| f.stage == "coding")
+56:                         .max_by_key(|f| f.timestamp)
+57:                 });
+58: 
+59:             if let Some(ref fb) = stored_feedback {
+60:                 tracing::debug!("found fallback feedback from storage: {}", fb.details.chars().take(100).collect::<String>());
+61:                 format!("Fix issues based on feedback: {}", fb.details)
+62:             } else {
+63:                 
+64:                 tracing::debug!("no feedback found, loading plan...");
+65:                 let iteration_dir = workspace.parent().unwrap_or(&workspace);
+66:                 let plan_artifact = iteration_dir.join("artifacts").join("plan.md");
+67:                 
+68:                 if let Ok(content) = std::fs::read_to_string(&plan_artifact) {
+69:                     format!("Implement the tasks from the plan:\n\n{}", content)
+70:                 } else {
+71:                     "Implement the planned features.".to_string()
+72:                 }
+73:             }
+74:         };
+75: 
+76:         
+77:         let project_context = format!(
+78:             "Project: {}\nDescription: {}",
+79:             ctx.iteration.title,
+80:             ctx.iteration.description
+81:         );
+82: 
+83:         
+84:         tracing::debug!(workspace = %workspace.display(), "creating ExternalCodingAgent");
+85:         tracing::debug!(iteration_id = %ctx.iteration.id, base_id = ?ctx.iteration.base_iteration_id, inheritance = ?ctx.iteration.inheritance, "iteration context");
+86:         let agent = match ExternalCodingAgent::new_with_iteration(&workspace, Some(ctx.iteration.clone())).await {
+87:             Ok(agent) => agent,
+88:             Err(e) => {
+89:                 interaction
+90:                     .show_message_with_context(
+91:                         MessageLevel::Error,
+92:                         format!("Failed to start external agent: {}", e),
+93:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
+94:                     )
+95:                     .await;
+96:                 
+97:                 
+98:                 
+99:                 tracing::warn!("Falling back to built-in coding agent");
+100:                 let fallback_feedback = feedback;
+101:                 return execute_stage_with_instruction_and_context(
+102:                     ctx,
+103:                     interaction,
+104:                     "coding",
+105:                     CODING_ACTOR_INSTRUCTION,
+106:                     fallback_feedback,
+107:                     Some(&task_description),
+108:                 )
+109:                 .await;
+110:             }
+111:         };
 112: 
-113:         if let Some(parent) = full_path.parent() {
-114:             std::fs::create_dir_all(parent).map_err(acp::Error::into_internal_error)?;
-115:         }
-116:         std::fs::write(&full_path, args.content).map_err(|e| {
-117:             tracing::error!(path = %full_path.display(), error = %e, "ACP write_text_file failed");
-118:             acp::Error::into_internal_error(e)
-119:         })?;
-120: 
-121:         tracing::info!(path = %full_path.display(), bytes = ?std::fs::metadata(&full_path).map(|m| m.len()).unwrap_or(0), "ACP write_text_file succeeded");
-122:         let _ = self.message_tx.send(AgentMessage::Status(format!(
-123:             "Wrote file {}",
-124:             rel_path.display()
-125:         )));
-126:         Ok(acp::WriteTextFileResponse::new())
-127:     }
-128: 
-129:     async fn read_text_file(
-130:         &self,
-131:         args: acp::ReadTextFileRequest,
-132:     ) -> acp::Result<acp::ReadTextFileResponse> {
-133:         tracing::debug!(session_id = %args.session_id, path = %args.path.display(), "ACP read_text_file");
-134: 
-135:         let rel_path = self.validate_workspace_path(&args.path)?;
-136:         let full_path = self.workspace.join(&rel_path);
-137: 
-138:         let content = std::fs::read_to_string(&full_path).map_err(|e| {
-139:             tracing::error!(path = %full_path.display(), error = %e, "ACP read_text_file failed");
-140:             if e.kind() == std::io::ErrorKind::NotFound {
-141:                 acp::Error::resource_not_found(Some(full_path.display().to_string()))
-142:             } else {
-143:                 acp::Error::into_internal_error(e)
-144:             }
-145:         })?;
-146: 
-147:         tracing::info!(path = %full_path.display(), len = content.len(), "ACP read_text_file succeeded");
-148:         Ok(acp::ReadTextFileResponse::new(content))
-149:     }
-150: 
-151:     async fn create_terminal(
-152:         &self,
-153:         _args: acp::CreateTerminalRequest,
-154:     ) -> Result<acp::CreateTerminalResponse, acp::Error> {
-155:         Err(acp::Error::method_not_found())
-156:     }
-157: 
-158:     async fn terminal_output(
-159:         &self,
-160:         _args: acp::TerminalOutputRequest,
-161:     ) -> acp::Result<acp::TerminalOutputResponse> {
-162:         Err(acp::Error::method_not_found())
-163:     }
-164: 
-165:     async fn release_terminal(
-166:         &self,
-167:         _args: acp::ReleaseTerminalRequest,
-168:     ) -> acp::Result<acp::ReleaseTerminalResponse> {
-169:         Err(acp::Error::method_not_found())
-170:     }
-171: 
-172:     async fn wait_for_terminal_exit(
-173:         &self,
-174:         _args: acp::WaitForTerminalExitRequest,
-175:     ) -> acp::Result<acp::WaitForTerminalExitResponse> {
-176:         Err(acp::Error::method_not_found())
-177:     }
+113:         
+114:         let ctx_external = MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding");
+115: 
+116:         
+117:         let StreamingTask { mut messages, result } = agent.execute_task_stream(&task_description, &project_context);
+118: 
+119:         
+120:         let interaction_clone = interaction.clone();
+121:         
+122:         
+123:         
+124:         let message_handle = tokio::spawn(async move {
+125:             let mut thinking_buffer = String::new();
+126:             let mut output_buffer = String::new();
+127:             
+128:             loop {
+129:                 tokio::select! {
+130:                     msg = messages.recv() => {
+131:                         match msg {
+132:                             Some(AgentMessage::Thinking(text)) => {
+133:                                 
+134:                                 thinking_buffer.push_str(&text);
+135:                                 
+136:                                 if thinking_buffer.chars().count() > 100 {
+137:                                     let truncated: String = thinking_buffer.chars().take(100).collect();
+138:                                     let display = format!("💭 Thinking: {}...", truncated);
+139:                                     interaction_clone.show_message_with_context(MessageLevel::Info, display, ctx_external.clone()).await;
+140:                                     thinking_buffer.clear();
+141:                                 }
+142:                             }
+143:                             Some(AgentMessage::Output(text)) => {
+144:                                 output_buffer.push_str(&text);
+145:                                 
+146:                                 if output_buffer.chars().count() > 200 {
+147:                                     let truncated: String = output_buffer.chars().take(200).collect();
+148:                                     let display = format!("📝 Output: {}...", truncated);
+149:                                     interaction_clone.show_message_with_context(MessageLevel::Info, display, ctx_external.clone()).await;
+150:                                     output_buffer.clear();
+151:                                 }
+152:                             }
+153:                             Some(AgentMessage::Status(text)) => {
+154:                                 interaction_clone.show_message_with_context(MessageLevel::Info, format!("⏳ {}", text), ctx_external.clone()).await;
+155:                             }
+156:                             Some(AgentMessage::Error(text)) => {
+157:                                 interaction_clone.show_message_with_context(MessageLevel::Error, format!("❌ {}", text), ctx_external.clone()).await;
+158:                             }
+159:                             Some(AgentMessage::Completed) => {
+160:                                 interaction_clone.show_message_with_context(MessageLevel::Info, "✅ Task completed".to_string(), ctx_external.clone()).await;
+161:                                 
+162:                                 
+163:                                 beak;
+164:                             }
+165:                             None => {
+166:                                 
+167:                                 beak;
+168:                             }
+169:                         }
+170:                     }
+171:                     _ = tokio::time::sleep(tokio::time::Duration::from_secs(60)) => {
+172:                         
+173:                         interaction_clone.show_message_with_context(MessageLevel::Info, "⏳ Waiting for agent...".to_string(), ctx_external.clone()).await;
+174:                     }
+175:                 }
+176:             }
+177:         });
 178: 
-179:     async fn kill_terminal_command(
-180:         &self,
-181:         _args: acp::KillTerminalCommandRequest,
-182:     ) -> acp::Result<acp::KillTerminalCommandResponse> {
-183:         Err(acp::Error::method_not_found())
-184:     }
-185: 
-186:     async fn session_notification(
-187:         &self,
-188:         args: acp::SessionNotification,
-189:     ) -> acp::Result<(), acp::Error> {
-190:         match args.update {
-191:             acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk {
-192:                 content: acp::ContentBlock::Text(text_content),
-193:                 ..
-194:             }) => {
-195:                 let text = text_content.text.clone();
-196:                 tracing::debug!(len = text.len(), "ACP agent message chunk");
-197:                 let _ = self.message_tx.send(AgentMessage::Output(text));
-198:                 if let Ok(mut out) = self.output.lock() {
-199:                     out.push_str(&text_content.text);
-200:                 }
-201:             }
-202:             acp::SessionUpdate::AgentThoughtChunk(acp::ContentChunk {
-203:                 content: acp::ContentBlock::Text(text_content),
-204:                 ..
-205:             }) => {
-206:                 let text = text_content.text.clone();
-207:                 tracing::debug!(len = text.len(), "ACP agent thought chunk");
-208:                 let _ = self.message_tx.send(AgentMessage::Thinking(text));
-209:             }
-210:             
-211:             _ => {}
-212:         }
-213:         Ok(())
-214:     }
-215: 
-216:     async fn ext_method(&self, _args: acp::ExtRequest) -> acp::Result<acp::ExtResponse> {
-217:         Err(acp::Error::method_not_found())
-218:     }
-219: 
-220:     async fn ext_notification(&self, _args: acp::ExtNotification) -> acp::Result<()> {
-221:         Err(acp::Error::method_not_found())
-222:     }
-223: }
-224: ⋮----
-225: AcpTaskResult
-226: ⋮----
-227: {
-228:     
-229:     pub content: String,
-230:     
-231:     pub completed: bool,
-232:     
-233:     pub error: Option<String>,
-234: }
-235: ⋮----
-236: AcpTaskResult
-237: ⋮----
-238: {
-239:     pub fn new(content: String, completed: bool) -> Self {
-240:         Self {
-241:             content,
-242:             completed,
-243:             error: None,
-244:         }
-245:     }
-246: 
-247:     pub fn error(msg: String) -> Self {
-248:         Self {
-249:             content: String::new(),
-250:             completed: false,
-251:             error: Some(msg),
-252:         }
-253:     }
-254: }
-255: ⋮----
-256: execute_with_external_agent
-257: ⋮----
-258: (
-259:     config: CodingAgentConfig,
-260:     workspace: PathBuf,
-261:     task: String,
-262: )
-263: ⋮----
-264: run_acp_in_thread
-265: ⋮----
-266: (
-267:     config: CodingAgentConfig,
-268:     workspace: PathBuf,
-269:     task: String,
-270:     message_tx: mpsc::UnboundedSender<AgentMessage>,
-271: )
-272: ⋮----
-273: AcpClient
-274: ⋮----
-275: {
-276:     config: CodingAgentConfig,
-277:     workspace: PathBuf,
-278: }
-279: ⋮----
-280: AcpClient
-281: ⋮----
-282: {
-283:     
-284:     pub async fn from_config(config: &CodingAgentConfig, workspace: &Path) -> Result<Self> {
-285:         Ok(Self {
-286:             config: config.clone(),
-287:             workspace: workspace.to_path_buf(),
-288:         })
-289:     }
-290: 
-291:     
-292:     pub fn execute_task_stream(
-293:         self,
-294:         task: String,
-295:     ) -> (mpsc::UnboundedReceiver<AgentMessage>, impl std::future::Future<Output = Result<Result<String>>>) {
-296:         execute_with_external_agent(self.config, self.workspace, task)
-297:     }
-298: 
-299:     
-300:     pub async fn execute_task(&mut self, task: &str) -> Result<String> {
-301:         let (_, result) = execute_with_external_agent(
-302:             self.config.clone(),
-303:             self.workspace.clone(),
-304:             task.to_string(),
-305:         );
-306:         
-307:         result.await?
-308:     }
-309: }
+179:         
+180:         match result.await {
+181:             
+182:             Ok(Ok(_output)) => {
+183:                 
+184:                 
+185:                 
+186:                 
+187:                 let _ = tokio::time::timeout(
+188:                     tokio::time::Duration::from_secs(10),
+189:                     message_handle,
+190:                 ).await;
+191: 
+192:                 interaction
+193:                     .show_message_with_context(
+194:                         MessageLevel::Info,
+195:                         "External coding agent completed successfully".to_string(),
+196:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
+197:                     )
+198:                     .await;
+199:                 StageResult::Success(None)
+200:             }
+201:             
+202:             Ok(Err(e)) => {
+203:                 
+204:                 message_handle.abort();
+205:                 let error_msg = format!("External agent execution error: {}", e);
+206:                 interaction
+207:                     .show_message_with_context(
+208:                         MessageLevel::Error,
+209:                         error_msg.clone(),
+210:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
+211:                     )
+212:                     .await;
+213:                 StageResult::Failed(e.to_string())
+214:             }
+215:             
+216:             Err(e) => {
+217:                 
+218:                 message_handle.abort();
+219:                 let error_msg = format!("External agent error: {}", e);
+220:                 interaction
+221:                     .show_message_with_context(
+222:                         MessageLevel::Error,
+223:                         error_msg.clone(),
+224:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
+225:                     )
+226:                     .await;
+227:                 StageResult::Failed(e.to_string())
+228:             }
+229:         }
+230:     }
+231: }
+232: ⋮----
+233: CodingStage
+234: ⋮----
+235: {
+236:     fn name(&self) -> &str {
+237:         "coding"
+238:     }
+239: 
+240:     fn description(&self) -> &str {
+241:         "Coding - Generate code implementation using Agent with Memory and Tools"
+242:     }
+243: 
+244:     fn needs_confirmation(&self) -> bool {
+245:         true
+246:     }
+247: 
+248:     async fn execute(
+249:         &self,
+250:         ctx: &PipelineContext,
+251:         interaction: Arc<dyn InteractiveBackend>,
+252:     ) -> StageResult {
+253:         
+254:         if Self::is_external_enabled() {
+255:             return Self::execute_external(ctx, interaction, None).await;
+256:         }
+257:         
+258:         execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, None).await
+259:     }
+260: 
+261:     async fn execute_with_feedback(
+262:         &self,
+263:         ctx: &PipelineContext,
+264:         interaction: Arc<dyn InteractiveBackend>,
+265:         feedback: &str,
+266:     ) -> StageResult {
+267:         
+268:         let agent_name = if Self::is_external_enabled() {
+269:             AGENT_NAME_EXTERNAL
+270:         } else {
+271:             AGENT_NAME_BUILTIN
+272:         };
+273: 
+274:         interaction
+275:             .show_message_with_context(
+276:                 MessageLevel::Info,
+277:                 "Regenerating code based on your feedback...".to_string(),
+278:                 MessageContext::new(agent_name).with_stage("coding"),
+279:             )
+280:             .await;
+281: 
+282:         
+283:         if Self::is_external_enabled() {
+284:             return Self::execute_external(ctx, interaction, Some(feedback)).await;
+285:         }
+286:         
+287:         execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, Some(feedback)).await
+288:     }
+289: }
 ```
 
 ### crates/cowork-core/src/tools/control_tools.rs (263 lines)
@@ -3468,301 +3762,6 @@ LICENSE
 93: "##;
 ````
 
-### crates/cowork-core/src/pipeline/stages/coding.rs (290 lines)
-
-```
-1: CodingStage
-2: ⋮----
-3: {
-4:     
-5:     fn is_external_enabled() -> bool {
-6:         match load_config() {
-7:             Ok(config) => config.coding_agent.enabled,
-8:             Err(_) => false,
-9:         }
-10:     }
-11: 
-12:     
-13:     async fn execute_external(
-14:         ctx: &PipelineContext,
-15:         interaction: Arc<dyn InteractiveBackend>,
-16:         feedback: Option<&str>,
-17:     ) -> StageResult {
-18:         
-19:         crate::persistence::set_iteration_id(ctx.iteration.id.clone());
-20:         
-21:         let workspace = ctx.workspace_path.clone();
-22:         
-23:         interaction
-24:             .show_message_with_context(
-25:                 MessageLevel::Info,
-26:                 "🚀 Using External Coding Agent (ACP)".to_string(),
-27:                 MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
-28:             )
-29:             .await;
-30: 
-31:         
-32:         
-33:         
-34:         let task_description = if let Some(fb) = feedback {
-35:             
-36:             println!("[Coding] Using parameter feedback: {}", fb.chars().take(100).collect::<String>());
-37:             format!(
-38:                 "## ⚠️ USER REPORTED ISSUE - REQUIRES FIX\n\n\
-39:                 The user has reported the following problems with the project:\n\n\
-40:                 \"\"\"\n{}\n\"\"\"\n\n\
-41:                 ## Your Task\n\
-42:                 1. Read and understand the user's issues above\n\
-43:                 2. Find the relevant code files\n\
-44:                 3. Fix each issue one by one\n\
-45:                 4. Verify your fixes work correctly",
-46:                 fb
-47:             )
-48:         } else {
-49:             
-50:             let stored_feedback = crate::persistence::load_feedback_history()
-51:                 .ok()
-52:                 .and_then(|history| {
-53:                     history.feedbacks
-54:                         .into_iter()
-55:                         .filter(|f| f.stage == "coding")
-56:                         .max_by_key(|f| f.timestamp)
-57:                 });
-58: 
-59:             if let Some(ref fb) = stored_feedback {
-60:                 println!("[Coding] Found fallback feedback from storage: {}", fb.details.chars().take(100).collect::<String>());
-61:                 format!("Fix issues based on feedback: {}", fb.details)
-62:             } else {
-63:                 
-64:                 println!("[Coding] No feedback found, loading plan...");
-65:                 let iteration_dir = workspace.parent().unwrap_or(&workspace);
-66:                 let plan_artifact = iteration_dir.join("artifacts").join("plan.md");
-67:                 
-68:                 if let Ok(content) = std::fs::read_to_string(&plan_artifact) {
-69:                     format!("Implement the tasks from the plan:\n\n{}", content)
-70:                 } else {
-71:                     "Implement the planned features.".to_string()
-72:                 }
-73:             }
-74:         };
-75: 
-76:         
-77:         let project_context = format!(
-78:             "Project: {}\nDescription: {}",
-79:             ctx.iteration.title,
-80:             ctx.iteration.description
-81:         );
-82: 
-83:         
-84:         eprintln!("DEBUG: Creating ExternalCodingAgent for workspace: {}", workspace.display());
-85:         eprintln!("DEBUG: Iteration id={}, base_id={:?}, inheritance={:?}", 
-86:             ctx.iteration.id, ctx.iteration.base_iteration_id, ctx.iteration.inheritance);
-87:         let agent = match ExternalCodingAgent::new_with_iteration(&workspace, Some(ctx.iteration.clone())).await {
-88:             Ok(agent) => agent,
-89:             Err(e) => {
-90:                 interaction
-91:                     .show_message_with_context(
-92:                         MessageLevel::Error,
-93:                         format!("Failed to start external agent: {}", e),
-94:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
-95:                     )
-96:                     .await;
-97:                 
-98:                 
-99:                 
-100:                 tracing::warn!("Falling back to built-in coding agent");
-101:                 let fallback_feedback = feedback;
-102:                 return execute_stage_with_instruction_and_context(
-103:                     ctx,
-104:                     interaction,
-105:                     "coding",
-106:                     CODING_ACTOR_INSTRUCTION,
-107:                     fallback_feedback,
-108:                     Some(&task_description),
-109:                 )
-110:                 .await;
-111:             }
-112:         };
-113: 
-114:         
-115:         let ctx_external = MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding");
-116: 
-117:         
-118:         let StreamingTask { mut messages, result } = agent.execute_task_stream(&task_description, &project_context);
-119: 
-120:         
-121:         let interaction_clone = interaction.clone();
-122:         
-123:         
-124:         
-125:         let message_handle = tokio::spawn(async move {
-126:             let mut thinking_buffer = String::new();
-127:             let mut output_buffer = String::new();
-128:             
-129:             loop {
-130:                 tokio::select! {
-131:                     msg = messages.recv() => {
-132:                         match msg {
-133:                             Some(AgentMessage::Thinking(text)) => {
-134:                                 
-135:                                 thinking_buffer.push_str(&text);
-136:                                 
-137:                                 if thinking_buffer.chars().count() > 100 {
-138:                                     let truncated: String = thinking_buffer.chars().take(100).collect();
-139:                                     let display = format!("💭 Thinking: {}...", truncated);
-140:                                     interaction_clone.show_message_with_context(MessageLevel::Info, display, ctx_external.clone()).await;
-141:                                     thinking_buffer.clear();
-142:                                 }
-143:                             }
-144:                             Some(AgentMessage::Output(text)) => {
-145:                                 output_buffer.push_str(&text);
-146:                                 
-147:                                 if output_buffer.chars().count() > 200 {
-148:                                     let truncated: String = output_buffer.chars().take(200).collect();
-149:                                     let display = format!("📝 Output: {}...", truncated);
-150:                                     interaction_clone.show_message_with_context(MessageLevel::Info, display, ctx_external.clone()).await;
-151:                                     output_buffer.clear();
-152:                                 }
-153:                             }
-154:                             Some(AgentMessage::Status(text)) => {
-155:                                 interaction_clone.show_message_with_context(MessageLevel::Info, format!("⏳ {}", text), ctx_external.clone()).await;
-156:                             }
-157:                             Some(AgentMessage::Error(text)) => {
-158:                                 interaction_clone.show_message_with_context(MessageLevel::Error, format!("❌ {}", text), ctx_external.clone()).await;
-159:                             }
-160:                             Some(AgentMessage::Completed) => {
-161:                                 interaction_clone.show_message_with_context(MessageLevel::Info, "✅ Task completed".to_string(), ctx_external.clone()).await;
-162:                                 
-163:                                 
-164:                                 beak;
-165:                             }
-166:                             None => {
-167:                                 
-168:                                 beak;
-169:                             }
-170:                         }
-171:                     }
-172:                     _ = tokio::time::sleep(tokio::time::Duration::from_secs(60)) => {
-173:                         
-174:                         interaction_clone.show_message_with_context(MessageLevel::Info, "⏳ Waiting for agent...".to_string(), ctx_external.clone()).await;
-175:                     }
-176:                 }
-177:             }
-178:         });
-179: 
-180:         
-181:         match result.await {
-182:             
-183:             Ok(Ok(_output)) => {
-184:                 
-185:                 
-186:                 
-187:                 
-188:                 let _ = tokio::time::timeout(
-189:                     tokio::time::Duration::from_secs(10),
-190:                     message_handle,
-191:                 ).await;
-192: 
-193:                 interaction
-194:                     .show_message_with_context(
-195:                         MessageLevel::Info,
-196:                         "External coding agent completed successfully".to_string(),
-197:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
-198:                     )
-199:                     .await;
-200:                 StageResult::Success(None)
-201:             }
-202:             
-203:             Ok(Err(e)) => {
-204:                 
-205:                 message_handle.abort();
-206:                 let error_msg = format!("External agent execution error: {}", e);
-207:                 interaction
-208:                     .show_message_with_context(
-209:                         MessageLevel::Error,
-210:                         error_msg.clone(),
-211:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
-212:                     )
-213:                     .await;
-214:                 StageResult::Failed(e.to_string())
-215:             }
-216:             
-217:             Err(e) => {
-218:                 
-219:                 message_handle.abort();
-220:                 let error_msg = format!("External agent error: {}", e);
-221:                 interaction
-222:                     .show_message_with_context(
-223:                         MessageLevel::Error,
-224:                         error_msg.clone(),
-225:                         MessageContext::new(AGENT_NAME_EXTERNAL).with_stage("coding"),
-226:                     )
-227:                     .await;
-228:                 StageResult::Failed(e.to_string())
-229:             }
-230:         }
-231:     }
-232: }
-233: ⋮----
-234: CodingStage
-235: ⋮----
-236: {
-237:     fn name(&self) -> &str {
-238:         "coding"
-239:     }
-240: 
-241:     fn description(&self) -> &str {
-242:         "Coding - Generate code implementation using Agent with Memory and Tools"
-243:     }
-244: 
-245:     fn needs_confirmation(&self) -> bool {
-246:         true
-247:     }
-248: 
-249:     async fn execute(
-250:         &self,
-251:         ctx: &PipelineContext,
-252:         interaction: Arc<dyn InteractiveBackend>,
-253:     ) -> StageResult {
-254:         
-255:         if Self::is_external_enabled() {
-256:             return Self::execute_external(ctx, interaction, None).await;
-257:         }
-258:         
-259:         execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, None).await
-260:     }
-261: 
-262:     async fn execute_with_feedback(
-263:         &self,
-264:         ctx: &PipelineContext,
-265:         interaction: Arc<dyn InteractiveBackend>,
-266:         feedback: &str,
-267:     ) -> StageResult {
-268:         
-269:         let agent_name = if Self::is_external_enabled() {
-270:             AGENT_NAME_EXTERNAL
-271:         } else {
-272:             AGENT_NAME_BUILTIN
-273:         };
-274: 
-275:         interaction
-276:             .show_message_with_context(
-277:                 MessageLevel::Info,
-278:                 "Regenerating code based on your feedback...".to_string(),
-279:                 MessageContext::new(agent_name).with_stage("coding"),
-280:             )
-281:             .await;
-282: 
-283:         
-284:         if Self::is_external_enabled() {
-285:             return Self::execute_external(ctx, interaction, Some(feedback)).await;
-286:         }
-287:         
-288:         execute_stage_with_instruction(ctx, interaction, "coding", CODING_ACTOR_INSTRUCTION, Some(feedback)).await
-289:     }
-290: }
-```
-
 ### crates/cowork-core/src/tools/goto_stage_tool.rs (90 lines)
 
 ```
@@ -3940,6 +3939,220 @@ LICENSE
 48: adk-skill = { workspace = true }
 49: adk-tool = { workspace = true, features = ["http-transport"] }
 50: which = "8.0.0"
+```
+
+### crates/cowork-core/src/agents/external_coding_agent.rs (209 lines)
+
+```
+1: ExternalCodingAgent
+2: ⋮----
+3: {
+4:     
+5:     config: CodingAgentConfig,
+6:     
+7:     workspace: PathBuf,
+8:     
+9:     ready: bool,
+10:     
+11:     iteration: Option<Iteration>,
+12: }
+13: ⋮----
+14: StreamingTask
+15: ⋮----
+16: {
+17:     
+18:     pub messages: mpsc::UnboundedReceiver<AgentMessage>,
+19:     
+20:     pub result: std::pin::Pin<Box<dyn std::future::Future<Output = Result<Result<String>>> + Send>>,
+21: }
+22: ⋮----
+23: ExternalCodingAgent
+24: ⋮----
+25: {
+26:     
+27:     pub async fn new(workspace: &PathBuf) -> Result<Self> {
+28:         Self::new_with_iteration(workspace, None).await
+29:     }
+30: 
+31:     
+32:     pub async fn new_with_iteration(workspace: &PathBuf, iteration: Option<Iteration>) -> Result<Self> {
+33:         tracing::debug!(workspace = %workspace.display(), "creating ExternalCodingAgent");
+34:         if let Some(ref iter) = iteration {
+35:             tracing::debug!(iteration_id = %iter.id, base_id = ?iter.base_iteration_id, inheritance = ?iter.inheritance, "iteration context");
+36:         }
+37: 
+38:         let config = load_config()
+39:             .context("Failed to load config")?;
+40: 
+41:         tracing::debug!(enabled = config.coding_agent.enabled, "external coding agent config loaded");
+42: 
+43:         if !config.coding_agent.enabled {
+44:             anyhow::bail!("External coding agent is not enabled in config");
+45:         }
+46: 
+47:         Ok(Self {
+48:             config: config.coding_agent,
+49:             workspace: workspace.clone(),
+50:             ready: false,
+51:             iteration,
+52:         })
+53:     }
+54: 
+55:     
+56:     pub fn is_enabled() -> Result<bool> {
+57:         let config = load_config()
+58:             .context("Failed to load config")?;
+59:         Ok(config.coding_agent.enabled)
+60:     }
+61: 
+62:     
+63:     
+64:     
+65:     
+66:     pub fn execute_task_stream(
+67:         self,
+68:         task_description: &str,
+69:         project_context: &str,
+70:     ) -> StreamingTask {
+71:         let prompt = self.build_prompt(task_description, project_context);
+72: 
+73:         
+74:         let (messages, result) = crate::acp::execute_with_external_agent(
+75:             self.config,
+76:             self.workspace,
+77:             prompt,
+78:         );
+79: 
+80:         StreamingTask {
+81:             messages,
+82:             result: Box::pin(result),
+83:         }
+84:     }
+85: 
+86:     
+87:     
+88:     
+89:     
+90:     
+91:     
+92:     
+93:     pub async fn execute_task(
+94:         &mut self,
+95:         task_description: &str,
+96:         project_context: &str,
+97:     ) -> Result<AcpTaskResult> {
+98:         
+99:         let prompt = self.build_prompt(task_description, project_context);
+100: 
+101:         tracing::info!("Executing coding task via external agent: {}", &prompt[..prompt.len().min(200)]);
+102: 
+103:         
+104:         let mut client = AcpClient::from_config(&self.config, &self.workspace).await?;
+105: 
+106:         
+107:         match client.execute_task(&prompt).await {
+108:             Ok(result) => {
+109:                 self.ready = true;
+110:                 Ok(AcpTaskResult::new(result, true))
+111:             }
+112:             Err(e) => {
+113:                 tracing::error!("External agent execution failed: {}", e);
+114:                 Ok(AcpTaskResult::error(e.to_string()))
+115:             }
+116:         }
+117:     }
+118: 
+119:     
+120:     fn build_prompt(&self, task_description: &str, project_context: &str) -> String {
+121:         let mut prompt = String::new();
+122: 
+123:         
+124:         let is_evolution = self.iteration.as_ref()
+125:             .map(|i| i.base_iteration_id.is_some())
+126:             .unwrap_or(false);
+127: 
+128:         let inheritance_mode = self.iteration.as_ref()
+129:             .map(|i| i.inheritance)
+130:             .unwrap_or(InheritanceMode::None);
+131: 
+132:         if is_evolution {
+133:             prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+134:             prompt.push_str("🚨 CRITICAL: THIS IS AN EVOLUTION ITERATION\n");
+135:             prompt.push_str("═══════════════════════════════════════════════════════════════\n");
+136:             prompt.push_str("\n");
+137:             prompt.push_str("⚠️ DO NOT DELETE EXISTING CODE! ⚠️\n");
+138:             prompt.push_str("\n");
+139:             prompt.push_str("This iteration builds upon an EXISTING project.\n");
+140:             prompt.push_str("The workspace directory already contains code from a previous iteration.\n");
+141:             prompt.push_str("\n");
+142: 
+143:             match inheritance_mode {
+144:                 InheritanceMode::Partial => {
+145:                     prompt.push_str("📋 INHERITANCE MODE: PARTIAL\n");
+146:                     prompt.push_str("- Code files from the base iteration have been copied to the workspace\n");
+147:                     prompt.push_str("- Artifacts (PRD, Design, Plan) are regenerated fresh\n");
+148:                     prompt.push_str("- You MUST preserve existing code and add new features incrementally\n");
+149:                 }
+150:                 InheritanceMode::Full => {
+151:                     prompt.push_str("📋 INHERITANCE MODE: FULL\n");
+152:                     prompt.push_str("- All files (code + artifacts) from base iteration are available\n");
+153:                     prompt.push_str("- You MUST preserve existing code and only make necessary modifications\n");
+154:                 }
+155:                 InheritanceMode::None => {}
+156:             }
+157: 
+158:             prompt.push_str("\n");
+159:             prompt.push_str("🎯 YOUR TASK:\n");
+160:             prompt.push_str("1. FIRST, list the existing files in the workspace to understand the current structure\n");
+161:             prompt.push_str("2. Read relevant existing code files before making changes\n");
+162:             prompt.push_str("3. Add new features incrementally - DO NOT rewrite from scratch\n");
+163:             prompt.push_str("4. Only modify files that need changes for the new features\n");
+164:             prompt.push_str("5. Preserve all existing functionality\n");
+165:             prompt.push_str("\n");
+166:             prompt.push_str("═══════════════════════════════════════════════════════════════\n\n");
+167:         }
+168: 
+169:         prompt.push_str(&format!(
+170:             r#"# Coding Task
+171: 
+172: ## Project Context
+173: {}
+174: 
+175: ## Base Instruction
+176: {}
+177: 
+178: ## Task Description
+179: {}
+180: 
+181: ## Working Directory
+182: {}
+183: 
+184: ## Requirements
+185: 1. Implement the task according to the description
+186: 2. Write clean, maintainable code
+187: 3. Ensure the code compiles and runs correctly
+188: 4. If you encounter any issues, report them clearly
+189: 
+190: Please start implementing the task."#,
+191:             project_context,
+192:             CODING_ACTOR_INSTRUCTION,
+193:             task_description,
+194:             self.workspace.display()
+195:         ));
+196: 
+197:         prompt
+198:     }
+199: 
+200:     
+201:     pub fn is_ready(&self) -> bool {
+202:         self.ready
+203:     }
+204: 
+205:     
+206:     pub fn agent_type(&self) -> &str {
+207:         &self.config.agent_type
+208:     }
+209: }
 ```
 
 ### crates/cowork-core/src/config_definition/agent_definition.rs (177 lines)
@@ -4122,6 +4335,168 @@ LICENSE
 175: test_agent_definition_serialization
 176: ⋮----
 177: ()
+```
+
+### crates/cowork-core/src/config_definition/default_configs/agents/built-in/design_critic.json (51 lines)
+
+```
+1: {
+2:   "id": "design_critic",
+3:   "name": "Design Critic",
+4:   "description": "Reviews and validates the system design specification",
+5:   "version": "1.0.0",
+6:   "agent_type": "simple",
+7:   "instruction": "builtin://design_critic",
+8:   "tools": [
+9:     {
+10:       "tool_id": "get_requirements"
+11:     },
+12:     {
+13:       "tool_id": "get_design"
+14:     },
+15:     {
+16:       "tool_id": "load_design_doc"
+17:     },
+18:     {
+19:       "tool_id": "check_feature_coverage"
+20:     },
+21:     {
+22:       "tool_id": "provide_feedback"
+23:     },
+24:     {
+25:       "tool_id": "exit_loop"
+26:     },
+27:     {
+28:       "tool_id": "request_human_review"
+29:     },
+30:     {
+31:       "tool_id": "read_file"
+32:     },
+33:     {
+34:       "tool_id": "list_files"
+35:     },
+36:     {
+37:       "tool_id": "read_file_truncated"
+38:     },
+39:     {
+40:       "tool_id": "query_memory"
+41:     },
+42:     {
+43:       "tool_id": "save_issue"
+44:     }
+45:   ],
+46:   "model": {
+47:     "temperature": 0.3
+48:   },
+49:   "include_contents": "none",
+50:   "tags": ["built-in", "design", "critic"]
+51: }
+```
+
+### crates/cowork-core/src/config_definition/default_configs/agents/built-in/plan_critic.json (48 lines)
+
+```
+1: {
+2:   "id": "plan_critic",
+3:   "name": "Plan Critic",
+4:   "description": "Reviews and validates the implementation plan",
+5:   "version": "1.0.0",
+6:   "agent_type": "simple",
+7:   "instruction": "builtin://plan_critic",
+8:   "tools": [
+9:     {
+10:       "tool_id": "get_implementation_plan"
+11:     },
+12:     {
+13:       "tool_id": "load_plan_doc"
+14:     },
+15:     {
+16:       "tool_id": "check_task_dependencies"
+17:     },
+18:     {
+19:       "tool_id": "provide_feedback"
+20:     },
+21:     {
+22:       "tool_id": "exit_loop"
+23:     },
+24:     {
+25:       "tool_id": "request_human_review"
+26:     },
+27:     {
+28:       "tool_id": "read_file"
+29:     },
+30:     {
+31:       "tool_id": "list_files"
+32:     },
+33:     {
+34:       "tool_id": "read_file_truncated"
+35:     },
+36:     {
+37:       "tool_id": "query_memory"
+38:     },
+39:     {
+40:       "tool_id": "save_issue"
+41:     }
+42:   ],
+43:   "model": {
+44:     "temperature": 0.3
+45:   },
+46:   "include_contents": "none",
+47:   "tags": ["built-in", "planning", "critic"]
+48: }
+```
+
+### crates/cowork-core/src/config_definition/default_configs/agents/built-in/prd_critic.json (48 lines)
+
+```
+1: {
+2:   "id": "prd_critic",
+3:   "name": "PRD Critic",
+4:   "description": "Reviews and validates the Product Requirements Document",
+5:   "version": "1.0.0",
+6:   "agent_type": "simple",
+7:   "instruction": "builtin://prd_critic",
+8:   "tools": [
+9:     {
+10:       "tool_id": "get_requirements"
+11:     },
+12:     {
+13:       "tool_id": "load_idea"
+14:     },
+15:     {
+16:       "tool_id": "load_prd_doc"
+17:     },
+18:     {
+19:       "tool_id": "provide_feedback"
+20:     },
+21:     {
+22:       "tool_id": "exit_loop"
+23:     },
+24:     {
+25:       "tool_id": "request_human_review"
+26:     },
+27:     {
+28:       "tool_id": "read_file"
+29:     },
+30:     {
+31:       "tool_id": "list_files"
+32:     },
+33:     {
+34:       "tool_id": "read_file_truncated"
+35:     },
+36:     {
+37:       "tool_id": "query_memory"
+38:     },
+39:     {
+40:       "tool_id": "save_issue"
+41:     }
+42:   ],
+43:   "model": {
+44:     "temperature": 0.3
+45:   },
+46:   "include_contents": "none",
+47:   "tags": ["built-in", "requirements", "critic"]
+48: }
 ```
 
 ### crates/cowork-core/src/config_definition/mod.rs (17 lines)
@@ -7368,467 +7743,6 @@ LICENSE
 88: (src: &PathBuf, dst: &PathBuf, skip_hidden: bool)
 ```
 
-### crates/cowork-gui/src-tauri/src/commands/preview.rs (52 lines)
-
-```
-1: get_code_directory
-2: ⋮----
-3: (iteration_id: &str, workspace_path: Option<&str>)
-4: ⋮----
-5: install_dependencies_if_needed
-6: ⋮----
-7: (workspace: &std::path::Path)
-8: ⋮----
-9: try_analyze_runtime
-10: ⋮----
-11: (code_dir: &std::path::Path)
-12: ⋮----
-13: is_vanilla_html_project
-14: ⋮----
-15: (dir: &std::path::Path)
-16: ⋮----
-17: has_html_files
-18: ⋮----
-19: (dir: &std::path::Path)
-20: ⋮----
-21: start_iteration_preview
-22: ⋮----
-23: (
-24:     iteration_id: String,
-25:     state: State<'_, AppState>,
-26: )
-27: ⋮----
-28: stop_iteration_preview
-29: ⋮----
-30: (iteration_id: String)
-31: ⋮----
-32: check_preview_status
-33: ⋮----
-34: (iteration_id: String)
-35: ⋮----
-36: get_project_runtime_info
-37: ⋮----
-38: (
-39:     iteration_id: String,
-40:     state: State<'_, AppState>,
-41: )
-42: ⋮----
-43: detect_start_command_with_info
-44: ⋮----
-45: (
-46:     _code_dir: &std::path::Path,
-47:     config_result: &Result<cowork_core::ProjectRuntimeConfig, String>,
-48: )
-49: ⋮----
-50: generate_start_command
-51: ⋮----
-52: (config: &cowork_core::ProjectRuntimeConfig)
-```
-
-### crates/cowork-gui/src-tauri/src/project_runner.rs (399 lines)
-
-```
-1: ProjectRunner
-2: ⋮----
-3: {
-4:     processes: Arc<Mutex<HashMap<String, ProjectProcess>>>,
-5:     app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
-6: }
-7: ⋮----
-8: command_exists
-9: ⋮----
-10: (cmd: &str)
-11: ⋮----
-12: ProjectProcess
-13: ⋮----
-14: {
-15:     child: Child,
-16:     #[allow(dead_code)]
-17:     output_tx: mpsc::UnboundedSender<String>,
-18:     url: Option<String>,
-19:     port: Option<u16>,
-20: }
-21: ⋮----
-22: ProjectRunner
-23: ⋮----
-24: {
-25:     pub fn new() -> Self {
-26:         Self {
-27:             processes: Arc::new(Mutex::new(HashMap::new())),
-28:             app_handle: Arc::new(Mutex::new(None)),
-29:         }
-30:     }
-31: 
-32:     pub fn set_app_handle(&self, handle: tauri::AppHandle) {
-33:         let mut app_handle_guard = self.app_handle.lock().unwrap();
-34:         *app_handle_guard = Some(handle);
-35:     }
-36: 
-37:     pub fn is_running(&self, iteration_id: &str) -> bool {
-38:         let processes = self.processes.lock().unwrap();
-39:         processes.contains_key(iteration_id)
-40:     }
-41: 
-42:     pub async fn start(
-43:         &self,
-44:         iteration_id: String,
-45:         command: String,
-46:         code_dir: String,
-47:         url: Option<String>,
-48:         port: Option<u16>,
-49:     ) -> Result<u32, String> {
-50:         
-51:         if let Ok(()) = self.stop(iteration_id.clone()).await {
-52:             tracing::info!(
-53:                 "[Runner] Stopped existing process for iteration: {}",
-54:                 iteration_id
-55:             );
-56:         }
-57: 
-58:         
-59:         let code_path = std::path::Path::new(&code_dir);
-60: 
-61:         if !code_path.exists() {
-62:             return Err(format!("Code directory not found: {}", code_dir));
-63:         }
-64: 
-65:         
-66:         let path_env = std::env::var("PATH").unwrap_or_else(|_| "PATH not found".to_string());
-67:         tracing::debug!("[Runner] PATH = {}", path_env);
-68: 
-69:         
-70:         tracing::debug!("[Runner] Checking commands...");
-71:         if command_exists("bun") {
-72:             tracing::debug!("[Runner] bun found");
-73:         } else {
-74:             tracing::debug!("[Runner] bun NOT found");
-75:         }
-76:         if command_exists("sh") {
-77:             tracing::debug!("[Runner] sh found");
-78:         } else {
-79:             tracing::debug!("[Runner] sh NOT found");
-80:         }
-81: 
-82:         tracing::info!("[Runner] Starting command: {} in {}", command, code_dir);
-83: 
-84:         #[cfg(target_os = "windows")]
-85:         let mut child = {
-86:             let mut cmd = tokio::process::Command::new("cmd");
-87:             cmd.args(["/C", &command])
-88:                 .current_dir(&code_path)
-89:                 .stdout(std::process::Stdio::piped())
-90:                 .stderr(std::process::Stdio::piped())
-91:                 .creation_flags(0x08000000); 
-92: 
-93:             cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
-94:         };
-95: 
-96:         #[cfg(not(target_os = "windows"))]
-97:         let mut child = {
-98:             
-99:             let path = std::env::var("PATH").unwrap_or_else(|_| {
-100:                 
-101:                 "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin".to_string()
-102:             });
-103:             
-104:             tokio::process::Command::new("sh")
-105:                 .args(["-c", &command])
-106:                 .current_dir(&code_path)
-107:                 .env("PATH", path)
-108:                 .stdout(std::process::Stdio::piped())
-109:                 .stderr(std::process::Stdio::piped())
-110:                 .spawn()
-111:                 .map_err(|e| format!("Failed to start: {}", e))?
-112:         };
-113: 
-114:         let pid = child.id().unwrap();
-115: 
-116:         
-117:         let app_handle_opt = self.app_handle.lock().unwrap().clone();
-118:         let app_handle_stdout = app_handle_opt.clone();
-119:         let app_handle_stderr = app_handle_opt.clone();
-120:         let app_handle_exit = app_handle_opt.clone();
-121:         let iteration_id_clone = iteration_id.clone();
-122: 
-123:         
-124:         let (stdout_tx, _stdout_rx) = mpsc::unbounded_channel();
-125:         let (stderr_tx, _stderr_rx) = mpsc::unbounded_channel();
-126: 
-127:         
-128:         let stdout = child.stdout.take().unwrap();
-129:         let stderr = child.stderr.take().unwrap();
-130: 
-131:         
-132:         let stdout_tx_spawn = stdout_tx.clone();
-133:         let stderr_tx_spawn = stderr_tx.clone();
-134: 
-135:         
-136:         let iteration_id_stdout = iteration_id_clone.clone();
-137:         
-138:         
-139:         
-140:         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-141:         
-142:         match child.try_wait() {
-143:             Ok(Some(status)) => {
-144:                 
-145:                 tracing::warn!("[Runner] Process exited immediately with status: {:?}", status);
-146:                 return Err(format!(
-147:                     "Command failed immediately. Exit status: {}. Check if the command is correct.",
-148:                     status
-149:                 ));
-150:             }
-151:             Ok(None) => {
-152:                 
-153:             }
-154:             Err(e) => {
-155:                 tracing::error!("[Runner] Error checking process status: {}", e);
-156:             }
-157:         }
-158: 
-159:         
-160:         tokio::spawn(async move {
-161:             use tokio::io::{AsyncBufReadExt, BufReader};
-162:             let mut reader = BufReader::new(stdout);
-163:             let mut line = String::new();
-164: 
-165:             loop {
-166:                 match reader.read_line(&mut line).await {
-167:                     Ok(0) => beak,
-168:                     Ok(_) => {
-169:                         let _ = stdout_tx_spawn.send(line.clone());
-170: 
-171:                         
-172:                         if let Some(ref handle) = app_handle_stdout {
-173:                             if let Err(e) = handle.emit(
-174:                                 "project_log",
-175:                                 serde_json::json!({
-176:                                     "iteration_id": iteration_id_stdout,
-177:                                     "session_id": iteration_id_stdout,
-178:                                     "stream": "stdout",
-179:                                     "content": line.clone()
-180:                                 }),
-181:                             ) {
-182:                                 tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
-183:                             }
-184:                         }
-185: 
-186:                         line.clear();
-187:                     }
-188:                     Err(e) => {
-189:                         tracing::error!("[Runner] Error reading stdout: {}", e);
-190: 
-191:                         
-192:                         if let Some(ref handle) = app_handle_stdout {
-193:                             if let Err(e) = handle.emit(
-194:                                 "project_log",
-195:                                 serde_json::json!({
-196:                                     "iteration_id": iteration_id_stdout,
-197:                                     "session_id": iteration_id_stdout,
-198:                                     "stream": "stderr",
-199:                                     "content": format!("Error reading output: {}\n", e)
-200:                                 }),
-201:                             ) {
-202:                                 tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
-203:                             }
-204:                         }
-205:                         beak;
-206:                     }
-207:                 }
-208:             }
-209:         });
-210: 
-211:         
-212:         tokio::spawn(async move {
-213:             use tokio::io::{AsyncBufReadExt, BufReader};
-214:             let mut reader = BufReader::new(stderr);
-215:             let mut line = String::new();
-216: 
-217:             loop {
-218:                 match reader.read_line(&mut line).await {
-219:                     Ok(0) => beak,
-220:                     Ok(_) => {
-221:                         let _ = stderr_tx_spawn.send(line.clone());
-222: 
-223:                         
-224:                         if let Some(ref handle) = app_handle_stderr {
-225:                             if let Err(e) = handle.emit(
-226:                                 "project_log",
-227:                                 serde_json::json!({
-228:                                     "iteration_id": iteration_id_clone,
-229:                                     "session_id": iteration_id_clone,
-230:                                     "stream": "stderr",
-231:                                     "content": line.clone()
-232:                                 }),
-233:                             ) {
-234:                                 tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
-235:                             }
-236:                         }
-237: 
-238:                         line.clear();
-239:                     }
-240:                     Err(e) => {
-241:                         tracing::error!("[Runner] Error reading stderr: {}", e);
-242: 
-243:                         
-244:                         if let Some(ref handle) = app_handle_stderr {
-245:                             if let Err(emit_err) = handle.emit(
-246:                                 "process_error",
-247:                                 serde_json::json!({
-248:                                     "iteration_id": iteration_id_clone,
-249:                                     "error": e.to_string()
-250:                                 }),
-251:                             ) {
-252:                                 tracing::warn!(
-253:                                     "[Runner] Failed to emit process_error event: {}",
-254:                                     emit_err
-255:                                 );
-256:                             }
-257:                         }
-258:                         beak;
-259:                     }
-260:                 }
-261:             }
-262:         });
-263: 
-264:         let mut processes = self.processes.lock().unwrap();
-265:         processes.insert(
-266:             iteration_id.clone(),
-267:             ProjectProcess {
-268:                 child,
-269:                 output_tx: stdout_tx,
-270:                 url,
-271:                 port,
-272:             },
-273:         );
-274:         drop(processes);
-275: 
-276:         
-277:         
-278:         
-279:         
-280:         
-281:         let iteration_id_exit = iteration_id.clone();
-282:         let processes_ref = Arc::clone(&self.processes);
-283:         let app_handle_for_cleanup = app_handle_exit.clone();
-284: 
-285:         tokio::spawn(async move {
-286:             
-287:             loop {
-288:                 
-289:                 let should_check = {
-290:                     let procs = processes_ref.lock().unwrap();
-291:                     procs.contains_key(&iteration_id_exit)
-292:                 };
-293:                 
-294:                 if !should_check {
-295:                     
-296:                     beak;
-297:                 }
-298:                 
-299:                 
-300:                 let exited = {
-301:                     let mut procs = processes_ref.lock().unwrap();
-302:                     if let Some(proc) = procs.get_mut(&iteration_id_exit) {
-303:                         
-304:                         match proc.child.try_wait() {
-305:                             Ok(Some(status)) => {
-306:                                 
-307:                                 tracing::info!("[Runner] Process {} exited with status: {:?}", iteration_id_exit, status);
-308:                                 procs.remove(&iteration_id_exit);
-309:                                 true
-310:                             }
-311:                             Ok(None) => false, 
-312:                             Err(e) => {
-313:                                 tracing::error!("[Runner] Error checking process status: {}", e);
-314:                                 false
-315:                             }
-316:                         }
-317:                     } else {
-318:                         true 
-319:                     }
-320:                 };
-321:                 
-322:                 if exited {
-323:                     
-324:                     if let Some(ref handle) = app_handle_for_cleanup {
-325:                         let _ = handle.emit(
-326:                             "project_stopped",
-327:                             serde_json::json!({
-328:                                 "iteration_id": iteration_id_exit,
-329:                                 "session_id": iteration_id_exit
-330:                             }),
-331:                         );
-332:                     }
-333:                     beak;
-334:                 }
-335:                 
-336:                 
-337:                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-338:             }
-339:         });
-340: 
-341:         tracing::info!("[Runner] Process started with PID: {}", pid);
-342:         Ok(pid)
-343:     }
-344: 
-345:     pub async fn stop(&self, iteration_id: String) -> Result<(), String> {
-346:         
-347:         let process = {
-348:             let mut processes = self.processes.lock().unwrap();
-349:             processes.remove(&iteration_id)
-350:         };
-351: 
-352:         if let Some(mut process) = process {
-353:             tracing::info!("[Runner] Stopping process for iteration: {}", iteration_id);
-354: 
-355:             let _ = process.child.kill().await;
-356: 
-357:             
-358:             if let Some(ref handle) = *self.app_handle.lock().unwrap() {
-359:                 let _ = handle.emit(
-360:                     "project_stopped",
-361:                     serde_json::json!({
-362:                         "iteration_id": iteration_id,
-363:                         "session_id": iteration_id
-364:                     }),
-365:                 );
-366:             }
-367: 
-368:             tracing::info!("[Runner] Process stopped");
-369:             Ok(())
-370:         } else {
-371:             
-372:             tracing::debug!(
-373:                 "[Runner] No running process found for iteration: {} (may already be stopped)",
-374:                 iteration_id
-375:             );
-376:             Ok(())
-377:         }
-378:     }
-379: 
-380:     pub fn get_info(&self, iteration_id: &str) -> Option<PreviewInfo> {
-381:         let processes = self.processes.lock().unwrap();
-382:         if let Some(process) = processes.get(iteration_id) {
-383:             
-384:             if let (Some(url), Some(port)) = (&process.url, process.port) {
-385:                 Some(PreviewInfo {
-386:                     url: url.clone(),
-387:                     port,
-388:                     status: super::gui_types::PreviewStatus::Running,
-389:                     project_type: super::gui_types::ProjectType::Unknown,
-390:                 })
-391:             } else {
-392:                 
-393:                 None
-394:             }
-395:         } else {
-396:             None
-397:         }
-398:     }
-399: }
-```
-
 ### litho.docs/en/2.Architecture.md (1224 lines)
 
 ````
@@ -9126,221 +9040,6 @@ LICENSE
 63: tempfile = { workspace = true }
 ```
 
-### crates/cowork-core/src/agents/external_coding_agent.rs (210 lines)
-
-```
-1: ExternalCodingAgent
-2: ⋮----
-3: {
-4:     
-5:     config: CodingAgentConfig,
-6:     
-7:     workspace: PathBuf,
-8:     
-9:     ready: bool,
-10:     
-11:     iteration: Option<Iteration>,
-12: }
-13: ⋮----
-14: StreamingTask
-15: ⋮----
-16: {
-17:     
-18:     pub messages: mpsc::UnboundedReceiver<AgentMessage>,
-19:     
-20:     pub result: std::pin::Pin<Box<dyn std::future::Future<Output = Result<Result<String>>> + Send>>,
-21: }
-22: ⋮----
-23: ExternalCodingAgent
-24: ⋮----
-25: {
-26:     
-27:     pub async fn new(workspace: &PathBuf) -> Result<Self> {
-28:         Self::new_with_iteration(workspace, None).await
-29:     }
-30: 
-31:     
-32:     pub async fn new_with_iteration(workspace: &PathBuf, iteration: Option<Iteration>) -> Result<Self> {
-33:         eprintln!("DEBUG: ExternalCodingAgent::new_with_iteration called with workspace: {}", workspace.display());
-34:         if let Some(ref iter) = iteration {
-35:             eprintln!("DEBUG: Iteration context: id={}, base_id={:?}, inheritance={:?}",
-36:                 iter.id, iter.base_iteration_id, iter.inheritance);
-37:         }
-38: 
-39:         let config = load_config()
-40:             .context("Failed to load config")?;
-41: 
-42:         eprintln!("DEBUG: Config loaded, coding_agent.enabled: {}", config.coding_agent.enabled);
-43: 
-44:         if !config.coding_agent.enabled {
-45:             anyhow::bail!("External coding agent is not enabled in config");
-46:         }
-47: 
-48:         Ok(Self {
-49:             config: config.coding_agent,
-50:             workspace: workspace.clone(),
-51:             ready: false,
-52:             iteration,
-53:         })
-54:     }
-55: 
-56:     
-57:     pub fn is_enabled() -> Result<bool> {
-58:         let config = load_config()
-59:             .context("Failed to load config")?;
-60:         Ok(config.coding_agent.enabled)
-61:     }
-62: 
-63:     
-64:     
-65:     
-66:     
-67:     pub fn execute_task_stream(
-68:         self,
-69:         task_description: &str,
-70:         project_context: &str,
-71:     ) -> StreamingTask {
-72:         let prompt = self.build_prompt(task_description, project_context);
-73: 
-74:         
-75:         let (messages, result) = crate::acp::execute_with_external_agent(
-76:             self.config,
-77:             self.workspace,
-78:             prompt,
-79:         );
-80: 
-81:         StreamingTask {
-82:             messages,
-83:             result: Box::pin(result),
-84:         }
-85:     }
-86: 
-87:     
-88:     
-89:     
-90:     
-91:     
-92:     
-93:     
-94:     pub async fn execute_task(
-95:         &mut self,
-96:         task_description: &str,
-97:         project_context: &str,
-98:     ) -> Result<AcpTaskResult> {
-99:         
-100:         let prompt = self.build_prompt(task_description, project_context);
-101: 
-102:         tracing::info!("Executing coding task via external agent: {}", &prompt[..prompt.len().min(200)]);
-103: 
-104:         
-105:         let mut client = AcpClient::from_config(&self.config, &self.workspace).await?;
-106: 
-107:         
-108:         match client.execute_task(&prompt).await {
-109:             Ok(result) => {
-110:                 self.ready = true;
-111:                 Ok(AcpTaskResult::new(result, true))
-112:             }
-113:             Err(e) => {
-114:                 tracing::error!("External agent execution failed: {}", e);
-115:                 Ok(AcpTaskResult::error(e.to_string()))
-116:             }
-117:         }
-118:     }
-119: 
-120:     
-121:     fn build_prompt(&self, task_description: &str, project_context: &str) -> String {
-122:         let mut prompt = String::new();
-123: 
-124:         
-125:         let is_evolution = self.iteration.as_ref()
-126:             .map(|i| i.base_iteration_id.is_some())
-127:             .unwrap_or(false);
-128: 
-129:         let inheritance_mode = self.iteration.as_ref()
-130:             .map(|i| i.inheritance)
-131:             .unwrap_or(InheritanceMode::None);
-132: 
-133:         if is_evolution {
-134:             prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-135:             prompt.push_str("🚨 CRITICAL: THIS IS AN EVOLUTION ITERATION\n");
-136:             prompt.push_str("═══════════════════════════════════════════════════════════════\n");
-137:             prompt.push_str("\n");
-138:             prompt.push_str("⚠️ DO NOT DELETE EXISTING CODE! ⚠️\n");
-139:             prompt.push_str("\n");
-140:             prompt.push_str("This iteration builds upon an EXISTING project.\n");
-141:             prompt.push_str("The workspace directory already contains code from a previous iteration.\n");
-142:             prompt.push_str("\n");
-143: 
-144:             match inheritance_mode {
-145:                 InheritanceMode::Partial => {
-146:                     prompt.push_str("📋 INHERITANCE MODE: PARTIAL\n");
-147:                     prompt.push_str("- Code files from the base iteration have been copied to the workspace\n");
-148:                     prompt.push_str("- Artifacts (PRD, Design, Plan) are regenerated fresh\n");
-149:                     prompt.push_str("- You MUST preserve existing code and add new features incrementally\n");
-150:                 }
-151:                 InheritanceMode::Full => {
-152:                     prompt.push_str("📋 INHERITANCE MODE: FULL\n");
-153:                     prompt.push_str("- All files (code + artifacts) from base iteration are available\n");
-154:                     prompt.push_str("- You MUST preserve existing code and only make necessary modifications\n");
-155:                 }
-156:                 InheritanceMode::None => {}
-157:             }
-158: 
-159:             prompt.push_str("\n");
-160:             prompt.push_str("🎯 YOUR TASK:\n");
-161:             prompt.push_str("1. FIRST, list the existing files in the workspace to understand the current structure\n");
-162:             prompt.push_str("2. Read relevant existing code files before making changes\n");
-163:             prompt.push_str("3. Add new features incrementally - DO NOT rewrite from scratch\n");
-164:             prompt.push_str("4. Only modify files that need changes for the new features\n");
-165:             prompt.push_str("5. Preserve all existing functionality\n");
-166:             prompt.push_str("\n");
-167:             prompt.push_str("═══════════════════════════════════════════════════════════════\n\n");
-168:         }
-169: 
-170:         prompt.push_str(&format!(
-171:             r#"# Coding Task
-172: 
-173: ## Project Context
-174: {}
-175: 
-176: ## Base Instruction
-177: {}
-178: 
-179: ## Task Description
-180: {}
-181: 
-182: ## Working Directory
-183: {}
-184: 
-185: ## Requirements
-186: 1. Implement the task according to the description
-187: 2. Write clean, maintainable code
-188: 3. Ensure the code compiles and runs correctly
-189: 4. If you encounter any issues, report them clearly
-190: 
-191: Please start implementing the task."#,
-192:             project_context,
-193:             CODING_ACTOR_INSTRUCTION,
-194:             task_description,
-195:             self.workspace.display()
-196:         ));
-197: 
-198:         prompt
-199:     }
-200: 
-201:     
-202:     pub fn is_ready(&self) -> bool {
-203:         self.ready
-204:     }
-205: 
-206:     
-207:     pub fn agent_type(&self) -> &str {
-208:         &self.config.agent_type
-209:     }
-210: }
-```
-
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/check_agent.json (51 lines)
 
 ```
@@ -9471,6 +9170,62 @@ LICENSE
 69: }
 ```
 
+### crates/cowork-core/src/config_definition/default_configs/agents/built-in/coding_critic.json (51 lines)
+
+```
+1: {
+2:   "id": "coding_critic",
+3:   "name": "Coding Critic",
+4:   "description": "Reviews and validates the implemented code",
+5:   "version": "1.0.0",
+6:   "agent_type": "simple",
+7:   "instruction": "builtin://coding_critic",
+8:   "tools": [
+9:     {
+10:       "tool_id": "get_implementation_plan"
+11:     },
+12:     {
+13:       "tool_id": "load_plan_doc"
+14:     },
+15:     {
+16:       "tool_id": "read_file"
+17:     },
+18:     {
+19:       "tool_id": "list_files"
+20:     },
+21:     {
+22:       "tool_id": "run_command"
+23:     },
+24:     {
+25:       "tool_id": "check_tests"
+26:     },
+27:     {
+28:       "tool_id": "check_lint"
+29:     },
+30:     {
+31:       "tool_id": "provide_feedback"
+32:     },
+33:     {
+34:       "tool_id": "exit_loop"
+35:     },
+36:     {
+37:       "tool_id": "request_human_review"
+38:     },
+39:     {
+40:       "tool_id": "query_memory"
+41:     },
+42:     {
+43:       "tool_id": "save_issue"
+44:     }
+45:   ],
+46:   "model": {
+47:     "temperature": 0.3
+48:   },
+49:   "include_contents": "none",
+50:   "tags": ["built-in", "coding", "critic"]
+51: }
+```
+
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/design_actor.json (57 lines)
 
 ```
@@ -9531,62 +9286,6 @@ LICENSE
 55:   "include_contents": "default",
 56:   "tags": ["built-in", "design", "actor"]
 57: }
-```
-
-### crates/cowork-core/src/config_definition/default_configs/agents/built-in/design_critic.json (51 lines)
-
-```
-1: {
-2:   "id": "design_critic",
-3:   "name": "Design Critic",
-4:   "description": "Reviews and validates the system design specification",
-5:   "version": "1.0.0",
-6:   "agent_type": "simple",
-7:   "instruction": "builtin://design_critic",
-8:   "tools": [
-9:     {
-10:       "tool_id": "get_requirements"
-11:     },
-12:     {
-13:       "tool_id": "get_design"
-14:     },
-15:     {
-16:       "tool_id": "load_design_doc"
-17:     },
-18:     {
-19:       "tool_id": "check_feature_coverage"
-20:     },
-21:     {
-22:       "tool_id": "provide_feedback"
-23:     },
-24:     {
-25:       "tool_id": "exit_loop"
-26:     },
-27:     {
-28:       "tool_id": "request_human_review"
-29:     },
-30:     {
-31:       "tool_id": "read_file"
-32:     },
-33:     {
-34:       "tool_id": "list_files"
-35:     },
-36:     {
-37:       "tool_id": "read_file_truncated"
-38:     },
-39:     {
-40:       "tool_id": "query_memory"
-41:     },
-42:     {
-43:       "tool_id": "save_issue"
-44:     }
-45:   ],
-46:   "model": {
-47:     "temperature": 0.3
-48:   },
-49:   "include_contents": "default",
-50:   "tags": ["built-in", "design", "critic"]
-51: }
 ```
 
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/plan_actor.json (63 lines)
@@ -9657,59 +9356,6 @@ LICENSE
 63: }
 ```
 
-### crates/cowork-core/src/config_definition/default_configs/agents/built-in/plan_critic.json (48 lines)
-
-```
-1: {
-2:   "id": "plan_critic",
-3:   "name": "Plan Critic",
-4:   "description": "Reviews and validates the implementation plan",
-5:   "version": "1.0.0",
-6:   "agent_type": "simple",
-7:   "instruction": "builtin://plan_critic",
-8:   "tools": [
-9:     {
-10:       "tool_id": "get_implementation_plan"
-11:     },
-12:     {
-13:       "tool_id": "load_plan_doc"
-14:     },
-15:     {
-16:       "tool_id": "check_task_dependencies"
-17:     },
-18:     {
-19:       "tool_id": "provide_feedback"
-20:     },
-21:     {
-22:       "tool_id": "exit_loop"
-23:     },
-24:     {
-25:       "tool_id": "request_human_review"
-26:     },
-27:     {
-28:       "tool_id": "read_file"
-29:     },
-30:     {
-31:       "tool_id": "list_files"
-32:     },
-33:     {
-34:       "tool_id": "read_file_truncated"
-35:     },
-36:     {
-37:       "tool_id": "query_memory"
-38:     },
-39:     {
-40:       "tool_id": "save_issue"
-41:     }
-42:   ],
-43:   "model": {
-44:     "temperature": 0.3
-45:   },
-46:   "include_contents": "default",
-47:   "tags": ["built-in", "planning", "critic"]
-48: }
-```
-
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/prd_actor.json (60 lines)
 
 ```
@@ -9773,59 +9419,6 @@ LICENSE
 58:   "include_contents": "default",
 59:   "tags": ["built-in", "requirements", "actor"]
 60: }
-```
-
-### crates/cowork-core/src/config_definition/default_configs/agents/built-in/prd_critic.json (48 lines)
-
-```
-1: {
-2:   "id": "prd_critic",
-3:   "name": "PRD Critic",
-4:   "description": "Reviews and validates the Product Requirements Document",
-5:   "version": "1.0.0",
-6:   "agent_type": "simple",
-7:   "instruction": "builtin://prd_critic",
-8:   "tools": [
-9:     {
-10:       "tool_id": "get_requirements"
-11:     },
-12:     {
-13:       "tool_id": "load_idea"
-14:     },
-15:     {
-16:       "tool_id": "load_prd_doc"
-17:     },
-18:     {
-19:       "tool_id": "provide_feedback"
-20:     },
-21:     {
-22:       "tool_id": "exit_loop"
-23:     },
-24:     {
-25:       "tool_id": "request_human_review"
-26:     },
-27:     {
-28:       "tool_id": "read_file"
-29:     },
-30:     {
-31:       "tool_id": "list_files"
-32:     },
-33:     {
-34:       "tool_id": "read_file_truncated"
-35:     },
-36:     {
-37:       "tool_id": "query_memory"
-38:     },
-39:     {
-40:       "tool_id": "save_issue"
-41:     }
-42:   ],
-43:   "model": {
-44:     "temperature": 0.3
-45:   },
-46:   "include_contents": "default",
-47:   "tags": ["built-in", "requirements", "critic"]
-48: }
 ```
 
 ### crates/cowork-core/src/config_definition/registry.rs (653 lines)
@@ -11403,34 +10996,6 @@ LICENSE
 133: iteration_dir_exists
 134: ⋮----
 135: ()
-```
-
-### crates/cowork-core/src/persistence/mod.rs (23 lines)
-
-```
-1: get_global_workspace_lock
-2: ⋮----
-3: ()
-4: ⋮----
-5: set_workspace_path
-6: ⋮----
-7: (path: PathBuf)
-8: ⋮----
-9: get_workspace_path
-10: ⋮----
-11: ()
-12: ⋮----
-13: get_cowork_dir
-14: ⋮----
-15: ()
-16: ⋮----
-17: is_project_initialized
-18: ⋮----
-19: ()
-20: ⋮----
-21: init_project_structure
-22: ⋮----
-23: (_project_name: &str)
 ```
 
 ### crates/cowork-core/src/pipeline/executor/knowledge.rs (34 lines)
@@ -15680,18 +15245,18 @@ LICENSE
 7: ()
 ```
 
-### crates/cowork-gui/src-tauri/src/commands/runner.rs (59 lines)
+### crates/cowork-gui/src-tauri/src/commands/preview.rs (52 lines)
 
 ```
 1: get_code_directory
 2: ⋮----
 3: (iteration_id: &str, workspace_path: Option<&str>)
 4: ⋮----
-5: install_deps_if_needed
+5: install_dependencies_if_needed
 6: ⋮----
 7: (workspace: &std::path::Path)
 8: ⋮----
-9: try_analyze
+9: try_analyze_runtime
 10: ⋮----
 11: (code_dir: &std::path::Path)
 12: ⋮----
@@ -15703,45 +15268,38 @@ LICENSE
 18: ⋮----
 19: (dir: &std::path::Path)
 20: ⋮----
-21: detect_npm_start_command
+21: start_iteration_preview
 22: ⋮----
-23: (dir: &std::path::Path)
-24: ⋮----
-25: start_iteration_project
-26: ⋮----
-27: (
-28:     iteration_id: String, 
-29:     window: Window,
-30:     state: State<'_, AppState>,
-31: )
-32: ⋮----
-33: stop_iteration_project
-34: ⋮----
-35: (iteration_id: String)
-36: ⋮----
-37: check_project_status
-38: ⋮----
-39: (iteration_id: String)
-40: ⋮----
-41: format_code
+23: (
+24:     iteration_id: String,
+25:     state: State<'_, AppState>,
+26: )
+27: ⋮----
+28: stop_iteration_preview
+29: ⋮----
+30: (iteration_id: String)
+31: ⋮----
+32: check_preview_status
+33: ⋮----
+34: (iteration_id: String)
+35: ⋮----
+36: get_project_runtime_info
+37: ⋮----
+38: (
+39:     iteration_id: String,
+40:     state: State<'_, AppState>,
+41: )
 42: ⋮----
-43: (_session_id: String, _file_path: Option<String>)
+43: detect_start_command_with_info
 44: ⋮----
-45: check_formatter_available
-46: ⋮----
-47: (_session_id: String)
-48: ⋮----
-49: is_fullstack
-50: ⋮----
-51: (rt: &RuntimeType)
-52: ⋮----
-53: get_start_command_from_config
-54: ⋮----
-55: (config: &cowork_core::ProjectRuntimeConfig)
-56: ⋮----
-57: start_fullstack
-58: ⋮----
-59: (iteration_id: String, code_dir: PathBuf, config: &cowork_core::ProjectRuntimeConfig)
+45: (
+46:     _code_dir: &std::path::Path,
+47:     config_result: &Result<cowork_core::ProjectRuntimeConfig, String>,
+48: )
+49: ⋮----
+50: generate_start_command
+51: ⋮----
+52: (config: &cowork_core::ProjectRuntimeConfig)
 ```
 
 ### crates/cowork-gui/src-tauri/src/iteration_commands.rs (125 lines)
@@ -15872,6 +15430,410 @@ LICENSE
 123: iteration_to_info
 124: ⋮----
 125: (iteration: &Iteration)
+```
+
+### crates/cowork-gui/src-tauri/src/project_runner.rs (399 lines)
+
+```
+1: ProjectRunner
+2: ⋮----
+3: {
+4:     processes: Arc<Mutex<HashMap<String, ProjectProcess>>>,
+5:     app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
+6: }
+7: ⋮----
+8: command_exists
+9: ⋮----
+10: (cmd: &str)
+11: ⋮----
+12: ProjectProcess
+13: ⋮----
+14: {
+15:     child: Child,
+16:     #[allow(dead_code)]
+17:     output_tx: mpsc::UnboundedSender<String>,
+18:     url: Option<String>,
+19:     port: Option<u16>,
+20: }
+21: ⋮----
+22: ProjectRunner
+23: ⋮----
+24: {
+25:     pub fn new() -> Self {
+26:         Self {
+27:             processes: Arc::new(Mutex::new(HashMap::new())),
+28:             app_handle: Arc::new(Mutex::new(None)),
+29:         }
+30:     }
+31: 
+32:     pub fn set_app_handle(&self, handle: tauri::AppHandle) {
+33:         let mut app_handle_guard = self.app_handle.lock().unwrap();
+34:         *app_handle_guard = Some(handle);
+35:     }
+36: 
+37:     pub fn is_running(&self, iteration_id: &str) -> bool {
+38:         let processes = self.processes.lock().unwrap();
+39:         processes.contains_key(iteration_id)
+40:     }
+41: 
+42:     pub async fn start(
+43:         &self,
+44:         iteration_id: String,
+45:         command: String,
+46:         code_dir: String,
+47:         url: Option<String>,
+48:         port: Option<u16>,
+49:     ) -> Result<u32, String> {
+50:         
+51:         if let Ok(()) = self.stop(iteration_id.clone()).await {
+52:             tracing::info!(
+53:                 "[Runner] Stopped existing process for iteration: {}",
+54:                 iteration_id
+55:             );
+56:         }
+57: 
+58:         
+59:         let code_path = std::path::Path::new(&code_dir);
+60: 
+61:         if !code_path.exists() {
+62:             return Err(format!("Code directory not found: {}", code_dir));
+63:         }
+64: 
+65:         
+66:         let path_env = std::env::var("PATH").unwrap_or_else(|_| "PATH not found".to_string());
+67:         tracing::debug!("[Runner] PATH = {}", path_env);
+68: 
+69:         
+70:         tracing::debug!("[Runner] Checking commands...");
+71:         if command_exists("bun") {
+72:             tracing::debug!("[Runner] bun found");
+73:         } else {
+74:             tracing::debug!("[Runner] bun NOT found");
+75:         }
+76:         if command_exists("sh") {
+77:             tracing::debug!("[Runner] sh found");
+78:         } else {
+79:             tracing::debug!("[Runner] sh NOT found");
+80:         }
+81: 
+82:         tracing::info!("[Runner] Starting command: {} in {}", command, code_dir);
+83: 
+84:         #[cfg(target_os = "windows")]
+85:         let mut child = {
+86:             let mut cmd = tokio::process::Command::new("cmd");
+87:             cmd.args(["/C", &command])
+88:                 .current_dir(&code_path)
+89:                 .stdout(std::process::Stdio::piped())
+90:                 .stderr(std::process::Stdio::piped())
+91:                 .creation_flags(0x08000000); 
+92: 
+93:             cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
+94:         };
+95: 
+96:         #[cfg(not(target_os = "windows"))]
+97:         let mut child = {
+98:             
+99:             let path = std::env::var("PATH").unwrap_or_else(|_| {
+100:                 
+101:                 "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin".to_string()
+102:             });
+103:             
+104:             tokio::process::Command::new("sh")
+105:                 .args(["-c", &command])
+106:                 .current_dir(&code_path)
+107:                 .env("PATH", path)
+108:                 .stdout(std::process::Stdio::piped())
+109:                 .stderr(std::process::Stdio::piped())
+110:                 .spawn()
+111:                 .map_err(|e| format!("Failed to start: {}", e))?
+112:         };
+113: 
+114:         let pid = child.id().unwrap();
+115: 
+116:         
+117:         let app_handle_opt = self.app_handle.lock().unwrap().clone();
+118:         let app_handle_stdout = app_handle_opt.clone();
+119:         let app_handle_stderr = app_handle_opt.clone();
+120:         let app_handle_exit = app_handle_opt.clone();
+121:         let iteration_id_clone = iteration_id.clone();
+122: 
+123:         
+124:         let (stdout_tx, _stdout_rx) = mpsc::unbounded_channel();
+125:         let (stderr_tx, _stderr_rx) = mpsc::unbounded_channel();
+126: 
+127:         
+128:         let stdout = child.stdout.take().unwrap();
+129:         let stderr = child.stderr.take().unwrap();
+130: 
+131:         
+132:         let stdout_tx_spawn = stdout_tx.clone();
+133:         let stderr_tx_spawn = stderr_tx.clone();
+134: 
+135:         
+136:         let iteration_id_stdout = iteration_id_clone.clone();
+137:         
+138:         
+139:         
+140:         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+141:         
+142:         match child.try_wait() {
+143:             Ok(Some(status)) => {
+144:                 
+145:                 tracing::warn!("[Runner] Process exited immediately with status: {:?}", status);
+146:                 return Err(format!(
+147:                     "Command failed immediately. Exit status: {}. Check if the command is correct.",
+148:                     status
+149:                 ));
+150:             }
+151:             Ok(None) => {
+152:                 
+153:             }
+154:             Err(e) => {
+155:                 tracing::error!("[Runner] Error checking process status: {}", e);
+156:             }
+157:         }
+158: 
+159:         
+160:         tokio::spawn(async move {
+161:             use tokio::io::{AsyncBufReadExt, BufReader};
+162:             let mut reader = BufReader::new(stdout);
+163:             let mut line = String::new();
+164: 
+165:             loop {
+166:                 match reader.read_line(&mut line).await {
+167:                     Ok(0) => beak,
+168:                     Ok(_) => {
+169:                         let _ = stdout_tx_spawn.send(line.clone());
+170: 
+171:                         
+172:                         if let Some(ref handle) = app_handle_stdout {
+173:                             if let Err(e) = handle.emit(
+174:                                 "project_log",
+175:                                 serde_json::json!({
+176:                                     "iteration_id": iteration_id_stdout,
+177:                                     "session_id": iteration_id_stdout,
+178:                                     "stream": "stdout",
+179:                                     "content": line.clone()
+180:                                 }),
+181:                             ) {
+182:                                 tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
+183:                             }
+184:                         }
+185: 
+186:                         line.clear();
+187:                     }
+188:                     Err(e) => {
+189:                         tracing::error!("[Runner] Error reading stdout: {}", e);
+190: 
+191:                         
+192:                         if let Some(ref handle) = app_handle_stdout {
+193:                             if let Err(e) = handle.emit(
+194:                                 "project_log",
+195:                                 serde_json::json!({
+196:                                     "iteration_id": iteration_id_stdout,
+197:                                     "session_id": iteration_id_stdout,
+198:                                     "stream": "stderr",
+199:                                     "content": format!("Error reading output: {}\n", e)
+200:                                 }),
+201:                             ) {
+202:                                 tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
+203:                             }
+204:                         }
+205:                         beak;
+206:                     }
+207:                 }
+208:             }
+209:         });
+210: 
+211:         
+212:         tokio::spawn(async move {
+213:             use tokio::io::{AsyncBufReadExt, BufReader};
+214:             let mut reader = BufReader::new(stderr);
+215:             let mut line = String::new();
+216: 
+217:             loop {
+218:                 match reader.read_line(&mut line).await {
+219:                     Ok(0) => beak,
+220:                     Ok(_) => {
+221:                         let _ = stderr_tx_spawn.send(line.clone());
+222: 
+223:                         
+224:                         if let Some(ref handle) = app_handle_stderr {
+225:                             if let Err(e) = handle.emit(
+226:                                 "project_log",
+227:                                 serde_json::json!({
+228:                                     "iteration_id": iteration_id_clone,
+229:                                     "session_id": iteration_id_clone,
+230:                                     "stream": "stderr",
+231:                                     "content": line.clone()
+232:                                 }),
+233:                             ) {
+234:                                 tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
+235:                             }
+236:                         }
+237: 
+238:                         line.clear();
+239:                     }
+240:                     Err(e) => {
+241:                         tracing::error!("[Runner] Error reading stderr: {}", e);
+242: 
+243:                         
+244:                         if let Some(ref handle) = app_handle_stderr {
+245:                             if let Err(emit_err) = handle.emit(
+246:                                 "process_error",
+247:                                 serde_json::json!({
+248:                                     "iteration_id": iteration_id_clone,
+249:                                     "error": e.to_string()
+250:                                 }),
+251:                             ) {
+252:                                 tracing::warn!(
+253:                                     "[Runner] Failed to emit process_error event: {}",
+254:                                     emit_err
+255:                                 );
+256:                             }
+257:                         }
+258:                         beak;
+259:                     }
+260:                 }
+261:             }
+262:         });
+263: 
+264:         let mut processes = self.processes.lock().unwrap();
+265:         processes.insert(
+266:             iteration_id.clone(),
+267:             ProjectProcess {
+268:                 child,
+269:                 output_tx: stdout_tx,
+270:                 url,
+271:                 port,
+272:             },
+273:         );
+274:         drop(processes);
+275: 
+276:         
+277:         
+278:         
+279:         
+280:         
+281:         let iteration_id_exit = iteration_id.clone();
+282:         let processes_ref = Arc::clone(&self.processes);
+283:         let app_handle_for_cleanup = app_handle_exit.clone();
+284: 
+285:         tokio::spawn(async move {
+286:             
+287:             loop {
+288:                 
+289:                 let should_check = {
+290:                     let procs = processes_ref.lock().unwrap();
+291:                     procs.contains_key(&iteration_id_exit)
+292:                 };
+293:                 
+294:                 if !should_check {
+295:                     
+296:                     beak;
+297:                 }
+298:                 
+299:                 
+300:                 let exited = {
+301:                     let mut procs = processes_ref.lock().unwrap();
+302:                     if let Some(proc) = procs.get_mut(&iteration_id_exit) {
+303:                         
+304:                         match proc.child.try_wait() {
+305:                             Ok(Some(status)) => {
+306:                                 
+307:                                 tracing::info!("[Runner] Process {} exited with status: {:?}", iteration_id_exit, status);
+308:                                 procs.remove(&iteration_id_exit);
+309:                                 true
+310:                             }
+311:                             Ok(None) => false, 
+312:                             Err(e) => {
+313:                                 tracing::error!("[Runner] Error checking process status: {}", e);
+314:                                 false
+315:                             }
+316:                         }
+317:                     } else {
+318:                         true 
+319:                     }
+320:                 };
+321:                 
+322:                 if exited {
+323:                     
+324:                     if let Some(ref handle) = app_handle_for_cleanup {
+325:                         let _ = handle.emit(
+326:                             "project_stopped",
+327:                             serde_json::json!({
+328:                                 "iteration_id": iteration_id_exit,
+329:                                 "session_id": iteration_id_exit
+330:                             }),
+331:                         );
+332:                     }
+333:                     beak;
+334:                 }
+335:                 
+336:                 
+337:                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+338:             }
+339:         });
+340: 
+341:         tracing::info!("[Runner] Process started with PID: {}", pid);
+342:         Ok(pid)
+343:     }
+344: 
+345:     pub async fn stop(&self, iteration_id: String) -> Result<(), String> {
+346:         
+347:         let process = {
+348:             let mut processes = self.processes.lock().unwrap();
+349:             processes.remove(&iteration_id)
+350:         };
+351: 
+352:         if let Some(mut process) = process {
+353:             tracing::info!("[Runner] Stopping process for iteration: {}", iteration_id);
+354: 
+355:             let _ = process.child.kill().await;
+356: 
+357:             
+358:             if let Some(ref handle) = *self.app_handle.lock().unwrap() {
+359:                 let _ = handle.emit(
+360:                     "project_stopped",
+361:                     serde_json::json!({
+362:                         "iteration_id": iteration_id,
+363:                         "session_id": iteration_id
+364:                     }),
+365:                 );
+366:             }
+367: 
+368:             tracing::info!("[Runner] Process stopped");
+369:             Ok(())
+370:         } else {
+371:             
+372:             tracing::debug!(
+373:                 "[Runner] No running process found for iteration: {} (may already be stopped)",
+374:                 iteration_id
+375:             );
+376:             Ok(())
+377:         }
+378:     }
+379: 
+380:     pub fn get_info(&self, iteration_id: &str) -> Option<PreviewInfo> {
+381:         let processes = self.processes.lock().unwrap();
+382:         if let Some(process) = processes.get(iteration_id) {
+383:             
+384:             if let (Some(url), Some(port)) = (&process.url, process.port) {
+385:                 Some(PreviewInfo {
+386:                     url: url.clone(),
+387:                     port,
+388:                     status: super::gui_types::PreviewStatus::Running,
+389:                     project_type: super::gui_types::ProjectType::Unknown,
+390:                 })
+391:             } else {
+392:                 
+393:                 None
+394:             }
+395:         } else {
+396:             None
+397:         }
+398:     }
+399: }
 ```
 
 ### crates/cowork-gui/src-tauri/tauri.conf.json (31 lines)
@@ -17888,62 +17850,6 @@ LICENSE
 19: ()
 ```
 
-### crates/cowork-core/src/config_definition/default_configs/agents/built-in/coding_critic.json (51 lines)
-
-```
-1: {
-2:   "id": "coding_critic",
-3:   "name": "Coding Critic",
-4:   "description": "Reviews and validates the implemented code",
-5:   "version": "1.0.0",
-6:   "agent_type": "simple",
-7:   "instruction": "builtin://coding_critic",
-8:   "tools": [
-9:     {
-10:       "tool_id": "get_implementation_plan"
-11:     },
-12:     {
-13:       "tool_id": "load_plan_doc"
-14:     },
-15:     {
-16:       "tool_id": "read_file"
-17:     },
-18:     {
-19:       "tool_id": "list_files"
-20:     },
-21:     {
-22:       "tool_id": "run_command"
-23:     },
-24:     {
-25:       "tool_id": "check_tests"
-26:     },
-27:     {
-28:       "tool_id": "check_lint"
-29:     },
-30:     {
-31:       "tool_id": "provide_feedback"
-32:     },
-33:     {
-34:       "tool_id": "exit_loop"
-35:     },
-36:     {
-37:       "tool_id": "request_human_review"
-38:     },
-39:     {
-40:       "tool_id": "query_memory"
-41:     },
-42:     {
-43:       "tool_id": "save_issue"
-44:     }
-45:   ],
-46:   "model": {
-47:     "temperature": 0.3
-48:   },
-49:   "include_contents": "default",
-50:   "tags": ["built-in", "coding", "critic"]
-51: }
-```
-
 ### crates/cowork-core/src/config_definition/default_configs/agents/built-in/delivery_agent.json (36 lines)
 
 ```
@@ -18164,6 +18070,130 @@ LICENSE
 63:   },
 64:   "tags": ["built-in", "default"]
 65: }
+```
+
+### crates/cowork-core/src/config_definition/default_configs/stages/coding.json (21 lines)
+
+```
+1: {
+2:   "id": "coding",
+3:   "name": "Coding Stage",
+4:   "description": "Implements the code based on the plan with Actor-Critic validation",
+5:   "stage_type": "actor_critic",
+6:   "actor_critic": {
+7:     "actor": "coding_actor",
+8:     "critic": "coding_critic",
+9:     "max_iterations": 3
+10:   },
+11:   "needs_confirmation": true,
+12:   "artifacts": [
+13:     {
+14:       "path": "workspace/",
+15:       "required": true,
+16:       "description": "The implemented source code"
+17:     }
+18:   ],
+19:   "hooks": [],
+20:   "tags": ["built-in", "coding"]
+21: }
+```
+
+### crates/cowork-core/src/config_definition/default_configs/stages/design.json (26 lines)
+
+```
+1: {
+2:   "id": "design",
+3:   "name": "Design Stage",
+4:   "description": "Creates system design specification with Actor-Critic validation",
+5:   "stage_type": "actor_critic",
+6:   "actor_critic": {
+7:     "actor": "design_actor",
+8:     "critic": "design_critic",
+9:     "max_iterations": 2
+10:   },
+11:   "needs_confirmation": true,
+12:   "artifacts": [
+13:     {
+14:       "path": "artifacts/design.md",
+15:       "required": true,
+16:       "description": "The system design specification"
+17:     },
+18:     {
+19:       "path": "data/design_spec.json",
+20:       "required": true,
+21:       "description": "Structured design components"
+22:     }
+23:   ],
+24:   "hooks": [],
+25:   "tags": ["built-in", "design"]
+26: }
+```
+
+### crates/cowork-core/src/config_definition/default_configs/stages/plan.json (26 lines)
+
+```
+1: {
+2:   "id": "plan",
+3:   "name": "Plan Stage",
+4:   "description": "Creates implementation plan with detailed tasks",
+5:   "stage_type": "actor_critic",
+6:   "actor_critic": {
+7:     "actor": "plan_actor",
+8:     "critic": "plan_critic",
+9:     "max_iterations": 2
+10:   },
+11:   "needs_confirmation": true,
+12:   "artifacts": [
+13:     {
+14:       "path": "artifacts/plan.md",
+15:       "required": true,
+16:       "description": "The implementation plan document"
+17:     },
+18:     {
+19:       "path": "data/implementation_plan.json",
+20:       "required": true,
+21:       "description": "Structured implementation tasks"
+22:     }
+23:   ],
+24:   "hooks": [],
+25:   "tags": ["built-in", "planning"]
+26: }
+```
+
+### crates/cowork-core/src/config_definition/default_configs/stages/prd.json (31 lines)
+
+```
+1: {
+2:   "id": "prd",
+3:   "name": "PRD Stage",
+4:   "description": "Generates Product Requirements Document with Actor-Critic validation",
+5:   "stage_type": "actor_critic",
+6:   "actor_critic": {
+7:     "actor": "prd_actor",
+8:     "critic": "prd_critic",
+9:     "max_iterations": 2
+10:   },
+11:   "needs_confirmation": true,
+12:   "artifacts": [
+13:     {
+14:       "path": "artifacts/prd.md",
+15:       "required": true,
+16:       "description": "The Product Requirements Document"
+17:     },
+18:     {
+19:       "path": "data/requirements.json",
+20:       "required": true,
+21:       "description": "Structured requirements data"
+22:     },
+23:     {
+24:       "path": "data/feature_list.json",
+25:       "required": false,
+26:       "description": "Feature list derived from requirements"
+27:     }
+28:   ],
+29:   "hooks": [],
+30:   "tags": ["built-in", "requirements"]
+31: }
 ```
 
 ### crates/cowork-core/src/config_definition/flow_definition.rs (269 lines)
@@ -20355,136 +20385,32 @@ LICENSE
 11: ()
 ```
 
-### crates/cowork-core/src/persistence/iteration_store.rs (127 lines)
+### crates/cowork-core/src/persistence/mod.rs (23 lines)
 
 ```
-1: IterationStore
+1: get_global_workspace_lock
 2: ⋮----
-3: {
-4:     pub fn new() -> Self {
-5:         Self
-6:     }
-7: 
-8:     
-9:     pub fn load(&self, iteration_id: &str) -> anyhow::Result<Iteration> {
-10:         let path = self.iteration_file_path(iteration_id)?;
-11:         if !path.exists() {
-12:             anyhow::bail!("Iteration not found: {}", iteration_id);
-13:         }
-14:         let content = std::fs::read_to_string(&path)?;
-15:         let iteration: Iteration = serde_json::from_str(&content)?;
-16:         Ok(iteration)
-17:     }
-18: 
-19:     
-20:     pub fn save(&self, iteration: &Iteration) -> anyhow::Result<()> {
-21:         let path = self.iteration_file_path(&iteration.id)?;
-22:         
-23:         
-24:         if let Some(parent) = path.parent() {
-25:             std::fs::create_dir_all(parent)?;
-26:         }
-27:         
-28:         let content = serde_json::to_string_pretty(iteration)?;
-29:         std::fs::write(&path, content)?;
-30:         Ok(())
-31:     }
-32: 
-33:     
-34:     pub fn exists(&self, iteration_id: &str) -> bool {
-35:         self.iteration_file_path(iteration_id)
-36:             .map(|p| p.exists())
-37:             .unwrap_or(false)
-38:     }
-39: 
-40:     
-41:     pub fn delete(&self, iteration_id: &str) -> anyhow::Result<()> {
-42:         let path = self.iteration_file_path(iteration_id)?;
-43:         if path.exists() {
-44:             std::fs::remove_file(&path)?;
-45:         }
-46:         Ok(())
-47:     }
-48: 
-49:     
-50:     pub fn load_all(&self) -> anyhow::Result<Vec<Iteration>> {
-51:         let dir = get_cowork_dir()?.join("iterations");
-52:         if !dir.exists() {
-53:             return Ok(Vec::new());
-54:         }
-55: 
-56:         let mut iterations = Vec::new();
-57:         for entry in std::fs::read_dir(&dir)? {
-58:             let entry = entry?;
-59:             if entry
-60:                 .path()
-61:                 .extension()
-62:                 .map(|e| e == "json")
-63:                 .unwrap_or(false)
-64:             {
-65:                 if let Ok(content) = std::fs::read_to_string(entry.path()) {
-66:                     if let Ok(iteration) = serde_json::from_str::<Iteration>(&content) {
-67:                         iterations.push(iteration);
-68:                     }
-69:                 }
-70:             }
-71:         }
-72: 
-73:         
-74:         iterations.sort_by_key(|i| i.number);
-75:         Ok(iterations)
-76:     }
-77: 
-78:     
-79:     pub fn load_summaries(&self) -> anyhow::Result<Vec<IterationSummary>> {
-80:         let iterations = self.load_all()?;
-81:         Ok(iterations.into_iter().map(|i| i.to_summary()).collect())
-82:     }
-83: 
-84:     
-85:     
-86:     pub fn workspace_path(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
-87:         let cowork_dir = get_cowork_dir()?;
-88:         Ok(cowork_dir
-89:             .join("iterations")
-90:             .join(iteration_id)
-91:             .join("workspace"))
-92:     }
-93: 
-94:     
-95:     pub fn ensure_workspace(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
-96:         let workspace = self.workspace_path(iteration_id)?;
-97:         std::fs::create_dir_all(&workspace)?;
-98: 
-99:         
-100:         let memory_dir = get_cowork_dir()?.join("memory/iterations");
-101:         std::fs::create_dir_all(&memory_dir)?;
-102: 
-103:         Ok(workspace)
-104:     }
-105: 
-106:     
-107:     
-108:     pub fn iteration_path(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
-109:         let cowork_dir = get_cowork_dir()?;
-110:         Ok(cowork_dir.join("iterations").join(iteration_id))
-111:     }
-112: 
-113:     fn iteration_file_path(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
-114:         let cowork_dir = get_cowork_dir()?;
-115:         Ok(cowork_dir
-116:             .join("iterations")
-117:             .join(format!("{}.json", iteration_id)))
-118:     }
-119: }
-120: ⋮----
-121: IterationStore
-122: ⋮----
-123: {
-124:     fn default() -> Self {
-125:         Self::new()
-126:     }
-127: }
+3: ()
+4: ⋮----
+5: set_workspace_path
+6: ⋮----
+7: (path: PathBuf)
+8: ⋮----
+9: get_workspace_path
+10: ⋮----
+11: ()
+12: ⋮----
+13: get_cowork_dir
+14: ⋮----
+15: ()
+16: ⋮----
+17: is_project_initialized
+18: ⋮----
+19: ()
+20: ⋮----
+21: init_project_structure
+22: ⋮----
+23: (_project_name: &str)
 ```
 
 ### crates/cowork-core/src/pipeline/executor/interaction_ext.rs (36 lines)
@@ -23530,74 +23456,6 @@ LICENSE
 10: @import 'highlight.js/styles/github.css';
 ```
 
-### crates/cowork-gui/src-tauri/src/commands/file.rs (63 lines)
-
-```
-1: get_workspace_path_internal
-2: ⋮----
-3: (iteration_id: &str, workspace_path: Option<&str>)
-4: ⋮----
-5: get_iteration_path_internal
-6: ⋮----
-7: (iteration_id: &str, workspace_path: Option<&str>)
-8: ⋮----
-9: open_in_file_manager
-10: ⋮----
-11: (
-12:     path: String,
-13:     state: State<'_, AppState>,
-14: )
-15: ⋮----
-16: get_iteration_artifacts
-17: ⋮----
-18: (
-19:     iteration_id: String,
-20:     state: State<'_, AppState>,
-21: )
-22: ⋮----
-23: read_iteration_file
-24: ⋮----
-25: (
-26:     iteration_id: String,
-27:     file_path: String,
-28:     offset: Option<usize>,
-29:     limit: Option<usize>,
-30:     state: State<'_, AppState>,
-31: )
-32: ⋮----
-33: save_iteration_file
-34: ⋮----
-35: (
-36:     iteration_id: String,
-37:     file_path: String,
-38:     content: String,
-39:     state: State<'_, AppState>,
-40: )
-41: ⋮----
-42: get_iteration_file_tree
-43: ⋮----
-44: (
-45:     iteration_id: String,
-46:     state: State<'_, AppState>,
-47: )
-48: ⋮----
-49: collect_files
-50: ⋮----
-51: (dir: &Path)
-52: ⋮----
-53: detect_language
-54: ⋮----
-55: (path: &Path)
-56: ⋮----
-57: build_file_tree
-58: ⋮----
-59: (dir: &Path, base: &Path, depth: usize)
-60: ⋮----
-61: read_local_file
-62: ⋮----
-63: (file_path: String)
-```
-
 ### crates/cowork-gui/src-tauri/src/commands/path_utils.rs (59 lines)
 
 ```
@@ -23719,6 +23577,70 @@ LICENSE
 52: get_stage_names
 53: ⋮----
 54: ()
+```
+
+### crates/cowork-gui/src-tauri/src/commands/runner.rs (59 lines)
+
+```
+1: get_code_directory
+2: ⋮----
+3: (iteration_id: &str, workspace_path: Option<&str>)
+4: ⋮----
+5: install_deps_if_needed
+6: ⋮----
+7: (workspace: &std::path::Path)
+8: ⋮----
+9: try_analyze
+10: ⋮----
+11: (code_dir: &std::path::Path)
+12: ⋮----
+13: is_vanilla_html_project
+14: ⋮----
+15: (dir: &std::path::Path)
+16: ⋮----
+17: has_html_files
+18: ⋮----
+19: (dir: &std::path::Path)
+20: ⋮----
+21: detect_npm_start_command
+22: ⋮----
+23: (dir: &std::path::Path)
+24: ⋮----
+25: start_iteration_project
+26: ⋮----
+27: (
+28:     iteration_id: String, 
+29:     window: Window,
+30:     state: State<'_, AppState>,
+31: )
+32: ⋮----
+33: stop_iteration_project
+34: ⋮----
+35: (iteration_id: String)
+36: ⋮----
+37: check_project_status
+38: ⋮----
+39: (iteration_id: String)
+40: ⋮----
+41: format_code
+42: ⋮----
+43: (_session_id: String, _file_path: Option<String>)
+44: ⋮----
+45: check_formatter_available
+46: ⋮----
+47: (_session_id: String)
+48: ⋮----
+49: is_fullstack
+50: ⋮----
+51: (rt: &RuntimeType)
+52: ⋮----
+53: get_start_command_from_config
+54: ⋮----
+55: (config: &cowork_core::ProjectRuntimeConfig)
+56: ⋮----
+57: start_fullstack
+58: ⋮----
+59: (iteration_id: String, code_dir: PathBuf, config: &cowork_core::ProjectRuntimeConfig)
 ```
 
 ### crates/cowork-gui/src-tauri/src/commands/system.rs (11 lines)
@@ -26642,32 +26564,6 @@ LICENSE
 17: }
 ```
 
-### crates/cowork-core/src/config_definition/default_configs/stages/coding.json (21 lines)
-
-```
-1: {
-2:   "id": "coding",
-3:   "name": "Coding Stage",
-4:   "description": "Implements the code based on the plan with Actor-Critic validation",
-5:   "stage_type": "actor_critic",
-6:   "actor_critic": {
-7:     "actor": "coding_actor",
-8:     "critic": "coding_critic",
-9:     "max_iterations": 1
-10:   },
-11:   "needs_confirmation": true,
-12:   "artifacts": [
-13:     {
-14:       "path": "workspace/",
-15:       "required": true,
-16:       "description": "The implemented source code"
-17:     }
-18:   ],
-19:   "hooks": [],
-20:   "tags": ["built-in", "coding"]
-21: }
-```
-
 ### crates/cowork-core/src/config_definition/default_configs/stages/delivery.json (17 lines)
 
 ```
@@ -26690,37 +26586,6 @@ LICENSE
 17: }
 ```
 
-### crates/cowork-core/src/config_definition/default_configs/stages/design.json (26 lines)
-
-```
-1: {
-2:   "id": "design",
-3:   "name": "Design Stage",
-4:   "description": "Creates system design specification with Actor-Critic validation",
-5:   "stage_type": "actor_critic",
-6:   "actor_critic": {
-7:     "actor": "design_actor",
-8:     "critic": "design_critic",
-9:     "max_iterations": 1
-10:   },
-11:   "needs_confirmation": true,
-12:   "artifacts": [
-13:     {
-14:       "path": "artifacts/design.md",
-15:       "required": true,
-16:       "description": "The system design specification"
-17:     },
-18:     {
-19:       "path": "data/design_spec.json",
-20:       "required": true,
-21:       "description": "Structured design components"
-22:     }
-23:   ],
-24:   "hooks": [],
-25:   "tags": ["built-in", "design"]
-26: }
-```
-
 ### crates/cowork-core/src/config_definition/default_configs/stages/idea.json (17 lines)
 
 ```
@@ -26741,73 +26606,6 @@ LICENSE
 15:   "hooks": [],
 16:   "tags": ["built-in", "ideation"]
 17: }
-```
-
-### crates/cowork-core/src/config_definition/default_configs/stages/plan.json (26 lines)
-
-```
-1: {
-2:   "id": "plan",
-3:   "name": "Plan Stage",
-4:   "description": "Creates implementation plan with detailed tasks",
-5:   "stage_type": "actor_critic",
-6:   "actor_critic": {
-7:     "actor": "plan_actor",
-8:     "critic": "plan_critic",
-9:     "max_iterations": 1
-10:   },
-11:   "needs_confirmation": true,
-12:   "artifacts": [
-13:     {
-14:       "path": "artifacts/plan.md",
-15:       "required": true,
-16:       "description": "The implementation plan document"
-17:     },
-18:     {
-19:       "path": "data/implementation_plan.json",
-20:       "required": true,
-21:       "description": "Structured implementation tasks"
-22:     }
-23:   ],
-24:   "hooks": [],
-25:   "tags": ["built-in", "planning"]
-26: }
-```
-
-### crates/cowork-core/src/config_definition/default_configs/stages/prd.json (31 lines)
-
-```
-1: {
-2:   "id": "prd",
-3:   "name": "PRD Stage",
-4:   "description": "Generates Product Requirements Document with Actor-Critic validation",
-5:   "stage_type": "actor_critic",
-6:   "actor_critic": {
-7:     "actor": "prd_actor",
-8:     "critic": "prd_critic",
-9:     "max_iterations": 1
-10:   },
-11:   "needs_confirmation": true,
-12:   "artifacts": [
-13:     {
-14:       "path": "artifacts/prd.md",
-15:       "required": true,
-16:       "description": "The Product Requirements Document"
-17:     },
-18:     {
-19:       "path": "data/requirements.json",
-20:       "required": true,
-21:       "description": "Structured requirements data"
-22:     },
-23:     {
-24:       "path": "data/feature_list.json",
-25:       "required": false,
-26:       "description": "Feature list derived from requirements"
-27:     }
-28:   ],
-29:   "hooks": [],
-30:   "tags": ["built-in", "requirements"]
-31: }
 ```
 
 ### crates/cowork-core/src/config_definition/integration_definition.rs (304 lines)
@@ -28929,6 +28727,138 @@ LICENSE
 176: test_backoff_calculation
 177: ⋮----
 178: ()
+```
+
+### crates/cowork-core/src/persistence/iteration_store.rs (127 lines)
+
+```
+1: IterationStore
+2: ⋮----
+3: {
+4:     pub fn new() -> Self {
+5:         Self
+6:     }
+7: 
+8:     
+9:     pub fn load(&self, iteration_id: &str) -> anyhow::Result<Iteration> {
+10:         let path = self.iteration_file_path(iteration_id)?;
+11:         if !path.exists() {
+12:             anyhow::bail!("Iteration not found: {}", iteration_id);
+13:         }
+14:         let content = std::fs::read_to_string(&path)?;
+15:         let iteration: Iteration = serde_json::from_str(&content)?;
+16:         Ok(iteration)
+17:     }
+18: 
+19:     
+20:     pub fn save(&self, iteration: &Iteration) -> anyhow::Result<()> {
+21:         let path = self.iteration_file_path(&iteration.id)?;
+22:         
+23:         
+24:         if let Some(parent) = path.parent() {
+25:             std::fs::create_dir_all(parent)?;
+26:         }
+27:         
+28:         let content = serde_json::to_string_pretty(iteration)?;
+29:         std::fs::write(&path, content)?;
+30:         Ok(())
+31:     }
+32: 
+33:     
+34:     pub fn exists(&self, iteration_id: &str) -> bool {
+35:         self.iteration_file_path(iteration_id)
+36:             .map(|p| p.exists())
+37:             .unwrap_or(false)
+38:     }
+39: 
+40:     
+41:     pub fn delete(&self, iteration_id: &str) -> anyhow::Result<()> {
+42:         let path = self.iteration_file_path(iteration_id)?;
+43:         if path.exists() {
+44:             std::fs::remove_file(&path)?;
+45:         }
+46:         Ok(())
+47:     }
+48: 
+49:     
+50:     pub fn load_all(&self) -> anyhow::Result<Vec<Iteration>> {
+51:         let dir = get_cowork_dir()?.join("iterations");
+52:         if !dir.exists() {
+53:             return Ok(Vec::new());
+54:         }
+55: 
+56:         let mut iterations = Vec::new();
+57:         for entry in std::fs::read_dir(&dir)? {
+58:             let entry = entry?;
+59:             if entry
+60:                 .path()
+61:                 .extension()
+62:                 .map(|e| e == "json")
+63:                 .unwrap_or(false)
+64:             {
+65:                 if let Ok(content) = std::fs::read_to_string(entry.path()) {
+66:                     if let Ok(iteration) = serde_json::from_str::<Iteration>(&content) {
+67:                         iterations.push(iteration);
+68:                     }
+69:                 }
+70:             }
+71:         }
+72: 
+73:         
+74:         iterations.sort_by_key(|i| i.number);
+75:         Ok(iterations)
+76:     }
+77: 
+78:     
+79:     pub fn load_summaries(&self) -> anyhow::Result<Vec<IterationSummary>> {
+80:         let iterations = self.load_all()?;
+81:         Ok(iterations.into_iter().map(|i| i.to_summary()).collect())
+82:     }
+83: 
+84:     
+85:     
+86:     pub fn workspace_path(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
+87:         let cowork_dir = get_cowork_dir()?;
+88:         Ok(cowork_dir
+89:             .join("iterations")
+90:             .join(iteration_id)
+91:             .join("workspace"))
+92:     }
+93: 
+94:     
+95:     pub fn ensure_workspace(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
+96:         let workspace = self.workspace_path(iteration_id)?;
+97:         std::fs::create_dir_all(&workspace)?;
+98: 
+99:         
+100:         let memory_dir = get_cowork_dir()?.join("memory/iterations");
+101:         std::fs::create_dir_all(&memory_dir)?;
+102: 
+103:         Ok(workspace)
+104:     }
+105: 
+106:     
+107:     
+108:     pub fn iteration_path(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
+109:         let cowork_dir = get_cowork_dir()?;
+110:         Ok(cowork_dir.join("iterations").join(iteration_id))
+111:     }
+112: 
+113:     fn iteration_file_path(&self, iteration_id: &str) -> anyhow::Result<PathBuf> {
+114:         let cowork_dir = get_cowork_dir()?;
+115:         Ok(cowork_dir
+116:             .join("iterations")
+117:             .join(format!("{}.json", iteration_id)))
+118:     }
+119: }
+120: ⋮----
+121: IterationStore
+122: ⋮----
+123: {
+124:     fn default() -> Self {
+125:         Self::new()
+126:     }
+127: }
 ```
 
 ### crates/cowork-core/src/persistence/memory_store.rs (222 lines)
@@ -33316,6 +33246,74 @@ LICENSE
 
 ```
 1: {"$schema": "../gen/schemas/desktop-schema.json", "identifier": "default", "description": "Capability for the main window", "windows": ["main"], "permissions": ["core:default", "opener:default", "dialog:allow-open"]}
+```
+
+### crates/cowork-gui/src-tauri/src/commands/file.rs (63 lines)
+
+```
+1: get_workspace_path_internal
+2: ⋮----
+3: (iteration_id: &str, workspace_path: Option<&str>)
+4: ⋮----
+5: get_iteration_path_internal
+6: ⋮----
+7: (iteration_id: &str, workspace_path: Option<&str>)
+8: ⋮----
+9: open_in_file_manager
+10: ⋮----
+11: (
+12:     path: String,
+13:     state: State<'_, AppState>,
+14: )
+15: ⋮----
+16: get_iteration_artifacts
+17: ⋮----
+18: (
+19:     iteration_id: String,
+20:     state: State<'_, AppState>,
+21: )
+22: ⋮----
+23: read_iteration_file
+24: ⋮----
+25: (
+26:     iteration_id: String,
+27:     file_path: String,
+28:     offset: Option<usize>,
+29:     limit: Option<usize>,
+30:     state: State<'_, AppState>,
+31: )
+32: ⋮----
+33: save_iteration_file
+34: ⋮----
+35: (
+36:     iteration_id: String,
+37:     file_path: String,
+38:     content: String,
+39:     state: State<'_, AppState>,
+40: )
+41: ⋮----
+42: get_iteration_file_tree
+43: ⋮----
+44: (
+45:     iteration_id: String,
+46:     state: State<'_, AppState>,
+47: )
+48: ⋮----
+49: collect_files
+50: ⋮----
+51: (dir: &Path)
+52: ⋮----
+53: detect_language
+54: ⋮----
+55: (path: &Path)
+56: ⋮----
+57: build_file_tree
+58: ⋮----
+59: (dir: &Path, base: &Path, depth: usize)
+60: ⋮----
+61: read_local_file
+62: ⋮----
+63: (file_path: String)
 ```
 
 ### crates/cowork-gui/src-tauri/src/commands/memory.rs (43 lines)
