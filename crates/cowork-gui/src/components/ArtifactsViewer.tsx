@@ -1,12 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
-import rehypeRaw from 'rehype-raw';
-import JsonView from 'react-json-view';
+import { remarkPlugins, fullRehypePlugins } from '@/utils/markdown';
 import { App, Tabs, Spin, Alert, Empty, Button, Space, Tooltip } from 'antd';
 import { FileTextOutlined, ProjectOutlined, DatabaseOutlined, BuildOutlined, CheckCircleOutlined, FileMarkdownOutlined, FolderOpenOutlined, ReloadOutlined } from '@ant-design/icons';
+
+// P1: JsonView 体积较大（~70KB raw），仅在用户切到 JSON 视图时才需要加载。
+// 用 React.lazy 拆成独立 chunk，避免在仅查看 markdown 文档时也被一起加载。
+// 同时复用类型，避免破坏后续 JsonView 的 props 类型推断。
+const JsonView = lazy(() => import('react-json-view'));
 
 interface ArtifactsData {
   iteration_id?: string;
@@ -164,7 +166,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
             </Tooltip>
           </div>
           <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, rehypeRaw]}>{artifacts.idea}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.idea}</ReactMarkdown>
           </div>
         </div>
       ) : null,
@@ -184,7 +186,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
             </Tooltip>
           </div>
           <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, rehypeRaw]}>{artifacts.requirements}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.requirements}</ReactMarkdown>
           </div>
         </div>
       ) : null,
@@ -216,11 +218,13 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
           <div className="artifact-content" style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
             {artifacts.design_raw || designViewMode === 'doc' ? (
               <div className="markdown-content">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, rehypeRaw]}>{designContent}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{designContent}</ReactMarkdown>
               </div>
             ) : (
               <div style={{ overflow: 'auto', maxHeight: '100%' }}>
-                <JsonView src={artifacts.design as object} theme="monokai" displayObjectSize={false} enableClipboard={false} indentWidth={2} collapsed={false} quotesOnKeys={false} sortKeys={false} />
+                <Suspense fallback={<Spin />}>
+                  <JsonView src={artifacts.design as object} theme="monokai" displayObjectSize={false} enableClipboard={false} indentWidth={2} collapsed={false} quotesOnKeys={false} sortKeys={false} />
+                </Suspense>
               </div>
             )}
           </div>
@@ -254,11 +258,13 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
           <div className="artifact-content" style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
             {artifacts.plan_raw || planViewMode === 'doc' ? (
               <div className="markdown-content">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, rehypeRaw]}>{planContent}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{planContent}</ReactMarkdown>
               </div>
             ) : (
               <div style={{ overflow: 'auto', maxHeight: '100%' }}>
-                <JsonView src={artifacts.plan as object} theme="monokai" displayObjectSize={false} enableClipboard={false} indentWidth={2} collapsed={false} quotesOnKeys={false} sortKeys={false} />
+                <Suspense fallback={<Spin />}>
+                  <JsonView src={artifacts.plan as object} theme="monokai" displayObjectSize={false} enableClipboard={false} indentWidth={2} collapsed={false} quotesOnKeys={false} sortKeys={false} />
+                </Suspense>
               </div>
             )}
           </div>
@@ -281,7 +287,9 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
           </div>
           <div className="artifact-content" style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
             <div style={{ overflow: 'auto', maxHeight: '100%' }}>
-              <JsonView src={artifacts.code_files as unknown as object} theme="monokai" displayObjectSize={false} enableClipboard={false} indentWidth={2} collapsed={false} quotesOnKeys={false} sortKeys={false} />
+              <Suspense fallback={<Spin />}>
+                <JsonView src={artifacts.code_files as unknown as object} theme="monokai" displayObjectSize={false} enableClipboard={false} indentWidth={2} collapsed={false} quotesOnKeys={false} sortKeys={false} />
+              </Suspense>
             </div>
           </div>
         </div>
@@ -302,7 +310,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
             </Tooltip>
           </div>
           <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, rehypeRaw]}>{artifacts.check_report}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.check_report}</ReactMarkdown>
           </div>
         </div>
       ) : null,
@@ -322,7 +330,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
             </Tooltip>
           </div>
           <div className="artifact-content markdown-content" style={{ flex: 1, overflow: 'auto' }}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, rehypeRaw]}>{artifacts.delivery_report}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.delivery_report}</ReactMarkdown>
           </div>
         </div>
       ) : null,

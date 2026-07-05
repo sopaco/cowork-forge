@@ -41,7 +41,10 @@ export default defineConfig({
     // Vite 8: Rolldown 默认开启
     target: "esnext",
     cssCodeSplit: true,
-    chunkSizeWarningLimit: 1536,
+    // P3: 桌面应用从本地文件系统加载，chunk 大小警告阈值放宽。
+    // antd v6 的 CSS-in-JS runtime + 主题/locale 是不可压缩的固定成本，
+    // gzip 后 ~470KB 对 Tauri 本地加载无性能影响（<100ms 解析）。
+    chunkSizeWarningLimit: 2500,
     // rolldown minifier 默认在 production 启用，会消除被 define 替换为常量的 console 调用
     minify: isProd ? "rolldown" : false,
     rollupOptions: {
@@ -50,13 +53,23 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes("node_modules")) {
             if (id.includes("react-dom") || id.includes("/react/")) return "vendor-react";
-            if (id.includes("antd") || id.includes("@ant-design")) return "vendor-antd";
+            // P2: 不再把 antd 强制合并为单个 chunk。
+            // 之前所有 antd 都被打入 vendor-antd，导致 lazy 面板（KnowledgePanel /
+            // MemoryPanel / SettingsPanel 等）的 antd 依赖也被提前加载。
+            // 现在让 Rolldown 自动 code-split：初始渲染用到的 antd 进入共享 chunk，
+            // 仅 lazy 面板用到的组件随面板按需加载。
+            // @ant-design/icons 仍合并：图标是 SVG 路径字符串，跨面板高频共用
+            if (id.includes("@ant-design/icons")) return "vendor-icons";
             if (id.includes("@monaco-editor") || id.includes("monaco-editor")) return "vendor-monaco";
             if (
               id.includes("react-markdown") ||
               id.includes("remark-gfm") ||
               id.includes("rehype-highlight") ||
-              id.includes("rehype-raw")
+              id.includes("rehype-raw") ||
+              // P0 后 highlight.js 语言子集和 lowlight 与 react-markdown 一起使用，
+              // 合并到同一 chunk 避免拆出微小语言文件
+              id.includes("highlight.js") ||
+              id.includes("lowlight")
             ) {
               return "vendor-markdown";
             }

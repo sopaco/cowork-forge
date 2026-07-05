@@ -1,8 +1,6 @@
 import React, { memo, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
-import rehypeRaw from 'rehype-raw';
+import { remarkPlugins, fullRehypePlugins } from '@/utils/markdown';
 
 interface MarkdownMessageProps {
   content: string;
@@ -98,11 +96,7 @@ const streamingComponents = {
   code: streamingCode,
 };
 
-// Memoized plugins
-const remarkPlugins = [remarkGfm];
-const fullRehypePlugins = [rehypeHighlight, rehypeRaw];
 // 流式期间不用 rehype（highlight.js 是同步阻塞的，长代码块 50–200ms）
-
 const MarkdownMessageInner: React.FC<MarkdownMessageProps> = ({ content, streaming }) => {
   // streaming=true：用轻量组件 + 不带 rehype，纯文本快速渲染
   // streaming=false/undefined：完整渲染（gfm + highlight + raw）

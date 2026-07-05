@@ -22,9 +22,7 @@ import {
   ClockCircleOutlined,
 } from "@ant-design/icons";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeHighlight from "rehype-highlight";
-import rehypeRaw from "rehype-raw";
+import { remarkPlugins, fullRehypePlugins } from "@/utils/markdown";
 
 const { Option } = Select;
 const { Text, Paragraph } = Typography;
@@ -562,8 +560,8 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({
                       }}
                     >
                       <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                        remarkPlugins={remarkPlugins}
+                        rehypePlugins={fullRehypePlugins}
                       >
                         {memoryDetail.content}
                       </ReactMarkdown>
@@ -591,8 +589,8 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({
                         }}
                       >
                         <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                          remarkPlugins={remarkPlugins}
+                          rehypePlugins={fullRehypePlugins}
                         >
                           {selectedMemory.summary}
                         </ReactMarkdown>
