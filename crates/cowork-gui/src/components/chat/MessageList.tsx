@@ -75,8 +75,8 @@ const estimateItemSize = (msg: ChatMessage | undefined, containerWidth: number):
       // 每行 ~50 字符（14px font, ~7-8px/char, 可用宽度 ~container * 0.75 - 32）
       const charsPerLine = Math.max(Math.floor((containerWidth * 0.75 - 32) / 8), 20);
       const lines = Math.ceil(content.length / charsPerLine) + (content.includes('\n') ? content.split('\n').length - 1 : 0);
-      // row padding 32 + bubble padding 20 + content
-      return Math.max(80, lines * 22 + 56);
+      // row padding 32 + bubble padding 20 + content，增加少量缓冲
+      return Math.max(90, lines * 24 + 60);
     }
     case 'tool_call':
     case 'tool_result':
@@ -91,10 +91,10 @@ const estimateItemSize = (msg: ChatMessage | undefined, containerWidth: number):
       const explicitLines = content.split('\n').length;
       const wrappedLines = Math.ceil(content.length / charsPerLine);
       const lines = Math.max(explicitLines, wrappedLines);
-      // 留出 actions 按钮区域 (~50px) 和 header (~32px)
+      // 留出 actions 按钮区域 (~50px) 和 header (~32px)，并增加 markdown 边距缓冲
       const actions = (msg as { actions?: unknown[] }).actions;
       const actionsHeight = actions && actions.length > 0 ? 50 : 0;
-      return Math.max(120, lines * 22 + 80 + actionsHeight);
+      return Math.max(140, lines * 24 + 100 + actionsHeight);
     }
     case 'agent':
     default: {
@@ -103,7 +103,8 @@ const estimateItemSize = (msg: ChatMessage | undefined, containerWidth: number):
       const explicitLines = content.split('\n').length;
       const wrappedLines = Math.ceil(content.length / charsPerLine);
       const lines = Math.max(explicitLines, wrappedLines);
-      return Math.max(100, lines * 22 + 80);
+      // markdown-body line-height 1.7 + 段落/列表边距缓冲
+      return Math.max(120, lines * 24 + 100);
     }
   }
 };
@@ -324,14 +325,16 @@ const MessageListInner: React.FC<MessageListProps> = ({
   const safeMessages = Array.isArray(messages) ? messages : [];
   const safePmMessages = Array.isArray(pmMessages) ? pmMessages : [];
 
-  // 测量容器宽度，用于估算行高
+  // 测量容器宽高，用于 react-window List 尺寸和行高估算
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
+  const [containerHeight, setContainerHeight] = useState(600);
   useEffect(() => {
     if (!containerRef.current) return;
     const observer = new ResizeObserver(entries => {
       for (const entry of entries) {
         setContainerWidth(entry.contentRect.width);
+        setContainerHeight(entry.contentRect.height);
       }
     });
     observer.observe(containerRef.current);
@@ -405,7 +408,7 @@ const MessageListInner: React.FC<MessageListProps> = ({
     <div ref={containerRef} style={{ height: '100%', width: '100%' }}>
       <List
         ref={listRef}
-        height={containerRef.current?.clientHeight || 600}
+        height={containerHeight}
         itemCount={activeMessages.length}
         itemSize={itemSize}
         width="100%"

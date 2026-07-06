@@ -4,7 +4,7 @@
 
 /* Messages Container */
 .chat-messages {
-  overflow-y: auto;
+  overflow: hidden;
   padding: 0;
   flex: 1;
   display: flex;
