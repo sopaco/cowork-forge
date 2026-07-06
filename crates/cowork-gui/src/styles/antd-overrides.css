@@ -180,13 +180,21 @@
 
 /* Card */
 .ant-card {
-  background: var(--bg-base);
+  background: var(--bg-container);
   border-color: var(--border-color);
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 /* Modal */
+.ant-modal-container {
+  background: var(--bg-base) !important;
+}
+
+.ant-modal {
+  background: var(--bg-base) !important;
+}
+
 .ant-modal-content {
   background: var(--bg-base) !important;
   border-radius: 4px !important;
@@ -211,6 +219,7 @@
 .ant-modal-body {
   padding: 20px !important;
   color: var(--text-primary);
+  background: var(--bg-base) !important;
 }
 
 .ant-modal-footer {
