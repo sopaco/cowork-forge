@@ -279,7 +279,9 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 					// PM Agent 流式
 					if (agent_name === 'PM Agent') {
 						if (is_last && !content) {
-							// 收尾：把末尾 PM 消息的 isStreaming 关掉
+							// 收尾：先 flush 被 raf 节流的 PM buffer，确保提示文本等内容先落地
+							flushPM();
+							// 再把末尾 PM 消息的 isStreaming 关掉
 							// 关键：必须显式置 isStreaming: false，否则 PM action 按钮永远不渲染
 							agentActions.setPMMessages((prev) => {
 								const lastMsg = prev[prev.length - 1];
@@ -288,6 +290,8 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 								}
 								return prev;
 							});
+							// 流式结束后 flush pending 的 actions，确保它们挂到最后一条消息
+							agentActions.flushPendingPMActions();
 							agentActions.setPmProcessing(false);
 							return;
 						}
@@ -358,22 +362,9 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 				// PM actions event
 				listen('pm_actions', (event) => {
 					const { actions } = event.payload as { actions: PMAction[] };
-					agentActions.setPMMessages((prev) => {
-						const lastMsg = prev[prev.length - 1];
-						if (lastMsg?.type === 'pm_agent') {
-							return [
-								...prev.slice(0, -1),
-								{
-									...lastMsg,
-									actions: [...((lastMsg as PMAgentMessage).actions || []), ...actions],
-									// 关键：actions 来到时消息已结束，必须显式置 isStreaming: false
-									// 否则 PMAgentMessageItem 中的 !isStreaming 检查会阻止按钮渲染
-									isStreaming: false,
-								} as PMAgentMessage
-							];
-						}
-						return prev;
-					});
+					// 先 pending，等 agent_streaming 的 is_last 触发 flush，
+					// 避免 raf 节流导致提示文本还没落地时就把 actions 挂到错误消息。
+					agentActions.setPendingPMActions(actions);
 				}),
 
 				// Input request event

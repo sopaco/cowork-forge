@@ -295,7 +295,19 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
             <FileOutlined style={{ color: 'var(--text-secondary)' }} />
           </>
         )}
-        <span style={{ fontSize: '13px' }}>{node.name}</span>
+        <span
+          style={{
+            fontSize: '13px',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            flex: 1,
+            minWidth: 0,
+          }}
+          title={node.name}
+        >
+          {node.name}
+        </span>
       </div>
     );
   }, [handleToggleFolder, handleFileSelect]);

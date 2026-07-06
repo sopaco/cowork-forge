@@ -76,6 +76,7 @@ interface AgentState {
   inputRequest: InputRequest | null;
   chatMode: ChatMode;
   pmProcessing: boolean;
+  pendingPMActions: PMAction[] | null;
 
   addMessage: (message: ChatMessage) => void;
   setMessages: (messages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
@@ -95,6 +96,9 @@ interface AgentState {
   setInputRequest: (request: InputRequest | null) => void;
   setChatMode: (mode: ChatMode) => void;
   setPmProcessing: (processing: boolean) => void;
+  setPendingPMActions: (actions: PMAction[] | null) => void;
+  /** 将 pending 的 PM actions 附加到最后一条 pm_agent 消息 */
+  flushPendingPMActions: () => void;
 
   submitInput: (response: string, responseType: string) => Promise<void>;
   sendPMMessage: (iterationId: string, message: string) => Promise<void>;
@@ -110,6 +114,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   inputRequest: null,
   chatMode: 'disabled',
   pmProcessing: false,
+  pendingPMActions: null,
 
   addMessage: (message) => {
     set((state) => ({ messages: [...state.messages, message] }));
@@ -254,6 +259,29 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     set({ pmProcessing: processing });
   },
 
+  setPendingPMActions: (actions) => {
+    set({ pendingPMActions: actions });
+  },
+
+  flushPendingPMActions: () => {
+    const { pendingPMActions, pmMessages } = get();
+    if (!pendingPMActions || pendingPMActions.length === 0) return;
+
+    const msgs = [...pmMessages];
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].type === 'pm_agent') {
+        const existing = (msgs[i] as PMAgentMessage).actions || [];
+        msgs[i] = {
+          ...msgs[i],
+          actions: [...existing, ...pendingPMActions],
+          isStreaming: false,
+        } as PMAgentMessage & { isStreaming?: boolean };
+        break;
+      }
+    }
+    set({ pmMessages: msgs, pendingPMActions: null });
+  },
+
   submitInput: async (response, responseType) => {
     const { inputRequest } = get();
     if (!inputRequest) return;
@@ -298,6 +326,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         }
         return { pmMessages: msgs, pmProcessing: false };
       });
+      // API 收尾后再尝试 flush 一次 pending actions（防御 pm_actions 在 is_last 之后到达）
+      get().flushPendingPMActions();
     } catch (error) {
       set({ pmProcessing: false });
       throw error;
