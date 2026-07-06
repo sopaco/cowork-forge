@@ -282,43 +282,22 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         [...pmMessages, userMsg]
       ) as { agent_message?: string; actions?: PMAction[] };
 
-      // If there are actions from the response, find the last pm_agent message and add actions to it
-      if (response.actions && response.actions.length > 0) {
-        set((state) => {
-          const msgs = [...state.pmMessages];
-          let lastPmAgentIdx = -1;
-          for (let i = msgs.length - 1; i >= 0; i--) {
-            if (msgs[i].type === 'pm_agent') {
-              lastPmAgentIdx = i;
-              break;
+      // PM actions 由 `pm_actions` Tauri 事件统一附加，不要在这里用 response.actions 直接附加：
+      // sendMessage 的 await 可能在流式事件全部到达前 resolve，导致 actions 被错误挂到较早的消息上。
+      // 统一收尾：把末尾 PM 消息的 isStreaming 关掉
+      set((state) => {
+        const msgs = [...state.pmMessages];
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          if (msgs[i].type === 'pm_agent') {
+            const last = msgs[i] as PMAgentMessage & { isStreaming?: boolean };
+            if (last.isStreaming) {
+              msgs[i] = { ...last, isStreaming: false } as PMAgentMessage;
             }
+            break;
           }
-
-          if (lastPmAgentIdx >= 0) {
-            const lastMsg = msgs[lastPmAgentIdx] as PMAgentMessage & { isStreaming?: boolean };
-            if (!lastMsg.actions || lastMsg.actions.length === 0) {
-              // 关键：必须显式置 isStreaming: false，否则 PM action 按钮永远不渲染
-              msgs[lastPmAgentIdx] = { ...lastMsg, actions: response.actions, isStreaming: false } as PMAgentMessage;
-            }
-          }
-          return { pmMessages: msgs, pmProcessing: false };
-        });
-      } else {
-        // 即使没有 actions，也要把末尾 PM 消息的 isStreaming 关掉
-        set((state) => {
-          const msgs = [...state.pmMessages];
-          for (let i = msgs.length - 1; i >= 0; i--) {
-            if (msgs[i].type === 'pm_agent') {
-              const last = msgs[i] as PMAgentMessage & { isStreaming?: boolean };
-              if (last.isStreaming) {
-                msgs[i] = { ...last, isStreaming: false } as PMAgentMessage;
-              }
-              break;
-            }
-          }
-          return { pmMessages: msgs, pmProcessing: false };
-        });
-      }
+        }
+        return { pmMessages: msgs, pmProcessing: false };
+      });
     } catch (error) {
       set({ pmProcessing: false });
       throw error;

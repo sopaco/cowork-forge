@@ -157,7 +157,7 @@ function App() {
 	// 改为条件挂载：访问过的重面板不再保持 display:none + 副作用持续跑
 	// 状态在 stores 中保留，切回时从 store 恢复，不影响体验
 	const renderContent = () => (
-		<div style={{ height: '100%' }}>
+		<div style={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 			{activeView === 'iterations' && (
 				<Suspense fallback={loadingFallback}>
 					<IterationsPanel

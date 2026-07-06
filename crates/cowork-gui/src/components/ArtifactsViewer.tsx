@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import ReactMarkdown from 'react-markdown';
 import { remarkPlugins, fullRehypePlugins } from '@/utils/markdown';
@@ -29,6 +29,25 @@ const renderJson = (data: unknown) => {
     }}>{text}</pre>
   );
 };
+
+interface ArtifactTabPanelProps {
+  title: string;
+  actions?: ReactNode;
+  contentClassName?: string;
+  children: ReactNode;
+}
+
+const ArtifactTabPanel: React.FC<ArtifactTabPanelProps> = ({ title, actions, contentClassName, children }) => (
+  <div className="artifact-tab-panel">
+    <div className="artifact-tab-header">
+      <span className="artifact-tab-title">{title}</span>
+      {actions}
+    </div>
+    <div className={contentClassName ? `artifact-content ${contentClassName}` : 'artifact-content'}>
+      {children}
+    </div>
+  </div>
+);
 
 interface ArtifactsData {
   iteration_id?: string;
@@ -178,17 +197,17 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
       key: 'idea',
       label: <span><FileTextOutlined /> Idea</span>,
       children: isActive('idea') ? (
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '10px 20px', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', flexShrink: 0 }}>
-            <span style={{ fontWeight: 'bold', color: '#fff' }}>Idea Document</span>
+        <ArtifactTabPanel
+          title="Idea Document"
+          contentClassName="markdown-content"
+          actions={(
             <Tooltip title="Open artifacts folder">
               <Button size="small" icon={<FolderOpenOutlined />} onClick={handleOpenArtifactsFolder}>Open Folder</Button>
             </Tooltip>
-          </div>
-          <div className="artifact-content markdown-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-            <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.idea}</ReactMarkdown>
-          </div>
-        </div>
+          )}
+        >
+          <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.idea}</ReactMarkdown>
+        </ArtifactTabPanel>
       ) : null,
     });
   }
@@ -198,17 +217,17 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
       key: 'requirements',
       label: <span><ProjectOutlined /> Requirements</span>,
       children: isActive('requirements') ? (
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '10px 20px', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', flexShrink: 0 }}>
-            <span style={{ fontWeight: 'bold', color: '#fff' }}>Requirements Document</span>
+        <ArtifactTabPanel
+          title="Requirements Document"
+          contentClassName="markdown-content"
+          actions={(
             <Tooltip title="Open artifacts folder">
               <Button size="small" icon={<FolderOpenOutlined />} onClick={handleOpenArtifactsFolder}>Open Folder</Button>
             </Tooltip>
-          </div>
-          <div className="artifact-content markdown-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-            <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.requirements}</ReactMarkdown>
-          </div>
-        </div>
+          )}
+        >
+          <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.requirements}</ReactMarkdown>
+        </ArtifactTabPanel>
       ) : null,
     });
   }
@@ -220,9 +239,9 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
       key: 'design',
       label: <span><BuildOutlined /> Design</span>,
       children: isActive('design') ? (
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '10px 20px', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', flexShrink: 0 }}>
-            <span style={{ fontWeight: 'bold', color: '#fff' }}>Design Specification</span>
+        <ArtifactTabPanel
+          title="Design Specification"
+          actions={(
             <Space>
               <Tooltip title="Open artifacts folder">
                 <Button size="small" icon={<FolderOpenOutlined />} onClick={handleOpenArtifactsFolder}>Open Folder</Button>
@@ -234,17 +253,16 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
                 </>
               )}
             </Space>
-          </div>
-          <div className="artifact-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-            {artifacts.design_raw || designViewMode === 'doc' ? (
-              <div className="markdown-content">
-                <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{designContent}</ReactMarkdown>
-              </div>
-            ) : (
-              renderJson(artifacts.design)
-            )}
-          </div>
-        </div>
+          )}
+        >
+          {artifacts.design_raw || designViewMode === 'doc' ? (
+            <div className="markdown-content">
+              <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{designContent}</ReactMarkdown>
+            </div>
+          ) : (
+            renderJson(artifacts.design)
+          )}
+        </ArtifactTabPanel>
       ) : null,
     });
   }
@@ -256,9 +274,9 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
       key: 'plan',
       label: <span><CheckCircleOutlined /> Plan</span>,
       children: isActive('plan') ? (
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '10px 20px', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', flexShrink: 0 }}>
-            <span style={{ fontWeight: 'bold', color: '#fff' }}>Implementation Plan</span>
+        <ArtifactTabPanel
+          title="Implementation Plan"
+          actions={(
             <Space>
               <Tooltip title="Open artifacts folder">
                 <Button size="small" icon={<FolderOpenOutlined />} onClick={handleOpenArtifactsFolder}>Open Folder</Button>
@@ -270,17 +288,16 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
                 </>
               )}
             </Space>
-          </div>
-          <div className="artifact-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-            {artifacts.plan_raw || planViewMode === 'doc' ? (
-              <div className="markdown-content">
-                <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{planContent}</ReactMarkdown>
-              </div>
-            ) : (
-              renderJson(artifacts.plan)
-            )}
-          </div>
-        </div>
+          )}
+        >
+          {artifacts.plan_raw || planViewMode === 'doc' ? (
+            <div className="markdown-content">
+              <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{planContent}</ReactMarkdown>
+            </div>
+          ) : (
+            renderJson(artifacts.plan)
+          )}
+        </ArtifactTabPanel>
       ) : null,
     });
   }
@@ -290,17 +307,16 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
       key: 'code',
       label: <span><FileTextOutlined /> Code Files</span>,
       children: isActive('code') ? (
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '10px 20px', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', flexShrink: 0 }}>
-            <span style={{ fontWeight: 'bold', color: '#fff' }}>Code Files ({artifacts.code_files.length})</span>
+        <ArtifactTabPanel
+          title={`Code Files (${artifacts.code_files.length})`}
+          actions={(
             <Tooltip title="Open workspace folder">
               <Button size="small" icon={<FolderOpenOutlined />} onClick={handleOpenWorkspaceFolder}>Open Folder</Button>
             </Tooltip>
-          </div>
-          <div className="artifact-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-            {renderJson(artifacts.code_files)}
-          </div>
-        </div>
+          )}
+        >
+          {renderJson(artifacts.code_files)}
+        </ArtifactTabPanel>
       ) : null,
     });
   }
@@ -310,17 +326,17 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
       key: 'check_report',
       label: <span><CheckCircleOutlined /> Check Report</span>,
       children: isActive('check_report') ? (
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '10px 20px', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', flexShrink: 0 }}>
-            <span style={{ fontWeight: 'bold', color: '#fff' }}>Check Report</span>
+        <ArtifactTabPanel
+          title="Check Report"
+          contentClassName="markdown-content"
+          actions={(
             <Tooltip title="Open artifacts folder">
               <Button size="small" icon={<FolderOpenOutlined />} onClick={handleOpenArtifactsFolder}>Open Folder</Button>
             </Tooltip>
-          </div>
-          <div className="artifact-content markdown-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-            <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.check_report}</ReactMarkdown>
-          </div>
-        </div>
+          )}
+        >
+          <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.check_report}</ReactMarkdown>
+        </ArtifactTabPanel>
       ) : null,
     });
   }
@@ -330,17 +346,17 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
       key: 'delivery_report',
       label: <span><CheckCircleOutlined /> Delivery Report</span>,
       children: isActive('delivery_report') ? (
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '10px 20px', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', flexShrink: 0 }}>
-            <span style={{ fontWeight: 'bold', color: '#fff' }}>Delivery Report</span>
+        <ArtifactTabPanel
+          title="Delivery Report"
+          contentClassName="markdown-content"
+          actions={(
             <Tooltip title="Open artifacts folder">
               <Button size="small" icon={<FolderOpenOutlined />} onClick={handleOpenArtifactsFolder}>Open Folder</Button>
             </Tooltip>
-          </div>
-          <div className="artifact-content markdown-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-            <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.delivery_report}</ReactMarkdown>
-          </div>
-        </div>
+          )}
+        >
+          <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={fullRehypePlugins}>{artifacts.delivery_report}</ReactMarkdown>
+        </ArtifactTabPanel>
       ) : null,
     });
   }
@@ -353,7 +369,7 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
   };
 
   return (
-    <div className="artifacts-viewer" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="artifacts-viewer">
       <div style={{ padding: '10px 20px', borderBottom: '1px solid #e8e8e8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fafafa', flexShrink: 0 }}>
         <span style={{ fontWeight: 'bold', color: '#333' }}>Artifacts</span>
         <Space>
@@ -369,9 +385,13 @@ const ArtifactsViewer: React.FC<ArtifactsViewerProps> = ({ iterationId, activeTa
         type="card"
         size="large"
         items={items}
-        style={{ height: '100%' }}
+        style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
         className="artifacts-tabs"
         destroyOnHidden
+        styles={{
+          body: { flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+          content: { flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+        }}
       />
     </div>
   );

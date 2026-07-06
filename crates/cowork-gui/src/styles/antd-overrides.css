@@ -87,7 +87,7 @@
   border-bottom-color: var(--bg-base) !important;
 }
 
-.ant-tabs-content-holder {
+.ant-tabs-body-holder {
   background: var(--bg-base);
 }
 
