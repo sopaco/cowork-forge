@@ -261,6 +261,11 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   setPendingPMActions: (actions) => {
     set({ pendingPMActions: actions });
+    // pm_actions 事件可能在 is_last flush 或 sendMessage resolve 之后才到达，
+    // 必须在此处立即 flush，否则按钮永远不会挂到消息上。
+    if (actions && actions.length > 0) {
+      get().flushPendingPMActions();
+    }
   },
 
   flushPendingPMActions: () => {
@@ -268,6 +273,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     if (!pendingPMActions || pendingPMActions.length === 0) return;
 
     const msgs = [...pmMessages];
+    let attached = false;
     for (let i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].type === 'pm_agent') {
         const existing = (msgs[i] as PMAgentMessage).actions || [];
@@ -276,10 +282,14 @@ export const useAgentStore = create<AgentState>((set, get) => ({
           actions: [...existing, ...pendingPMActions],
           isStreaming: false,
         } as PMAgentMessage & { isStreaming?: boolean };
+        attached = true;
         break;
       }
     }
-    set({ pmMessages: msgs, pendingPMActions: null });
+    // 流式消息尚未创建时不要丢弃 pending，等 is_last 或后续 flush 再挂
+    if (attached) {
+      set({ pmMessages: msgs, pendingPMActions: null });
+    }
   },
 
   submitInput: async (response, responseType) => {

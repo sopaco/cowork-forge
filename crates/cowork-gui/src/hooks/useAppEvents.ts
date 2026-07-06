@@ -48,6 +48,8 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 			setCurrentStage: s.setCurrentStage,
 			setInputRequest: s.setInputRequest,
 			setPmProcessing: s.setPmProcessing,
+			setPendingPMActions: s.setPendingPMActions,
+			flushPendingPMActions: s.flushPendingPMActions,
 			submitInput: s.submitInput,
 			loadPMWelcomeMessage: s.loadPMWelcomeMessage,
 			appendLastMessageContent: s.appendLastMessageContent,
@@ -362,8 +364,9 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 				// PM actions event
 				listen('pm_actions', (event) => {
 					const { actions } = event.payload as { actions: PMAction[] };
-					// 先 pending，等 agent_streaming 的 is_last 触发 flush，
-					// 避免 raf 节流导致提示文本还没落地时就把 actions 挂到错误消息。
+					// setPendingPMActions 会在流式收尾后自动 flush。
+					// 后端顺序为：提示文本流式 chunk → is_last → pm_actions → invoke 返回；
+					// pm_actions 可能晚于 is_last 的 flush 到达，必须在 setPending 时再次 flush。
 					agentActions.setPendingPMActions(actions);
 				}),
 
