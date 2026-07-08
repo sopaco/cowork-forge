@@ -64,19 +64,21 @@ async fn install_deps_if_needed(workspace: &std::path::Path) -> Result<(), Strin
     let pkg = workspace.join("package.json");
     let mods = workspace.join("node_modules");
     if pkg.exists() && !mods.exists() {
-        // Use our path_utils instead of which::which for macOS App Bundle compatibility
-        let (cmd, args) = if path_utils::has_bun() { 
-            ("bun", vec!["install"]) 
-        } else if path_utils::has_npm() { 
-            ("npm", vec!["install"]) 
-        } else { 
-            return Ok(()) 
+        let (cmd, args): (PathBuf, Vec<&str>) = if let Some(bun) = path_utils::find_bun() {
+            (bun, vec!["install"])
+        } else if let Some(npm) = path_utils::find_npm() {
+            (npm, vec!["install"])
+        } else {
+            return Ok(())
         };
-        
-        eprintln!("[Runner] Installing dependencies with {} {:?}", cmd, args);
-        let out = std::process::Command::new(cmd).args(&args).current_dir(workspace).output();
+
+        eprintln!("[Runner] Installing dependencies with {:?} {:?}", cmd, args);
+        let mut install_cmd = std::process::Command::new(&cmd);
+        install_cmd.args(&args).current_dir(workspace);
+        path_utils::apply_gui_child_env(&mut install_cmd);
+        let out = install_cmd.output();
         if let Ok(r) = out {
-            if !r.status.success() { 
+            if !r.status.success() {
                 eprintln!("[Runner] Install warning: {}", String::from_utf8_lossy(&r.stderr));
             } else {
                 eprintln!("[Runner] Dependencies installed successfully");
@@ -144,23 +146,27 @@ fn detect_npm_start_command(dir: &std::path::Path) -> Option<String> {
     if !pkg_path.exists() {
         return None;
     }
-    
+
     if let Ok(content) = fs::read_to_string(&pkg_path) {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
             if let Some(scripts) = json.get("scripts").and_then(|s| s.as_object()) {
-                // Try common start scripts in order
                 for script_name in &["dev", "start", "serve"] {
-                    if scripts.get(*script_name).and_then(|s| s.as_str()).is_some() {
-                        let pkg_manager = if path_utils::has_bun() { "bun" } else { "npm" };
-                        let command = format!("{} run {}", pkg_manager, script_name);
-                        eprintln!("[Runner] Detected start command from package.json: {}", command);
-                        return Some(command);
+                    if let Some(script_body) = scripts.get(*script_name).and_then(|s| s.as_str()) {
+                        if let Some(command) =
+                            path_utils::build_start_command_for_script(script_body, script_name)
+                        {
+                            eprintln!(
+                                "[Runner] Detected start command from package.json ({}): {}",
+                                script_name, command
+                            );
+                            return Some(command);
+                        }
                     }
                 }
             }
         }
     }
-    
+
     None
 }
 
@@ -331,22 +337,58 @@ pub async fn start_iteration_project(
         }
         
         // No start script but has package.json - try common defaults
-        let pkg_manager = if path_utils::has_bun() { "bun" } else { "npm" };
-        let default_cmd = format!("{} run dev", pkg_manager);
-        eprintln!("[Runner] Fallback: trying default command: {}", default_cmd);
-        
-        // Check if dev script exists, otherwise try start
         if let Ok(content) = fs::read_to_string(code_dir.join("package.json")) {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                if json.get("scripts").and_then(|s| s.as_object()).map(|s| s.contains_key("dev")).unwrap_or(false) {
-                    let pid = PROJECT_RUNNER.start(iteration_id.clone(), default_cmd.clone(), code_dir.to_string_lossy().to_string(), None, None).await?;
-                    return Ok(RunInfo { status: RunStatus::Running, process_id: Some(pid), command: Some(default_cmd), ..Default::default() });
-                }
-                
-                if json.get("scripts").and_then(|s| s.as_object()).map(|s| s.contains_key("start")).unwrap_or(false) {
-                    let cmd = format!("{} run start", pkg_manager);
-                    let pid = PROJECT_RUNNER.start(iteration_id.clone(), cmd.clone(), code_dir.to_string_lossy().to_string(), None, None).await?;
-                    return Ok(RunInfo { status: RunStatus::Running, process_id: Some(pid), command: Some(cmd), ..Default::default() });
+                if let Some(scripts) = json.get("scripts").and_then(|s| s.as_object()) {
+                    if scripts.contains_key("dev") {
+                        if let Some(script_body) = scripts.get("dev").and_then(|s| s.as_str()) {
+                            if let Some(cmd) =
+                                path_utils::build_start_command_for_script(script_body, "dev")
+                            {
+                                eprintln!("[Runner] Fallback: using dev script: {}", cmd);
+                                let pid = PROJECT_RUNNER
+                                    .start(
+                                        iteration_id.clone(),
+                                        cmd.clone(),
+                                        code_dir.to_string_lossy().to_string(),
+                                        None,
+                                        None,
+                                    )
+                                    .await?;
+                                return Ok(RunInfo {
+                                    status: RunStatus::Running,
+                                    process_id: Some(pid),
+                                    command: Some(cmd),
+                                    ..Default::default()
+                                });
+                            }
+                        }
+                    }
+
+                    if scripts.contains_key("start") {
+                        if let Some(script_body) = scripts.get("start").and_then(|s| s.as_str()) {
+                            if let Some(cmd) =
+                                path_utils::build_start_command_for_script(script_body, "start")
+                            {
+                                eprintln!("[Runner] Fallback: using start script: {}", cmd);
+                                let pid = PROJECT_RUNNER
+                                    .start(
+                                        iteration_id.clone(),
+                                        cmd.clone(),
+                                        code_dir.to_string_lossy().to_string(),
+                                        None,
+                                        None,
+                                    )
+                                    .await?;
+                                return Ok(RunInfo {
+                                    status: RunStatus::Running,
+                                    process_id: Some(pid),
+                                    command: Some(cmd),
+                                    ..Default::default()
+                                });
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -355,7 +397,11 @@ pub async fn start_iteration_project(
     // Fallback 4: Cargo.toml (Rust project)
     if code_dir.join("Cargo.toml").exists() {
         eprintln!("[Runner] Fallback 4: Cargo.toml found, using cargo run");
-        let cmd = "cargo run".to_string();
+        let cmd = if let Some(cargo) = path_utils::resolve_executable("cargo") {
+            format!("{} run", cargo.to_string_lossy())
+        } else {
+            "cargo run".to_string()
+        };
         let pid = PROJECT_RUNNER.start(iteration_id.clone(), cmd.clone(), code_dir.to_string_lossy().to_string(), None, None).await?;
         return Ok(RunInfo { status: RunStatus::Running, process_id: Some(pid), command: Some(cmd), ..Default::default() });
     }
@@ -450,17 +496,29 @@ fn is_fullstack(rt: &RuntimeType) -> bool {
 }
 
 fn get_start_command_from_config(config: &cowork_core::ProjectRuntimeConfig) -> Option<String> {
-    if let Some(ref f) = config.frontend { 
-        return Some(f.dev_command.clone()); 
-    }
-    if let Some(ref b) = config.backend { 
-        if let Some(ref cmd) = b.start_command {
-            if !cmd.is_empty() {
-                return Some(cmd.clone());
-            }
+    let raw = if let Some(ref f) = config.frontend {
+        if path_utils::is_runnable_external_command(&f.dev_command) {
+            Some(f.dev_command.clone())
+        } else {
+            None
         }
-    }
-    None
+    } else if let Some(ref b) = config.backend {
+        if let Some(ref cmd) = b.start_command {
+            if path_utils::is_runnable_external_command(cmd) {
+                Some(cmd.clone())
+            } else {
+                None
+            }
+        } else if path_utils::is_runnable_external_command(&b.dev_command) {
+            Some(b.dev_command.clone())
+        } else {
+            None
+        }
+    } else {
+        None
+    }?;
+
+    Some(path_utils::resolve_command(&path_utils::rewrite_script_package_manager(&raw)))
 }
 
 async fn start_fullstack(iteration_id: String, code_dir: PathBuf, config: &cowork_core::ProjectRuntimeConfig) -> Result<RunInfo, String> {
@@ -468,8 +526,17 @@ async fn start_fullstack(iteration_id: String, code_dir: PathBuf, config: &cowor
     let (fk, bk) = static_server::get_fullstack_process_keys(&iteration_id);
 
     let b_url = format!("http://localhost:{}", fs_cfg.backend_port);
-    let _bpid = PROJECT_RUNNER.start(bk.clone(), fs_cfg.backend_dev_command.clone(), 
-        code_dir.to_string_lossy().to_string(), Some(b_url.clone()), Some(fs_cfg.backend_port)).await?;
+    let backend_cmd = path_utils::resolve_command(&path_utils::rewrite_script_package_manager(
+        &fs_cfg.backend_dev_command,
+    ));
+    let _bpid = PROJECT_RUNNER.start(
+        bk.clone(),
+        backend_cmd,
+        code_dir.to_string_lossy().to_string(),
+        Some(b_url.clone()),
+        Some(fs_cfg.backend_port),
+    )
+    .await?;
 
     for _ in 0..30 {
         if !PROJECT_RUNNER.is_running(&fk) { tokio::time::sleep(std::time::Duration::from_secs(1)).await; continue; }
@@ -477,8 +544,17 @@ async fn start_fullstack(iteration_id: String, code_dir: PathBuf, config: &cowor
     }
 
     let f_url = format!("http://localhost:{}", fs_cfg.frontend_port);
-    let fpid = PROJECT_RUNNER.start(fk.clone(), fs_cfg.frontend_dev_command.clone(),
-        code_dir.to_string_lossy().to_string(), Some(f_url.clone()), Some(fs_cfg.frontend_port)).await?;
+    let frontend_cmd = path_utils::resolve_command(&path_utils::rewrite_script_package_manager(
+        &fs_cfg.frontend_dev_command,
+    ));
+    let fpid = PROJECT_RUNNER.start(
+        fk.clone(),
+        frontend_cmd.clone(),
+        code_dir.to_string_lossy().to_string(),
+        Some(f_url.clone()),
+        Some(fs_cfg.frontend_port),
+    )
+    .await?;
 
     let inst = static_server::FullstackProcessInstance {
         iteration_id: iteration_id.clone(),

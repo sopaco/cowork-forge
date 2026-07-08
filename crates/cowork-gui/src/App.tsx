@@ -97,8 +97,9 @@ function App() {
 	// Compute chat mode
 	const chatMode = useMemo<ChatMode>(() => {
 		if (!currentIteration) return 'disabled';
-		if (currentIteration.status === 'Completed') return 'pm_agent';
-		if (isProcessing || currentIteration.status === 'Running') return 'pipeline';
+		const status = currentIteration.status.toLowerCase();
+		if (status === 'completed') return 'pm_agent';
+		if (isProcessing || status === 'running') return 'pipeline';
 		return 'pipeline';
 	}, [currentIteration, isProcessing]);
 

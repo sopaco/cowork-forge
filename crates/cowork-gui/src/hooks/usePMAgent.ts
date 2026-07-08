@@ -21,9 +21,9 @@ export function usePMAgent() {
 
 	// Agent store
 	const agentActions = useAgentStore(
-		useShallow(s => ({ setMessages: s.setMessages, clearPMMessages: s.clearPMMessages, setPmProcessing: s.setPmProcessing, sendPMMessage: s.sendPMMessage }))
+		useShallow(s => ({ setMessages: s.setMessages, clearPMMessages: s.clearPMMessages, sendPMMessage: s.sendPMMessage }))
 	);
-	const { setMessages, clearPMMessages, setPmProcessing, sendPMMessage } = agentActions;
+	const { setMessages, clearPMMessages, sendPMMessage } = agentActions;
 
 	// UI store
 	const uiActions = useUIStore(
@@ -186,29 +186,21 @@ export function usePMAgent() {
 	 */
 	const handlePMSendMessage = useCallback(
 		async (userInput: string, setUserInput: (input: string) => void) => {
-			console.log(
-				'[usePMAgent] handlePMSendMessage called, userInput:',
-				userInput,
-				'currentIteration:',
-				currentIteration?.id
-			);
-			if (!userInput.trim() || !currentIteration) {
-				console.log('[usePMAgent] handlePMSendMessage early return: no input or no iteration');
+			const trimmed = userInput.trim();
+			// Read latest iteration from store — avoids stale closure in optimized prod builds
+			const iteration = useProjectStore.getState().currentIteration;
+			if (!trimmed || !iteration) {
 				return;
 			}
-			const userMessage = userInput.trim();
 			setUserInput('');
-			setPmProcessing(true);
 
 			try {
-				await sendPMMessage(currentIteration.id, userMessage);
+				await sendPMMessage(iteration.id, trimmed);
 			} catch (error) {
 				message.error('Failed to process message: ' + error);
-			} finally {
-				setPmProcessing(false);
 			}
 		},
-		[currentIteration, sendPMMessage, setPmProcessing, message]
+		[sendPMMessage, message]
 	);
 
 	return {

@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { App as AntApp } from 'antd';
 import { useAgentStore, useUIStore, useProjectStore } from '../stores';
 import { useShallow } from 'zustand/react/shallow';
 import type { ChatMessage, ThinkingMessage, InputOption } from '../stores';
@@ -8,6 +9,8 @@ import type { ChatMessage, ThinkingMessage, InputOption } from '../stores';
  * Extracts chat input logic from App.tsx
  */
 export function useChatInput() {
+	const { message } = AntApp.useApp();
+
 	// Project store: selector + useShallow
 	const updateCurrentIterationStatus = useProjectStore(s => s.updateCurrentIterationStatus);
 
@@ -49,10 +52,12 @@ export function useChatInput() {
 
 			if (inputRequest) {
 				await submitInput(msgContent, 'text');
+			} else {
+				message.info('Waiting for the agent to request input. Your message was not sent.');
 			}
 			setUserInput('');
 		},
-		[inputRequest, addMessage, submitInput]
+		[inputRequest, addMessage, submitInput, message]
 	);
 
 	/**

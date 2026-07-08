@@ -25,5 +25,5 @@ pub fn init_app_handle(handle: tauri::AppHandle) {
 /// Initialize PATH for macOS App Bundle compatibility
 /// Must be called very early in the application lifecycle
 pub fn init_path_for_app_bundle() {
-    path_utils::init_extended_path();
+    path_utils::ensure_path_initialized();
 }

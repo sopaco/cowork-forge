@@ -18,7 +18,13 @@ export function useIterationActions() {
 	const { currentIteration, setCurrentIteration, setIsExecuting } = projectActions;
 
 	// Agent store
-	const setProcessing = useAgentStore(s => s.setProcessing);
+	const agentActions = useAgentStore(
+		useShallow(s => ({
+			setProcessing: s.setProcessing,
+			setPmProcessing: s.setPmProcessing,
+		}))
+	);
+	const { setProcessing, setPmProcessing } = agentActions;
 
 	// UI store
 	const uiState = useUIStore(
@@ -35,19 +41,28 @@ export function useIterationActions() {
 			try {
 				const { currentIteration, isExecuting } = useProjectStore.getState();
 				const fullIteration = await API.iteration.get(iterationId);
-				
+
 				if (isExecuting && currentIteration?.id === iterationId) {
 					setCurrentIteration({ ...fullIteration, status: currentIteration.status });
 				} else {
 					setCurrentIteration(fullIteration);
 				}
+
+				// Release builds launched from Finder may leave stale processing flags
+				// when no pipeline is actually running for this iteration.
+				const status = fullIteration.status.toLowerCase();
+				if (!isExecuting && status !== 'running') {
+					setProcessing(false);
+					setPmProcessing(false);
+				}
+
 				setActiveView('chat');
 			} catch (error) {
 				console.error('Failed to load iteration:', error);
 				message.error('Failed to load iteration: ' + error);
 			}
 		},
-		[setCurrentIteration, setActiveView, message]
+		[setCurrentIteration, setActiveView, setProcessing, setPmProcessing, message]
 	);
 
 	/**

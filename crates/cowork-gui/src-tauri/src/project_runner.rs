@@ -6,6 +6,8 @@ use tokio::process::Child;
 use tokio::sync::mpsc;
 use tracing;
 
+use crate::commands::path_utils;
+
 // Import PreviewInfo from gui_types
 use super::gui_types::PreviewInfo;
 
@@ -109,34 +111,62 @@ impl ProjectRunner {
 
         tracing::info!("[Runner] Starting command: {} in {}", command, code_dir);
 
+        let normalized_command =
+            path_utils::normalize_project_start_command(code_path, &command);
+        let resolved_command = path_utils::resolve_command(&normalized_command);
+        if !path_utils::is_runnable_external_command(&resolved_command) {
+            return Err(format!(
+                "Invalid or empty start command: {:?}. Check project runtime configuration.",
+                command
+            ));
+        }
+
         #[cfg(target_os = "windows")]
         let mut child = {
             let mut cmd = tokio::process::Command::new("cmd");
-            cmd.args(["/C", &command])
+            cmd.args(["/C", &resolved_command])
                 .current_dir(&code_path)
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::piped())
                 .creation_flags(0x08000000); // CREATE_NO_WINDOW
+            path_utils::apply_gui_child_env_async(&mut cmd);
 
             cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
         };
 
         #[cfg(not(target_os = "windows"))]
         let mut child = {
-            // Set PATH to include common locations - critical for macOS app bundle
-            let path = std::env::var("PATH").unwrap_or_else(|_| {
-                // Default PATH for macOS
-                "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin".to_string()
-            });
-            
-            tokio::process::Command::new("sh")
-                .args(["-c", &command])
-                .current_dir(&code_path)
-                .env("PATH", path)
-                .stdout(std::process::Stdio::piped())
-                .stderr(std::process::Stdio::piped())
-                .spawn()
-                .map_err(|e| format!("Failed to start: {}", e))?
+            if let Some((program, args)) = path_utils::parse_direct_command(&resolved_command) {
+                tracing::info!(
+                    "[Runner] Spawning directly: {:?} {:?}",
+                    program,
+                    args
+                );
+                let mut cmd = tokio::process::Command::new(&program);
+                cmd.args(&args)
+                    .current_dir(&code_path)
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::piped());
+                path_utils::apply_gui_child_env_async(&mut cmd);
+                cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
+            } else {
+                // Compound commands only: login shell without -i (non-TTY safe).
+                // `exec` replaces the shell so we monitor the real dev-server process.
+                let shell = path_utils::command_shell();
+                let shell_script = format!("exec {resolved_command}");
+                tracing::info!(
+                    "[Runner] Spawning via shell: {} -lc {}",
+                    shell,
+                    shell_script
+                );
+                let mut cmd = tokio::process::Command::new(&shell);
+                cmd.args(["-lc", &shell_script])
+                    .current_dir(&code_path)
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::piped());
+                path_utils::apply_gui_child_env_async(&mut cmd);
+                cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
+            }
         };
 
         let pid = child.id().unwrap();
@@ -152,28 +182,62 @@ impl ProjectRunner {
         let (stdout_tx, _stdout_rx) = mpsc::unbounded_channel();
         let (stderr_tx, _stderr_rx) = mpsc::unbounded_channel();
 
-        // Clone child for stdout reading
-        let stdout = child.stdout.take().unwrap();
-        let stderr = child.stderr.take().unwrap();
-
-        // Clone senders for spawn tasks
-        let stdout_tx_spawn = stdout_tx.clone();
-        let stderr_tx_spawn = stderr_tx.clone();
-
         // Clone for stdout task
         let iteration_id_stdout = iteration_id_clone.clone();
-        
+
         // Check if process exited immediately (command error detection)
-        // Give it a brief moment to potentially fail
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
         match child.try_wait() {
             Ok(Some(status)) => {
-                // Process already exited - command likely failed
-                tracing::warn!("[Runner] Process exited immediately with status: {:?}", status);
+                let mut output_preview = String::new();
+                {
+                    use tokio::io::AsyncReadExt;
+                    if let Some(mut stdout) = child.stdout.take() {
+                        let mut stdout_buf = vec![0u8; 4096];
+                        if let Ok(n) = stdout.read(&mut stdout_buf).await {
+                            if n > 0 {
+                                output_preview
+                                    .push_str(&String::from_utf8_lossy(&stdout_buf[..n]));
+                            }
+                        }
+                    }
+                    if let Some(mut stderr) = child.stderr.take() {
+                        let mut stderr_buf = vec![0u8; 4096];
+                        if let Ok(n) = stderr.read(&mut stderr_buf).await {
+                            if n > 0 {
+                                if !output_preview.is_empty() {
+                                    output_preview.push('\n');
+                                }
+                                output_preview
+                                    .push_str(&String::from_utf8_lossy(&stderr_buf[..n]));
+                            }
+                        }
+                    }
+                }
+
+                tracing::warn!(
+                    "[Runner] Process exited immediately with status: {:?}, output: {}",
+                    status,
+                    output_preview
+                );
+
+                let hint = if status.success() {
+                    "The dev process exited immediately. Check package.json scripts and that dependencies are installed."
+                } else {
+                    "The command failed to start. Check that bun/npm/cargo is installed and the project directory is correct."
+                };
+
                 return Err(format!(
-                    "Command failed immediately. Exit status: {}. Check if the command is correct.",
-                    status
+                    "Command failed immediately. Exit status: {}. {}\nCommand: {}\n{}",
+                    status,
+                    hint,
+                    resolved_command,
+                    if output_preview.is_empty() {
+                        String::new()
+                    } else {
+                        format!("Output:\n{output_preview}")
+                    }
                 ));
             }
             Ok(None) => {
@@ -183,6 +247,14 @@ impl ProjectRunner {
                 tracing::error!("[Runner] Error checking process status: {}", e);
             }
         }
+
+        // Clone child for stdout/stderr reading (only after liveness check passes)
+        let stdout = child.stdout.take().unwrap();
+        let stderr = child.stderr.take().unwrap();
+
+        // Clone senders for spawn tasks
+        let stdout_tx_spawn = stdout_tx.clone();
+        let stderr_tx_spawn = stderr_tx.clone();
 
         // Spawn task to read stdout and emit events
         tokio::spawn(async move {

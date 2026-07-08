@@ -25,16 +25,14 @@ export default defineConfig({
     port: 15173,
   },
   // Vite 8.1: esbuild 选项已弃用（被 oxc 替代）。
-  // 用 define + 死代码消除来剥除 console/debugger，跨 minifier 都管用。
-  // dev 模式下保留 console 便于调试；prod 模式下把 console.* 调用变成 void 0，
-  // 然后 Rolldown minifier 会通过 tree-shaking 死代码消除掉。
+  // prod 下把 console.* 替换成空函数，避免 `console.log(...)` 被错误替换成 `0(...)` 导致运行时 TypeError
+  // （PM Send 等热路径在函数体首行打 log，dev 正常、release 静默失败）。
   define: isProd
     ? {
-        // 让 `console.log(...)` 等调用变成 `void 0(...)`，minifier 视为死代码消除
-        "console.log": "0",
-        "console.info": "0",
-        "console.debug": "0",
-        "console.trace": "0",
+        "console.log": "(() => undefined)",
+        "console.info": "(() => undefined)",
+        "console.debug": "(() => undefined)",
+        "console.trace": "(() => undefined)",
       }
     : {},
   build: {
