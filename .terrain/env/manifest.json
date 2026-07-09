@@ -1,0 +1,11 @@
+{
+  "catalog_version": 1,
+  "integrated_at": "2026-07-06T02:48:26.200853+00:00",
+  "applied": [
+    "skill-terrain-knowledge: → .agents/skills/terrain-knowledge-skill + .claude/skills/terrain-knowledge-skill",
+    "skill-repomix: → .agents/skills/repomix-context-skill + .claude/skills/repomix-context-skill",
+    "skill-codegraph: → .agents/skills/codegraph-skill + .claude/skills/codegraph-skill",
+    "skill-rtk: → .agents/skills/rtk-skill + .claude/skills/rtk-skill",
+    "tool-codegraph: CodeGraph 已初始化 .codegraph/（Agent 使用 ~/.terrain/bin/codegraph，见 .terrain/env/agent-tools.json）"
+  ]
+}

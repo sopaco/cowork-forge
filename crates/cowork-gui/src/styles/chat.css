@@ -4,7 +4,7 @@
 
 /* Messages Container */
 .chat-messages {
-  overflow-y: auto;
+  overflow: hidden;
   padding: 0;
   flex: 1;
   display: flex;
@@ -41,7 +41,7 @@
 .chat-msg-agent .chat-agent-avatar {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: 3px;
   object-fit: cover;
   flex-shrink: 0;
 }
@@ -57,7 +57,7 @@
   color: var(--text-tertiary);
   background: var(--bg-elevated);
   padding: 1px 8px;
-  border-radius: 4px;
+  border-radius: 2px;
 }
 
 /* ---- User Message ---- */
@@ -74,7 +74,7 @@
   background: var(--primary);
   color: #fff;
   padding: 10px 16px;
-  border-radius: 12px 12px 4px 12px;
+  border-radius: 6px 6px 2px 6px;
   max-width: 75%;
   word-break: break-word;
   line-height: 1.6;
@@ -106,7 +106,7 @@
 .chat-msg-thinking .chat-agent-avatar {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: 3px;
   object-fit: cover;
   flex-shrink: 0;
   opacity: 0.7;
@@ -130,7 +130,7 @@
   margin-top: 8px;
   padding: 10px 14px;
   background: var(--bg-elevated);
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid var(--border-light);
   font-size: 13px;
   line-height: 1.6;
@@ -158,7 +158,7 @@
 .chat-msg-tool-call .chat-tool-icon {
   width: 20px;
   height: 20px;
-  border-radius: 4px;
+  border-radius: 2px;
   background: var(--warning-light);
   display: flex;
   align-items: center;
@@ -178,7 +178,7 @@
   margin-top: 6px;
   padding: 8px 12px;
   background: var(--bg-elevated);
-  border-radius: 6px;
+  border-radius: 3px;
   font-family: 'JetBrains Mono', 'Consolas', monospace;
   font-size: 12px;
   color: var(--text-secondary);
@@ -235,7 +235,7 @@
 .chat-msg-pm-agent .chat-agent-avatar {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: 3px;
   object-fit: cover;
   flex-shrink: 0;
 }
@@ -256,7 +256,7 @@
 .chat-msg-pm-agent .chat-pm-action {
   cursor: pointer;
   padding: 5px 12px;
-  border-radius: 6px;
+  border-radius: 3px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -343,7 +343,7 @@
   padding: 16px;
   background: var(--primary-lighter);
   border: 1px solid var(--primary-light);
-  border-radius: 10px;
+  border-radius: 5px;
   margin-bottom: 16px;
 }
 

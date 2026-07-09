@@ -186,7 +186,7 @@ const IntegrationConfig: React.FC = () => {
       {Object.keys(integrations).length === 0 ? (
         <Empty 
           description={
-            <Space direction="vertical" size="small">
+            <Space orientation="vertical" size="small">
               <Text>No integrations configured</Text>
               <Text type="secondary">Connect to external systems and services</Text>
             </Space>
@@ -247,7 +247,7 @@ const IntegrationConfig: React.FC = () => {
                   </Space>
                 }
                 description={
-                  <Space direction="vertical" size="small">
+                  <Space orientation="vertical" size="small">
                     <Text type="secondary">{integration.description || 'No description'}</Text>
                     <Space size={4}>
                       <Tag icon={<SafetyOutlined />} color={getAuthTypeColor(integration.auth.auth_type)}>
@@ -401,7 +401,7 @@ const IntegrationConfig: React.FC = () => {
         }
       >
         {selectedIntegrationData && (
-          <Space direction="vertical" style={{ width: '100%' }} size="large">
+          <Space orientation="vertical" style={{ width: '100%' }} size="large">
             <Descriptions column={1} bordered size="small">
               <Descriptions.Item label="ID">{selectedIntegrationData.id}</Descriptions.Item>
               <Descriptions.Item label="Status">

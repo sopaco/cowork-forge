@@ -17,7 +17,7 @@ pub fn set_interaction_backend(backend: Arc<dyn InteractiveBackend + Send + Sync
 }
 
 /// Get the global InteractiveBackend
-fn get_interaction_backend() -> Option<Arc<dyn InteractiveBackend + Send + Sync>> {
+pub(crate) fn get_interaction_backend() -> Option<Arc<dyn InteractiveBackend + Send + Sync>> {
     INTERACTION_BACKEND.lock().unwrap().clone()
 }
 

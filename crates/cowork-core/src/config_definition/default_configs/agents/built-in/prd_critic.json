@@ -13,7 +13,16 @@
       "tool_id": "load_idea"
     },
     {
+      "tool_id": "load_prd_doc"
+    },
+    {
       "tool_id": "provide_feedback"
+    },
+    {
+      "tool_id": "exit_loop"
+    },
+    {
+      "tool_id": "request_human_review"
     },
     {
       "tool_id": "read_file"

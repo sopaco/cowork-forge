@@ -1,7 +1,7 @@
-// Goto Stage tool for Check Agent
 use crate::data::*;
 use crate::persistence::*;
-use adk_core::{Tool, ToolContext};
+use crate::pipeline::set_goto_stage_signal;
+use adk_core::{Tool, ToolContext, EventActions};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -38,11 +38,10 @@ impl Tool for GotoStageTool {
         }))
     }
 
-    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+    async fn execute(&self, ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
         let stage_str = get_required_string_param(&args, "stage")?;
         let reason = get_required_string_param(&args, "reason")?;
 
-        // Parse stage
         let stage = match stage_str {
             "prd" => Stage::Prd,
             "design" => Stage::Design,
@@ -56,9 +55,8 @@ impl Tool for GotoStageTool {
             }
         };
 
-        // Save detailed feedback to FeedbackHistory for incremental update support
         let feedback = Feedback {
-            stage: stage_str.to_string(),  // 标识反馈来自当前 stage
+            stage: stage_str.to_string(),
             feedback_type: FeedbackType::QualityIssue,
             severity: Severity::Critical,
             details: reason.to_string(),
@@ -67,11 +65,9 @@ impl Tool for GotoStageTool {
         };
 
         if let Err(e) = crate::persistence::append_feedback(&feedback) {
-            // Log warning but don't fail the operation
-            eprintln!("[GotoStageTool] Warning: Failed to save feedback: {}", e);
+            tracing::warn!("[GotoStageTool] Failed to save feedback: {}", e);
         }
 
-        // Load or create session meta
         let mut meta = load_session_meta()
             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?
             .unwrap_or_else(|| SessionMeta {
@@ -81,19 +77,24 @@ impl Tool for GotoStageTool {
                 restart_reason: None,
             });
 
-        // Set restart information by updating current_stage and reason
         meta.current_stage = Some(stage);
         meta.restart_reason = Some(reason.to_string());
 
-        // Save session meta
         save_session_meta(&meta)
             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?;
 
-        // Signal to stage executor that we need to jump to another stage
-        // This will be caught by the executor and trigger a proper stage transition
-        Err(adk_core::AdkError::tool(format!(
-            "GOTO_STAGE:{}:{}",
-            stage_str, reason
-        )))
+        set_goto_stage_signal(stage_str.to_string(), reason.to_string());
+
+        let mut actions = EventActions::default();
+        actions.escalate = true;
+        actions.state_delta.insert("goto_stage".to_string(), json!(stage_str));
+        actions.state_delta.insert("goto_reason".to_string(), json!(reason));
+        ctx.set_actions(actions);
+
+        Ok(json!({
+            "status": "goto_stage",
+            "stage": stage_str,
+            "reason": reason
+        }))
     }
 }

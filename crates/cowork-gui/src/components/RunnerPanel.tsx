@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { FixedSizeList as List } from 'react-window';
 import { Spin, Button, Space, Tag, Input, Select, Checkbox, Card } from 'antd';
 import { PlayCircleOutlined, StopOutlined, CopyOutlined, ClearOutlined, SearchOutlined, EyeOutlined, ReloadOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { showError, showSuccess, tryExecute } from '../utils/errorHandler';
@@ -49,7 +50,6 @@ const RunnerPanel: React.FC<RunnerPanelProps> = ({ iterationId }) => {
   const [activeTab, setActiveTab] = useState('run');
   const [projectRuntimeInfo, setProjectRuntimeInfo] = useState<ProjectRuntimeInfo | null>(null);
   
-  const logsEndRef = useRef<HTMLDivElement>(null);
   const listenersRegistered = useRef(false);
   const isVisibleRef = useRef(true);
 
@@ -85,12 +85,6 @@ const RunnerPanel: React.FC<RunnerPanelProps> = ({ iterationId }) => {
       setProjectRuntimeInfo(null);
     }
   };
-
-  useEffect(() => {
-    if (autoScroll && logsEndRef.current) {
-      logsEndRef.current.scrollTop = logsEndRef.current.scrollHeight;
-    }
-  }, [logs, autoScroll]);
 
   useEffect(() => {
     if (listenersRegistered.current) return;
@@ -210,6 +204,41 @@ const RunnerPanel: React.FC<RunnerPanelProps> = ({ iterationId }) => {
   const frontendPort = projectRuntimeInfo?.frontend_port;
   const backendPort = projectRuntimeInfo?.backend_port;
 
+  // ===== 虚拟化日志列表 =====
+  const logListRef = useRef<List>(null);
+  const logContainerRef = useRef<HTMLDivElement>(null);
+  const [logHeight, setLogHeight] = useState(400);
+
+  useEffect(() => {
+    if (!logContainerRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) setLogHeight(entry.contentRect.height);
+    });
+    observer.observe(logContainerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // 自动滚动到底部
+  useEffect(() => {
+    if (!autoScroll) return;
+    requestAnimationFrame(() => {
+      logListRef.current?.scrollToItem(filteredLogs.length - 1, 'end');
+    });
+  }, [filteredLogs.length, autoScroll]);
+
+  // 日志行高 13px 字体 + 5px = 18px
+  const LOG_ROW_HEIGHT = 18;
+
+  const LogRow = useCallback(({ index, style, data }: { index: number; style: React.CSSProperties; data: LogEntry[] }) => {
+    const log = data[index];
+    const color = log.type === 'stderr' ? '#cf1322' : log.type === 'system' ? '#389e0d' : '#333';
+    return (
+      <div style={{ ...style, color, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: '18px' }}>
+        {log.content}
+      </div>
+    );
+  }, []);
+
   const renderRunTab = () => (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '10px', alignItems: 'center', background: '#fafafa', flexShrink: 0 }}>
@@ -224,17 +253,23 @@ const RunnerPanel: React.FC<RunnerPanelProps> = ({ iterationId }) => {
         <span style={{ color: '#888', fontSize: '12px', marginLeft: 'auto' }}>{filteredLogs.length}/{logs.length} lines</span>
       </div>
 
-      <div ref={logsEndRef} style={{ flex: 1, backgroundColor: '#f5f5f5', color: '#333', fontFamily: 'Consolas, "Courier New", monospace', fontSize: '13px', padding: '10px', overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', border: '1px solid #d9d9d9', margin: '8px', borderRadius: '4px' }}>
+      <div ref={logContainerRef} style={{ flex: 1, backgroundColor: '#f5f5f5', color: '#333', fontFamily: 'Consolas, "Courier New", monospace', fontSize: '13px', padding: '10px', overflow: 'hidden', whiteSpace: 'pre-wrap', wordBreak: 'break-all', border: '1px solid #d9d9d9', margin: '8px', borderRadius: '2px' }}>
         {logs.length === 0 ? (
           <div style={{ color: '#999', textAlign: 'center', marginTop: '50px' }}>Click "Start" to run your project</div>
         ) : filteredLogs.length === 0 ? (
           <div style={{ color: '#999', textAlign: 'center', marginTop: '50px' }}>No matching logs</div>
         ) : (
-          filteredLogs.map((log, index) => (
-            <div key={index} style={{ color: log.type === 'stderr' ? '#cf1322' : log.type === 'system' ? '#389e0d' : '#333', marginBottom: '2px' }}>
-              {log.content}
-            </div>
-          ))
+          <List
+            ref={logListRef}
+            height={logHeight - 20}
+            itemCount={filteredLogs.length}
+            itemSize={LOG_ROW_HEIGHT}
+            width="100%"
+            itemData={filteredLogs}
+            overscanCount={10}
+          >
+            {LogRow}
+          </List>
         )}
       </div>
     </div>
@@ -256,10 +291,10 @@ const RunnerPanel: React.FC<RunnerPanelProps> = ({ iterationId }) => {
             <span style={{ fontSize: 13, color: '#1890ff', fontFamily: 'monospace', flex: 1 }}>{previewUrl}</span>
             <Button icon={<ReloadOutlined />} size="small" onClick={refreshPreview}>Refresh</Button>
           </div>
-          <iframe src={previewUrl} className="preview-iframe" style={{ flex: 1, width: '100%', border: 'none', backgroundColor: '#ffffff', margin: '8px', borderRadius: '4px' }} title="Preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
+          <iframe src={previewUrl} className="preview-iframe" style={{ flex: 1, width: '100%', border: 'none', backgroundColor: '#ffffff', margin: '8px', borderRadius: '2px' }} title="Preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
         </>
       ) : (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, backgroundColor: '#ffffff', margin: '8px', borderRadius: '4px', border: '1px solid #d9d9d9' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, backgroundColor: '#ffffff', margin: '8px', borderRadius: '2px', border: '1px solid #d9d9d9' }}>
           <EyeOutlined style={{ fontSize: 64, color: '#d9d9d9' }} />
           <div style={{ textAlign: 'center', color: '#666' }}>
             <div style={{ fontSize: 14, marginBottom: 8 }}>{!hasFrontend ? 'No frontend project detected' : 'Please start the project first'}</div>
@@ -271,7 +306,7 @@ const RunnerPanel: React.FC<RunnerPanelProps> = ({ iterationId }) => {
   );
 
   return (
-    <Card className="runner-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', margin: '8px', borderRadius: '8px' }} styles={{ body: { flex: 1, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' } }}>
+    <Card className="runner-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', margin: '8px', borderRadius: '4px' }} styles={{ body: { flex: 1, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' } }}>
       <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '16px', fontWeight: 500 }}>🚀 Run Center</span>

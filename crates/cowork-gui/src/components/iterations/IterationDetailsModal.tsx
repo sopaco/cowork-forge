@@ -72,31 +72,31 @@ const IterationDetailsModal: React.FC<IterationDetailsModalProps> = ({
   return (
     <Modal open={open} onCancel={onClose} footer={null} width={680}>
       <div>
-        <div style={{ marginBottom: "20px", paddingBottom: "16px", borderBottom: "1px solid #e8e8e8" }}>
+        <div style={{ marginBottom: "20px", paddingBottom: "16px", borderBottom: "1px solid var(--border-color)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-            <span style={{ fontSize: "13px", fontWeight: 600, background: "#f0f0f0", padding: "2px 10px", borderRadius: "4px" }}>
+            <span style={{ fontSize: "13px", fontWeight: 600, background: "var(--bg-elevated)", color: "var(--text-primary)", padding: "2px 10px", borderRadius: "2px", border: "1px solid var(--border-light)" }}>
               #{iteration.number}
             </span>
             <Badge status={getStatusColor(iteration.status)} text={iteration.status} />
           </div>
-          <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 600, marginBottom: "6px" }}>
+          <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 600, marginBottom: "6px", color: "var(--text-primary)" }}>
             {iteration.title}
           </h2>
-          <div style={{ fontSize: "12px", color: "#999", fontFamily: "monospace" }}>
+          <div style={{ fontSize: "12px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>
             ID: {iteration.id}
           </div>
         </div>
 
         <div style={{ marginBottom: "16px" }}>
-          <div style={{ padding: "12px", background: "#fafafa", borderRadius: "6px", lineHeight: "1.5", fontSize: "14px", color: "#666" }}>
+          <div style={{ padding: "12px", background: "var(--bg-container)", borderRadius: "3px", lineHeight: "1.5", fontSize: "14px", color: "var(--text-secondary)", border: "1px solid var(--border-light)" }}>
             {iteration.description}
           </div>
         </div>
 
         {iteration.base_iteration_id && (
           <div style={{ marginBottom: "16px" }}>
-            <div style={{ fontSize: "13px", color: "#999", marginBottom: "4px" }}>
-              Based on: <code style={{ background: "#f5f5f5", padding: "2px 6px", borderRadius: "3px", fontSize: "11px" }}>
+            <div style={{ fontSize: "13px", color: "var(--text-tertiary)", marginBottom: "4px" }}>
+              Based on: <code style={{ background: "var(--bg-elevated)", padding: "2px 6px", borderRadius: "2px", fontSize: "11px", color: "var(--text-secondary)", border: "1px solid var(--border-light)" }}>
                 {iteration.base_iteration_id.substring(0, 20)}...
               </code>
               <Tag style={{ marginLeft: "6px", fontSize: "11px" }}>{iteration.inheritance}</Tag>
@@ -106,10 +106,10 @@ const IterationDetailsModal: React.FC<IterationDetailsModalProps> = ({
 
         <div style={{ marginBottom: "16px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-            <span style={{ fontSize: "13px", fontWeight: 600 }}>Progress</span>
-            <span style={{ fontSize: "13px", color: "#666" }}>{calculateProgress(iteration.completed_stages, currentStages.length)}%</span>
+            <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>Progress</span>
+            <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{calculateProgress(iteration.completed_stages, currentStages.length)}%</span>
           </div>
-          <Progress percent={calculateProgress(iteration.completed_stages, currentStages.length)} strokeColor="#52c41a" style={{ marginBottom: "12px" }} />
+          <Progress percent={calculateProgress(iteration.completed_stages, currentStages.length)} strokeColor="var(--success)" style={{ marginBottom: "12px" }} />
           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
             {currentStages.map((stage) => {
               const currentStageIndex = currentStages.findIndex((s) => s.key === iteration.current_stage);
@@ -122,7 +122,7 @@ const IterationDetailsModal: React.FC<IterationDetailsModalProps> = ({
                 <Tag
                   key={stage.key}
                   color={isCompleted ? "success" : isCurrent ? "processing" : "default"}
-                  style={{ margin: 0, fontSize: "12px", borderRadius: "4px", opacity: isCompleted || isCurrent ? 1 : 0.4 }}
+                  style={{ margin: 0, fontSize: "12px", borderRadius: "2px", opacity: isCompleted || isCurrent ? 1 : 0.4 }}
                 >
                   {stage.label}
                 </Tag>
@@ -131,15 +131,15 @@ const IterationDetailsModal: React.FC<IterationDetailsModalProps> = ({
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "24px", paddingTop: "16px", borderTop: "1px solid #e8e8e8" }}>
+        <div style={{ display: "flex", gap: "24px", paddingTop: "16px", borderTop: "1px solid var(--border-color)" }}>
           <div>
-            <div style={{ fontSize: "12px", color: "#999", marginBottom: "2px" }}>Created</div>
-            <div style={{ fontSize: "13px", color: "#333" }}>{formatDate(iteration.created_at)}</div>
+            <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Created</div>
+            <div style={{ fontSize: "13px", color: "var(--text-primary)" }}>{formatDate(iteration.created_at)}</div>
           </div>
           {iteration.completed_at && (
             <div>
-              <div style={{ fontSize: "12px", color: "#999", marginBottom: "2px" }}>Completed</div>
-              <div style={{ fontSize: "13px", color: "#333" }}>{formatDate(iteration.completed_at)}</div>
+              <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Completed</div>
+              <div style={{ fontSize: "13px", color: "var(--text-primary)" }}>{formatDate(iteration.completed_at)}</div>
             </div>
           )}
         </div>

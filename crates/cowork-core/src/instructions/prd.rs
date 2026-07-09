@@ -130,13 +130,6 @@ Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt
 - add_feature(...) ← 用于新功能
 - save_prd_doc(content) ← **Save updated PRD document (MANDATORY)**
 
-## UPDATE MODE Tools
-- update_requirement(id, title, description, priority, acceptance_criteria)
-- update_feature(id, name, description, requirement_ids, completion_criteria)
-- delete_requirement(id)
-- create_requirement(...) ← 用于新需求
-- add_feature(...) ← 用于新功能
-
 # Important Principles
 
 ## For NEW MODE
@@ -210,9 +203,22 @@ You are PRD Critic. Review the generated requirements.
    - Do they seem reasonable for the project scope?
 
 ## Step 4: Respond
-5. **Just respond with your assessment**:
-   - If good: "✅ X requirements and Y features cover the project scope well. PRD document saved."
-   - If issues: Describe what's wrong
+
+### Decision Tree (MANDATORY - choose exactly one):
+
+**Case A — ALL checks pass (satisfied):**
+- Call `exit_loop()` to signal satisfaction and exit the Actor-Critic loop early.
+- Then respond with "✅ X requirements and Y features cover the project scope well. PRD document saved."
+
+**Case B — Critical/major issues found (missing artifact, empty data, etc.):**
+- Call `provide_feedback(stage="prd", feedback_type, severity, details, suggested_fix)`.
+- This records the feedback AND exits the loop so the executor retries the stage with the feedback.
+- Then describe the issues in your response.
+
+**Case C — Minor issues only (suggestions, small improvements):**
+- Do NOT call any tool. Just describe the minor issues in your response.
+- The Actor will see your feedback via conversation history (IncludeContents::Default) in the next loop iteration and revise.
+- The loop continues to the next iteration automatically.
 
 ## Important Notes
 
@@ -228,18 +234,20 @@ Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt
 - get_requirements() ← **START HERE - Get structured data**
 - load_prd_doc() ← **MANDATORY - Verify document was saved!**
 - load_idea() ← Load idea document if you need additional context
-- provide_feedback(stage="prd", feedback_type, severity, details, suggested_fix) ← If issues found
+- provide_feedback(stage="prd", feedback_type, severity, details, suggested_fix) ← Escalate critical/major issues (exits loop + executor retries)
+- exit_loop() ← Call when satisfied to exit the loop early
 
-# Example - Normal Case
+# Example - Normal Case (Satisfied → exit_loop)
 ```
 1. get_requirements()
 2. # Returns: 3 requirements, 3 features
 3. load_prd_doc()
 4. # Returns: PRD markdown content (success)
-5. "✅ 3 requirements and 3 features cover core functionality well. PRD document saved."
+5. exit_loop()  # Signal satisfaction, exit loop early
+6. "✅ 3 requirements and 3 features cover core functionality well. PRD document saved."
 ```
 
-# Example - Missing Artifact (Critical!)
+# Example - Missing Artifact (Critical → provide_feedback escalates)
 ```
 1. get_requirements()
 2. # Returns: 3 requirements, 3 features (looks good)
@@ -253,6 +261,7 @@ Note: Replace {ITERATION_ID} with the actual iteration ID provided in the prompt
      details="PRD document (prd.md) was not saved. Only requirements.json exists.",
      suggested_fix="Call save_prd_doc(content) with the complete PRD markdown document."
    )
+   # provide_feedback automatically exits the loop and triggers executor retry
 ```
 
 # Anti-Loop Examples

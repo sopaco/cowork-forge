@@ -327,7 +327,7 @@ const FlowConfigPanel: React.FC = () => {
             </Space>
           }
           description={
-            <Space direction="vertical" size="small">
+            <Space orientation="vertical" size="small">
               <Text type="secondary">{flow.description || 'No description'}</Text>
               <Space size={4}>
                 {flow.stages.map((s, i) => (
@@ -464,7 +464,7 @@ const FlowConfigPanel: React.FC = () => {
                   <Text type="secondary" style={{ fontSize: 12 }}>{item.description}</Text>
                 </Space>
               )}
-              listStyle={{ width: 280, height: 300 }}
+              styles={{ section: { width: 280, height: 300 } }}
               showSearch
               filterOption={(input, item) =>
                 item.title.toLowerCase().includes(input.toLowerCase()) ||
@@ -511,7 +511,7 @@ const FlowConfigPanel: React.FC = () => {
         open={detailDrawerVisible}
       >
         {selectedFlowData && (
-          <Space direction="vertical" style={{ width: '100%' }} size="large">
+          <Space orientation="vertical" style={{ width: '100%' }} size="large">
             <Descriptions column={1} bordered size="small">
               <Descriptions.Item label="ID">{selectedFlowData.id}</Descriptions.Item>
               <Descriptions.Item label="Version">{selectedFlowData.version || '-'}</Descriptions.Item>

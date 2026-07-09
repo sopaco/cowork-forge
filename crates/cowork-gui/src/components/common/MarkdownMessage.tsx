@@ -1,11 +1,11 @@
 import React, { memo, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
-import rehypeRaw from 'rehype-raw';
+import { remarkPlugins, fullRehypePlugins } from '@/utils/markdown';
 
 interface MarkdownMessageProps {
   content: string;
+  /** 流式输出中：跳过 highlight.js / rehype-raw，streaming 结束后再切回完整渲染 */
+  streaming?: boolean;
 }
 
 // Copy button for code blocks
@@ -33,18 +33,16 @@ const getLanguage = (className?: string): string => {
   return match ? match[1] : '';
 };
 
-// Memoized markdown components
+// 完整渲染组件（streaming 结束后用）
 const markdownComponents = {
   code: ({ className, children, ...props }: React.HTMLAttributes<HTMLElement> & { className?: string }) => {
     const isBlock = className || (children && String(children).includes('\n'));
     const codeText = String(children).replace(/\n$/, '');
 
     if (!isBlock) {
-      // Inline code
       return <code {...props}>{children}</code>;
     }
 
-    // Block code with wrapper
     const lang = getLanguage(className);
     return (
       <div className="markdown-code-block">
@@ -80,17 +78,34 @@ const markdownComponents = {
   p: ({ children }: { children?: React.ReactNode }) => <p>{children}</p>,
 };
 
-// Memoized plugins
-const remarkPlugins = [remarkGfm];
-const rehypePlugins = [rehypeHighlight, rehypeRaw];
+// 流式期间用的轻量 code 组件：不跑 highlight.js，只渲染纯 pre/code
+const streamingCode = ({ className, children, ...props }: React.HTMLAttributes<HTMLElement> & { className?: string }) => {
+  const isBlock = className || (children && String(children).includes('\n'));
+  if (!isBlock) {
+    return <code {...props}>{children}</code>;
+  }
+  return (
+    <pre>
+      <code className={className} {...props}>{children}</code>
+    </pre>
+  );
+};
 
-const MarkdownMessageInner: React.FC<MarkdownMessageProps> = ({ content }) => {
+const streamingComponents = {
+  ...markdownComponents,
+  code: streamingCode,
+};
+
+// 流式期间不用 rehype（highlight.js 是同步阻塞的，长代码块 50–200ms）
+const MarkdownMessageInner: React.FC<MarkdownMessageProps> = ({ content, streaming }) => {
+  // streaming=true：用轻量组件 + 不带 rehype，纯文本快速渲染
+  // streaming=false/undefined：完整渲染（gfm + highlight + raw）
   return (
     <div className="markdown-body">
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
-        rehypePlugins={rehypePlugins}
-        components={markdownComponents}
+        rehypePlugins={streaming ? undefined : fullRehypePlugins}
+        components={streaming ? streamingComponents : markdownComponents}
       >
         {content}
       </ReactMarkdown>
@@ -98,4 +113,8 @@ const MarkdownMessageInner: React.FC<MarkdownMessageProps> = ({ content }) => {
   );
 };
 
-export const MarkdownMessage = memo(MarkdownMessageInner);
+// 自定义比较：content 与 streaming 都没变才跳过重渲
+export const MarkdownMessage = memo(
+  MarkdownMessageInner,
+  (prev, next) => prev.content === next.content && prev.streaming === next.streaming
+);

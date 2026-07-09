@@ -404,7 +404,7 @@ Cowork Forge uses a `config.toml` file stored in your system's application data 
 [llm]
 api_base_url = "https://api.openai.com/v1"
 api_key = "sk-your-openai-api-key"
-model_name = "gpt-4"
+model_name = "gpt-5"
 
 # Optional: Embedding Configuration
 [embedding]

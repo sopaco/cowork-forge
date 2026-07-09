@@ -6,7 +6,7 @@ use std::sync::Arc;
 use anyhow::{Result, Context};
 
 use crate::config_definition::{
-    AgentDefinition, StageDefinition, StageType,
+    AgentDefinition, StageDefinition, StageType, IncludeContentsMode,
     global_registry,
 };
 use crate::instructions::*;
@@ -16,6 +16,7 @@ use crate::skills::{SkillManager, SelectionPolicy};
 use adk_agent::{LlmAgentBuilder, LoopAgent};
 use adk_core::{Llm, Agent, IncludeContents};
 use adk_skill::select_skill_prompt_block;
+use adk_tool::ExitLoopTool;
 use crate::llm::config::McpConfig;
 use crate::tools::{create_mcp_toolsets_from_config, ConnectedMcpToolset};
 
@@ -229,9 +230,8 @@ pub fn create_agent_from_config_with_stage(
     // Add MCP toolsets if available
     builder = add_mcp_toolsets_to_builder(builder);
 
-    // Set content inclusion mode
-    // Note: Current adk_core only supports None, LastN, All variants may not be available
-    let include_contents = IncludeContents::None; // All agents use None for now
+    // Set content inclusion mode from config
+    let include_contents = include_contents_mode_to_adk(&definition.include_contents);
     builder = builder.include_contents(include_contents);
 
     // Build the agent
@@ -319,9 +319,19 @@ fn create_simple_agent_from_config_with_stage(
     // Add MCP toolsets if available
     builder = add_mcp_toolsets_to_builder(builder);
 
-    // Set content inclusion mode
-    // Note: Current adk_core only supports None, LastN, All variants may not be available
-    let include_contents = IncludeContents::None; // All agents use None for now
+    // Set content inclusion mode:
+    // - Actor agents use Default to see Critic feedback across LoopAgent iterations
+    //   (they explicitly set "include_contents": "default" in JSON configs).
+    // - Critic agents use None to avoid paying for Actor's full conversation history;
+    //   Critics load artifacts via tools (load_prd_doc, get_plan, etc.) rather than
+    //   reading conversation history, which significantly reduces token usage.
+    // - Simple agents default to None to keep context focused.
+    let include_contents = match &definition.include_contents {
+        IncludeContentsMode::None => IncludeContents::None,
+        IncludeContentsMode::Default => IncludeContents::Default,
+        IncludeContentsMode::All => IncludeContents::Default,
+        IncludeContentsMode::Selected(_) => IncludeContents::Default,
+    };
     builder = builder.include_contents(include_contents);
 
     let agent = builder.build()
@@ -401,6 +411,7 @@ fn create_tool_from_reference(tool_id: &str, iteration_id: &str) -> Result<Arc<d
         "get_requirements" => Arc::new(GetRequirementsTool),
         "add_feature" => Arc::new(AddFeatureTool),
         "update_feature" => Arc::new(UpdateFeatureTool),
+        "update_feature_status" => Arc::new(UpdateFeatureStatusTool),
         "create_task" => Arc::new(CreateTaskTool),
         "update_task_status" => Arc::new(UpdateTaskStatusTool),
         "get_design" => Arc::new(GetDesignTool),
@@ -441,6 +452,9 @@ fn create_tool_from_reference(tool_id: &str, iteration_id: &str) -> Result<Arc<d
         // HITL tools
         "provide_feedback" => Arc::new(ProvideFeedbackTool),
         "load_feedback_history" => Arc::new(LoadFeedbackHistoryTool),
+        "review_with_feedback_content" => Arc::new(ReviewWithFeedbackContentTool),
+        "request_human_review" => Arc::new(RequestHumanReviewTool),
+        "ask_user" => Arc::new(AskUserTool),
 
         // Memory tools
         "query_memory" => Arc::new(QueryMemoryTool::new(iteration_id.to_string())),
@@ -454,6 +468,7 @@ fn create_tool_from_reference(tool_id: &str, iteration_id: &str) -> Result<Arc<d
         "copy_workspace_to_project" => Arc::new(CopyWorkspaceToProjectTool),
 
         // Flow control tools
+        "exit_loop" => Arc::new(ExitLoopTool::new()),
         "goto_stage" => Arc::new(GotoStageTool),
 
         // PM tools (require iteration_id)
@@ -539,4 +554,14 @@ pub fn initialize_config_registry() -> Result<()> {
     );
 
     Ok(())
+}
+
+/// Convert config IncludeContentsMode to adk_core::IncludeContents
+fn include_contents_mode_to_adk(mode: &IncludeContentsMode) -> IncludeContents {
+    match mode {
+        IncludeContentsMode::None => IncludeContents::None,
+        IncludeContentsMode::Default => IncludeContents::Default,
+        IncludeContentsMode::All => IncludeContents::Default,
+        IncludeContentsMode::Selected(_) => IncludeContents::Default,
+    }
 }

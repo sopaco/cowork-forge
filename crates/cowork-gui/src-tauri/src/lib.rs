@@ -703,21 +703,19 @@ pub fn run() {
 
             // Initialize tool notification callback
             let app_handle = app.handle().clone();
-            cowork_core::tools::set_tool_notify_callback(move |tool_name: &str, args: &Value, is_call: bool, result: &str| {
+            cowork_core::tools::set_tool_notify_callback(move |tool_name: &str, args: &Value, is_call: bool, result: &str, agent_name: &str| {
                 if is_call {
-                    // Tool call event
                     let _ = app_handle.emit("tool_call", serde_json::json!({
                         "tool_name": tool_name,
                         "arguments": args,
-                        "agent_name": "Agent"
+                        "agent_name": agent_name
                     }));
                 } else {
-                    // Tool result event
                     let _ = app_handle.emit("tool_result", serde_json::json!({
                         "tool_name": tool_name,
                         "success": args.is_null() || result.is_empty() || !result.contains("error"),
                         "result": result,
-                        "agent_name": "Agent"
+                        "agent_name": agent_name
                     }));
                 }
             });

@@ -363,22 +363,32 @@ Before other checks, verify that architecture is SIMPLE and MINIMAL:
 
 ## Your Response
 
-### If ALL checks pass:
-- "✅ Design approved: [N] simple components covering all features, architecture follows minimal principles."
-- Provide brief positive feedback on the architecture
+### Decision Tree (MANDATORY - choose exactly one):
 
-### If any check FAILS:
-- Call `provide_feedback(stage="design", feedback_type, severity, details, suggested_fix)` with specific issues
+**Case A — ALL checks pass (satisfied):**
+- Call `exit_loop()` to signal satisfaction and exit the Actor-Critic loop early.
+- Then respond with "✅ Design approved: [N] simple components covering all features, architecture follows minimal principles."
+- Provide brief positive feedback on the architecture.
+
+**Case B — Critical/major issues found (empty data, missing artifacts, over-engineering, feature coverage gaps):**
+- Call `provide_feedback(stage="design", feedback_type, severity, details, suggested_fix)`.
+- This records the feedback AND exits the loop so the executor retries the stage with the feedback.
 - Use appropriate severity:
   - "critical" for empty data, missing artifacts, over-engineering
   - "major" for feature coverage issues
-  - "minor" for documentation issues
+- Then describe the issues in your response.
+
+**Case C — Minor issues only (documentation issues, small suggestions):**
+- Do NOT call any tool. Just describe the minor issues in your response.
+- The Actor will see your feedback via conversation history (IncludeContents::Default) in the next loop iteration and revise.
+- The loop continues to the next iteration automatically.
 
 # Tools Available
 - get_design() - Load design data
 - check_feature_coverage() - Verify all features covered
 - load_design_doc() - Verify design markdown document
-- provide_feedback(stage="design", feedback_type, severity, details, suggested_fix) - Report issues
+- provide_feedback(stage="design", feedback_type, severity, details, suggested_fix) - Escalate critical/major issues (exits loop + executor retries)
+- exit_loop() - Call when satisfied to exit the loop early
 
 # Anti-Loop Examples
 

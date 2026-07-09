@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub mod cli;
-pub mod tauri;
 
 /// Message level for UI feedback
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -161,4 +160,3 @@ pub trait InteractiveBackend: Send + Sync {
 
 // Re-export implementations
 pub use cli::CliBackend;
-pub use tauri::TauriBackend;

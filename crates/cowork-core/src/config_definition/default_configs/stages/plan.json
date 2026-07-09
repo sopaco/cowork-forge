@@ -6,7 +6,7 @@
   "actor_critic": {
     "actor": "plan_actor",
     "critic": "plan_critic",
-    "max_iterations": 1
+    "max_iterations": 2
   },
   "needs_confirmation": true,
   "artifacts": [

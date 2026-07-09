@@ -13,7 +13,22 @@
       "tool_id": "get_implementation_plan"
     },
     {
+      "tool_id": "get_requirements"
+    },
+    {
+      "tool_id": "load_design_doc"
+    },
+    {
+      "tool_id": "load_plan_doc"
+    },
+    {
+      "tool_id": "create_task"
+    },
+    {
       "tool_id": "update_task_status"
+    },
+    {
+      "tool_id": "update_feature_status"
     },
     {
       "tool_id": "read_file"
@@ -49,6 +64,6 @@
   "model": {
     "temperature": 0.7
   },
-  "include_contents": "none",
+  "include_contents": "default",
   "tags": ["built-in", "coding", "actor"]
 }

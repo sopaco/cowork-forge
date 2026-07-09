@@ -255,7 +255,7 @@ mod tests {
 [llm]
 api_base_url = "http://localhost:8000/v1"
 api_key = "test-key"
-model_name = "gpt-4"
+model_name = "gpt-5"
 
 [embedding]
 api_base_url = "http://localhost:8001/v1"
@@ -272,7 +272,7 @@ args = ["x", "opencode-ai", "acp"]
         let config: ModelConfig = toml::from_str(toml_content).unwrap();
         assert_eq!(config.llm.api_base_url, "http://localhost:8000/v1");
         assert_eq!(config.llm.api_key, "test-key");
-        assert_eq!(config.llm.model_name, "gpt-4");
+        assert_eq!(config.llm.model_name, "gpt-5");
         assert!(config.coding_agent.enabled);
         assert_eq!(config.embedding.api_base_url, "http://localhost:8001/v1");
     }
@@ -283,7 +283,7 @@ args = ["x", "opencode-ai", "acp"]
 [llm]
 api_base_url = "http://localhost:8000/v1"
 api_key = "test-key"
-model_name = "gpt-4"
+model_name = "gpt-5"
         "#;
 
         let config: ModelConfig = toml::from_str(toml_content).unwrap();

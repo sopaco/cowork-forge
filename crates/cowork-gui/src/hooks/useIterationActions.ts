@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { App as AntApp } from 'antd';
 import { useProjectStore, useAgentStore, useUIStore } from '../stores';
+import { useShallow } from 'zustand/react/shallow';
 import API from '../api';
 
 /**
@@ -10,14 +11,26 @@ import API from '../api';
 export function useIterationActions() {
 	const { message } = AntApp.useApp();
 
-	// Project store
-	const { currentIteration, setCurrentIteration, setIsExecuting } = useProjectStore();
+	// Project store: selector + useShallow
+	const projectActions = useProjectStore(
+		useShallow(s => ({ currentIteration: s.currentIteration, setCurrentIteration: s.setCurrentIteration, setIsExecuting: s.setIsExecuting }))
+	);
+	const { currentIteration, setCurrentIteration, setIsExecuting } = projectActions;
 
 	// Agent store
-	const { setProcessing } = useAgentStore();
+	const agentActions = useAgentStore(
+		useShallow(s => ({
+			setProcessing: s.setProcessing,
+			setPmProcessing: s.setPmProcessing,
+		}))
+	);
+	const { setProcessing, setPmProcessing } = agentActions;
 
 	// UI store
-	const { activeView, setActiveView } = useUIStore();
+	const uiState = useUIStore(
+		useShallow(s => ({ activeView: s.activeView, setActiveView: s.setActiveView }))
+	);
+	const { activeView, setActiveView } = uiState;
 
 	/**
 	 * Handle selecting an iteration
@@ -28,19 +41,28 @@ export function useIterationActions() {
 			try {
 				const { currentIteration, isExecuting } = useProjectStore.getState();
 				const fullIteration = await API.iteration.get(iterationId);
-				
+
 				if (isExecuting && currentIteration?.id === iterationId) {
 					setCurrentIteration({ ...fullIteration, status: currentIteration.status });
 				} else {
 					setCurrentIteration(fullIteration);
 				}
+
+				// Release builds launched from Finder may leave stale processing flags
+				// when no pipeline is actually running for this iteration.
+				const status = fullIteration.status.toLowerCase();
+				if (!isExecuting && status !== 'running') {
+					setProcessing(false);
+					setPmProcessing(false);
+				}
+
 				setActiveView('chat');
 			} catch (error) {
 				console.error('Failed to load iteration:', error);
 				message.error('Failed to load iteration: ' + error);
 			}
 		},
-		[setCurrentIteration, setActiveView, message]
+		[setCurrentIteration, setActiveView, setProcessing, setPmProcessing, message]
 	);
 
 	/**

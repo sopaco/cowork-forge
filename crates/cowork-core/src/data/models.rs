@@ -309,6 +309,9 @@ pub enum FeedbackType {
     BuildError,
     QualityIssue,
     MissingRequirement,
+    MissingArtifact,
+    ArchitectureIssue,
+    TaskScopeIssue,
     Suggestion,
 }
 

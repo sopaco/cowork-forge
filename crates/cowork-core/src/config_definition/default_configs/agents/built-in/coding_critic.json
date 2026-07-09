@@ -10,6 +10,9 @@
       "tool_id": "get_implementation_plan"
     },
     {
+      "tool_id": "load_plan_doc"
+    },
+    {
       "tool_id": "read_file"
     },
     {
@@ -26,6 +29,12 @@
     },
     {
       "tool_id": "provide_feedback"
+    },
+    {
+      "tool_id": "exit_loop"
+    },
+    {
+      "tool_id": "request_human_review"
     },
     {
       "tool_id": "query_memory"

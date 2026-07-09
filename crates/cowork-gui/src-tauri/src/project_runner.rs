@@ -4,6 +4,9 @@ use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 use tokio::process::Child;
 use tokio::sync::mpsc;
+use tracing;
+
+use crate::commands::path_utils;
 
 // Import PreviewInfo from gui_types
 use super::gui_types::PreviewInfo;
@@ -15,6 +18,29 @@ use std::os::windows::process::CommandExt;
 pub struct ProjectRunner {
     processes: Arc<Mutex<HashMap<String, ProjectProcess>>>,
     app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
+}
+
+fn command_exists(cmd: &str) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("where")
+            .arg(cmd)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::process::Command::new("which")
+            .arg(cmd)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    }
 }
 
 struct ProjectProcess {
@@ -53,7 +79,7 @@ impl ProjectRunner {
     ) -> Result<u32, String> {
         // Stop existing process if any
         if let Ok(()) = self.stop(iteration_id.clone()).await {
-            println!(
+            tracing::info!(
                 "[Runner] Stopped existing process for iteration: {}",
                 iteration_id
             );
@@ -68,51 +94,79 @@ impl ProjectRunner {
 
         // Debug: Print PATH and check commands
         let path_env = std::env::var("PATH").unwrap_or_else(|_| "PATH not found".to_string());
-        println!("[Runner] PATH = {}", path_env);
-        
+        tracing::debug!("[Runner] PATH = {}", path_env);
+
         // Check if bun or sh exists
-        println!("[Runner] Checking commands...");
-        if std::process::Command::new("which").arg("bun").output().map(|o| o.status.success()).unwrap_or(false) {
-            println!("[Runner] bun found");
+        tracing::debug!("[Runner] Checking commands...");
+        if command_exists("bun") {
+            tracing::debug!("[Runner] bun found");
         } else {
-            println!("[Runner] bun NOT found");
+            tracing::debug!("[Runner] bun NOT found");
         }
-        if std::process::Command::new("which").arg("sh").output().map(|o| o.status.success()).unwrap_or(false) {
-            println!("[Runner] sh found");
+        if command_exists("sh") {
+            tracing::debug!("[Runner] sh found");
         } else {
-            println!("[Runner] sh NOT found");
+            tracing::debug!("[Runner] sh NOT found");
         }
 
-        println!("[Runner] Starting command: {} in {}", command, code_dir);
+        tracing::info!("[Runner] Starting command: {} in {}", command, code_dir);
+
+        let normalized_command =
+            path_utils::normalize_project_start_command(code_path, &command);
+        let resolved_command = path_utils::resolve_command(&normalized_command);
+        if !path_utils::is_runnable_external_command(&resolved_command) {
+            return Err(format!(
+                "Invalid or empty start command: {:?}. Check project runtime configuration.",
+                command
+            ));
+        }
 
         #[cfg(target_os = "windows")]
         let mut child = {
             let mut cmd = tokio::process::Command::new("cmd");
-            cmd.args(["/C", &command])
+            cmd.args(["/C", &resolved_command])
                 .current_dir(&code_path)
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::piped())
                 .creation_flags(0x08000000); // CREATE_NO_WINDOW
+            path_utils::apply_gui_child_env_async(&mut cmd);
 
             cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
         };
 
         #[cfg(not(target_os = "windows"))]
         let mut child = {
-            // Set PATH to include common locations - critical for macOS app bundle
-            let path = std::env::var("PATH").unwrap_or_else(|_| {
-                // Default PATH for macOS
-                "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin".to_string()
-            });
-            
-            tokio::process::Command::new("sh")
-                .args(["-c", &command])
-                .current_dir(&code_path)
-                .env("PATH", path)
-                .stdout(std::process::Stdio::piped())
-                .stderr(std::process::Stdio::piped())
-                .spawn()
-                .map_err(|e| format!("Failed to start: {}", e))?
+            if let Some((program, args)) = path_utils::parse_direct_command(&resolved_command) {
+                tracing::info!(
+                    "[Runner] Spawning directly: {:?} {:?}",
+                    program,
+                    args
+                );
+                let mut cmd = tokio::process::Command::new(&program);
+                cmd.args(&args)
+                    .current_dir(&code_path)
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::piped());
+                path_utils::apply_gui_child_env_async(&mut cmd);
+                cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
+            } else {
+                // Compound commands only: login shell without -i (non-TTY safe).
+                // `exec` replaces the shell so we monitor the real dev-server process.
+                let shell = path_utils::command_shell();
+                let shell_script = format!("exec {resolved_command}");
+                tracing::info!(
+                    "[Runner] Spawning via shell: {} -lc {}",
+                    shell,
+                    shell_script
+                );
+                let mut cmd = tokio::process::Command::new(&shell);
+                cmd.args(["-lc", &shell_script])
+                    .current_dir(&code_path)
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::piped());
+                path_utils::apply_gui_child_env_async(&mut cmd);
+                cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
+            }
         };
 
         let pid = child.id().unwrap();
@@ -128,37 +182,79 @@ impl ProjectRunner {
         let (stdout_tx, _stdout_rx) = mpsc::unbounded_channel();
         let (stderr_tx, _stderr_rx) = mpsc::unbounded_channel();
 
-        // Clone child for stdout reading
-        let stdout = child.stdout.take().unwrap();
-        let stderr = child.stderr.take().unwrap();
-
-        // Clone senders for spawn tasks
-        let stdout_tx_spawn = stdout_tx.clone();
-        let stderr_tx_spawn = stderr_tx.clone();
-
         // Clone for stdout task
         let iteration_id_stdout = iteration_id_clone.clone();
-        
+
         // Check if process exited immediately (command error detection)
-        // Give it a brief moment to potentially fail
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
         match child.try_wait() {
             Ok(Some(status)) => {
-                // Process already exited - command likely failed
-                println!("[Runner] Process exited immediately with status: {:?}", status);
+                let mut output_preview = String::new();
+                {
+                    use tokio::io::AsyncReadExt;
+                    if let Some(mut stdout) = child.stdout.take() {
+                        let mut stdout_buf = vec![0u8; 4096];
+                        if let Ok(n) = stdout.read(&mut stdout_buf).await {
+                            if n > 0 {
+                                output_preview
+                                    .push_str(&String::from_utf8_lossy(&stdout_buf[..n]));
+                            }
+                        }
+                    }
+                    if let Some(mut stderr) = child.stderr.take() {
+                        let mut stderr_buf = vec![0u8; 4096];
+                        if let Ok(n) = stderr.read(&mut stderr_buf).await {
+                            if n > 0 {
+                                if !output_preview.is_empty() {
+                                    output_preview.push('\n');
+                                }
+                                output_preview
+                                    .push_str(&String::from_utf8_lossy(&stderr_buf[..n]));
+                            }
+                        }
+                    }
+                }
+
+                tracing::warn!(
+                    "[Runner] Process exited immediately with status: {:?}, output: {}",
+                    status,
+                    output_preview
+                );
+
+                let hint = if status.success() {
+                    "The dev process exited immediately. Check package.json scripts and that dependencies are installed."
+                } else {
+                    "The command failed to start. Check that bun/npm/cargo is installed and the project directory is correct."
+                };
+
                 return Err(format!(
-                    "Command failed immediately. Exit status: {}. Check if the command is correct.",
-                    status
+                    "Command failed immediately. Exit status: {}. {}\nCommand: {}\n{}",
+                    status,
+                    hint,
+                    resolved_command,
+                    if output_preview.is_empty() {
+                        String::new()
+                    } else {
+                        format!("Output:\n{output_preview}")
+                    }
                 ));
             }
             Ok(None) => {
                 // Process is still running - good
             }
             Err(e) => {
-                eprintln!("[Runner] Error checking process status: {}", e);
+                tracing::error!("[Runner] Error checking process status: {}", e);
             }
         }
+
+        // Clone child for stdout/stderr reading (only after liveness check passes)
+        let stdout = child.stdout.take().unwrap();
+        let stderr = child.stderr.take().unwrap();
+
+        // Clone senders for spawn tasks
+        let stdout_tx_spawn = stdout_tx.clone();
+        let stderr_tx_spawn = stderr_tx.clone();
 
         // Spawn task to read stdout and emit events
         tokio::spawn(async move {
@@ -183,14 +279,14 @@ impl ProjectRunner {
                                     "content": line.clone()
                                 }),
                             ) {
-                                eprintln!("[Runner] Failed to emit project_log event: {}", e);
+                                tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
                             }
                         }
 
                         line.clear();
                     }
                     Err(e) => {
-                        eprintln!("[Runner] Error reading stdout: {}", e);
+                        tracing::error!("[Runner] Error reading stdout: {}", e);
 
                         // Emit error event (use expected event name)
                         if let Some(ref handle) = app_handle_stdout {
@@ -203,7 +299,7 @@ impl ProjectRunner {
                                     "content": format!("Error reading output: {}\n", e)
                                 }),
                             ) {
-                                eprintln!("[Runner] Failed to emit project_log event: {}", e);
+                                tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
                             }
                         }
                         break;
@@ -235,14 +331,14 @@ impl ProjectRunner {
                                     "content": line.clone()
                                 }),
                             ) {
-                                eprintln!("[Runner] Failed to emit project_log event: {}", e);
+                                tracing::warn!("[Runner] Failed to emit project_log event: {}", e);
                             }
                         }
 
                         line.clear();
                     }
                     Err(e) => {
-                        eprintln!("[Runner] Error reading stderr: {}", e);
+                        tracing::error!("[Runner] Error reading stderr: {}", e);
 
                         // Emit error event
                         if let Some(ref handle) = app_handle_stderr {
@@ -253,7 +349,7 @@ impl ProjectRunner {
                                     "error": e.to_string()
                                 }),
                             ) {
-                                eprintln!(
+                                tracing::warn!(
                                     "[Runner] Failed to emit process_error event: {}",
                                     emit_err
                                 );
@@ -308,13 +404,13 @@ impl ProjectRunner {
                         match proc.child.try_wait() {
                             Ok(Some(status)) => {
                                 // Process has exited, remove it
-                                println!("[Runner] Process {} exited with status: {:?}", iteration_id_exit, status);
+                                tracing::info!("[Runner] Process {} exited with status: {:?}", iteration_id_exit, status);
                                 procs.remove(&iteration_id_exit);
                                 true
                             }
                             Ok(None) => false, // Still running
                             Err(e) => {
-                                eprintln!("[Runner] Error checking process status: {}", e);
+                                tracing::error!("[Runner] Error checking process status: {}", e);
                                 false
                             }
                         }
@@ -342,7 +438,7 @@ impl ProjectRunner {
             }
         });
 
-        println!("[Runner] Process started with PID: {}", pid);
+        tracing::info!("[Runner] Process started with PID: {}", pid);
         Ok(pid)
     }
 
@@ -354,7 +450,7 @@ impl ProjectRunner {
         };
 
         if let Some(mut process) = process {
-            println!("[Runner] Stopping process for iteration: {}", iteration_id);
+            tracing::info!("[Runner] Stopping process for iteration: {}", iteration_id);
 
             let _ = process.child.kill().await;
 
@@ -369,11 +465,11 @@ impl ProjectRunner {
                 );
             }
 
-            println!("[Runner] Process stopped");
+            tracing::info!("[Runner] Process stopped");
             Ok(())
         } else {
             // Process already stopped or not found - this is fine, just return success
-            println!(
+            tracing::debug!(
                 "[Runner] No running process found for iteration: {} (may already be stopped)",
                 iteration_id
             );

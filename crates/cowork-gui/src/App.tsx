@@ -97,8 +97,9 @@ function App() {
 	// Compute chat mode
 	const chatMode = useMemo<ChatMode>(() => {
 		if (!currentIteration) return 'disabled';
-		if (currentIteration.status === 'Completed') return 'pm_agent';
-		if (isProcessing || currentIteration.status === 'Running') return 'pipeline';
+		const status = currentIteration.status.toLowerCase();
+		if (status === 'completed') return 'pm_agent';
+		if (isProcessing || status === 'running') return 'pipeline';
 		return 'pipeline';
 	}, [currentIteration, isProcessing]);
 
@@ -154,9 +155,11 @@ function App() {
 	);
 
 	// Render content based on active view
+	// 改为条件挂载：访问过的重面板不再保持 display:none + 副作用持续跑
+	// 状态在 stores 中保留，切回时从 store 恢复，不影响体验
 	const renderContent = () => (
-		<div style={{ height: '100%' }}>
-			<div style={{ height: '100%', display: activeView === 'iterations' ? 'block' : 'none' }}>
+		<div style={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+			{activeView === 'iterations' && (
 				<Suspense fallback={loadingFallback}>
 					<IterationsPanel
 						key="iterations"
@@ -164,14 +167,14 @@ function App() {
 						selectedIterationId={currentIteration?.id}
 					/>
 				</Suspense>
-			</div>
+			)}
 
-			<div style={{ height: '100%', display: activeView === 'projects' ? 'block' : 'none' }}>
+			{activeView === 'projects' && (
 				<ProjectsPanel key="projects" />
-			</div>
+			)}
 
-			<div style={{ height: '100%', display: activeView === 'artifacts' ? 'block' : 'none' }}>
-				{currentIteration ? (
+			{activeView === 'artifacts' && (
+				currentIteration ? (
 					<Suspense fallback={loadingFallback}>
 						<ArtifactsViewer
 							key={`artifacts-${currentIteration.id}`}
@@ -183,11 +186,11 @@ function App() {
 					</Suspense>
 				) : (
 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-				)}
-			</div>
+				)
+			)}
 
-			<div style={{ height: '100%', display: activeView === 'code' ? 'block' : 'none' }}>
-				{currentIteration ? (
+			{activeView === 'code' && (
+				currentIteration ? (
 					<Suspense fallback={loadingFallback}>
 						<CodeEditor
 							key={`code-${currentIteration.id}`}
@@ -197,20 +200,20 @@ function App() {
 					</Suspense>
 				) : (
 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-				)}
-			</div>
+				)
+			)}
 
-			<div style={{ height: '100%', display: activeView === 'run' ? 'block' : 'none' }}>
-				{currentIteration ? (
+			{activeView === 'run' && (
+				currentIteration ? (
 					<Suspense fallback={loadingFallback}>
 						<RunnerPanel key={`run-${currentIteration.id}`} iterationId={currentIteration.id} />
 					</Suspense>
 				) : (
 					<Empty description="Select an iteration" style={{ marginTop: '40px' }} />
-				)}
-			</div>
+				)
+			)}
 
-			<div style={{ height: '100%', display: activeView === 'execution-memory' ? 'block' : 'none' }}>
+			{activeView === 'execution-memory' && (
 				<Suspense fallback={loadingFallback}>
 					<MemoryPanel
 						key={`memory-${memoryRefreshTrigger}`}
@@ -218,9 +221,9 @@ function App() {
 						refreshTrigger={memoryRefreshTrigger}
 					/>
 				</Suspense>
-			</div>
+			)}
 
-			<div style={{ height: '100%', display: activeView === 'project-knowledge' ? 'block' : 'none' }}>
+			{activeView === 'project-knowledge' && (
 				<Suspense fallback={loadingFallback}>
 					<KnowledgePanel
 						key={`knowledge-${knowledgeRefreshTrigger}`}
@@ -229,22 +232,26 @@ function App() {
 						refreshTrigger={knowledgeRefreshTrigger}
 					/>
 				</Suspense>
-			</div>
+			)}
 
-			<div style={{ height: '100%', display: activeView === 'settings' ? 'block' : 'none', overflow: 'auto' }}>
-				<Suspense fallback={loadingFallback}>
-					<SettingsPanel />
-				</Suspense>
-			</div>
+			{activeView === 'settings' && (
+				<div style={{ height: '100%', overflow: 'auto' }}>
+					<Suspense fallback={loadingFallback}>
+						<SettingsPanel />
+					</Suspense>
+				</div>
+			)}
 
-			<div style={{ height: '100%', display: activeView === 'config' ? 'block' : 'none', overflow: 'auto' }}>
-				<Suspense fallback={loadingFallback}>
-					<AgentsSetupPanel />
-				</Suspense>
-			</div>
+			{activeView === 'config' && (
+				<div style={{ height: '100%', overflow: 'auto' }}>
+					<Suspense fallback={loadingFallback}>
+						<AgentsSetupPanel />
+					</Suspense>
+				</div>
+			)}
 
-			<div style={{ height: '100%', display: activeView === 'chat' ? 'block' : 'none' }}>
-				{currentIteration ? (
+			{activeView === 'chat' && (
+				currentIteration ? (
 					<Suspense fallback={loadingFallback}>
 						<ChatPanel
 							messages={messages}
@@ -271,8 +278,8 @@ function App() {
 					</Suspense>
 				) : (
 					<Empty description="Select an iteration to view chat" style={{ marginTop: '40px' }} />
-				)}
-			</div>
+				)
+			)}
 		</div>
 	);
 

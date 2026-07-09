@@ -1,7 +1,8 @@
 // Unified Iteration Pipeline
 // Single entry point for all development cycles
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::sync::LazyLock;
 
 use crate::domain::{Iteration, Project};
 use crate::interaction::InteractiveBackend;
@@ -13,6 +14,24 @@ pub mod stage_executor;
 pub use executor::*;
 pub use stages::*;
 pub use stage_executor::*;
+
+static GOTO_STAGE_SIGNAL: LazyLock<Mutex<Option<(String, String)>>> = LazyLock::new(|| Mutex::new(None));
+
+pub fn set_goto_stage_signal(stage: String, reason: String) {
+    if let Ok(mut guard) = GOTO_STAGE_SIGNAL.lock() {
+        *guard = Some((stage, reason));
+    }
+}
+
+pub fn take_goto_stage_signal() -> Option<(String, String)> {
+    GOTO_STAGE_SIGNAL.lock().ok().and_then(|mut g| g.take())
+}
+
+pub fn clear_goto_stage_signal() {
+    if let Ok(mut guard) = GOTO_STAGE_SIGNAL.lock() {
+        *guard = None;
+    }
+}
 
 /// Stage execution result
 #[derive(Debug)]

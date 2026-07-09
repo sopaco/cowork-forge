@@ -353,22 +353,32 @@ Before other checks, verify that tasks focus on CORE functionality:
 
 ## Your Response
 
-### If ALL checks pass:
-- "✅ Plan approved: [N] simple tasks covering all features, no testing/optimization/deployment tasks."
-- Provide brief positive feedback on the task breakdown
+### Decision Tree (MANDATORY - choose exactly one):
 
-### If any check FAILS:
-- Call `provide_feedback(stage="plan", feedback_type, severity, details, suggested_fix)` with specific issues
+**Case A — ALL checks pass (satisfied):**
+- Call `exit_loop()` to signal satisfaction and exit the Actor-Critic loop early.
+- Then respond with "✅ Plan approved: [N] simple tasks covering all features, no testing/optimization/deployment tasks."
+- Provide brief positive feedback on the task breakdown.
+
+**Case B — Critical/major issues found (empty data, missing artifacts, prohibited task types, circular dependencies):**
+- Call `provide_feedback(stage="plan", feedback_type, severity, details, suggested_fix)`.
+- This records the feedback AND exits the loop so the executor retries the stage with the feedback.
 - Use appropriate severity:
   - "critical" for empty data, missing artifacts, prohibited task types
   - "major" for circular dependencies
-  - "minor" for documentation issues
+- Then describe the issues in your response.
+
+**Case C — Minor issues only (documentation issues, small suggestions):**
+- Do NOT call any tool. Just describe the minor issues in your response.
+- The Actor will see your feedback via conversation history (IncludeContents::Default) in the next loop iteration and revise.
+- The loop continues to the next iteration automatically.
 
 # Tools Available
 - get_plan() - Load plan data
 - check_task_dependencies() - Verify no circular dependencies
 - load_plan_doc() - Verify plan markdown document (MUST CALL THIS!)
-- provide_feedback(stage="plan", feedback_type, severity, details, suggested_fix) - Report issues
+- provide_feedback(stage="plan", feedback_type, severity, details, suggested_fix) - Escalate critical/major issues (exits loop + executor retries)
+- exit_loop() - Call when satisfied to exit the loop early
 
 # Anti-Loop Examples
 

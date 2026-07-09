@@ -613,7 +613,6 @@ The Settings Panel (`SettingsPanel.tsx`) provides configuration for external cod
 
 ```
 OpenCode  → bun x opencode-ai acp
-iFlow     → iflow acp
 Codex     → codex
 Gemini    → gemini
 Claude    → claude

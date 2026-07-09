@@ -1,9 +1,10 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import { ConfigProvider, theme, App as AntApp } from 'antd';
 import App from './App';
 import './styles.css';
 
+// React 19: 直接用 createRoot，不再包 StrictMode
+// StrictMode 双调用会放大流式 setState 的调试卡顿（每 token 跑两次 reducer）
 const lightTheme = {
   algorithm: theme.defaultAlgorithm,
   token: {
@@ -19,9 +20,9 @@ const lightTheme = {
     colorText: '#1e293b',
     colorTextSecondary: '#64748b',
     colorTextTertiary: '#94a3b8',
-    borderRadius: 8,
-    borderRadiusLG: 12,
-    borderRadiusSM: 6,
+    borderRadius: 4,
+    borderRadiusLG: 6,
+    borderRadiusSM: 3,
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
     boxShadowSecondary: '0 4px 12px rgba(0, 0, 0, 0.08)',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
@@ -44,15 +45,15 @@ const lightTheme = {
       itemHoverColor: '#1e293b',
     },
     Button: {
-      borderRadius: 8,
+      borderRadius: 4,
       boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
     },
     Input: {
-      borderRadius: 10,
+      borderRadius: 5,
       activeShadow: '0 0 0 3px rgba(37, 99, 235, 0.1)',
     },
     Card: {
-      borderRadius: 12,
+      borderRadius: 6,
       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
     },
     Tabs: {
@@ -61,26 +62,24 @@ const lightTheme = {
       itemSelectedColor: '#2563eb',
     },
     Tag: {
-      borderRadius: 6,
+      borderRadius: 3,
     },
     Alert: {
-      borderRadius: 10,
+      borderRadius: 5,
     },
     Modal: {
-      borderRadius: 16,
+      borderRadius: 8,
     },
     Dropdown: {
-      borderRadius: 12,
+      borderRadius: 6,
     },
   },
 };
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ConfigProvider theme={lightTheme}>
-      <AntApp>
-        <App />
-      </AntApp>
-    </ConfigProvider>
-  </React.StrictMode>
+createRoot(document.getElementById('root')!).render(
+  <ConfigProvider theme={lightTheme}>
+    <AntApp>
+      <App />
+    </AntApp>
+  </ConfigProvider>
 );

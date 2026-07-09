@@ -5,6 +5,9 @@ import type { InputRequest, InputOption } from '../../stores';
 
 const { TextArea } = Input;
 
+// antd v6 不再从根导出 TextAreaRef，用 ComponentRef 推导
+type TextAreaRef = React.ComponentRef<typeof TextArea>;
+
 interface InputAreaProps {
   userInput: string;
   onUserInputChange: (value: string) => void;
@@ -31,8 +34,8 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
   mode,
 }) => {
   const [expanded, setExpanded] = useState(false);
-  const textAreaRef = useRef<HTMLTextAreaElement>(null);
-  const modalTextAreaRef = useRef<HTMLTextAreaElement>(null);
+  const textAreaRef = useRef<TextAreaRef>(null);
+  const modalTextAreaRef = useRef<TextAreaRef>(null);
   const isComposingRef = useRef(false);
   const compositionEndTimeRef = useRef(0);
 
@@ -92,7 +95,7 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
       setTimeout(() => {
         modalTextAreaRef.current?.focus();
         const len = userInput.length;
-        modalTextAreaRef.current?.setSelectionRange(len, len);
+        modalTextAreaRef.current?.resizableTextArea?.textArea.setSelectionRange(len, len);
       }, 100);
     }
   }, [expanded, userInput]);
@@ -202,7 +205,7 @@ const InputAreaInner: React.FC<InputAreaProps> = ({
             {inputRequest.isFeedbackMode ? inputRequest.feedbackPrompt : inputRequest.prompt}
           </div>
           {inputRequest.options && !inputRequest.isFeedbackMode && (
-            <Space direction="vertical" style={{ width: '100%' }}>
+            <Space orientation="vertical" style={{ width: '100%' }}>
               {inputRequest.options.map((option) => (
                 <Button key={option.id} onClick={() => onSelectOption(option)} block size="small">
                   {option.label}

@@ -103,7 +103,7 @@ const SkillManager: React.FC = () => {
       {skills.length === 0 ? (
         <Empty
           description={
-            <Space direction="vertical" size="small">
+            <Space orientation="vertical" size="small">
               <Text>No skills installed</Text>
               <Text type="secondary">
                 Install skills to extend agent capabilities
@@ -157,7 +157,7 @@ const SkillManager: React.FC = () => {
                       </Space>
                     }
                     description={
-                      <Space direction="vertical" size="small">
+                      <Space orientation="vertical" size="small">
                         <Text type="secondary">{skill.description}</Text>
                         <Space size={4}>
                           {skill.tags.slice(0, 3).map((tag, i) => (
@@ -188,7 +188,7 @@ const SkillManager: React.FC = () => {
         open={detailDrawerVisible}
       >
         {selectedSkillData && (
-          <Space direction="vertical" style={{ width: "100%" }} size="large">
+          <Space orientation="vertical" style={{ width: "100%" }} size="large">
             <Descriptions column={1} bordered size="small">
               <Descriptions.Item label="ID">
                 {selectedSkillData.id}

@@ -22,9 +22,7 @@ import {
   ClockCircleOutlined,
 } from "@ant-design/icons";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeHighlight from "rehype-highlight";
-import rehypeRaw from "rehype-raw";
+import { remarkPlugins, fullRehypePlugins } from "@/utils/markdown";
 
 const { Option } = Select;
 const { Text, Paragraph } = Typography;
@@ -242,7 +240,7 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({
       </div>
 
       <Card style={{ marginBottom: "20px", flexShrink: 0 }}>
-        <Space direction="vertical" style={{ width: "100%" }}>
+        <Space orientation="vertical" style={{ width: "100%" }}>
           <div
             style={{
               display: "flex",
@@ -490,119 +488,129 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({
             <Spin size="large" />
           </div>
         ) : (
-          <Tabs defaultActiveKey="content">
-            <Tabs.TabPane tab="Content" key="content">
-              {memoryDetail ? (
-                <div>
-                  <div
-                    style={{
-                      marginBottom: "16px",
-                      padding: "20px",
-                      background: "#f5f5f5",
-                      borderRadius: "4px",
-                    }}
-                  >
-                    <Space direction="vertical" style={{ width: "100%" }}>
-                      <div>
-                        <Text strong>ID: </Text>
-                        <Text code>{selectedMemory?.id}</Text>
-                      </div>
-                      <div>
-                        <Text strong>Category: </Text>
-                        <Tag
-                          color={getCategoryColor(
-                            selectedMemory?.category || "",
-                          )}
-                        >
-                          {getCategoryLabel(selectedMemory?.category || "")}
-                        </Tag>
-                      </div>
-                      {selectedMemory?.stage && (
-                        <div>
-                          <Text strong>Stage: </Text>
-                          <Tag>{selectedMemory.stage}</Tag>
-                        </div>
-                      )}
-                      <div>
-                        <Text strong>Created: </Text>
-                        <Text>{formatDate(selectedMemory?.created_at)}</Text>
-                      </div>
-                      {selectedMemory?.impact && (
-                        <div>
-                          <Text strong>Impact: </Text>
-                          <Tag color={getImpactColor(selectedMemory.impact)}>
-                            {selectedMemory.impact}
-                          </Tag>
-                        </div>
-                      )}
-                      {selectedMemory?.tags &&
-                        selectedMemory.tags.length > 0 && (
-                          <div>
-                            <Text strong>Tags: </Text>
-                            <Space>
-                              {selectedMemory.tags.map((tag, idx) => (
-                                <Tag key={idx}>{tag}</Tag>
-                              ))}
-                            </Space>
-                          </div>
-                        )}
-                    </Space>
-                  </div>
-                  <div
-                    style={{
-                      maxHeight: "50vh",
-                      overflow: "auto",
-                      padding: "20px",
-                      backgroundColor: "#fafafa",
-                      borderRadius: "4px",
-                    }}
-                  >
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeHighlight, rehypeRaw]}
-                    >
-                      {memoryDetail.content}
-                    </ReactMarkdown>
-                  </div>
-                </div>
-              ) : (
-                <Empty description="Failed to load memory detail" />
-              )}
-            </Tabs.TabPane>
-            <Tabs.TabPane tab="Summary" key="summary">
-              {selectedMemory && (
-                <div>
-                  <div style={{ marginBottom: "16px" }}>
-                    <Text strong>Summary</Text>
-                    <Divider style={{ margin: "8px 0" }} />
+          <Tabs
+            defaultActiveKey="content"
+            items={[
+              {
+                key: 'content',
+                label: 'Content',
+                children: memoryDetail ? (
+                  <div>
                     <div
                       style={{
-                        padding: "20px",
-                        backgroundColor: "#fafafa",
-                        borderRadius: "4px",
-                        maxHeight: "60vh",
+                        marginBottom: "16px",
+                        padding: "16px 20px",
+                        background: "var(--bg-elevated)",
+                        borderRadius: "3px",
+                        border: "1px solid var(--border-light)",
+                      }}
+                    >
+                      <Space orientation="vertical" style={{ width: "100%" }}>
+                        <div>
+                          <Text strong>ID: </Text>
+                          <Text code>{selectedMemory?.id}</Text>
+                        </div>
+                        <div>
+                          <Text strong>Category: </Text>
+                          <Tag
+                            color={getCategoryColor(
+                              selectedMemory?.category || "",
+                            )}
+                          >
+                            {getCategoryLabel(selectedMemory?.category || "")}
+                          </Tag>
+                        </div>
+                        {selectedMemory?.stage && (
+                          <div>
+                            <Text strong>Stage: </Text>
+                            <Tag>{selectedMemory.stage}</Tag>
+                          </div>
+                        )}
+                        <div>
+                          <Text strong>Created: </Text>
+                          <Text>{formatDate(selectedMemory?.created_at)}</Text>
+                        </div>
+                        {selectedMemory?.impact && (
+                          <div>
+                            <Text strong>Impact: </Text>
+                            <Tag color={getImpactColor(selectedMemory.impact)}>
+                              {selectedMemory.impact}
+                            </Tag>
+                          </div>
+                        )}
+                        {selectedMemory?.tags &&
+                          selectedMemory.tags.length > 0 && (
+                            <div>
+                              <Text strong>Tags: </Text>
+                              <Space>
+                                {selectedMemory.tags.map((tag, idx) => (
+                                  <Tag key={idx}>{tag}</Tag>
+                                ))}
+                              </Space>
+                            </div>
+                          )}
+                      </Space>
+                    </div>
+                    <div
+                      style={{
+                        maxHeight: "50vh",
                         overflow: "auto",
+                        padding: "16px 20px",
+                        background: "var(--bg-container)",
+                        borderRadius: "3px",
+                        border: "1px solid var(--border-light)",
                       }}
                     >
                       <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                        remarkPlugins={remarkPlugins}
+                        rehypePlugins={fullRehypePlugins}
                       >
-                        {selectedMemory.summary}
+                        {memoryDetail.content}
                       </ReactMarkdown>
                     </div>
                   </div>
-                  {selectedMemory.file && (
-                    <div>
-                      <Text strong>File</Text>
+                ) : (
+                  <Empty description="Failed to load memory detail" />
+                ),
+              },
+              {
+                key: 'summary',
+                label: 'Summary',
+                children: selectedMemory && (
+                  <div>
+                    <div style={{ marginBottom: "16px" }}>
+                      <Text strong>Summary</Text>
                       <Divider style={{ margin: "8px 0" }} />
-                      <Text code>{selectedMemory.file}</Text>
+                      <div
+                        style={{
+                          padding: "16px 20px",
+                          background: "var(--bg-container)",
+                          borderRadius: "3px",
+                          border: "1px solid var(--border-light)",
+                          maxHeight: "60vh",
+                          overflow: "auto",
+                        }}
+                      >
+                        <ReactMarkdown
+                          remarkPlugins={remarkPlugins}
+                          rehypePlugins={fullRehypePlugins}
+                        >
+                          {selectedMemory.summary}
+                        </ReactMarkdown>
+                      </div>
                     </div>
-                  )}
-                </div>
-              )}
-            </Tabs.TabPane>
-          </Tabs>
+                    {selectedMemory.file && (
+                      <div>
+                        <Text strong>File</Text>
+                        <Divider style={{ margin: "8px 0" }} />
+                        <Text code>{selectedMemory.file}</Text>
+                      </div>
+                    )}
+                  </div>
+                ),
+              },
+            ]}
+          />
         )}
       </Modal>
     </div>

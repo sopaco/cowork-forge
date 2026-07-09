@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import Editor from '@monaco-editor/react';
+import Editor, { type OnMount } from '@monaco-editor/react';
+import type { editor as MonacoEditor } from 'monaco-editor';
+import { FixedSizeList as List } from 'react-window';
 import { Tabs, Spin, Alert, Empty, Dropdown, Button, Space } from 'antd';
 import { FolderOutlined, FileOutlined, ReloadOutlined, CaretRightOutlined, CaretDownOutlined, CodeOutlined, DownOutlined } from '@ant-design/icons';
 import { showError, showSuccess, showWarning, tryExecute } from '../utils/errorHandler';
@@ -45,6 +47,25 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
   const [error, setError] = useState<string | null>(null);
   const [formatting, setFormatting] = useState(false);
   const prevRefreshTriggerRef = useRef(0);
+
+  // ===== Monaco viewState 持久化（切 tab 不丢光标/折叠/scroll） =====
+  const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
+  const viewStatesRef = useRef<Record<string, MonacoEditor.ICodeEditorViewState | null>>({});
+  const monacoRef = useRef<typeof import('monaco-editor') | null>(null);
+
+  // ===== 文件树虚拟化 =====
+  const fileTreeContainerRef = useRef<HTMLDivElement>(null);
+  const [treeHeight, setTreeHeight] = useState(600);
+  const fileTreeListRef = useRef<List>(null);
+
+  useEffect(() => {
+    if (!fileTreeContainerRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) setTreeHeight(entry.contentRect.height);
+    });
+    observer.observe(fileTreeContainerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (iterationId) {
@@ -199,6 +220,32 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
     }
   };
 
+  // 切 tab 前保存旧 tab 的 viewState
+  const handleFileSelectWithViewState = useCallback(async (filePath: string) => {
+    if (editorRef.current && activeFile) {
+      viewStatesRef.current[activeFile] = editorRef.current.saveViewState();
+    }
+    await handleFileSelect(filePath);
+    // 切换后恢复新 tab 的 viewState
+    if (editorRef.current && viewStatesRef.current[filePath]) {
+      editorRef.current.restoreViewState(viewStatesRef.current[filePath]!);
+    }
+  }, [activeFile, handleFileSelect]);
+
+  // Editor 挂载：恢复 viewState，注册保存快捷键
+  const handleEditorMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+    if (activeFile && viewStatesRef.current[activeFile]) {
+      editor.restoreViewState(viewStatesRef.current[activeFile]!);
+    }
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      if (activeFile) {
+        saveFileContent(activeFile, editor.getValue());
+      }
+    });
+  };
+
   const getLanguageFromPath = (filePath: string): string => {
     const ext = filePath.split('.').pop()?.toLowerCase() || '';
     const langMap: Record<string, string> = {
@@ -209,8 +256,9 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
     return langMap[ext] || 'plaintext';
   };
 
-  const renderFileTreeRow = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
-    const node = flatFileTree[index];
+  // react-window 兼容的 Row 组件（接收 data prop）
+  const FileTreeRow = useCallback(({ index, style, data }: { index: number; style: React.CSSProperties; data: FlatFileTreeNode[] }) => {
+    const node = data[index];
     if (!node) return null;
 
     return (
@@ -247,29 +295,80 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
             <FileOutlined style={{ color: 'var(--text-secondary)' }} />
           </>
         )}
-        <span style={{ fontSize: '13px' }}>{node.name}</span>
+        <span
+          style={{
+            fontSize: '13px',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            flex: 1,
+            minWidth: 0,
+          }}
+          title={node.name}
+        >
+          {node.name}
+        </span>
       </div>
     );
-  }, [flatFileTree, handleToggleFolder, handleFileSelect]);
+  }, [handleToggleFolder, handleFileSelect]);
 
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '40px' }}>
         <Spin size="large" />
-        <div style={{ marginTop: '16px', color: '#999' }}>Loading files...</div>
+        <div style={{ marginTop: '16px', color: 'var(--text-secondary)' }}>Loading files...</div>
       </div>
     );
   }
 
   if (error) {
+    const isMissingWorkspace = error.toLowerCase().includes('workspace not found')
+      || error.toLowerCase().includes('iteration directory not found');
     return (
-      <Alert
-        message="Error loading files"
-        description={error}
-        type="error"
-        showIcon
-        action={<button onClick={loadFileTree}>Retry</button>}
-      />
+      <div style={{ padding: '40px', height: '100%', overflow: 'auto' }}>
+        <Alert
+          message={isMissingWorkspace ? 'No code workspace yet' : 'Error loading files'}
+          description={
+            isMissingWorkspace ? (
+              <>
+                <div style={{ marginBottom: 8 }}>
+                  The code workspace for this iteration does not exist yet.
+                </div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+                  Run the iteration through the <strong>Coding</strong> stage to generate code files.
+                  Use the <strong>Collaborate</strong> tab to start or continue the iteration.
+                </div>
+              </>
+            ) : error
+          }
+          type={isMissingWorkspace ? 'info' : 'error'}
+          showIcon
+          action={<Button size="small" onClick={loadFileTree}>Retry</Button>}
+        />
+      </div>
+    );
+  }
+
+  // Detect empty workspace (root with no children)
+  const isEmptyWorkspace = !fileTree
+    || (!fileTree.children || fileTree.children.length === 0);
+
+  if (isEmptyWorkspace) {
+    return (
+      <div style={{ padding: '40px', height: '100%', overflow: 'auto' }}>
+        <Empty
+          description={
+            <span>
+              <div style={{ marginBottom: 8 }}>No code files in this workspace yet.</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+                Code files appear here after the Coding stage runs.
+              </div>
+            </span>
+          }
+        >
+          <Button icon={<ReloadOutlined />} onClick={loadFileTree}>Refresh</Button>
+        </Empty>
+      </div>
     );
   }
 
@@ -295,14 +394,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
                 scrollBeyondLastLine: false,
                 automaticLayout: true,
               }}
-              saveViewState={true}
-              onMount={(editor) => {
-                editor.addCommand(0, () => {
-                  if (activeFile) {
-                    saveFileContent(activeFile, editor.getValue());
-                  }
-                }, 'save');
-              }}
+              onMount={handleEditorMount}
             />
           ) : null}
         </div>
@@ -331,14 +423,18 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
             </button>
           </h3>
         </div>
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <div style={{ overflow: 'auto', height: '100%' }}>
-            {flatFileTree.map((node, index) => (
-              <div key={node.path || index}>
-                {renderFileTreeRow({ index, style: {} })}
-              </div>
-            ))}
-          </div>
+        <div ref={fileTreeContainerRef} style={{ flex: 1, overflow: 'hidden' }}>
+          <List
+            ref={fileTreeListRef}
+            height={treeHeight}
+            itemCount={flatFileTree.length}
+            itemSize={26}
+            width="100%"
+            itemData={flatFileTree}
+            overscanCount={8}
+          >
+            {FileTreeRow}
+          </List>
         </div>
       </div>
 
@@ -346,7 +442,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ iterationId, refreshTrigger }) 
         <Tabs
           type="editable-card"
           activeKey={activeFile}
-          onChange={handleFileSelect}
+          onChange={handleFileSelectWithViewState}
           onEdit={(targetKey, action) => {
             if (action === 'remove' && typeof targetKey === 'string') {
               handleCloseFile(targetKey);

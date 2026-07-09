@@ -3,12 +3,46 @@
    ========================================== */
 
 /* Artifacts Viewer */
+.artifacts-viewer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .artifact-content {
   padding: 24px;
   background: var(--bg-container);
   color: var(--text-primary);
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+.artifact-tab-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.artifact-tab-header {
+  padding: 10px 20px;
+  border-bottom: 1px solid #303030;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #1f1f1f;
+  flex-shrink: 0;
+}
+
+.artifact-tab-title {
+  font-weight: bold;
+  color: #fff;
 }
 
 .artifact-content h3 {
@@ -80,7 +114,7 @@
   background: var(--bg-elevated);
   color: var(--primary);
   padding: 2px 7px;
-  border-radius: 4px;
+  border-radius: 2px;
   font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
   font-size: 0.88em;
   border: 1px solid var(--border-light);
@@ -124,7 +158,7 @@
   padding: 10px 18px;
   margin: 16px 0;
   background: var(--bg-elevated);
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 4px 4px 0;
   color: var(--text-secondary);
   line-height: 1.7;
 }
@@ -152,7 +186,7 @@
   margin: 16px 0;
   font-size: 13px;
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 4px;
   overflow: hidden;
 }
 
@@ -189,14 +223,14 @@
 /* Images */
 .markdown-content img {
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: 4px;
   margin: 16px 0;
 }
 
 /* Code blocks */
 .markdown-content pre {
   margin: 16px 0;
-  border-radius: 8px;
+  border-radius: 4px;
   overflow: hidden;
   border: 1px solid var(--border-color);
   background: #1e293b;
@@ -213,26 +247,45 @@
 }
 
 .artifacts-tabs {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-.artifacts-tabs .ant-tabs-content-holder {
+.artifacts-tabs > .ant-tabs-nav {
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+.artifacts-tabs .ant-tabs-body-holder {
   flex: 1;
+  min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-.artifacts-tabs .ant-tabs-content {
+.artifacts-tabs .ant-tabs-body {
   flex: 1;
-  overflow: auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-.artifacts-tabs .ant-tabs-tabpane {
-  height: 100%;
-  overflow: auto;
+/* Ant Design 6: each tab panel uses .ant-tabs-content (v5 used .ant-tabs-tabpane) */
+.artifacts-tabs .ant-tabs-content {
+  flex: 1;
+  min-height: 0;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden;
+}
+
+.artifacts-tabs .ant-tabs-content-hidden {
+  display: none !important;
 }
 
 /* Code Editor Tabs */
@@ -242,39 +295,41 @@
   flex-direction: column;
 }
 
+.code-editor-tabs .ant-tabs-body-holder {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.code-editor-tabs .ant-tabs-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .code-editor-tabs .ant-tabs-content {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.code-editor-tabs .ant-tabs-content-holder {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.code-editor-tabs .ant-tabs-tabpane {
   height: 100% !important;
   overflow: hidden !important;
   display: none !important;
 }
 
-.code-editor-tabs .ant-tabs-tabpane-active {
+.code-editor-tabs .ant-tabs-content-active {
   display: flex !important;
   flex-direction: column !important;
 }
 
-.code-editor-tabs .ant-tabs-tabpane > div {
+.code-editor-tabs .ant-tabs-content > div {
   height: 100% !important;
   display: flex !important;
   flex-direction: column !important;
   position: relative;
 }
 
-.code-editor-tabs .ant-tabs-tabpane > div > div {
+.code-editor-tabs .ant-tabs-content > div > div {
   flex: 1;
   overflow: hidden;
   position: relative;
@@ -288,7 +343,7 @@
 .react-json-view {
   background: var(--bg-container) !important;
   padding: 20px;
-  border-radius: 12px;
+  border-radius: 6px;
   border: 1px solid var(--border-color);
   font-size: 14px;
   line-height: 1.8;
