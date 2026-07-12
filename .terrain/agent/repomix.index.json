@@ -1,1036 +1,1040 @@
 {
   "files": [
     {
-      "path": "crates/cowork-core/src/pipeline/stage_executor.rs",
-      "header_line": 342
-    },
-    {
-      "path": "crates/cowork-gui/src/components/chat/MessageList.tsx",
-      "header_line": 938
-    },
-    {
       "path": "crates/cowork-gui/src/hooks/useAppEvents.ts",
-      "header_line": 977
+      "header_line": 343
     },
     {
       "path": "crates/cowork-gui/src-tauri/src/lib.rs",
-      "header_line": 1436
+      "header_line": 810
+    },
+    {
+      "path": "crates/cowork-core/src/pipeline/stage_executor.rs",
+      "header_line": 1113
+    },
+    {
+      "path": "crates/cowork-gui/src/components/chat/MessageList.tsx",
+      "header_line": 1709
     },
     {
       "path": "AGENTS.md",
-      "header_line": 1723
+      "header_line": 1748
     },
     {
       "path": "crates/cowork-core/src/acp/client.rs",
-      "header_line": 1990
+      "header_line": 2015
     },
     {
       "path": "crates/cowork-core/src/agents/mod.rs",
-      "header_line": 2304
+      "header_line": 2329
     },
     {
       "path": "crates/cowork-core/src/pipeline/executor/mod.rs",
-      "header_line": 2387
+      "header_line": 2412
     },
     {
       "path": "crates/cowork-core/src/pipeline/stages/coding.rs",
-      "header_line": 3035
+      "header_line": 3060
     },
     {
       "path": "crates/cowork-core/src/tools/mod.rs",
-      "header_line": 3398
+      "header_line": 3423
     },
     {
       "path": "crates/cowork-gui/src/components/ArtifactsViewer.tsx",
-      "header_line": 3434
+      "header_line": 3459
     },
     {
       "path": "crates/cowork-gui/src/components/chat/ChatPanel.tsx",
-      "header_line": 3482
+      "header_line": 3507
     },
     {
       "path": "crates/cowork-gui/src/components/chat/InputArea.tsx",
-      "header_line": 3511
+      "header_line": 3536
     },
     {
       "path": "crates/cowork-core/src/tools/control_tools.rs",
-      "header_line": 3534
+      "header_line": 3559
     },
     {
       "path": "crates/cowork-gui/src/components/MemoryPanel.tsx",
-      "header_line": 3802
+      "header_line": 3827
     },
     {
       "path": "crates/cowork-gui/src/stores/agentStore.ts",
-      "header_line": 3855
+      "header_line": 3880
     },
     {
       "path": "crates/cowork-gui/src/styles/chat.css",
-      "header_line": 3981
+      "header_line": 4006
     },
     {
       "path": "crates/cowork-core/src/instructions/check.rs",
-      "header_line": 4418
+      "header_line": 4443
     },
     {
       "path": "crates/cowork-core/src/lib.rs",
-      "header_line": 4516
+      "header_line": 4541
     },
     {
       "path": "crates/cowork-core/src/tools/goto_stage_tool.rs",
-      "header_line": 4630
+      "header_line": 4655
     },
     {
       "path": "crates/cowork-gui/package.json",
-      "header_line": 4725
+      "header_line": 4750
     },
     {
       "path": "crates/cowork-gui/src/App.tsx",
-      "header_line": 4773
+      "header_line": 4798
     },
     {
       "path": "crates/cowork-gui/src/components/common/MarkdownMessage.tsx",
-      "header_line": 5198
+      "header_line": 5223
     },
     {
       "path": "crates/cowork-gui/src/styles/antd-overrides.css",
-      "header_line": 5210
+      "header_line": 5235
     },
     {
       "path": "crates/cowork-gui/src/styles/components.css",
-      "header_line": 5491
-    },
-    {
-      "path": "crates/cowork-gui/src-tauri/src/commands/path_utils.rs",
-      "header_line": 5907
-    },
-    {
-      "path": "crates/cowork-gui/vite.config.js",
-      "header_line": 6127
-    },
-    {
-      "path": "Cargo.toml",
-      "header_line": 6135
-    },
-    {
-      "path": "crates/cowork-core/src/agents/external_coding_agent.rs",
-      "header_line": 6193
-    },
-    {
-      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/coding_actor.json",
-      "header_line": 6407
-    },
-    {
-      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/design_critic.json",
-      "header_line": 6484
-    },
-    {
-      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/plan_critic.json",
-      "header_line": 6540
-    },
-    {
-      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/prd_critic.json",
-      "header_line": 6593
-    },
-    {
-      "path": "crates/cowork-core/src/instructions/coding.rs",
-      "header_line": 6646
-    },
-    {
-      "path": "crates/cowork-core/src/instructions/plan.rs",
-      "header_line": 7016
-    },
-    {
-      "path": "crates/cowork-core/src/instructions/prd.rs",
-      "header_line": 7422
-    },
-    {
-      "path": "crates/cowork-core/src/pipeline/executor/knowledge.rs",
-      "header_line": 7712
-    },
-    {
-      "path": "crates/cowork-core/src/tools/artifact_tools.rs",
-      "header_line": 7751
-    },
-    {
-      "path": "crates/cowork-core/src/tools/file_tools.rs",
-      "header_line": 8060
-    },
-    {
-      "path": "crates/cowork-core/src/tools/pm_tools.rs",
-      "header_line": 8798
-    },
-    {
-      "path": "crates/cowork-gui/src/components/CodeEditor.tsx",
-      "header_line": 9127
-    },
-    {
-      "path": "crates/cowork-gui/src/components/KnowledgePanel.tsx",
-      "header_line": 9172
-    },
-    {
-      "path": "crates/cowork-gui/src/components/config/AgentConfigForm.tsx",
-      "header_line": 9218
-    },
-    {
-      "path": "crates/cowork-gui/src/hooks/useIterationActions.ts",
-      "header_line": 9935
-    },
-    {
-      "path": "crates/cowork-gui/src/styles/markdown.css",
-      "header_line": 10053
+      "header_line": 5516
     },
     {
       "path": "crates/cowork-gui/src-tauri/Cargo.toml",
-      "header_line": 10270
+      "header_line": 5932
+    },
+    {
+      "path": "crates/cowork-gui/src-tauri/src/commands/path_utils.rs",
+      "header_line": 5989
+    },
+    {
+      "path": "crates/cowork-gui/vite.config.js",
+      "header_line": 6209
+    },
+    {
+      "path": "Cargo.toml",
+      "header_line": 6217
+    },
+    {
+      "path": "crates/cowork-core/src/agents/external_coding_agent.rs",
+      "header_line": 6275
+    },
+    {
+      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/coding_actor.json",
+      "header_line": 6489
+    },
+    {
+      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/design_critic.json",
+      "header_line": 6566
+    },
+    {
+      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/plan_critic.json",
+      "header_line": 6622
+    },
+    {
+      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/prd_critic.json",
+      "header_line": 6675
+    },
+    {
+      "path": "crates/cowork-core/src/instructions/coding.rs",
+      "header_line": 6728
+    },
+    {
+      "path": "crates/cowork-core/src/instructions/plan.rs",
+      "header_line": 7098
+    },
+    {
+      "path": "crates/cowork-core/src/instructions/prd.rs",
+      "header_line": 7504
+    },
+    {
+      "path": "crates/cowork-core/src/pipeline/executor/knowledge.rs",
+      "header_line": 7794
+    },
+    {
+      "path": "crates/cowork-core/src/tools/artifact_tools.rs",
+      "header_line": 7833
+    },
+    {
+      "path": "crates/cowork-core/src/tools/file_tools.rs",
+      "header_line": 8142
+    },
+    {
+      "path": "crates/cowork-core/src/tools/pm_tools.rs",
+      "header_line": 8880
+    },
+    {
+      "path": "crates/cowork-gui/src/components/CodeEditor.tsx",
+      "header_line": 9209
+    },
+    {
+      "path": "crates/cowork-gui/src/components/KnowledgePanel.tsx",
+      "header_line": 9254
+    },
+    {
+      "path": "crates/cowork-gui/src/components/config/AgentConfigForm.tsx",
+      "header_line": 9300
+    },
+    {
+      "path": "crates/cowork-gui/src/hooks/useIterationActions.ts",
+      "header_line": 10017
+    },
+    {
+      "path": "crates/cowork-gui/src/styles/markdown.css",
+      "header_line": 10135
     },
     {
       "path": "crates/cowork-gui/src-tauri/src/commands/import_cmd.rs",
-      "header_line": 10325
-    },
-    {
-      "path": "crates/cowork-gui/src-tauri/src/commands/runner.rs",
-      "header_line": 10418
-    },
-    {
-      "path": "crates/cowork-gui/src-tauri/src/project_runner.rs",
-      "header_line": 10482
-    },
-    {
-      "path": "litho.docs/en/1.Overview.md",
-      "header_line": 10956
-    },
-    {
-      "path": "crates/cowork-core/src/config_definition/agent_definition.rs",
-      "header_line": 11257
-    },
-    {
-      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/check_agent.json",
-      "header_line": 11439
-    },
-    {
-      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/coding_critic.json",
-      "header_line": 11495
-    },
-    {
-      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/design_actor.json",
-      "header_line": 11551
-    },
-    {
-      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/plan_actor.json",
-      "header_line": 11613
-    },
-    {
-      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/prd_actor.json",
-      "header_line": 11681
-    },
-    {
-      "path": "crates/cowork-core/src/config_definition/mod.rs",
-      "header_line": 11746
-    },
-    {
-      "path": "crates/cowork-core/src/domain/iteration.rs",
-      "header_line": 11768
-    },
-    {
-      "path": "crates/cowork-core/src/instructions/design.rs",
-      "header_line": 12092
-    },
-    {
-      "path": "crates/cowork-core/src/persistence/iteration_data.rs",
-      "header_line": 12507
-    },
-    {
-      "path": "crates/cowork-core/src/pipeline/mod.rs",
-      "header_line": 12647
-    },
-    {
-      "path": "crates/cowork-core/src/tools/data_tools.rs",
-      "header_line": 12788
-    },
-    {
-      "path": "crates/cowork-core/src/tools/deployment_tools.rs",
-      "header_line": 13632
-    },
-    {
-      "path": "crates/cowork-core/src/tools/hitl_content_tools.rs",
-      "header_line": 13940
-    },
-    {
-      "path": "crates/cowork-core/src/tools/knowledge_tools.rs",
-      "header_line": 14150
-    },
-    {
-      "path": "crates/cowork-core/src/tools/legacy_project_analyzer_tools.rs",
-      "header_line": 14476
-    },
-    {
-      "path": "crates/cowork-core/src/tools/load_artifacts.rs",
-      "header_line": 15001
-    },
-    {
-      "path": "crates/cowork-core/src/tools/test_lint_tools.rs",
-      "header_line": 15141
-    },
-    {
-      "path": "crates/cowork-core/src/tools/validation_tools.rs",
-      "header_line": 15323
-    },
-    {
-      "path": "crates/cowork-gui/src/assets.d.ts",
-      "header_line": 15495
-    },
-    {
-      "path": "crates/cowork-gui/src/components/RunnerPanel.tsx",
-      "header_line": 15527
-    },
-    {
-      "path": "crates/cowork-gui/src/components/iterations/IterationDetailsModal.tsx",
-      "header_line": 15568
-    },
-    {
-      "path": "crates/cowork-gui/src/hooks/useChatInput.ts",
-      "header_line": 15584
-    },
-    {
-      "path": "crates/cowork-gui/src/hooks/usePMAgent.ts",
-      "header_line": 15755
-    },
-    {
-      "path": "crates/cowork-gui/src/main.tsx",
-      "header_line": 15953
-    },
-    {
-      "path": "crates/cowork-gui/src/types/config.ts",
-      "header_line": 16043
-    },
-    {
-      "path": "crates/cowork-gui/src-tauri/src/commands/mod.rs",
-      "header_line": 16339
+      "header_line": 10352
     },
     {
       "path": "crates/cowork-gui/src-tauri/src/commands/pm.rs",
-      "header_line": 16351
+      "header_line": 10445
     },
     {
-      "path": "crates/cowork-gui/src-tauri/src/commands/preview.rs",
-      "header_line": 16410
+      "path": "crates/cowork-gui/src-tauri/src/commands/runner.rs",
+      "header_line": 10507
     },
     {
       "path": "crates/cowork-gui/src-tauri/src/iteration_commands.rs",
-      "header_line": 16467
+      "header_line": 10571
+    },
+    {
+      "path": "crates/cowork-gui/src-tauri/src/project_runner.rs",
+      "header_line": 10701
+    },
+    {
+      "path": "litho.docs/en/1.Overview.md",
+      "header_line": 11175
+    },
+    {
+      "path": "crates/cowork-core/src/config_definition/agent_definition.rs",
+      "header_line": 11476
+    },
+    {
+      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/check_agent.json",
+      "header_line": 11658
+    },
+    {
+      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/coding_critic.json",
+      "header_line": 11714
+    },
+    {
+      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/design_actor.json",
+      "header_line": 11770
+    },
+    {
+      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/plan_actor.json",
+      "header_line": 11832
+    },
+    {
+      "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/prd_actor.json",
+      "header_line": 11900
+    },
+    {
+      "path": "crates/cowork-core/src/config_definition/mod.rs",
+      "header_line": 11965
+    },
+    {
+      "path": "crates/cowork-core/src/instructions/design.rs",
+      "header_line": 11987
+    },
+    {
+      "path": "crates/cowork-core/src/persistence/iteration_data.rs",
+      "header_line": 12402
+    },
+    {
+      "path": "crates/cowork-core/src/pipeline/mod.rs",
+      "header_line": 12542
+    },
+    {
+      "path": "crates/cowork-core/src/tools/data_tools.rs",
+      "header_line": 12683
+    },
+    {
+      "path": "crates/cowork-core/src/tools/deployment_tools.rs",
+      "header_line": 13527
+    },
+    {
+      "path": "crates/cowork-core/src/tools/hitl_content_tools.rs",
+      "header_line": 13835
+    },
+    {
+      "path": "crates/cowork-core/src/tools/knowledge_tools.rs",
+      "header_line": 14045
+    },
+    {
+      "path": "crates/cowork-core/src/tools/legacy_project_analyzer_tools.rs",
+      "header_line": 14371
+    },
+    {
+      "path": "crates/cowork-core/src/tools/load_artifacts.rs",
+      "header_line": 14896
+    },
+    {
+      "path": "crates/cowork-core/src/tools/test_lint_tools.rs",
+      "header_line": 15036
+    },
+    {
+      "path": "crates/cowork-core/src/tools/validation_tools.rs",
+      "header_line": 15218
+    },
+    {
+      "path": "crates/cowork-gui/src/assets.d.ts",
+      "header_line": 15390
+    },
+    {
+      "path": "crates/cowork-gui/src/components/RunnerPanel.tsx",
+      "header_line": 15422
+    },
+    {
+      "path": "crates/cowork-gui/src/components/iterations/IterationDetailsModal.tsx",
+      "header_line": 15463
+    },
+    {
+      "path": "crates/cowork-gui/src/hooks/useChatInput.ts",
+      "header_line": 15479
+    },
+    {
+      "path": "crates/cowork-gui/src/hooks/usePMAgent.ts",
+      "header_line": 15650
+    },
+    {
+      "path": "crates/cowork-gui/src/main.tsx",
+      "header_line": 15848
+    },
+    {
+      "path": "crates/cowork-gui/src/types/config.ts",
+      "header_line": 15938
+    },
+    {
+      "path": "crates/cowork-gui/src-tauri/src/commands/mod.rs",
+      "header_line": 16234
+    },
+    {
+      "path": "crates/cowork-gui/src-tauri/src/commands/preview.rs",
+      "header_line": 16246
     },
     {
       "path": "crates/cowork-gui/src-tauri/tauri.conf.json",
-      "header_line": 16597
+      "header_line": 16303
     },
     {
       "path": "litho.docs/en/2.Architecture.md",
-      "header_line": 16633
+      "header_line": 16339
     },
     {
       "path": "litho.docs/en/4.Deep-Exploration/CLI Domain.md",
-      "header_line": 17862
+      "header_line": 17568
     },
     {
       "path": "litho.docs/en/4.Deep-Exploration/Persistence Domain.md",
-      "header_line": 18601
+      "header_line": 18307
     },
     {
       "path": "litho.docs/en/4.Deep-Exploration/Tools Domain.md",
-      "header_line": 19042
+      "header_line": 18748
     },
     {
       "path": "crates/cowork-core/Cargo.toml",
-      "header_line": 19528
+      "header_line": 19234
     },
     {
       "path": "crates/cowork-core/src/config_definition/builtin.rs",
-      "header_line": 19596
+      "header_line": 19302
     },
     {
       "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/delivery_agent.json",
-      "header_line": 19620
+      "header_line": 19326
     },
     {
       "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/idea_agent.json",
-      "header_line": 19661
+      "header_line": 19367
     },
     {
       "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/pm_agent.json",
-      "header_line": 19696
+      "header_line": 19402
     },
     {
       "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/summary_agent.json",
-      "header_line": 19740
-    },
-    {
-      "path": "crates/cowork-core/src/config_definition/default_configs/flows/default.json",
-      "header_line": 19772
+      "header_line": 19446
     },
     {
       "path": "crates/cowork-core/src/config_definition/default_configs/flows/rapid-prototype.json",
-      "header_line": 19842
+      "header_line": 19478
     },
     {
       "path": "crates/cowork-core/src/config_definition/default_configs/stages/coding.json",
-      "header_line": 19892
+      "header_line": 19528
     },
     {
       "path": "crates/cowork-core/src/config_definition/default_configs/stages/design.json",
-      "header_line": 19918
+      "header_line": 19554
     },
     {
       "path": "crates/cowork-core/src/config_definition/default_configs/stages/plan.json",
-      "header_line": 19949
+      "header_line": 19585
     },
     {
       "path": "crates/cowork-core/src/config_definition/default_configs/stages/prd.json",
-      "header_line": 19980
-    },
-    {
-      "path": "crates/cowork-core/src/config_definition/flow_definition.rs",
-      "header_line": 20016
+      "header_line": 19616
     },
     {
       "path": "crates/cowork-core/src/config_definition/registry.rs",
-      "header_line": 20290
+      "header_line": 19652
     },
     {
       "path": "crates/cowork-core/src/data/mod.rs",
-      "header_line": 20948
+      "header_line": 20310
     },
     {
       "path": "crates/cowork-core/src/data/models.rs",
-      "header_line": 20955
+      "header_line": 20317
+    },
+    {
+      "path": "crates/cowork-core/src/domain/iteration.rs",
+      "header_line": 20732
     },
     {
       "path": "crates/cowork-core/src/instructions/delivery.rs",
-      "header_line": 21370
+      "header_line": 21056
     },
     {
       "path": "crates/cowork-core/src/instructions/idea.rs",
-      "header_line": 21505
+      "header_line": 21191
     },
     {
       "path": "crates/cowork-core/src/instructions/project_manager.rs",
-      "header_line": 21605
+      "header_line": 21291
     },
     {
       "path": "crates/cowork-core/src/integration/hooks.rs",
-      "header_line": 21766
+      "header_line": 21452
     },
     {
       "path": "crates/cowork-core/src/interaction/cli.rs",
-      "header_line": 22022
+      "header_line": 21708
     },
     {
       "path": "crates/cowork-core/src/interaction/mod.rs",
-      "header_line": 22197
+      "header_line": 21883
     },
     {
       "path": "crates/cowork-core/src/llm/mod.rs",
-      "header_line": 22355
+      "header_line": 22041
     },
     {
       "path": "crates/cowork-core/src/llm/rate_limiter.rs",
-      "header_line": 22371
+      "header_line": 22057
     },
     {
       "path": "crates/cowork-core/src/persistence/mod.rs",
-      "header_line": 22550
+      "header_line": 22236
     },
     {
       "path": "crates/cowork-core/src/pipeline/executor/interaction_ext.rs",
-      "header_line": 22578
+      "header_line": 22264
     },
     {
       "path": "crates/cowork-core/src/pipeline/executor/workspace.rs",
-      "header_line": 22619
+      "header_line": 22305
     },
     {
       "path": "crates/cowork-core/src/runtime_analyzer.rs",
-      "header_line": 22685
+      "header_line": 22371
     },
     {
       "path": "crates/cowork-core/src/tools/memory_tools.rs",
-      "header_line": 23314
+      "header_line": 23000
     },
     {
       "path": "crates/cowork-gui/src/components/CommandPalette.tsx",
-      "header_line": 23808
+      "header_line": 23494
     },
     {
       "path": "crates/cowork-gui/src/components/IterationsPanel.tsx",
-      "header_line": 23831
+      "header_line": 23517
     },
     {
       "path": "crates/cowork-gui/src/components/ProjectsPanel.tsx",
-      "header_line": 23843
+      "header_line": 23529
     },
     {
       "path": "crates/cowork-gui/src/components/config/FlowConfigPanel.tsx",
-      "header_line": 24196
+      "header_line": 23882
     },
     {
       "path": "crates/cowork-gui/src/components/config/IntegrationConfig.tsx",
-      "header_line": 24204
+      "header_line": 23890
     },
     {
       "path": "crates/cowork-gui/src/components/config/SkillManager.tsx",
-      "header_line": 24212
+      "header_line": 23898
     },
     {
       "path": "crates/cowork-gui/src/stores/configStore.ts",
-      "header_line": 24454
+      "header_line": 24140
     },
     {
       "path": "crates/cowork-gui/src/stores/projectStore.ts",
-      "header_line": 24508
+      "header_line": 24194
     },
     {
       "path": "crates/cowork-gui/src/styles/global.css",
-      "header_line": 24571
+      "header_line": 24257
     },
     {
       "path": "crates/cowork-gui/src/styles/layout.css",
-      "header_line": 24610
+      "header_line": 24296
     },
     {
       "path": "crates/cowork-gui/src/styles.css",
-      "header_line": 24746
+      "header_line": 24432
     },
     {
       "path": "crates/cowork-gui/src/types/index.ts",
-      "header_line": 24761
+      "header_line": 24447
     },
     {
       "path": "crates/cowork-gui/src/utils/markdown.ts",
-      "header_line": 24839
+      "header_line": 24525
     },
     {
       "path": "crates/cowork-gui/src-tauri/src/commands/file.rs",
-      "header_line": 24903
+      "header_line": 24589
     },
     {
       "path": "crates/cowork-gui/src-tauri/src/commands/system.rs",
-      "header_line": 24971
+      "header_line": 24657
     },
     {
       "path": "crates/cowork-gui/src-tauri/src/static_server.rs",
-      "header_line": 24987
+      "header_line": 24673
+    },
+    {
+      "path": "crates/cowork-gui/src-tauri/src/tray.rs",
+      "header_line": 24764
     },
     {
       "path": "crates/cowork-gui/tsconfig.json",
-      "header_line": 25078
+      "header_line": 24985
     },
     {
       "path": "litho.docs/en/4.Deep-Exploration/Domain Logic.md",
-      "header_line": 25109
+      "header_line": 25016
     },
     {
       "path": "litho.docs/en/4.Deep-Exploration/GUI Backend Domain.md",
-      "header_line": 25605
+      "header_line": 25512
     },
     {
       "path": "litho.docs/en/4.Deep-Exploration/GUI Frontend Domain.md",
-      "header_line": 26004
+      "header_line": 25911
     },
     {
       "path": "litho.docs/en/4.Deep-Exploration/LLM Integration Domain.md",
-      "header_line": 26658
+      "header_line": 26565
     },
     {
       "path": "litho.docs/en/4.Deep-Exploration/Pipeline Domain.md",
-      "header_line": 26947
+      "header_line": 26854
     },
     {
       "path": "LICENSE",
-      "header_line": 27493
+      "header_line": 27400
     },
     {
       "path": "crates/cowork-cli/Cargo.toml",
-      "header_line": 27519
+      "header_line": 27426
     },
     {
       "path": "crates/cowork-cli/src/commands/config.rs",
-      "header_line": 27568
+      "header_line": 27475
     },
     {
       "path": "crates/cowork-cli/src/commands/continue_cmd.rs",
-      "header_line": 27576
+      "header_line": 27483
     },
     {
       "path": "crates/cowork-cli/src/commands/delete.rs",
-      "header_line": 27584
+      "header_line": 27491
     },
     {
       "path": "crates/cowork-cli/src/commands/import.rs",
-      "header_line": 27592
+      "header_line": 27499
     },
     {
       "path": "crates/cowork-cli/src/commands/init.rs",
-      "header_line": 27630
+      "header_line": 27537
     },
     {
       "path": "crates/cowork-cli/src/commands/iter.rs",
-      "header_line": 27638
+      "header_line": 27545
     },
     {
       "path": "crates/cowork-cli/src/commands/knowledge.rs",
-      "header_line": 27651
+      "header_line": 27558
     },
     {
       "path": "crates/cowork-cli/src/commands/list.rs",
-      "header_line": 27659
+      "header_line": 27566
     },
     {
       "path": "crates/cowork-cli/src/commands/mod.rs",
-      "header_line": 27667
+      "header_line": 27574
     },
     {
       "path": "crates/cowork-cli/src/commands/show.rs",
-      "header_line": 27694
+      "header_line": 27601
     },
     {
       "path": "crates/cowork-cli/src/commands/status.rs",
-      "header_line": 27702
+      "header_line": 27609
     },
     {
       "path": "crates/cowork-cli/src/main.rs",
-      "header_line": 27710
+      "header_line": 27617
     },
     {
       "path": "crates/cowork-cli/src/utils.rs",
-      "header_line": 27825
+      "header_line": 27732
     },
     {
       "path": "crates/cowork-core/src/acp/mod.rs",
-      "header_line": 27833
+      "header_line": 27740
     },
     {
       "path": "crates/cowork-core/src/agents/iterative_assistant.rs",
-      "header_line": 27840
+      "header_line": 27747
     },
     {
       "path": "crates/cowork-core/src/agents/legacy_project_analyzer.rs",
-      "header_line": 28161
+      "header_line": 28068
     },
     {
       "path": "crates/cowork-core/src/config.rs",
-      "header_line": 28184
+      "header_line": 28091
     },
     {
       "path": "crates/cowork-core/src/config_definition/default_configs/agents/built-in/knowledge_gen_agent.json",
-      "header_line": 28200
+      "header_line": 28107
+    },
+    {
+      "path": "crates/cowork-core/src/config_definition/default_configs/flows/default.json",
+      "header_line": 28142
     },
     {
       "path": "crates/cowork-core/src/config_definition/default_configs/stages/check.json",
-      "header_line": 28235
+      "header_line": 28212
     },
     {
       "path": "crates/cowork-core/src/config_definition/default_configs/stages/delivery.json",
-      "header_line": 28257
+      "header_line": 28234
     },
     {
       "path": "crates/cowork-core/src/config_definition/default_configs/stages/idea.json",
-      "header_line": 28279
+      "header_line": 28256
+    },
+    {
+      "path": "crates/cowork-core/src/config_definition/flow_definition.rs",
+      "header_line": 28278
     },
     {
       "path": "crates/cowork-core/src/config_definition/integration_definition.rs",
-      "header_line": 28301
+      "header_line": 28552
     },
     {
       "path": "crates/cowork-core/src/config_definition/stage_definition.rs",
-      "header_line": 28610
+      "header_line": 28861
     },
     {
       "path": "crates/cowork-core/src/config_definition/validator.rs",
-      "header_line": 28847
+      "header_line": 29098
     },
     {
       "path": "crates/cowork-core/src/domain/memory.rs",
-      "header_line": 28922
+      "header_line": 29173
     },
     {
       "path": "crates/cowork-core/src/domain/mod.rs",
-      "header_line": 29304
+      "header_line": 29555
     },
     {
       "path": "crates/cowork-core/src/domain/project.rs",
-      "header_line": 29316
+      "header_line": 29567
     },
     {
       "path": "crates/cowork-core/src/importer/artifact_generator.rs",
-      "header_line": 29413
+      "header_line": 29664
     },
     {
       "path": "crates/cowork-core/src/importer/import_config.rs",
-      "header_line": 29527
+      "header_line": 29778
     },
     {
       "path": "crates/cowork-core/src/importer/mod.rs",
-      "header_line": 29741
+      "header_line": 29992
     },
     {
       "path": "crates/cowork-core/src/importer/project_analyzer.rs",
-      "header_line": 29753
+      "header_line": 30004
     },
     {
       "path": "crates/cowork-core/src/instructions/knowledge_gen.rs",
-      "header_line": 29889
+      "header_line": 30140
     },
     {
       "path": "crates/cowork-core/src/instructions/legacy_project_analyzer.rs",
-      "header_line": 30161
+      "header_line": 30412
     },
     {
       "path": "crates/cowork-core/src/instructions/mod.rs",
-      "header_line": 30249
+      "header_line": 30500
     },
     {
       "path": "crates/cowork-core/src/instructions/summary.rs",
-      "header_line": 30277
+      "header_line": 30528
     },
     {
       "path": "crates/cowork-core/src/integration/USAGE_EXAMPLE.md",
-      "header_line": 30394
+      "header_line": 30645
     },
     {
       "path": "crates/cowork-core/src/integration/adapters.rs",
-      "header_line": 30631
+      "header_line": 30882
     },
     {
       "path": "crates/cowork-core/src/integration/mod.rs",
-      "header_line": 30711
+      "header_line": 30962
     },
     {
       "path": "crates/cowork-core/src/persistence/iteration_store.rs",
-      "header_line": 30730
+      "header_line": 30981
     },
     {
       "path": "crates/cowork-core/src/persistence/memory_store.rs",
-      "header_line": 30862
+      "header_line": 31113
     },
     {
       "path": "crates/cowork-core/src/persistence/project_store.rs",
-      "header_line": 31089
+      "header_line": 31340
     },
     {
       "path": "crates/cowork-core/src/pipeline/stages/check.rs",
-      "header_line": 31176
+      "header_line": 31427
     },
     {
       "path": "crates/cowork-core/src/pipeline/stages/delivery.rs",
-      "header_line": 31215
+      "header_line": 31466
     },
     {
       "path": "crates/cowork-core/src/pipeline/stages/design.rs",
-      "header_line": 31254
+      "header_line": 31505
     },
     {
       "path": "crates/cowork-core/src/pipeline/stages/idea.rs",
-      "header_line": 31297
+      "header_line": 31548
     },
     {
       "path": "crates/cowork-core/src/pipeline/stages/mod.rs",
-      "header_line": 31336
+      "header_line": 31587
     },
     {
       "path": "crates/cowork-core/src/pipeline/stages/plan.rs",
-      "header_line": 31356
+      "header_line": 31607
     },
     {
       "path": "crates/cowork-core/src/pipeline/stages/prd.rs",
-      "header_line": 31395
+      "header_line": 31646
     },
     {
       "path": "crates/cowork-core/src/project_runtime.rs",
-      "header_line": 31438
+      "header_line": 31689
     },
     {
       "path": "crates/cowork-core/src/runtime_security.rs",
-      "header_line": 31845
+      "header_line": 32096
     },
     {
       "path": "crates/cowork-core/src/skills/manager.rs",
-      "header_line": 32119
+      "header_line": 32370
     },
     {
       "path": "crates/cowork-core/src/skills/mod.rs",
-      "header_line": 32322
+      "header_line": 32573
     },
     {
       "path": "crates/cowork-core/src/tech_stack.rs",
-      "header_line": 32347
+      "header_line": 32598
     },
     {
       "path": "crates/cowork-gui/README.md",
-      "header_line": 32473
+      "header_line": 32724
     },
     {
       "path": "crates/cowork-gui/index.html",
-      "header_line": 32566
+      "header_line": 32817
     },
     {
       "path": "crates/cowork-gui/src/components/PreviewPanel.tsx",
-      "header_line": 32584
+      "header_line": 32835
     },
     {
       "path": "crates/cowork-gui/src/components/chat/index.ts",
-      "header_line": 32601
+      "header_line": 32852
     },
     {
       "path": "crates/cowork-gui/src/components/common/LoadingScreen.tsx",
-      "header_line": 32609
+      "header_line": 32860
     },
     {
       "path": "crates/cowork-gui/src/components/common/StatusBadge.tsx",
-      "header_line": 32631
+      "header_line": 32882
     },
     {
       "path": "crates/cowork-gui/src/components/common/index.ts",
-      "header_line": 32641
+      "header_line": 32892
     },
     {
       "path": "crates/cowork-gui/src/components/config/AgentsSetupPanel.tsx",
-      "header_line": 32649
+      "header_line": 32900
     },
     {
       "path": "crates/cowork-gui/src/components/config/index.ts",
-      "header_line": 32657
+      "header_line": 32908
     },
     {
       "path": "crates/cowork-gui/src/components/iterations/CreateIterationModal.tsx",
-      "header_line": 32667
+      "header_line": 32918
     },
     {
       "path": "crates/cowork-gui/src/components/iterations/InitProjectModal.tsx",
-      "header_line": 32680
+      "header_line": 32931
     },
     {
       "path": "crates/cowork-gui/src/components/iterations/index.ts",
-      "header_line": 32692
+      "header_line": 32943
     },
     {
       "path": "crates/cowork-gui/src/components/onboarding/index.ts",
-      "header_line": 32700
+      "header_line": 32951
     },
     {
       "path": "crates/cowork-gui/src/components/projects/CreateProjectModal.tsx",
-      "header_line": 32706
+      "header_line": 32957
     },
     {
       "path": "crates/cowork-gui/src/components/projects/EditProjectModal.tsx",
-      "header_line": 32718
+      "header_line": 32969
     },
     {
       "path": "crates/cowork-gui/src/components/projects/ImportProjectModal.tsx",
-      "header_line": 32731
+      "header_line": 32982
     },
     {
       "path": "crates/cowork-gui/src/components/projects/index.ts",
-      "header_line": 32773
+      "header_line": 33024
     },
     {
       "path": "crates/cowork-gui/src/constants/events.ts",
-      "header_line": 32781
+      "header_line": 33032
     },
     {
       "path": "crates/cowork-gui/src/constants/index.ts",
-      "header_line": 32789
+      "header_line": 33040
     },
     {
       "path": "crates/cowork-gui/src/constants/stages.ts",
-      "header_line": 32799
+      "header_line": 33050
     },
     {
       "path": "crates/cowork-gui/src/constants/status.ts",
-      "header_line": 32825
+      "header_line": 33076
     },
     {
       "path": "crates/cowork-gui/src/hooks/index.ts",
-      "header_line": 32837
+      "header_line": 33088
     },
     {
       "path": "crates/cowork-gui/src/hooks/useAutoScroll.ts",
-      "header_line": 32855
+      "header_line": 33106
     },
     {
       "path": "crates/cowork-gui/src/hooks/useIterationEvents.ts",
-      "header_line": 32883
+      "header_line": 33134
     },
     {
       "path": "crates/cowork-gui/src/hooks/useIterationsData.ts",
-      "header_line": 32959
-    },
-    {
-      "path": "crates/cowork-gui/src/hooks/useLoading.ts",
-      "header_line": 33026
-    },
-    {
-      "path": "crates/cowork-gui/src/hooks/useModal.ts",
-      "header_line": 33079
-    },
-    {
-      "path": "crates/cowork-gui/src/hooks/useProjectEvents.ts",
-      "header_line": 33102
-    },
-    {
-      "path": "crates/cowork-gui/src/hooks/useProjectsData.ts",
-      "header_line": 33132
-    },
-    {
-      "path": "crates/cowork-gui/src/hooks/useRefreshTrigger.ts",
-      "header_line": 33184
-    },
-    {
-      "path": "crates/cowork-gui/src/hooks/useTauriEvent.ts",
       "header_line": 33210
     },
     {
+      "path": "crates/cowork-gui/src/hooks/useLoading.ts",
+      "header_line": 33277
+    },
+    {
+      "path": "crates/cowork-gui/src/hooks/useModal.ts",
+      "header_line": 33330
+    },
+    {
+      "path": "crates/cowork-gui/src/hooks/useProjectEvents.ts",
+      "header_line": 33353
+    },
+    {
+      "path": "crates/cowork-gui/src/hooks/useProjectsData.ts",
+      "header_line": 33383
+    },
+    {
+      "path": "crates/cowork-gui/src/hooks/useRefreshTrigger.ts",
+      "header_line": 33435
+    },
+    {
+      "path": "crates/cowork-gui/src/hooks/useTauriEvent.ts",
+      "header_line": 33461
+    },
+    {
       "path": "crates/cowork-gui/src/stores/index.ts",
-      "header_line": 33257
+      "header_line": 33508
     },
     {
       "path": "crates/cowork-gui/src/stores/uiStore.ts",
-      "header_line": 33270
+      "header_line": 33521
     },
     {
       "path": "crates/cowork-gui/src/styles/theme.css",
-      "header_line": 33308
+      "header_line": 33559
     },
     {
       "path": "crates/cowork-gui/src/types/agent.ts",
-      "header_line": 33347
+      "header_line": 33598
     },
     {
       "path": "crates/cowork-gui/src/types/artifacts.ts",
-      "header_line": 33464
+      "header_line": 33715
     },
     {
       "path": "crates/cowork-gui/src/types/chat.ts",
-      "header_line": 33560
+      "header_line": 33811
     },
     {
       "path": "crates/cowork-gui/src/types/iteration.ts",
-      "header_line": 33690
+      "header_line": 33941
     },
     {
       "path": "crates/cowork-gui/src/types/knowledge.ts",
-      "header_line": 33735
-    },
-    {
-      "path": "crates/cowork-gui/src/types/project.ts",
-      "header_line": 33761
-    },
-    {
-      "path": "crates/cowork-gui/src/types/registry.ts",
-      "header_line": 33822
-    },
-    {
-      "path": "crates/cowork-gui/src/utils/errorHandler.ts",
-      "header_line": 33847
-    },
-    {
-      "path": "crates/cowork-gui/src/utils/index.ts",
-      "header_line": 33969
-    },
-    {
-      "path": "crates/cowork-gui/src-tauri/build.rs",
       "header_line": 33986
     },
     {
+      "path": "crates/cowork-gui/src/types/project.ts",
+      "header_line": 34012
+    },
+    {
+      "path": "crates/cowork-gui/src/types/registry.ts",
+      "header_line": 34073
+    },
+    {
+      "path": "crates/cowork-gui/src/utils/errorHandler.ts",
+      "header_line": 34098
+    },
+    {
+      "path": "crates/cowork-gui/src/utils/index.ts",
+      "header_line": 34220
+    },
+    {
+      "path": "crates/cowork-gui/src-tauri/build.rs",
+      "header_line": 34237
+    },
+    {
       "path": "crates/cowork-gui/src-tauri/capabilities/default.json",
-      "header_line": 33994
+      "header_line": 34245
     },
     {
       "path": "crates/cowork-gui/src-tauri/src/commands/memory.rs",
-      "header_line": 34000
+      "header_line": 34251
     },
     {
       "path": "crates/cowork-gui/src-tauri/src/commands/template.rs",
-      "header_line": 34048
+      "header_line": 34299
     },
     {
       "path": "crates/cowork-gui/src-tauri/src/gui_types.rs",
-      "header_line": 34097
+      "header_line": 34348
     },
     {
       "path": "crates/cowork-gui/src-tauri/src/main.rs",
-      "header_line": 34280
+      "header_line": 34531
     },
     {
       "path": "crates/cowork-gui/src-tauri/src/project_manager.rs",
-      "header_line": 34288
+      "header_line": 34539
     },
     {
       "path": "crates/cowork-gui/tsconfig.node.json",
-      "header_line": 34707
+      "header_line": 34958
     },
     {
       "path": "litho.docs/en/3.Workflow.md",
-      "header_line": 34723
+      "header_line": 34974
     },
     {
       "path": "litho.docs/en/4.Deep-Exploration/Interaction Domain.md",
-      "header_line": 35278
+      "header_line": 35529
     },
     {
       "path": "litho.docs/en/4.Deep-Exploration/Memory Domain.md",
-      "header_line": 35613
+      "header_line": 35864
     },
     {
       "path": "litho.docs/zh/1、项目概述.md",
-      "header_line": 36094
+      "header_line": 36345
     },
     {
       "path": "litho.docs/zh/2、架构概览.md",
-      "header_line": 36389
+      "header_line": 36640
     },
     {
       "path": "litho.docs/zh/3、工作流程.md",
-      "header_line": 37636
+      "header_line": 37887
     },
     {
       "path": "litho.docs/zh/4、深入探索/4.10 、LLM集成.md",
-      "header_line": 38191
+      "header_line": 38442
     },
     {
       "path": "litho.docs/zh/4、深入探索/4.1、领域实体.md",
-      "header_line": 38480
+      "header_line": 38731
     },
     {
       "path": "litho.docs/zh/4、深入探索/4.2、流程调度.md",
-      "header_line": 38976
+      "header_line": 39227
     },
     {
       "path": "litho.docs/zh/4、深入探索/4.3、HITL人机协同.md",
-      "header_line": 39502
+      "header_line": 39753
     },
     {
       "path": "litho.docs/zh/4、深入探索/4.4、Agent工具系统.md",
-      "header_line": 39837
+      "header_line": 40088
     },
     {
       "path": "litho.docs/zh/4、深入探索/4.5、Artifacts存储.md",
-      "header_line": 40290
+      "header_line": 40541
     },
     {
       "path": "litho.docs/zh/4、深入探索/4.6、自迭代记忆系统.md",
-      "header_line": 40731
+      "header_line": 40982
     },
     {
       "path": "litho.docs/zh/4、深入探索/4.7、Cowork CLI.md",
-      "header_line": 41212
+      "header_line": 41463
     },
     {
       "path": "litho.docs/zh/4、深入探索/4.8、Cowork GUI前端.md",
-      "header_line": 41923
+      "header_line": 42174
     },
     {
       "path": "litho.docs/zh/4、深入探索/4.9、Cowork GUI后端.md",
-      "header_line": 42597
+      "header_line": 42848
     }
   ]
 }

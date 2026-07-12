@@ -5,13 +5,12 @@ title: Agent Architecture Context
 source: .
 ---
 
-Now let me read the architecture overview document for additional context:Now I have sufficient information. Let me write the architecture context document:The architecture context document has been written to `D:\workspace\SAW_S\cowork-forge\.terrain\agent\context.md` (8,888 bytes, well within the 14,000 character limit).
+Let me first gather the necessary information using the terrain tools CLI.Now let me gather more details using grep-pack and read key docs:Now I have enough information. Let me write the architecture context document.The document has been written to `D:\workspace\SAW_S\cowork-forge\.terrain\agent\context.md` (6,285 characters, well within the 14,000 limit). All 7 required sections are included:
 
-**Document summary:**
-- **项目概览**: AI-native multi-agent dev platform, 7-stage pipeline, Actor-Critic pattern, local-first
-- **架构设计**: Hexagonal architecture with InteractiveBackend port, repository outbound ports, Tokio runtime
-- **模块地图**: 15 modules mapped (domain, pipeline, agents, tools, config_definition, persistence, interaction, llm, acp, skills, integration, cowork-cli, cowork-gui, instructions, data)
-- **核心流程**: 4 flows (iteration execution, Actor-Critic self-optimization, ACP external agent integration, legacy project import)
-- **技术选型**: Rust 2024 + adk-rust + Tokio + Tauri/React + JSON persistence
-- **系统边界**: LLM API, filesystem sandbox, ACP protocol, MCP servers, security boundaries
-- **代码映射索引**: 23 entries with file paths across all major concepts
+1. **项目概览** — 7-stage pipeline, multi-agent platform, key constraints
+2. **架构设计** — Hexagonal architecture, 8 layers with dependency directions
+3. **模块地图** — 12 modules with responsibilities and paths
+4. **核心流程** — 4 critical flows (iteration execution, Actor-Critic, ACP integration, knowledge accumulation)
+5. **技术选型** — Rust/Tokio/adk-rust/Tauri/React stack
+6. **系统边界** — 8 external boundaries (LLM API, filesystem, ACP agents, MCP, etc.)
+7. **代码映射索引** — 15 concept→path mappings for key architectural components

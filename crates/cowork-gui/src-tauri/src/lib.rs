@@ -702,7 +702,7 @@ pub fn run() {
 
     let workspace_path_clone = workspace_path.clone();
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(app_state)
@@ -939,6 +939,29 @@ pub fn run() {
             path_exists,
             create_project_at_path,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    // Use the callback form of `run` so we can intercept app-exit events and
+    // clean up child processes (dev servers, static servers) that would
+    // otherwise be orphaned and keep holding their ports.
+    app.run(|_app_handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            cleanup_on_exit();
+        }
+    });
+}
+
+/// Kill all running project dev-server processes and stop all static file
+/// servers. Called when the app is about to exit so that no child processes
+/// are orphaned.
+fn cleanup_on_exit() {
+    println!("[GUI] Exit cleanup: stopping all project processes and static servers");
+    // Kill all tracked dev-server process trees (synchronous, no async runtime needed)
+    commands::PROJECT_RUNNER.stop_all_sync();
+    // Stop all static file servers
+    static_server::stop_all_static_servers();
+    // Clear fullstack process metadata
+    static_server::stop_all_fullstack_registrations();
+    println!("[GUI] Exit cleanup complete");
 }

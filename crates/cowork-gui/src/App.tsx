@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback, Suspense, lazy } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { Layout, Menu, Button, Empty, App as AntApp, Tag, Spin } from 'antd';
 import {
 	FolderOutlined,
@@ -112,6 +113,22 @@ function App() {
 			}
 		}
 	}, [chatMode, currentIteration?.id, loadPMWelcomeMessage]);
+
+	// Stop the previous iteration's running project when the user switches to a
+	// different iteration. Without this, dev servers from old iterations keep
+	// running in the background (holding their ports) even after the user has
+	// moved on to a new iteration.
+	const prevIterationIdRef = useRef<string | null>(null);
+	useEffect(() => {
+		const newId = currentIteration?.id ?? null;
+		const oldId = prevIterationIdRef.current;
+		if (oldId && newId && oldId !== newId) {
+			invoke('stop_iteration_project', { iterationId: oldId }).catch((err) => {
+				console.warn(`Failed to stop project for previous iteration ${oldId}:`, err);
+			});
+		}
+		prevIterationIdRef.current = newId;
+	}, [currentIteration?.id]);
 
 	// Auto-scroll
 	useEffect(() => {

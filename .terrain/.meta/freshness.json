@@ -3,29 +3,29 @@
   "project": "cowork-forge",
   "repo_path": ".",
   "baseline": {
-    "git_head": "6b833a1c35a27fa679ba2456c038d1abf316b9df",
-    "git_head_at": "2026-07-12T08:54:05.079331700+00:00",
+    "git_head": "30b91781a45737d99a3829e4a6a3f9af12a23c80",
+    "git_head_at": "2026-07-12T13:44:48.593422+00:00",
     "dirty": false
   },
   "assets": {
     "agent_pack": {
       "path": "agent/repomix.md",
-      "synced_at": "2026-07-12T08:43:27.302760800+00:00",
-      "baseline_git_head": "6b833a1c35a27fa679ba2456c038d1abf316b9df",
+      "synced_at": "2026-07-12T13:25:50.567605400+00:00",
+      "baseline_git_head": "30b91781a45737d99a3829e4a6a3f9af12a23c80",
       "stale": false,
       "freshness_score": 100
     },
     "agent_context": {
       "path": "agent/context.md",
-      "synced_at": "2026-07-12T08:50:06.299614400+00:00",
-      "baseline_git_head": "6b833a1c35a27fa679ba2456c038d1abf316b9df",
+      "synced_at": "2026-07-12T13:44:47.785440100+00:00",
+      "baseline_git_head": "30b91781a45737d99a3829e4a6a3f9af12a23c80",
       "stale": true,
       "stale_reason": "asset_not_ready",
       "freshness_score": 0
     },
     "human_docs": {
       "path": "human/",
-      "synced_at": "2026-07-12T08:48:23.000134900+00:00",
+      "synced_at": "2026-07-12T13:40:05.225529800+00:00",
       "stale": false,
       "freshness_score": 100
     }
@@ -40,10 +40,10 @@
     "overall_stale": true,
     "commits_since_baseline": 0,
     "changed_files_count": 0,
-    "current_git_head": "6b833a1",
+    "current_git_head": "30b9178",
     "working_tree_dirty": false,
     "is_git_repo": true,
-    "last_computed_at": "2026-07-12T08:54:05.079331700+00:00",
+    "last_computed_at": "2026-07-12T13:44:48.593422+00:00",
     "stale_reason": "asset_not_ready",
     "agent_pack_score": 100,
     "agent_context_score": 0,
@@ -60,7 +60,7 @@
         "id": "baseline_match",
         "severity": "info",
         "title": "与 baseline 提交一致",
-        "detail": "源码索引与 Agent 上下文均基于提交 6b833a1c35a27fa679ba2456c038d1abf316b9df 生成，相对 HEAD 无文件漂移。"
+        "detail": "源码索引与 Agent 上下文均基于提交 30b91781a45737d99a3829e4a6a3f9af12a23c80 生成，相对 HEAD 无文件漂移。"
       },
       {
         "id": "overall_driver",
@@ -75,8 +75,8 @@
         "detail": "分数 < 50：问答不会预加载可能过期的架构概览，需通过源码索引验证。"
       }
     ],
-    "pack_baseline_short": "6b833a1",
-    "context_baseline_short": "6b833a1"
+    "pack_baseline_short": "30b9178",
+    "context_baseline_short": "30b9178"
   },
-  "last_computed_at": "2026-07-12T08:54:05.079331700+00:00"
+  "last_computed_at": "2026-07-12T13:44:48.593422+00:00"
 }
