@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
 use std::process::Stdio;
 use std::sync::{Mutex, Once};
 use std::env;
@@ -389,7 +390,7 @@ fn path_helper_path() -> Option<String> {
     None
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(unix, not(target_os = "macos")))]
 fn path_helper_path() -> Option<String> {
     None
 }
@@ -634,6 +635,7 @@ pub fn command_shell() -> String {
 }
 
 #[cfg(windows)]
+#[allow(dead_code)]
 pub fn command_shell() -> String {
     "cmd".to_string()
 }
@@ -788,6 +790,7 @@ pub fn needs_shell_wrapper(command: &str) -> bool {
 }
 
 /// Split a simple `binary arg1 arg2` command for direct spawning (no shell).
+#[allow(dead_code)]
 pub fn parse_direct_command(command: &str) -> Option<(PathBuf, Vec<String>)> {
     let trimmed = command.trim();
     if trimmed.is_empty() || needs_shell_wrapper(trimmed) {
