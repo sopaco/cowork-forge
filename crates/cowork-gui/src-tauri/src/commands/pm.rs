@@ -48,7 +48,7 @@ pub async fn pm_send_message(
     history: Vec<serde_json::Value>,
     window: Window,
 ) -> Result<serde_json::Value, String> {
-    eprintln!("[PM] pm_send_message called: iteration_id={}, message={}, history_len={}", 
+    tracing::debug!("[PM] pm_send_message called: iteration_id={}, message={}, history_len={}",
         iteration_id, message, history.len());
     
     let store = IterationStore::new();
@@ -232,9 +232,9 @@ pub async fn pm_restart_iteration(
         };
         
         if let Err(e) = cowork_core::persistence::append_feedback(&feedback_entry) {
-            eprintln!("[PM] Warning: Failed to save feedback: {}", e);
+            tracing::warn!("[PM] Failed to save feedback: {}", e);
         } else {
-            println!("[PM] Saved feedback to storage ({} chars): {}", fb.len(), fb.chars().take(50).collect::<String>());
+            tracing::info!("[PM] Saved feedback to storage ({} chars): {}", fb.len(), fb.chars().take(50).collect::<String>());
         }
     } else {
         println!("[PM] No feedback provided, skipping storage save");

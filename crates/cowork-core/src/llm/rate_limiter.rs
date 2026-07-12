@@ -163,7 +163,7 @@ impl Llm for TokenBucketRateLimiter {
                         
                         // Calculate backoff delay
                         let backoff = Self::calculate_backoff(attempt);
-                        eprintln!(
+                        tracing::warn!(
                             "[TokenBucket] Rate limit hit (attempt {}/{}), waiting {:?} before retry...",
                             attempt + 1, self.max_retries, backoff
                         );
@@ -191,14 +191,6 @@ impl Llm for TokenBucketRateLimiter {
 /// Type alias for backward compatibility
 /// The new implementation uses token bucket algorithm
 pub type RateLimitedLlm = TokenBucketRateLimiter;
-
-/// Legacy function for backward compatibility
-/// Creates a rate limiter with default settings
-pub fn init_global_rate_limiter(_max_concurrent: usize) {
-    // No-op: The new token bucket implementation doesn't need global semaphore
-    // This function is kept for backward compatibility
-    tracing::info!("[TokenBucket] Rate limiter initialized (no global semaphore needed)");
-}
 
 // ============================================================================
 // Tests

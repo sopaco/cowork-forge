@@ -261,7 +261,7 @@ fn handle_request(
                 let _ = request.respond(response);
             }
             Err(e) => {
-                eprintln!("[StaticServer] Error opening file: {}", e);
+                tracing::error!("[StaticServer] Error opening file: {}", e);
                 let _ = request.respond(
                     tiny_http::Response::from_string("Internal Server Error").with_status_code(500),
                 );

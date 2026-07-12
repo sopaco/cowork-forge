@@ -414,7 +414,7 @@ fn augment_path_from_login_shell() {
     if merged != current {
         // SAFETY: called during single-threaded app startup before worker threads spawn.
         unsafe { env::set_var("PATH", &merged) };
-        eprintln!(
+        tracing::debug!(
             "[PathUtils] Augmented PATH from login shell ({} entries)",
             merged.split(PATH_SEP).filter(|s| !s.is_empty()).count()
         );
@@ -690,7 +690,7 @@ pub fn build_start_command_for_script(script_body: &str, script_name: &str) -> O
     let rewritten = rewrite_script_package_manager(script_body);
 
     if script_uses_alternate_package_manager(script_body) || needs_shell_wrapper(&rewritten) {
-        eprintln!(
+        tracing::debug!(
             "[PathUtils] Rewrote dev script: {:?} -> {:?}",
             script_body, rewritten
         );
@@ -959,7 +959,7 @@ pub fn build_extended_path() -> String {
 /// Initialize extended PATH at application startup.
 /// Must only run inside `PATH_INIT.call_once` — do not call directly.
 fn init_extended_path() {
-    eprintln!(
+    tracing::debug!(
         "[PathUtils] Setting extended PATH ({} platform)",
         std::env::consts::OS
     );
@@ -969,18 +969,18 @@ fn init_extended_path() {
     augment_path_from_login_shell();
 
     let extended_path = env::var("PATH").unwrap_or_else(|_| build_extended_path());
-    eprintln!("[PathUtils] PATH length: {} characters", extended_path.len());
+    tracing::debug!("[PathUtils] PATH length: {} characters", extended_path.len());
 
     if let Some(bun) = find_bun() {
-        eprintln!("[PathUtils] Found bun at: {:?}", bun);
+        tracing::debug!("[PathUtils] Found bun at: {:?}", bun);
     } else {
-        eprintln!("[PathUtils] bun not found after PATH extension");
+        tracing::debug!("[PathUtils] bun not found after PATH extension");
     }
 
     if let Some(npm) = find_npm() {
-        eprintln!("[PathUtils] Found npm at: {:?}", npm);
+        tracing::debug!("[PathUtils] Found npm at: {:?}", npm);
     } else {
-        eprintln!("[PathUtils] npm not found after PATH extension");
+        tracing::debug!("[PathUtils] npm not found after PATH extension");
     }
 }
 

@@ -230,9 +230,6 @@ pub fn save_config(config: &ModelConfig) -> Result<PathBuf> {
 pub fn create_llm_client(config: &LlmConfig) -> Result<Arc<dyn Llm>> {
     use crate::llm::rate_limiter::TokenBucketRateLimiter;
 
-    // Initialize rate limiter (for logging/backward compatibility)
-    crate::llm::rate_limiter::init_global_rate_limiter(1);
-
     let openai_config =
         OpenAIConfig::compatible(&config.api_key, &config.api_base_url, &config.model_name);
 

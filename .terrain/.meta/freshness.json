@@ -3,80 +3,119 @@
   "project": "cowork-forge",
   "repo_path": ".",
   "baseline": {
-    "git_head": "9c82bf7333ace6ae9508bf844063558e357d9192",
-    "git_head_at": "2026-07-06T02:48:28.420847+00:00",
-    "dirty": true
+    "git_head": "8c4c258f1e9d35bd3cb81deeec33bca90527452f",
+    "git_head_at": "2026-07-12T03:33:49.425370700+00:00",
+    "dirty": false
   },
   "assets": {
     "agent_pack": {
       "path": "agent/repomix.md",
       "synced_at": "2026-07-06T02:05:39.083865+00:00",
       "baseline_git_head": "9c82bf7333ace6ae9508bf844063558e357d9192",
-      "stale": false,
-      "freshness_score": 95
+      "stale": true,
+      "stale_reason": "repo_advanced_6_commits",
+      "freshness_score": 73
     },
     "agent_context": {
       "path": "agent/context.md",
       "synced_at": "2026-07-06T02:06:45.225154+00:00",
       "baseline_git_head": "9c82bf7333ace6ae9508bf844063558e357d9192",
-      "stale": false,
-      "freshness_score": 85
+      "stale": true,
+      "stale_reason": "repo_advanced_6_commits",
+      "freshness_score": 65
     },
     "human_docs": {
       "path": "human/",
       "synced_at": "2026-07-06T02:05:39.084445+00:00",
-      "stale": false,
-      "freshness_score": 95
+      "stale": true,
+      "stale_reason": "repo_advanced_6_commits",
+      "freshness_score": 73
     }
   },
   "drift": {
-    "commits_since_baseline": 0,
-    "changed_files_since_baseline": 0,
-    "sample_changed_files": []
+    "commits_since_baseline": 6,
+    "changed_files_since_baseline": 23,
+    "sample_changed_files": [
+      ".agents/skills/codegraph-skill/SKILL.md",
+      ".agents/skills/terrain-knowledge-skill/SKILL.md",
+      ".claude/skills/codegraph-skill/SKILL.md",
+      ".claude/skills/repomix-context-skill/SKILL.md",
+      ".claude/skills/rtk-skill/SKILL.md",
+      ".claude/skills/terrain-knowledge-skill/SKILL.md",
+      "crates/cowork-gui/src-tauri/src/commands/mod.rs",
+      "crates/cowork-gui/src-tauri/src/commands/path_utils.rs",
+      "crates/cowork-gui/src-tauri/src/commands/runner.rs",
+      "crates/cowork-gui/src-tauri/src/project_runner.rs",
+      "crates/cowork-gui/src/App.tsx",
+      "crates/cowork-gui/src/components/ArtifactsViewer.tsx"
+    ]
   },
   "summary": {
-    "overall_score": 85,
-    "overall_stale": false,
-    "commits_since_baseline": 0,
-    "changed_files_count": 0,
-    "current_git_head": "9c82bf7",
-    "working_tree_dirty": true,
+    "overall_score": 65,
+    "overall_stale": true,
+    "commits_since_baseline": 6,
+    "changed_files_count": 23,
+    "current_git_head": "8c4c258",
+    "working_tree_dirty": false,
     "is_git_repo": true,
-    "last_computed_at": "2026-07-06T02:48:28.420847+00:00",
-    "agent_pack_score": 95,
-    "agent_context_score": 85,
-    "human_docs_score": 95,
+    "last_computed_at": "2026-07-12T03:33:49.425370700+00:00",
+    "stale_reason": "repo_advanced_6_commits",
+    "agent_pack_score": 73,
+    "agent_context_score": 65,
+    "human_docs_score": 73,
     "macro_preload_allowed": true,
     "drift_factors": [
       {
-        "id": "baseline_match",
-        "severity": "info",
-        "title": "与 baseline 提交一致",
-        "detail": "源码索引与 Agent 上下文均基于提交 9c82bf7333ace6ae9508bf844063558e357d9192 生成，相对 HEAD 无文件漂移。"
+        "id": "commits_behind",
+        "severity": "medium",
+        "title": "代码已前进 6 个提交",
+        "detail": "知识资产 baseline 为 9c82bf7333ace6ae9508bf844063558e357d9192，当前 HEAD 为 8c4c258。每多 1 个提交约扣 2 分（上限 40 分）。",
+        "points_lost": 12
       },
       {
-        "id": "dirty_tree",
+        "id": "files_changed",
         "severity": "medium",
-        "title": "工作区有未提交修改",
-        "detail": "Git 工作区在源码路径上有未提交改动（已排除 `.terrain/` 等知识产出目录）。知识资产基于某次提交快照，与磁盘上的未提交源码改动不一致，扣 5 分。",
-        "points_lost": 5
+        "title": "23 个文件相对 baseline 有变更",
+        "detail": "变更文件占索引规模的比例越高，扣分越多（上限 30 分）。下方列出部分路径。",
+        "points_lost": 3
+      },
+      {
+        "id": "pack_age",
+        "severity": "low",
+        "title": "源码索引已生成 6 天",
+        "detail": "距上次 Repomix 打包越久，额外扣分越多（每天约 2 分，上限 20 分）。",
+        "points_lost": 12
       },
       {
         "id": "context_lineage",
         "severity": "info",
         "title": "Agent 上下文受源码索引牵连",
-        "detail": "架构上下文原始分 95/100，按规则不超过源码索引分数的 90%，现为 85/100。",
-        "points_lost": 10
+        "detail": "架构上下文原始分 73/100，按规则不超过源码索引分数的 90%，现为 65/100。",
+        "points_lost": 8
       },
       {
         "id": "overall_driver",
         "severity": "info",
         "title": "总分由 Agent 架构上下文决定",
-        "detail": "综合分取三层最低值：源码索引 95、Agent 上下文 85、人类文档 95。"
+        "detail": "综合分取三层最低值：源码索引 73、Agent 上下文 65、人类文档 73。"
       }
+    ],
+    "sample_changed_files": [
+      ".agents/skills/codegraph-skill/SKILL.md",
+      ".agents/skills/terrain-knowledge-skill/SKILL.md",
+      ".claude/skills/codegraph-skill/SKILL.md",
+      ".claude/skills/repomix-context-skill/SKILL.md",
+      ".claude/skills/rtk-skill/SKILL.md",
+      ".claude/skills/terrain-knowledge-skill/SKILL.md",
+      "crates/cowork-gui/src-tauri/src/commands/mod.rs",
+      "crates/cowork-gui/src-tauri/src/commands/path_utils.rs",
+      "crates/cowork-gui/src-tauri/src/commands/runner.rs",
+      "crates/cowork-gui/src-tauri/src/project_runner.rs",
+      "crates/cowork-gui/src/App.tsx",
+      "crates/cowork-gui/src/components/ArtifactsViewer.tsx"
     ],
     "pack_baseline_short": "9c82bf7",
     "context_baseline_short": "9c82bf7"
   },
-  "last_computed_at": "2026-07-06T02:48:28.420847+00:00"
+  "last_computed_at": "2026-07-12T03:33:49.425370700+00:00"
 }

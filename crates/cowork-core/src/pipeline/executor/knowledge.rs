@@ -14,7 +14,7 @@ pub async fn generate_document_summaries(
     iteration: &Iteration,
     model: Arc<dyn Llm>,
 ) -> anyhow::Result<()> {
-    println!(
+    tracing::info!(
         "[Executor] Generating document summaries for iteration {}...",
         iteration.id
     );
@@ -31,7 +31,7 @@ pub async fn generate_document_summaries(
         let doc_path = artifacts_dir.join(format!("{}.md", doc_type));
 
         if !doc_path.exists() {
-            println!("[Executor] Warning: {} not found, skipping", doc_type);
+            tracing::warn!("[Executor] {} not found, skipping", doc_type);
             continue;
         }
 
@@ -59,7 +59,7 @@ pub async fn generate_document_summaries(
         let stream = match summary_agent.run(invocation_ctx).await {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("[Executor] Error creating stream for {}: {}", doc_type, e);
+                tracing::error!("[Executor] Error creating stream for {}: {}", doc_type, e);
                 continue;
             }
         };
@@ -77,7 +77,7 @@ pub async fn generate_document_summaries(
         }
 
         if generated_text.is_empty() {
-            eprintln!("[Executor] No output generated for {}", doc_type);
+            tracing::warn!("[Executor] No output generated for {}", doc_type);
             continue;
         }
 
@@ -85,16 +85,16 @@ pub async fn generate_document_summaries(
         let summary_path = summaries_dir.join(format!("{}.md", doc_type));
         std::fs::write(&summary_path, summary)?;
 
-        println!("[Executor] Generated summary for {}", doc_type);
+        tracing::info!("[Executor] Generated summary for {}", doc_type);
 
         // Add delay between document summaries to avoid rate limiting
         if idx < doc_types.len() - 1 {
-            println!("[Executor] Waiting 2 seconds before processing next document...");
+            tracing::debug!("[Executor] Waiting 2 seconds before processing next document...");
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
         }
     }
 
-    println!("[Executor] Document summaries generation completed");
+    tracing::info!("[Executor] Document summaries generation completed");
     Ok(())
 }
 
@@ -104,7 +104,7 @@ pub async fn generate_iteration_knowledge(
     iteration: &Iteration,
     model: Arc<dyn Llm>,
 ) -> anyhow::Result<()> {
-    println!(
+    tracing::info!(
         "[Executor] Generating iteration knowledge for {}...",
         iteration.id
     );
@@ -116,14 +116,14 @@ pub async fn generate_iteration_knowledge(
         .get_iteration_knowledge(&iteration.id)
         .is_some()
     {
-        println!(
+        tracing::info!(
             "[Executor] Knowledge already exists for iteration {}, skipping",
             iteration.id
         );
         return Ok(());
     }
 
-    println!("[Executor] Creating knowledge generation agent...");
+    tracing::info!("[Executor] Creating knowledge generation agent...");
 
     let knowledge_agent = crate::agents::create_knowledge_generation_agent(
         model.clone(),
@@ -132,12 +132,12 @@ pub async fn generate_iteration_knowledge(
         iteration.base_iteration_id.clone(),
     )?;
 
-    println!("[Executor] Setting iteration ID for tool context...");
+    tracing::info!("[Executor] Setting iteration ID for tool context...");
     crate::persistence::set_iteration_id(iteration.id.clone());
 
     let prompt = "Please analyze this iteration and generate a comprehensive knowledge snapshot. Use the available tools to load document summaries, examine the codebase structure, and extract meaningful knowledge.";
 
-    println!("[Executor] Creating invocation context...");
+    tracing::info!("[Executor] Creating invocation context...");
 
     let iteration_dir = iteration_store.iteration_path(&iteration.id)?;
     let ctx_content = Content::new("user").with_text(prompt);
@@ -148,17 +148,17 @@ pub async fn generate_iteration_knowledge(
         knowledge_agent.clone(),
     ));
 
-    println!("[Executor] Running knowledge generation agent...");
+    tracing::info!("[Executor] Running knowledge generation agent...");
 
     let stream = match knowledge_agent.run(invocation_ctx).await {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("[Executor] Failed to create stream: {}", e);
+            tracing::error!("[Executor] Failed to create stream: {}", e);
             return Err(anyhow::anyhow!("Failed to create stream: {}", e));
         }
     };
 
-    println!("[Executor] Processing agent stream...");
+    tracing::info!("[Executor] Processing agent stream...");
 
     let mut stream = std::pin::pin!(stream);
     let mut step_count = 0;
@@ -166,10 +166,10 @@ pub async fn generate_iteration_knowledge(
     while let Some(result) = stream.next().await {
         step_count += 1;
         if step_count % 10 == 0 {
-            println!("[Executor] Stream processing step {}...", step_count);
+            tracing::debug!("[Executor] Stream processing step {}...", step_count);
         }
         if let Err(e) = result {
-            eprintln!("[Executor] Stream error at step {}: {}", step_count, e);
+            tracing::error!("[Executor] Stream error at step {}: {}", step_count, e);
             last_error = Some(anyhow::anyhow!("Stream error at step {}: {}", step_count, e));
         }
     }
@@ -178,7 +178,7 @@ pub async fn generate_iteration_knowledge(
         return Err(e);
     }
 
-    println!(
+    tracing::info!(
         "[Executor] Stream processing completed after {} steps",
         step_count
     );
@@ -188,10 +188,10 @@ pub async fn generate_iteration_knowledge(
         .get_iteration_knowledge(&iteration.id)
         .is_some()
     {
-        println!("[Executor] Iteration knowledge generated and saved successfully");
+        tracing::info!("[Executor] Iteration knowledge generated and saved successfully");
     } else {
-        eprintln!(
-            "[Executor] Warning: Knowledge generation completed but knowledge not found in project memory"
+        tracing::warn!(
+            "[Executor] Knowledge generation completed but knowledge not found in project memory"
         );
     }
 
@@ -209,7 +209,7 @@ pub async fn inject_project_knowledge(
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("Evolution iteration must have base_iteration_id"))?;
 
-    println!(
+    tracing::info!(
         "[Executor] Injecting project knowledge from base iteration {}...",
         base_iteration_id
     );
@@ -245,7 +245,7 @@ pub async fn inject_project_knowledge(
         );
     } else {
         // Fallback: Load artifacts directly from base iteration
-        println!(
+        tracing::info!(
             "[Executor] Knowledge summary not found, loading artifacts directly from base iteration..."
         );
 
@@ -276,8 +276,8 @@ pub async fn inject_project_knowledge(
         if context_parts.len() > 1 {
             iter_memory.add_insight("project_context", context_parts.join(""));
         } else {
-            println!(
-                "[Executor] Warning: No artifacts found in base iteration {}",
+            tracing::warn!(
+                "[Executor] No artifacts found in base iteration {}",
                 base_iteration_id
             );
             iter_memory.add_insight(
@@ -297,7 +297,7 @@ pub async fn inject_project_knowledge(
 
     memory_store.save_iteration_memory(&iter_memory)?;
 
-    println!(
+    tracing::info!(
         "[Executor] Project knowledge injected to iteration {}",
         iteration.id
     );
@@ -310,7 +310,7 @@ pub async fn regenerate_iteration_knowledge(
     iteration_id: &str,
     model: Arc<dyn Llm>,
 ) -> anyhow::Result<()> {
-    println!(
+    tracing::info!(
         "[Executor] Regenerating knowledge for iteration {}...",
         iteration_id
     );
@@ -335,7 +335,7 @@ pub async fn regenerate_iteration_knowledge(
     // Then generate knowledge
     generate_iteration_knowledge(iteration_store, &iteration, model).await?;
 
-    println!("[Executor] Knowledge regeneration completed");
+    tracing::info!("[Executor] Knowledge regeneration completed");
     Ok(())
 }
 

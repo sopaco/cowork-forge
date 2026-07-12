@@ -50,16 +50,13 @@ impl TauriBackend {
 #[async_trait::async_trait]
 impl InteractiveBackend for TauriBackend {
     async fn show_message(&self, level: cowork_core::interaction::MessageLevel, content: String) {
-        // Legacy method - emit without agent context
+        // Emit without agent context (used by show_message default impl)
         let _ = self.app_handle.emit("agent_event", serde_json::json!({
             "content": content,
             "agent_name": "System",
             "message_type": "normal",
             "level": format!("{:?}", level)
         }));
-
-        // Also emit legacy message event for backward compatibility
-        let _ = self.app_handle.emit("message", (format!("{:?}", level), content));
     }
 
     async fn show_message_with_context(&self, level: cowork_core::interaction::MessageLevel, content: String, context: MessageContext) {
@@ -313,7 +310,7 @@ async fn set_workspace(
 ) -> Result<(), String> {
     use std::path::Path;
 
-    eprintln!("[GUI] Setting workspace to: {}", workspace_path);
+    tracing::info!("[GUI] Setting workspace to: {}", workspace_path);
 
     let path = Path::new(&workspace_path);
     if !path.exists() {
@@ -338,7 +335,7 @@ async fn set_workspace(
     // Set the global workspace path in cowork-core
     // This is critical for macOS app bundle launches where current_dir() returns unexpected values
     cowork_core::persistence::set_workspace_path(path.to_path_buf());
-    eprintln!("[GUI] Set global workspace path in cowork-core: {:?}", path);
+    tracing::info!("[GUI] Set global workspace path in cowork-core: {:?}", path);
 
     // Change current directory
     std::env::set_current_dir(path)
@@ -389,7 +386,7 @@ async fn set_workspace(
             project_name,
             Some(format!("Cowork project at {}", workspace_path))
         ) {
-            eprintln!("[GUI] Warning: Failed to auto-register project: {}", e);
+            tracing::warn!("[GUI] Failed to auto-register project: {}", e);
             // Don't fail the whole operation if registration fails
         } else {
             println!("[GUI] Project registered successfully");
@@ -431,7 +428,7 @@ fn reset_running_iterations() {
                     println!("[GUI] Resetting iteration '{}' from Running to Paused", iteration.id);
                     iteration.status = IterationStatus::Paused;
                     if let Err(e) = iteration_store.save(&iteration) {
-                        eprintln!("[GUI] Warning: Failed to reset iteration {}: {}", iteration.id, e);
+                        tracing::warn!("[GUI] Failed to reset iteration {}: {}", iteration.id, e);
                     } else {
                         reset_count += 1;
                     }
@@ -442,7 +439,7 @@ fn reset_running_iterations() {
             }
         }
         Err(e) => {
-            eprintln!("[GUI] Warning: Failed to load iterations for reset: {}", e);
+            tracing::warn!("[GUI] Failed to load iterations for reset: {}", e);
         }
     }
 }
@@ -495,7 +492,7 @@ async fn open_project_in_current_window(
     drop(registry);
 
     // Log for debugging
-    eprintln!("[GUI] Project opened in current window: {}", workspace_path);
+    tracing::info!("[GUI] Project opened in current window: {}", workspace_path);
 
     // Set workspace in current window
     let path = Path::new(&workspace_path);
@@ -506,7 +503,7 @@ async fn open_project_in_current_window(
     // Set the global workspace path in cowork-core
     // This is critical for macOS app bundle launches where current_dir() returns unexpected values
     cowork_core::persistence::set_workspace_path(path.to_path_buf());
-    eprintln!("[GUI] Set global workspace path in cowork-core: {:?}", path);
+    tracing::info!("[GUI] Set global workspace path in cowork-core: {:?}", path);
 
     std::env::set_current_dir(path)
         .map_err(|e| format!("Failed to set current directory: {}", e))?;
@@ -600,7 +597,7 @@ async fn create_project_at_path(
 
 
 // ============================================================================
-// Legacy Session Commands (use iteration-based API instead)
+// HITL Input Response Handler - resolves user input via oneshot channel
 // ============================================================================
 
 #[tauri::command]
@@ -677,7 +674,7 @@ pub fn run() {
                         config_ready.store(true, std::sync::atomic::Ordering::Release);
                     }
                     Err(e) => {
-                        eprintln!("[GUI] Failed to initialize config registry: {}", e);
+                        tracing::error!("[GUI] Failed to initialize config registry: {}", e);
                         // Still mark as ready so the app doesn't hang
                         config_ready.store(true, std::sync::atomic::Ordering::Release);
                     }
@@ -696,7 +693,7 @@ pub fn run() {
                         }
                     }
                     Err(e) => {
-                        eprintln!("[GUI] Failed to initialize MCP: {}", e);
+                        tracing::error!("[GUI] Failed to initialize MCP: {}", e);
                     }
                 }
             });
@@ -728,12 +725,12 @@ pub fn run() {
                     // Set the global workspace path in cowork-core
                     // This is critical for macOS app bundle launches where current_dir() returns unexpected values
                     cowork_core::persistence::set_workspace_path(path.to_path_buf());
-                    eprintln!("[GUI] Set global workspace path in cowork-core: {:?}", path);
+                    tracing::info!("[GUI] Set global workspace path in cowork-core: {:?}", path);
                     
                     if let Err(e) = std::env::set_current_dir(path) {
-                        eprintln!("[GUI] Failed to set workspace directory: {}", e);
+                        tracing::error!("[GUI] Failed to set workspace directory: {}", e);
                     } else {
-                        eprintln!("[GUI] Working directory set to: {}", workspace);
+                        tracing::info!("[GUI] Working directory set to: {}", workspace);
                         // Store in app state
                         if let Some(state) = app.try_state::<AppState>() {
                             if let Ok(mut ws) = state.workspace_path.lock() {
@@ -747,11 +744,11 @@ pub fn run() {
                         // Emit project_loaded event to notify frontend to navigate to iterations page
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.emit("project_loaded", ());
-                            eprintln!("[GUI] Emitted project_loaded event for workspace: {}", workspace);
+                            tracing::debug!("[GUI] Emitted project_loaded event for workspace: {}", workspace);
                         }
                     }
                 } else {
-                    eprintln!("[GUI] Invalid workspace path: {}", workspace);
+                    tracing::warn!("[GUI] Invalid workspace path: {}", workspace);
                 }
             }
 

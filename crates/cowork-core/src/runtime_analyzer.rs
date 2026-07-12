@@ -926,12 +926,12 @@ Now extract the port information from the README above."#,
     let cache_file = cache_dir.join("readme_runtime_cache.json");
     
     if let Err(e) = fs::create_dir_all(&cache_dir) {
-        eprintln!("[RuntimeAnalyzer] Failed to create cache directory: {}", e);
+        tracing::warn!("[RuntimeAnalyzer] Failed to create cache directory: {}", e);
     } else {
         if let Err(e) = fs::write(&cache_file, serde_json::to_string_pretty(&cache_data).unwrap()) {
-            eprintln!("[RuntimeAnalyzer] Failed to write cache: {}", e);
+            tracing::warn!("[RuntimeAnalyzer] Failed to write cache: {}", e);
         } else {
-            println!("[RuntimeAnalyzer] Cached README analysis: port={}, hash={}", port, readme_hash);
+            tracing::info!("[RuntimeAnalyzer] Cached README analysis: port={}, hash={}", port, readme_hash);
         }
     }
 

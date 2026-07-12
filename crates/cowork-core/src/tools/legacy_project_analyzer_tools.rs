@@ -545,7 +545,7 @@ impl Tool for SaveArtifactTool {
         std::fs::write(&artifact_path, content)
             .map_err(|e| adk_core::AdkError::tool(format!("Failed to write artifact: {}", e)))?;
 
-        eprintln!("[SaveArtifactTool] Saved {} to {:?}", filename, artifact_path);
+        tracing::info!("[SaveArtifactTool] Saved {} to {:?}", filename, artifact_path);
 
         Ok(json!({
             "status": "success",

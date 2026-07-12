@@ -27,7 +27,7 @@ pub struct ImportProgressEvent {
 }
 
 fn emit_progress(app_handle: &tauri::AppHandle, step: &str, message: &str, progress: u8) {
-    eprintln!("[IMPORT] Progress: {}% - {} ({})", progress, message, step);
+    tracing::info!("[IMPORT] Progress: {}% - {} ({})", progress, message, step);
     let _ = app_handle.emit("import_progress", ImportProgressEvent {
         step: step.to_string(),
         message: message.to_string(),
@@ -110,21 +110,21 @@ async fn run_llm_agent(
     artifact_options: &str,
     app_handle: &tauri::AppHandle,
 ) -> Result<Vec<String>, String> {
-    eprintln!("[IMPORT] Loading LLM config...");
+    tracing::info!("[IMPORT] Loading LLM config...");
     
     // Load LLM configuration
     let llm_config = load_config().map_err(|e| {
         format!("Failed to load LLM config: {}", e)
     })?;
 
-    eprintln!("[IMPORT] Creating LLM client...");
+    tracing::info!("[IMPORT] Creating LLM client...");
     let model = create_llm_client(&llm_config.llm).map_err(|e| {
         format!("Failed to create LLM client: {}", e)
     })?;
 
     let project_path_str = project_path.to_string_lossy().to_string();
     
-    eprintln!("[IMPORT] Creating Legacy Project Analyzer agent...");
+    tracing::info!("[IMPORT] Creating Legacy Project Analyzer agent...");
     // ADK LlmAgentBuilder handles tool registration and automatic tool calling
     let agent = create_legacy_project_analyzer_with_context(
         model,
@@ -147,7 +147,7 @@ Then generate and save each artifact using save_artifact tool.
         project_path_str, project_path_str, artifact_options
     );
 
-    eprintln!("[IMPORT] Executing LLM agent (ADK handles tool calling automatically)...");
+    tracing::info!("[IMPORT] Executing LLM agent (ADK handles tool calling automatically)...");
 
     // Create a minimal pipeline context
     let project = Project::new("imported_project");
@@ -177,7 +177,7 @@ Then generate and save each artifact using save_artifact tool.
 
     use futures::StreamExt;
 
-    eprintln!("[IMPORT] Monitoring agent output...");
+    tracing::info!("[IMPORT] Monitoring agent output...");
 
     // Simply monitor the stream - ADK handles all tool execution internally
     while let Some(result) = stream.next().await {
@@ -196,12 +196,12 @@ Then generate and save each artifact using save_artifact tool.
                 }
             }
             Err(e) => {
-                eprintln!("[IMPORT] Stream error: {}", e);
+                tracing::warn!("[IMPORT] Stream error: {}", e);
             }
         }
     }
 
-    eprintln!("[IMPORT] LLM Agent completed. Checking for saved artifacts...");
+    tracing::info!("[IMPORT] LLM Agent completed. Checking for saved artifacts...");
 
     // Verify artifacts were created by checking the file system
     let check_files = ["idea.md", "prd.md", "design.md", "plan.md"];
@@ -211,7 +211,7 @@ Then generate and save each artifact using save_artifact tool.
     for filename in &check_files {
         let file_path = artifacts_dir.join(filename);
         if file_path.exists() {
-            eprintln!("[IMPORT] Found artifact: {}", filename);
+            tracing::info!("[IMPORT] Found artifact: {}", filename);
             saved_artifacts.push(filename.to_string());
         }
     }
@@ -225,9 +225,9 @@ Then generate and save each artifact using save_artifact tool.
                 // Move file to iteration artifacts directory
                 let dest_file = artifacts_dir.join(filename);
                 if let Err(e) = std::fs::copy(&root_file, &dest_file) {
-                    eprintln!("[IMPORT] Failed to copy {} from root artifacts: {}", filename, e);
+                    tracing::warn!("[IMPORT] Failed to copy {} from root artifacts: {}", filename, e);
                 } else {
-                    eprintln!("[IMPORT] Moved {} from root artifacts to iteration", filename);
+                    tracing::info!("[IMPORT] Moved {} from root artifacts to iteration", filename);
                     saved_artifacts.push(filename.to_string());
                 }
             }
@@ -238,7 +238,7 @@ Then generate and save each artifact using save_artifact tool.
     saved_artifacts.sort();
     saved_artifacts.dedup();
 
-    eprintln!("[IMPORT] Total artifacts saved: {}", saved_artifacts.len());
+    tracing::info!("[IMPORT] Total artifacts saved: {}", saved_artifacts.len());
 
     Ok(saved_artifacts)
 }
@@ -264,15 +264,15 @@ fn generate_template_artifacts(
         );
 
         let artifact_path = artifacts_dir.join(&artifact.filename);
-        eprintln!("[IMPORT] Saving artifact: {:?} to {:?}", artifact.filename, artifact_path);
+        tracing::debug!("[IMPORT] Saving artifact: {:?} to {:?}", artifact.filename, artifact_path);
 
         match std::fs::write(&artifact_path, &artifact.content) {
             Ok(_) => {
-                eprintln!("[IMPORT] Successfully saved: {:?}", artifact_path);
+                tracing::info!("[IMPORT] Successfully saved: {:?}", artifact_path);
                 generated_files.push(artifact.filename.clone());
             }
             Err(e) => {
-                eprintln!("[IMPORT] Failed to save {:?}: {}", artifact_path, e);
+                tracing::warn!("[IMPORT] Failed to save {:?}: {}", artifact_path, e);
             }
         }
     }
@@ -402,8 +402,8 @@ pub async fn import_project(
         format!("Failed to create workspace directory: {}", e)
     })?;
     
-    eprintln!("[IMPORT] Iteration directory: {:?}", iteration_dir);
-    eprintln!("[IMPORT] Artifacts directory: {:?}", artifacts_dir);
+    tracing::debug!("[IMPORT] Iteration directory: {:?}", iteration_dir);
+    tracing::debug!("[IMPORT] Artifacts directory: {:?}", artifacts_dir);
     
     // CRITICAL: Copy project source files to workspace
     // This ensures that partial iterations have access to the existing code
@@ -411,7 +411,7 @@ pub async fn import_project(
     copy_project_to_workspace(&project_path, &workspace_dir).map_err(|e| {
         format!("Failed to copy project files: {}", e)
     })?;
-    eprintln!("[IMPORT] Project files copied to workspace");
+    tracing::info!("[IMPORT] Project files copied to workspace");
 
     // Step 6: Analyze project (35%)
     emit_progress(&app_handle, "analyze", "Analyzing project structure and technology stack...", 35);
@@ -420,7 +420,7 @@ pub async fn import_project(
         format!("Failed to analyze project: {}", e)
     })?;
     
-    eprintln!("[IMPORT] Analysis complete: {} technologies detected", analysis.technologies.len());
+    tracing::info!("[IMPORT] Analysis complete: {} technologies detected", analysis.technologies.len());
 
     // Build artifact options string
     let artifact_options = format!(
@@ -441,12 +441,12 @@ pub async fn import_project(
         
         match run_llm_agent(&project_path, &artifacts_dir, &artifact_options, &app_handle).await {
             Ok(files) if !files.is_empty() => {
-                eprintln!("[IMPORT] LLM generation successful: {:?} files", files);
+                tracing::info!("[IMPORT] LLM generation successful: {:?} files", files);
                 generated_files = files;
                 used_llm = true;
             }
             Ok(_) => {
-                eprintln!("[IMPORT] LLM returned no files, falling back to template...");
+                tracing::warn!("[IMPORT] LLM returned no files, falling back to template...");
                 let options = cowork_core::importer::ArtifactGenerationOptions {
                     generate_idea: generateIdea,
                     generate_prd: generatePrd,
@@ -458,7 +458,7 @@ pub async fn import_project(
                 generated_files = generate_template_artifacts(&analysis, &options, &artifacts_dir, &app_handle)?;
             }
             Err(e) => {
-                eprintln!("[IMPORT] LLM generation failed: {}, falling back to template", e);
+                tracing::warn!("[IMPORT] LLM generation failed: {}, falling back to template", e);
                 emit_progress(&app_handle, "fallback", &format!("LLM unavailable, using template: {}", e), 45);
                 let options = cowork_core::importer::ArtifactGenerationOptions {
                     generate_idea: generateIdea,
