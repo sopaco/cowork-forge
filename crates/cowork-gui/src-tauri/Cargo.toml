@@ -14,7 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
-tauri = { version = "2.11.5", features = [] }
+tauri = { version = "2.11.5", features = ["tray-icon"] }
 tauri-plugin-opener = "2.5.4"
 tauri-plugin-dialog = "2.7.1"
 serde = { version = "1", features = ["derive"] }
@@ -38,6 +38,9 @@ lazy_static = "1.5"
 
 # Logging
 tracing = "0.1"
+
+# Image decoding (for tray icons - runtime decoding of embedded PNGs)
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 # File system
 dirs = { workspace = true }

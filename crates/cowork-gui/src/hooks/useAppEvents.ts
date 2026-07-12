@@ -440,6 +440,14 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 					console.error('[App] Knowledge regeneration failed:', iterationId, error);
 					message.error('Knowledge generation failed: ' + error);
 				}),
+
+				// Tray navigation event (emitted when user clicks "Settings" in tray menu)
+				listen<string>('tray_navigate', (event) => {
+					const target = event.payload;
+					if (target === 'settings') {
+						uiState.setActiveView('settings');
+					}
+				}),
 			];
 
 			// Wait for all listeners to be registered in parallel

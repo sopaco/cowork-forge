@@ -18,6 +18,7 @@ mod project_manager;
 mod iteration_commands;
 mod static_server;
 mod config_commands;
+mod tray;
 
 use project_manager::*;
 
@@ -69,6 +70,9 @@ impl InteractiveBackend for TauriBackend {
             MessageType::Streaming { .. } => "streaming",
         };
 
+        // Update tray icon to reflect the current agent (dynamic agent icon)
+        crate::tray::set_current_agent(Some(context.agent_name.clone()));
+
         // Emit agent_event for frontend processing display
         let _ = self.app_handle.emit("agent_event", serde_json::json!({
             "content": content,
@@ -81,6 +85,11 @@ impl InteractiveBackend for TauriBackend {
     }
 
     async fn send_streaming(&self, content: String, agent_name: &str, is_thinking: bool) {
+        // Update tray icon to reflect the current agent (dynamic agent icon).
+        // set_current_agent skips work when the agent hasn't changed, so this
+        // is safe to call on every streaming chunk.
+        crate::tray::set_current_agent(Some(agent_name.to_string()));
+
         // Emit streaming event for real-time display
         let _ = self.app_handle.emit("agent_streaming", serde_json::json!({
             "content": content,
@@ -383,7 +392,7 @@ async fn set_workspace(
         println!("[GUI] Auto-registering project to registry");
         if let Err(e) = registry.register_project(
             workspace_path.clone(),
-            project_name,
+            project_name.clone(),
             Some(format!("Cowork project at {}", workspace_path))
         ) {
             tracing::warn!("[GUI] Failed to auto-register project: {}", e);
@@ -403,6 +412,17 @@ async fn set_workspace(
     let mut workspace = state.workspace_path.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
     *workspace = Some(workspace_path.clone());
+    drop(workspace);
+
+    // Update window title to include the project name
+    let project_name = read_project_name_from_workspace(path)
+        .or_else(|| Some(project_name.clone()));
+    if let Err(e) = window.set_title(&format_window_title(project_name.as_deref())) {
+        tracing::warn!("[GUI] Failed to update window title: {}", e);
+    }
+
+    // Update tray menu with the project name
+    crate::tray::set_project_name(project_name.clone());
 
     // Emit event to trigger reload
     let _ = window.emit("project_loaded", ());
@@ -411,7 +431,30 @@ async fn set_workspace(
     Ok(())
 }
 
-/// Reset all running iterations to paused state
+/// Read project name from `.cowork-v2/project.json` in the given workspace path.
+/// Returns `None` if the project is not yet initialized or the file cannot be read.
+pub(crate) fn read_project_name_from_workspace(workspace_path: &std::path::Path) -> Option<String> {
+    let project_file = workspace_path.join(".cowork-v2").join("project.json");
+    if !project_file.exists() {
+        return None;
+    }
+    let content = fs::read_to_string(&project_file).ok()?;
+    let project: cowork_core::domain::Project = serde_json::from_str(&content).ok()?;
+    let name = project.name.trim().to_string();
+    if name.is_empty() { None } else { Some(name) }
+}
+
+/// Build the window title based on the (optional) project name.
+/// - `Some(name)` => `"Cowork Forge - <name>"`
+/// - `None`       => `"Cowork Forge"` (default app name)
+pub(crate) fn format_window_title(project_name: Option<&str>) -> String {
+    match project_name {
+        Some(name) if !name.is_empty() => format!("Cowork Forge - {}", name),
+        _ => "Cowork Forge".to_string(),
+    }
+}
+
+/// Reset all "running" iterations to paused state
 /// This should be called when opening a project to ensure no "orphaned" running states
 fn reset_running_iterations() {
     use cowork_core::persistence::IterationStore;
@@ -513,7 +556,19 @@ async fn open_project_in_current_window(
 
     let mut workspace = state.workspace_path.lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
-    *workspace = Some(workspace_path);
+    *workspace = Some(workspace_path.clone());
+    drop(workspace);
+
+    // Update window title to include the project name.
+    // Prefer the name stored in `.cowork-v2/project.json` (the source of truth for
+    // `gui_get_project`); fall back to the registry record's name.
+    let project_name = read_project_name_from_workspace(path).unwrap_or_else(|| project.name.clone());
+    if let Err(e) = window.set_title(&format_window_title(Some(&project_name))) {
+        tracing::warn!("[GUI] Failed to update window title: {}", e);
+    }
+
+    // Update tray menu with the project name
+    crate::tray::set_project_name(Some(project_name));
 
     // Emit event to trigger reload
     let _ = window.emit("project_loaded", ());
@@ -654,7 +709,22 @@ pub fn run() {
         .setup(move |app| {
             // Initialize app handle for project runner
             init_app_handle(app.handle().clone());
-            
+
+            // Initialize system tray (per-window, one tray per process)
+            tray::init_tray(app.handle());
+
+            // Intercept window close: hide to tray instead of exiting the app.
+            // The user can quit via the tray menu's "Quit" item.
+            if let Some(window) = app.get_webview_window("main") {
+                let window_clone = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = window_clone.hide();
+                    }
+                });
+            }
+
             // Initialize system locale at startup
             system::init_system_locale();
             
@@ -740,9 +810,16 @@ pub fn run() {
                         
                         // Reset any "running" iterations to "paused" since there's no actual execution after reopening
                         reset_running_iterations();
-                        
-                        // Emit project_loaded event to notify frontend to navigate to iterations page
+
+                        // Update window title to include the project name and emit project_loaded
+                        // event to notify frontend to navigate to iterations page.
                         if let Some(window) = app.get_webview_window("main") {
+                            let title_project_name = read_project_name_from_workspace(path);
+                            if let Err(e) = window.set_title(&format_window_title(title_project_name.as_deref())) {
+                                tracing::warn!("[GUI] Failed to update window title: {}", e);
+                            }
+                            // Update tray menu with the project name
+                            crate::tray::set_project_name(title_project_name);
                             let _ = window.emit("project_loaded", ());
                             tracing::debug!("[GUI] Emitted project_loaded event for workspace: {}", workspace);
                         }
