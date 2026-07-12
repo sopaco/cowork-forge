@@ -2,13 +2,13 @@
 
 Compiled from `terrain-meta.json` before Agent context generation.
 
-## Private knowledge (.terrain/knowledge/00-glossary.md)
+## Private knowledge (.terrain\knowledge\00-glossary.md)
 
 _Source: `.terrain/knowledge/00-glossary.md`_
 
 
 
-## Private knowledge (.terrain/knowledge/adk-rust.md)
+## Private knowledge (.terrain\knowledge\adk-rust.md)
 
 _Source: `.terrain/knowledge/adk-rust.md` (truncated)_
 
