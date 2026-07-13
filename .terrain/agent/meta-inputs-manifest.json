@@ -1,16 +1,16 @@
 {
-  "collected_at": "2026-07-12T13:40:05.479012700+00:00",
+  "collected_at": "2026-07-13T01:44:29.384460+00:00",
   "meta_files": [],
   "input_count": 2,
   "sources": [
     {
-      "label": "Private knowledge (.terrain\\knowledge\\00-glossary.md)",
+      "label": "Private knowledge (.terrain/knowledge/00-glossary.md)",
       "source": ".terrain/knowledge/00-glossary.md",
       "chars": 0,
       "truncated": false
     },
     {
-      "label": "Private knowledge (.terrain\\knowledge\\adk-rust.md)",
+      "label": "Private knowledge (.terrain/knowledge/adk-rust.md)",
       "source": ".terrain/knowledge/adk-rust.md",
       "chars": 3503,
       "truncated": true

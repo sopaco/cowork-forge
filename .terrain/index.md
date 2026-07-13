@@ -19,35 +19,35 @@ source: .
 
 ## Structure
 
+  - Cargo.toml
+  - crates/
+    - cowork-gui/
+    - cowork-cli/
+    - cowork-core/
+  - LICENSE
   - .agents/
     - skills/
   - .claude/
     - skills/
-  - .codegraph/
-    - .gitignore
-    - codegraph.db
+  - Cargo.lock
+  - litho.docs/
+    - zh/
+    - en/
+  - README.md
+  - .gitignore
+  - README_zh.md
   - .github/
     - workflows/
-  - .gitignore
   - AGENTS.md
   - assets/
-    - blend_banner.png
-    - clarify_flows.jpg
-    - clarify_snapshot_gui.jpg
-    - clarify_teams_like_human.jpg
     - icon_cowork.png
-    - icon_cowork_v1.png
-    - icon_cowork_v2b.jpeg
     - snapshots/
-  - Cargo.lock
-  - Cargo.toml
-  - crates/
-    - cowork-cli/
-    - cowork-core/
-    - cowork-gui/
-  - LICENSE
-  - litho.docs/
-    - en/
-    - zh/
-  - README.md
-  - README_zh.md
+    - blend_banner.png
+    - icon_cowork_v2b.jpeg
+    - clarify_flows.jpg
+    - icon_cowork_v1.png
+    - clarify_teams_like_human.jpg
+    - clarify_snapshot_gui.jpg
+  - .codegraph/
+    - codegraph.db
+    - .gitignore
