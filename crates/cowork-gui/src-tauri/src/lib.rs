@@ -945,9 +945,14 @@ pub fn run() {
     // Use the callback form of `run` so we can intercept app-exit events and
     // clean up child processes (dev servers, static servers) that would
     // otherwise be orphaned and keep holding their ports.
-    app.run(|_app_handle, event| {
-        if let tauri::RunEvent::Exit = event {
-            cleanup_on_exit();
+    app.run(|app_handle, event| {
+        match event {
+            tauri::RunEvent::Exit => cleanup_on_exit(),
+            // macOS Dock icon click after hide-to-tray (CloseRequested → hide).
+            // Tray menu already calls show_main_window; Dock needs Reopen.
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen { .. } => tray::show_main_window(app_handle),
+            _ => {}
         }
     });
 }

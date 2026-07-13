@@ -290,7 +290,8 @@ fn on_tray_icon_event(tray: &TrayIcon, event: TrayIconEvent) {
     }
 }
 
-fn show_main_window(app: &AppHandle) {
+/// Restore the main window after hide-to-tray (tray click, Dock icon, etc.).
+pub fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
