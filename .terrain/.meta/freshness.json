@@ -3,56 +3,62 @@
   "project": "cowork-forge",
   "repo_path": ".",
   "baseline": {
-    "git_head": "ceb88dd119b86c041c313c00167511337fd9e0e5",
-    "git_head_at": "2026-07-13T02:57:20.581076+00:00",
+    "git_head": "5692d563b8b82e898c7c4eddab512c0cd5663f6e",
+    "git_head_at": "2026-07-14T12:09:34.506881+00:00",
     "dirty": false
   },
   "assets": {
     "agent_pack": {
       "path": "agent/repomix.md",
-      "synced_at": "2026-07-13T02:13:58.011206+00:00",
-      "baseline_git_head": "e61934b0926e1226da9a72bc5f7baac5f1fad724",
+      "synced_at": "2026-07-13T08:18:00.016642+00:00",
+      "baseline_git_head": "5692d563b8b82e898c7c4eddab512c0cd5663f6e",
       "stale": false,
       "freshness_score": 98
     },
     "agent_context": {
       "path": "agent/context.md",
-      "synced_at": "2026-07-13T02:14:53.747755+00:00",
-      "baseline_git_head": "e61934b0926e1226da9a72bc5f7baac5f1fad724",
+      "synced_at": "2026-07-13T08:19:41.727947+00:00",
+      "baseline_git_head": "5692d563b8b82e898c7c4eddab512c0cd5663f6e",
       "stale": false,
       "freshness_score": 88
     },
     "human_docs": {
       "path": "human/",
-      "synced_at": "2026-07-13T02:13:58.011702+00:00",
+      "synced_at": "2026-07-13T08:18:00.017110+00:00",
       "stale": false,
       "freshness_score": 98
     }
   },
   "drift": {
-    "commits_since_baseline": 1,
+    "commits_since_baseline": 0,
     "changed_files_since_baseline": 0,
     "sample_changed_files": []
   },
   "summary": {
     "overall_score": 88,
     "overall_stale": false,
-    "commits_since_baseline": 1,
+    "commits_since_baseline": 0,
     "changed_files_count": 0,
-    "current_git_head": "ceb88dd",
+    "current_git_head": "5692d56",
     "working_tree_dirty": false,
     "is_git_repo": true,
-    "last_computed_at": "2026-07-13T02:57:20.581076+00:00",
+    "last_computed_at": "2026-07-14T12:09:34.506881+00:00",
     "agent_pack_score": 98,
     "agent_context_score": 88,
     "human_docs_score": 98,
     "macro_preload_allowed": true,
     "drift_factors": [
       {
-        "id": "commits_behind",
-        "severity": "medium",
-        "title": "代码已前进 1 个提交",
-        "detail": "知识资产 baseline 为 e61934b0926e1226da9a72bc5f7baac5f1fad724，当前 HEAD 为 ceb88dd。每多 1 个提交约扣 2 分（上限 40 分）。",
+        "id": "baseline_match",
+        "severity": "info",
+        "title": "与 baseline 提交一致",
+        "detail": "源码索引与 Agent 上下文均基于提交 5692d563b8b82e898c7c4eddab512c0cd5663f6e 生成，相对 HEAD 无文件漂移。"
+      },
+      {
+        "id": "pack_age",
+        "severity": "low",
+        "title": "源码索引已生成 1 天",
+        "detail": "距上次 Repomix 打包越久，额外扣分越多（每天约 2 分，上限 20 分）。",
         "points_lost": 2
       },
       {
@@ -69,8 +75,8 @@
         "detail": "综合分取三层最低值：源码索引 98、Agent 上下文 88、人类文档 98。"
       }
     ],
-    "pack_baseline_short": "e61934b",
-    "context_baseline_short": "e61934b"
+    "pack_baseline_short": "5692d56",
+    "context_baseline_short": "5692d56"
   },
-  "last_computed_at": "2026-07-13T02:57:20.581076+00:00"
+  "last_computed_at": "2026-07-14T12:09:34.506881+00:00"
 }
