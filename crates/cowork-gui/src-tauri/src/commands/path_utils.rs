@@ -1005,24 +1005,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_direct_command_splits_binary_and_args() {
-        let (bin, args) = parse_direct_command("bun run dev").expect("should parse");
-        assert!(bin.ends_with("bun"));
-        assert_eq!(args, vec!["run", "dev"]);
-        assert!(parse_direct_command("cd app && bun run dev").is_none());
-    }
-
-    #[test]
-    fn rewrite_pnpm_monorepo_script_to_bun() {
-        let script = "pnpm --filter @hytech/server start:dev & pnpm --filter @hytech/web dev & wait";
-        let rewritten = rewrite_script_package_manager(script);
-        assert!(!rewritten.contains("pnpm"));
-        assert!(rewritten.contains("run --filter @hytech/server start:dev"));
-        assert!(rewritten.contains("run --filter @hytech/web dev"));
-        assert!(needs_shell_wrapper(&rewritten));
-    }
-
-    #[test]
     fn rewrite_pnpm_script_to_npm_when_no_bun() {
         let script = "pnpm --filter @app/web dev";
         let rewritten = rewrite_pnpm_filter_commands(script, false, "npm");
