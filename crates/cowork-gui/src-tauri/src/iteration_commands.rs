@@ -67,6 +67,16 @@ pub async fn gui_init_project(
 
     let project = store.create(&name).map_err(|e| e.to_string())?;
 
+    // Update window title to reflect the newly initialized project name.
+    // This handles the edge case where the workspace was opened before
+    // `.cowork-v2/project.json` existed (title was "Cowork Forge" until now).
+    if let Err(e) = window.set_title(&crate::format_window_title(Some(&project.name))) {
+        tracing::warn!("[GUI] Failed to update window title after project init: {}", e);
+    }
+
+    // Update tray menu with the project name
+    crate::tray::set_project_name(Some(project.name.clone()));
+
     // Emit event
     let _ = window.emit("project_initialized", ());
 
@@ -197,6 +207,7 @@ pub async fn gui_execute_iteration(
 
     // Emit started event
     let _ = window.emit("iteration_started", iteration_id.clone());
+    crate::tray::set_working(true);
 
     // Execute in background
     let window_clone = window.app_handle().clone();
@@ -205,9 +216,11 @@ pub async fn gui_execute_iteration(
     tokio::spawn(async move {
         match executor.execute(&mut project, &iteration_id_clone, None, Some(model)).await {
             Ok(_) => {
+                crate::tray::set_working(false);
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);
             }
             Err(e) => {
+                crate::tray::set_working(false);
                 let _ = window_clone.emit("iteration_failed", (iteration_id_clone, e.to_string()));
             }
         }
@@ -243,6 +256,7 @@ pub async fn gui_continue_iteration(
 
     // Emit started event
     let _ = window.emit("iteration_continued", iteration_id.clone());
+    crate::tray::set_working(true);
 
     // Execute in background
     let window_clone = window.app_handle().clone();
@@ -252,10 +266,12 @@ pub async fn gui_continue_iteration(
         tracing::info!("[GUI] Starting continue_iteration for iteration: {}", iteration_id_clone);
         match executor.continue_iteration(&mut project, &iteration_id_clone, Some(model)).await {
             Ok(_) => {
+                crate::tray::set_working(false);
                 tracing::info!("[GUI] continue_iteration completed successfully");
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);
             }
             Err(e) => {
+                crate::tray::set_working(false);
                 tracing::error!("[GUI] continue_iteration failed: {}", e);
                 let _ = window_clone.emit("iteration_failed", (iteration_id_clone, e.to_string()));
             }
@@ -292,6 +308,7 @@ pub async fn gui_retry_iteration(
 
     // Emit started event
     let _ = window.emit("iteration_retrying", iteration_id.clone());
+    crate::tray::set_working(true);
 
     // Execute in background
     let window_clone = window.app_handle().clone();
@@ -301,10 +318,12 @@ pub async fn gui_retry_iteration(
         tracing::info!("[GUI] Starting retry_iteration for iteration: {}", iteration_id_clone);
         match executor.retry_iteration(&mut project, &iteration_id_clone, Some(model)).await {
             Ok(_) => {
+                crate::tray::set_working(false);
                 tracing::info!("[GUI] retry_iteration completed successfully");
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);
             }
             Err(e) => {
+                crate::tray::set_working(false);
                 tracing::error!("[GUI] retry_iteration failed: {}", e);
                 let _ = window_clone.emit("iteration_failed", (iteration_id_clone, e.to_string()));
             }

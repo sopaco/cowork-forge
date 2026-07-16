@@ -605,7 +605,9 @@ pub async fn gui_import_config(config_type: String, json_data: String) -> Result
     Ok(())
 }
 
-// Legacy LLM config commands below
+// ============================================================================
+// LLM Configuration Commands
+// ============================================================================
 
 #[tauri::command]
 pub async fn get_app_config() -> Result<ModelConfig, String> {

@@ -15,6 +15,66 @@ use super::gui_types::PreviewInfo;
 #[allow(unused_imports)]
 use std::os::windows::process::CommandExt;
 
+/// Kill a process and all its descendants (the entire process tree).
+///
+/// On Windows, uses `taskkill /T /F` which walks the process tree and force-kills
+/// all descendants. This is critical because `child.kill()` only terminates the
+/// direct child (e.g. `cmd.exe`), leaving the real dev server (`bun.exe`/`node.exe`)
+/// orphaned and still holding the port.
+///
+/// On Unix, kills the entire process group. The child must have been spawned with
+/// `process_group(0)` so that it leads its own group; the PGID equals the child PID.
+fn kill_process_tree(pid: u32) {
+    #[cfg(target_os = "windows")]
+    {
+        // /T = kill tree (all descendants), /F = force
+        let result = std::process::Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        match result {
+            Ok(status) if status.success() => {
+                tracing::info!("[Runner] taskkill succeeded for PID {}", pid);
+            }
+            Ok(status) => {
+                tracing::debug!(
+                    "[Runner] taskkill for PID {} exited with non-success status: {:?}",
+                    pid,
+                    status
+                );
+            }
+            Err(e) => {
+                tracing::warn!("[Runner] taskkill failed for PID {}: {}", pid, e);
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Kill the process group (negative PID targets the whole group).
+        // SIGTERM first for graceful shutdown, then SIGKILL to force.
+        let pgid = format!("-{}", pid);
+        let _ = std::process::Command::new("kill")
+            .args(["-TERM", &pgid])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        let _ = std::process::Command::new("kill")
+            .args(["-KILL", &pgid])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        // Fallback: kill the direct process too
+        let _ = std::process::Command::new("kill")
+            .args(["-KILL", &pid.to_string()])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+    }
+}
+
 pub struct ProjectRunner {
     processes: Arc<Mutex<HashMap<String, ProjectProcess>>>,
     app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
@@ -45,6 +105,9 @@ fn command_exists(cmd: &str) -> bool {
 
 struct ProjectProcess {
     child: Child,
+    /// OS-level PID of the spawned child. Used to kill the entire process tree
+    /// (shell wrapper + dev server + any workers) on stop / exit.
+    pid: u32,
     #[allow(dead_code)]
     output_tx: mpsc::UnboundedSender<String>,
     url: Option<String>,
@@ -136,6 +199,8 @@ impl ProjectRunner {
 
         #[cfg(not(target_os = "windows"))]
         let mut child = {
+            // Spawn the child in its own process group so that `kill_process_tree`
+            // can kill the entire group (dev server + any workers) on stop/exit.
             if let Some((program, args)) = path_utils::parse_direct_command(&resolved_command) {
                 tracing::info!(
                     "[Runner] Spawning directly: {:?} {:?}",
@@ -146,7 +211,8 @@ impl ProjectRunner {
                 cmd.args(&args)
                     .current_dir(&code_path)
                     .stdout(std::process::Stdio::piped())
-                    .stderr(std::process::Stdio::piped());
+                    .stderr(std::process::Stdio::piped())
+                    .process_group(0);
                 path_utils::apply_gui_child_env_async(&mut cmd);
                 cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
             } else {
@@ -163,7 +229,8 @@ impl ProjectRunner {
                 cmd.args(["-lc", &shell_script])
                     .current_dir(&code_path)
                     .stdout(std::process::Stdio::piped())
-                    .stderr(std::process::Stdio::piped());
+                    .stderr(std::process::Stdio::piped())
+                    .process_group(0);
                 path_utils::apply_gui_child_env_async(&mut cmd);
                 cmd.spawn().map_err(|e| format!("Failed to start: {}", e))?
             }
@@ -366,6 +433,7 @@ impl ProjectRunner {
             iteration_id.clone(),
             ProjectProcess {
                 child,
+                pid,
                 output_tx: stdout_tx,
                 url,
                 port,
@@ -450,8 +518,19 @@ impl ProjectRunner {
         };
 
         if let Some(mut process) = process {
-            tracing::info!("[Runner] Stopping process for iteration: {}", iteration_id);
+            tracing::info!(
+                "[Runner] Stopping process tree for iteration: {} (PID: {})",
+                iteration_id,
+                process.pid
+            );
 
+            // Kill the entire process tree (shell wrapper + dev server + workers).
+            // This is critical: `child.kill()` only terminates the direct child
+            // (e.g. `cmd.exe`), leaving the real dev server orphaned and still
+            // holding the port.
+            kill_process_tree(process.pid);
+
+            // Also call child.kill() as a fallback for the direct child.
             let _ = process.child.kill().await;
 
             // Emit stopped event (use expected event name)
@@ -474,6 +553,41 @@ impl ProjectRunner {
                 iteration_id
             );
             Ok(())
+        }
+    }
+
+    /// Synchronously stop ALL running project processes.
+    ///
+    /// Intended to be called from `RunEvent::Exit` (where the async runtime may
+    /// no longer be usable). Kills every tracked process tree and clears the map.
+    /// Does NOT emit frontend events (the frontend is going away).
+    pub fn stop_all_sync(&self) {
+        let entries: Vec<(String, u32)> = {
+            let mut processes = self.processes.lock().unwrap();
+            let entries: Vec<(String, u32)> = processes
+                .iter()
+                .map(|(k, v)| (k.clone(), v.pid))
+                .collect();
+            processes.clear();
+            entries
+        };
+
+        if entries.is_empty() {
+            return;
+        }
+
+        tracing::info!(
+            "[Runner] stop_all_sync: killing {} process tree(s)",
+            entries.len()
+        );
+
+        for (iteration_id, pid) in &entries {
+            tracing::info!(
+                "[Runner] stop_all_sync: killing PID {} for iteration {}",
+                pid,
+                iteration_id
+            );
+            kill_process_tree(*pid);
         }
     }
 

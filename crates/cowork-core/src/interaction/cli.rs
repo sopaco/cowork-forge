@@ -8,7 +8,6 @@ use serde_json::Value;
 use std::io::{self, Write};
 
 pub struct CliBackend {
-    // event_bus removed in V2
 }
 
 impl CliBackend {

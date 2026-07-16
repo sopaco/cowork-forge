@@ -299,18 +299,25 @@ const ProjectsPanel: React.FC = () => {
                         Last opened: {formatDate(project.last_opened_at)}
                       </span>
                     </div>
-                    {project.metadata?.technology_stack?.length > 0 && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-                        {project.metadata.technology_stack.slice(0, 4).map((tech, idx) => (
-                          <Tag key={idx} color="blue">
-                            {tech}
-                          </Tag>
-                        ))}
-                        {project.metadata.technology_stack.length > 4 && (
-                          <Tag color="default">+{project.metadata.technology_stack.length - 4}</Tag>
-                        )}
-                      </div>
-                    )}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "4px",
+                        minHeight: "22px",
+                      }}
+                    >
+                      {(project.metadata?.technology_stack ?? []).slice(0, 4).map((tech, idx) => (
+                        <Tag key={idx} color="blue">
+                          {tech}
+                        </Tag>
+                      ))}
+                      {(project.metadata?.technology_stack?.length ?? 0) > 4 && (
+                        <Tag color="default">
+                          +{(project.metadata?.technology_stack?.length ?? 0) - 4}
+                        </Tag>
+                      )}
+                    </div>
                   </div>
                 }
               />

@@ -10,6 +10,9 @@
       "tool_id": "load_feedback_history"
     },
     {
+      "tool_id": "load_idea"
+    },
+    {
       "tool_id": "get_implementation_plan"
     },
     {

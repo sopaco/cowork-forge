@@ -27,6 +27,8 @@ source: .
   - LICENSE
   - .agents/
     - skills/
+  - .claude/
+    - skills/
   - Cargo.lock
   - litho.docs/
     - zh/
@@ -46,3 +48,6 @@ source: .
     - icon_cowork_v1.png
     - clarify_teams_like_human.jpg
     - clarify_snapshot_gui.jpg
+  - .codegraph/
+    - codegraph.db
+    - .gitignore

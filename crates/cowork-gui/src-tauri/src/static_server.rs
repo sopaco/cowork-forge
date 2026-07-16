@@ -179,6 +179,32 @@ pub fn is_server_running(iteration_id: &str) -> bool {
     servers.contains_key(iteration_id)
 }
 
+/// Stop ALL running static servers. Intended for app-exit cleanup.
+///
+/// Dropping the `shutdown_tx` sender signals each server thread to stop
+/// (the server loop checks `!servers.contains_key(...)` and breaks).
+pub fn stop_all_static_servers() {
+    let mut servers = STATIC_SERVERS.lock().unwrap();
+    let count = servers.len();
+    servers.clear();
+    if count > 0 {
+        println!("[StaticServer] Stopped {} server(s) on exit", count);
+    }
+}
+
+/// Clear ALL fullstack process registrations. Intended for app-exit cleanup.
+///
+/// The actual process killing is handled by `ProjectRunner::stop_all_sync()`;
+/// this just clears the metadata map so stale entries don't linger.
+pub fn stop_all_fullstack_registrations() {
+    let mut processes = FULLSTACK_PROCESSES.lock().unwrap();
+    let count = processes.len();
+    processes.clear();
+    if count > 0 {
+        println!("[StaticServer] Cleared {} fullstack registration(s) on exit", count);
+    }
+}
+
 /// Get server info for the given iteration
 pub fn get_server_info(iteration_id: &str) -> Option<StaticServerInfo> {
     let servers = STATIC_SERVERS.lock().unwrap();
@@ -261,7 +287,7 @@ fn handle_request(
                 let _ = request.respond(response);
             }
             Err(e) => {
-                eprintln!("[StaticServer] Error opening file: {}", e);
+                tracing::error!("[StaticServer] Error opening file: {}", e);
                 let _ = request.respond(
                     tiny_http::Response::from_string("Internal Server Error").with_status_code(500),
                 );

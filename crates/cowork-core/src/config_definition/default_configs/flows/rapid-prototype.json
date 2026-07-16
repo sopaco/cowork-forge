@@ -1,0 +1,45 @@
+{
+  "id": "rapid-prototype",
+  "name": "Rapid Prototype Flow",
+  "description": "Fast idea-to-code flow for quick concept validation. Skips formal PRD, Design, Plan, and Check stages — goes directly from Idea to Coding to Delivery. Ideal for MVPs, demos, and rapid creative application generation.",
+  "version": "1.0.0",
+  "stages": [
+    {
+      "stage_id": "idea",
+      "alias": null,
+      "overrides": {},
+      "on_success": "coding"
+    },
+    {
+      "stage_id": "coding",
+      "alias": null,
+      "overrides": {},
+      "on_success": "delivery"
+    },
+    {
+      "stage_id": "delivery",
+      "alias": null,
+      "overrides": {}
+    }
+  ],
+  "start_stage": "idea",
+  "global_hooks": [],
+  "config": {
+    "stop_on_failure": true,
+    "save_state_on_interrupt": true,
+    "memory_scope": "merged",
+    "inheritance": {
+      "default_mode": "partial",
+      "stage_mapping": {
+        "none": "idea",
+        "partial": "idea",
+        "full": "idea"
+      }
+    }
+  },
+  "tags": ["built-in", "rapid", "prototype", "mvp"],
+  "metadata": {
+    "purpose": "rapid_creative_application_generation",
+    "skipped_stages": ["prd", "design", "plan", "check"]
+  }
+}

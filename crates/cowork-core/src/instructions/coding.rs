@@ -66,14 +66,20 @@ After creating essential files, verify:
 
 ## NEW MODE (全新实现)
 
-### Step 1: Load Plan (MANDATORY)
+### Step 1: Load Plan or Enter RAPID MODE
 1. Call `get_plan()` to see ALL pending tasks
-2. **STOP** if no tasks - report and exit
+2. **If tasks exist** → proceed with plan-based implementation (Step 1.5 below)
+3. **If no tasks (empty plan)** → **RAPID MODE**: this is a rapid prototype flow that skips the Plan stage. In RAPID MODE:
+   a. Call `load_idea()` to read the project idea from `artifacts/idea.md`
+   b. Derive implementation tasks directly from the idea — identify the core features, tech stack, and project structure
+   c. Skip `update_task_status`/`update_feature_status` calls (no formal task list exists)
+   d. Go directly to creating essential project files and implementing core features based on the idea
+   e. The goal is a working MVP that matches the idea — keep it simple, implement only what the idea describes
 
-### Step 1.5: Create Essential Project Files FIRST (NEW - MANDATORY)
+### Step 1.5: Create Essential Project Files FIRST (MANDATORY - both modes)
 3. **CRITICAL**: Before implementing any features, create ALL essential files:
-   - Read Plan document's "Required Files Checklist"
-   - Identify which tasks create config/entry files (usually TASK-001, TASK-002)
+   - In plan-based mode: Read Plan document's "Required Files Checklist"; identify which tasks create config/entry files (usually TASK-001, TASK-002)
+   - In RAPID MODE: Infer the required project files from the idea's described tech stack and features
    - **IMPLEMENT THESE TASKS FIRST** before any feature tasks
    - Use `write_file()` to create:
      - package.json/Cargo.toml/requirements.txt (COMPLETE with dependencies)

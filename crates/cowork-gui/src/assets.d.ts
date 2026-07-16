@@ -22,3 +22,6 @@ declare module '*.gif' {
   const value: string;
   export default value;
 }
+
+// TS 7.0: 副作用导入 CSS（如 `import './styles.css'`）需要模块声明，否则报 TS2882
+declare module '*.css';

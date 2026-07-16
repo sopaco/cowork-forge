@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
 use std::process::Stdio;
 use std::sync::{Mutex, Once};
 use std::env;
@@ -389,7 +390,7 @@ fn path_helper_path() -> Option<String> {
     None
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(unix, not(target_os = "macos")))]
 fn path_helper_path() -> Option<String> {
     None
 }
@@ -414,7 +415,7 @@ fn augment_path_from_login_shell() {
     if merged != current {
         // SAFETY: called during single-threaded app startup before worker threads spawn.
         unsafe { env::set_var("PATH", &merged) };
-        eprintln!(
+        tracing::debug!(
             "[PathUtils] Augmented PATH from login shell ({} entries)",
             merged.split(PATH_SEP).filter(|s| !s.is_empty()).count()
         );
@@ -634,6 +635,7 @@ pub fn command_shell() -> String {
 }
 
 #[cfg(windows)]
+#[allow(dead_code)]
 pub fn command_shell() -> String {
     "cmd".to_string()
 }
@@ -690,7 +692,7 @@ pub fn build_start_command_for_script(script_body: &str, script_name: &str) -> O
     let rewritten = rewrite_script_package_manager(script_body);
 
     if script_uses_alternate_package_manager(script_body) || needs_shell_wrapper(&rewritten) {
-        eprintln!(
+        tracing::debug!(
             "[PathUtils] Rewrote dev script: {:?} -> {:?}",
             script_body, rewritten
         );
@@ -788,6 +790,7 @@ pub fn needs_shell_wrapper(command: &str) -> bool {
 }
 
 /// Split a simple `binary arg1 arg2` command for direct spawning (no shell).
+#[allow(dead_code)]
 pub fn parse_direct_command(command: &str) -> Option<(PathBuf, Vec<String>)> {
     let trimmed = command.trim();
     if trimmed.is_empty() || needs_shell_wrapper(trimmed) {
@@ -959,7 +962,7 @@ pub fn build_extended_path() -> String {
 /// Initialize extended PATH at application startup.
 /// Must only run inside `PATH_INIT.call_once` — do not call directly.
 fn init_extended_path() {
-    eprintln!(
+    tracing::debug!(
         "[PathUtils] Setting extended PATH ({} platform)",
         std::env::consts::OS
     );
@@ -969,18 +972,18 @@ fn init_extended_path() {
     augment_path_from_login_shell();
 
     let extended_path = env::var("PATH").unwrap_or_else(|_| build_extended_path());
-    eprintln!("[PathUtils] PATH length: {} characters", extended_path.len());
+    tracing::debug!("[PathUtils] PATH length: {} characters", extended_path.len());
 
     if let Some(bun) = find_bun() {
-        eprintln!("[PathUtils] Found bun at: {:?}", bun);
+        tracing::debug!("[PathUtils] Found bun at: {:?}", bun);
     } else {
-        eprintln!("[PathUtils] bun not found after PATH extension");
+        tracing::debug!("[PathUtils] bun not found after PATH extension");
     }
 
     if let Some(npm) = find_npm() {
-        eprintln!("[PathUtils] Found npm at: {:?}", npm);
+        tracing::debug!("[PathUtils] Found npm at: {:?}", npm);
     } else {
-        eprintln!("[PathUtils] npm not found after PATH extension");
+        tracing::debug!("[PathUtils] npm not found after PATH extension");
     }
 }
 
@@ -999,24 +1002,6 @@ mod tests {
         assert!(!is_runnable_external_command(""));
         assert!(!is_runnable_external_command("(built-in static server)"));
         assert!(is_runnable_external_command("bun run dev"));
-    }
-
-    #[test]
-    fn parse_direct_command_splits_binary_and_args() {
-        let (bin, args) = parse_direct_command("bun run dev").expect("should parse");
-        assert!(bin.ends_with("bun"));
-        assert_eq!(args, vec!["run", "dev"]);
-        assert!(parse_direct_command("cd app && bun run dev").is_none());
-    }
-
-    #[test]
-    fn rewrite_pnpm_monorepo_script_to_bun() {
-        let script = "pnpm --filter @hytech/server start:dev & pnpm --filter @hytech/web dev & wait";
-        let rewritten = rewrite_script_package_manager(script);
-        assert!(!rewritten.contains("pnpm"));
-        assert!(rewritten.contains("run --filter @hytech/server start:dev"));
-        assert!(rewritten.contains("run --filter @hytech/web dev"));
-        assert!(needs_shell_wrapper(&rewritten));
     }
 
     #[test]

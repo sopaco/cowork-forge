@@ -132,6 +132,25 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 				}
 			};
 
+			const activateIterationForExecution = async (iterationId: string, status: string) => {
+				agentActions.setProcessing(true);
+				projectActions.setIsExecuting(true);
+
+				try {
+					const fullIteration = await API.iteration.get(iterationId);
+					const { currentIteration } = useProjectStore.getState();
+					if (currentIteration?.id !== iterationId) {
+						agentActions.clearMessages();
+					}
+					projectActions.setCurrentIteration({ ...fullIteration, status });
+				} catch (error) {
+					console.error('[App] Failed to load iteration for execution:', error);
+					projectActions.updateCurrentIterationStatus(status);
+				}
+
+				uiState.setActiveView('chat');
+			};
+
 			// Register all listeners in parallel for faster startup
 			const listenerPromises = [
 				// Iteration lifecycle events
@@ -140,27 +159,21 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 					message.success('Iteration created');
 				}),
 
-				listen('iteration_started', () => {
-					agentActions.setProcessing(true);
-					projectActions.setIsExecuting(true);
-					projectActions.updateCurrentIterationStatus('Running');
-					uiState.setActiveView('chat');
+				listen('iteration_started', async (event) => {
+					const iterationId = event.payload as string;
+					await activateIterationForExecution(iterationId, 'Running');
 					message.info('Iteration started');
 				}),
 
-				listen('iteration_continued', () => {
-					agentActions.setProcessing(true);
-					projectActions.setIsExecuting(true);
-					projectActions.updateCurrentIterationStatus('Running');
-					uiState.setActiveView('chat');
+				listen('iteration_continued', async (event) => {
+					const iterationId = event.payload as string;
+					await activateIterationForExecution(iterationId, 'Running');
 					message.info('Iteration continued');
 				}),
 
-				listen('iteration_retrying', () => {
-					agentActions.setProcessing(true);
-					projectActions.setIsExecuting(true);
-					projectActions.updateCurrentIterationStatus('Running');
-					uiState.setActiveView('chat');
+				listen('iteration_retrying', async (event) => {
+					const iterationId = event.payload as string;
+					await activateIterationForExecution(iterationId, 'Running');
 					message.info('Retrying iteration...');
 				}),
 
@@ -439,6 +452,14 @@ export function useAppEvents(userInput: string, setUserInput: (input: string) =>
 					const [iterationId, error] = event.payload;
 					console.error('[App] Knowledge regeneration failed:', iterationId, error);
 					message.error('Knowledge generation failed: ' + error);
+				}),
+
+				// Tray navigation event (emitted when user clicks "Settings" in tray menu)
+				listen<string>('tray_navigate', (event) => {
+					const target = event.payload;
+					if (target === 'settings') {
+						uiState.setActiveView('settings');
+					}
 				}),
 			];
 

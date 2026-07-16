@@ -23,6 +23,9 @@ struct TauriStreamCallback {
 #[async_trait]
 impl PMAgentStreamCallback for TauriStreamCallback {
     async fn on_text_chunk(&self, text: &str, is_first: bool, is_last: bool) {
+        // Update tray icon to reflect PM Agent activity
+        crate::tray::set_current_agent(Some("PM Agent".to_string()));
+
         let _ = self.window.emit("agent_streaming", serde_json::json!({
             "content": text,
             "agent_name": "PM Agent",
@@ -48,7 +51,7 @@ pub async fn pm_send_message(
     history: Vec<serde_json::Value>,
     window: Window,
 ) -> Result<serde_json::Value, String> {
-    eprintln!("[PM] pm_send_message called: iteration_id={}, message={}, history_len={}", 
+    tracing::debug!("[PM] pm_send_message called: iteration_id={}, message={}, history_len={}",
         iteration_id, message, history.len());
     
     let store = IterationStore::new();
@@ -232,9 +235,9 @@ pub async fn pm_restart_iteration(
         };
         
         if let Err(e) = cowork_core::persistence::append_feedback(&feedback_entry) {
-            eprintln!("[PM] Warning: Failed to save feedback: {}", e);
+            tracing::warn!("[PM] Failed to save feedback: {}", e);
         } else {
-            println!("[PM] Saved feedback to storage ({} chars): {}", fb.len(), fb.chars().take(50).collect::<String>());
+            tracing::info!("[PM] Saved feedback to storage ({} chars): {}", fb.len(), fb.chars().take(50).collect::<String>());
         }
     } else {
         println!("[PM] No feedback provided, skipping storage save");
@@ -255,21 +258,24 @@ pub async fn pm_restart_iteration(
 
     // Emit started event
     let _ = window.emit("iteration_started", iteration_id.clone());
+    crate::tray::set_working(true);
 
     // Execute in background
     let window_clone = window.app_handle().clone();
     let iteration_id_clone = iteration_id.clone();
 
     tokio::spawn(async move {
-        println!("[PM] Starting goto_stage for iteration: {} from stage: {}", 
+        println!("[PM] Starting goto_stage for iteration: {} from stage: {}",
             iteration_id_clone, target_stage);
         // Use regular execute() - feedback is now in storage, coding stage will read it
         match executor.execute(&mut project, &iteration_id_clone, Some(target_stage), None).await {
             Ok(_) => {
+                crate::tray::set_working(false);
                 println!("[PM] goto_stage completed successfully");
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);
             }
             Err(e) => {
+                crate::tray::set_working(false);
                 println!("[PM] goto_stage failed: {}", e);
                 let _ = window_clone.emit("iteration_failed", (iteration_id_clone, e.to_string()));
             }
