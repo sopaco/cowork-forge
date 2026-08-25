@@ -3,28 +3,28 @@
   "project": "cowork-forge",
   "repo_path": ".",
   "baseline": {
-    "git_head": "9aa2871fd20d9fdaf383b7ef8830307994572f53",
-    "git_head_at": "2026-07-15T03:20:27.772498+00:00",
+    "git_head": "3648988c24af4765ce097bfce94c36802afa799a",
+    "git_head_at": "2026-07-17T08:50:26.910002+00:00",
     "dirty": false
   },
   "assets": {
     "agent_pack": {
       "path": "agent/repomix.md",
-      "synced_at": "2026-07-15T03:19:39.469840+00:00",
-      "baseline_git_head": "9aa2871fd20d9fdaf383b7ef8830307994572f53",
+      "synced_at": "2026-07-17T08:47:15.068260+00:00",
+      "baseline_git_head": "3648988c24af4765ce097bfce94c36802afa799a",
       "stale": false,
       "freshness_score": 100
     },
     "agent_context": {
       "path": "agent/context.md",
-      "synced_at": "2026-07-15T03:20:27.383931+00:00",
-      "baseline_git_head": "9aa2871fd20d9fdaf383b7ef8830307994572f53",
+      "synced_at": "2026-07-17T08:50:26.623612+00:00",
+      "baseline_git_head": "3648988c24af4765ce097bfce94c36802afa799a",
       "stale": false,
       "freshness_score": 90
     },
     "human_docs": {
       "path": "human/",
-      "synced_at": "2026-07-15T03:19:39.470836+00:00",
+      "synced_at": "2026-07-17T08:47:15.071298+00:00",
       "stale": false,
       "freshness_score": 100
     }
@@ -39,10 +39,10 @@
     "overall_stale": false,
     "commits_since_baseline": 0,
     "changed_files_count": 0,
-    "current_git_head": "9aa2871",
+    "current_git_head": "3648988",
     "working_tree_dirty": false,
     "is_git_repo": true,
-    "last_computed_at": "2026-07-15T03:20:27.772498+00:00",
+    "last_computed_at": "2026-07-17T08:50:26.910002+00:00",
     "agent_pack_score": 100,
     "agent_context_score": 90,
     "human_docs_score": 100,
@@ -52,7 +52,7 @@
         "id": "baseline_match",
         "severity": "info",
         "title": "与 baseline 提交一致",
-        "detail": "源码索引与 Agent 上下文均基于提交 9aa2871fd20d9fdaf383b7ef8830307994572f53 生成，相对 HEAD 无文件漂移。"
+        "detail": "源码索引与 Agent 上下文均基于提交 3648988c24af4765ce097bfce94c36802afa799a 生成，相对 HEAD 无文件漂移。"
       },
       {
         "id": "context_lineage",
@@ -68,8 +68,8 @@
         "detail": "综合分取三层最低值：源码索引 100、Agent 上下文 90、人类文档 100。"
       }
     ],
-    "pack_baseline_short": "9aa2871",
-    "context_baseline_short": "9aa2871"
+    "pack_baseline_short": "3648988",
+    "context_baseline_short": "3648988"
   },
-  "last_computed_at": "2026-07-15T03:20:27.772498+00:00"
+  "last_computed_at": "2026-07-17T08:50:26.910002+00:00"
 }
