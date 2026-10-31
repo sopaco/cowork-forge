@@ -373,7 +373,7 @@ async fn set_workspace(
 
         // Create initial project file
         let project = cowork_core::domain::Project::new(&project_name);
-        let project_json = serde_json::to_string_pretty(&project)
+        let project_json = cowork_core::persistence::to_versioned_json(&project)
             .map_err(|e| format!("Failed to serialize project: {}", e))?;
         std::fs::write(&project_file, project_json)
             .map_err(|e| format!("Failed to write project.json: {}", e))?;
@@ -627,7 +627,7 @@ async fn create_project_at_path(
             .map_err(|e| format!("Failed to create iterations directory: {}", e))?;
 
         let project = cowork_core::domain::Project::new(&name);
-        let project_json = serde_json::to_string_pretty(&project)
+        let project_json = cowork_core::persistence::to_versioned_json(&project)
             .map_err(|e| format!("Failed to serialize project: {}", e))?;
         fs::write(&project_file, project_json)
             .map_err(|e| format!("Failed to write project.json: {}", e))?;
