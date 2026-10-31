@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::data::models::{FeatureStatus, FeedbackType};
 use crate::domain::idea::{truncated_excerpt, Idea, IdeaStatus};
+use crate::domain::IterationStatus;
 use crate::persistence::{IterationStore, MemoryStore, ProjectStore};
 
 use super::config::AutonomyResearchConfig;
@@ -38,6 +39,10 @@ pub struct KnownIssue {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PendingFeature {
     pub iteration_id: String,
+    /// 所属迭代的状态。特性状态由 Agent 主动回写，迭代已交付但状态仍是
+    /// `pending` 的情况很常见——不带上这个字段，模型会把已交付的特性
+    /// 当成真实缺口。
+    pub iteration_status: String,
     pub feature_id: String,
     pub name: String,
     pub status: String,
@@ -63,6 +68,9 @@ pub struct TodoMarker {
 pub struct ResearchContext {
     pub project_name: String,
     pub tech_stack: Vec<String>,
+    /// 已交付迭代的范围（标题 + 目标）。没有这一段，模型只知道文件清单，
+    /// 没有判断"缺口"的基准，容易给出"项目没有明显缺口"这种空结论。
+    pub completed_iterations: Vec<String>,
     pub known_issues: Vec<KnownIssue>,
     pub pending_features: Vec<PendingFeature>,
     pub feedback_items: Vec<FeedbackItem>,
@@ -134,6 +142,16 @@ impl ResearchContext {
 
         push_section(
             &mut out,
+            "已交付的迭代（判断缺口的范围基线）",
+            &self
+                .completed_iterations
+                .iter()
+                .map(|i| format!("- {}", i))
+                .collect::<Vec<_>>(),
+            max_chars,
+        );
+        push_section(
+            &mut out,
             "历史迭代遗留的已知问题",
             &self
                 .known_issues
@@ -144,11 +162,16 @@ impl ResearchContext {
         );
         push_section(
             &mut out,
-            "未完成的特性（与 PRD/计划对账）",
+            "特性状态（与 PRD/计划对账；所属迭代已交付的，状态可能是未回写而非真缺口）",
             &self
                 .pending_features
                 .iter()
-                .map(|f| format!("- {}（{}，{}）", f.name, f.feature_id, f.status))
+                .map(|f| {
+                    format!(
+                        "- {}（{}，状态 {}，所属迭代 {} {}）",
+                        f.name, f.feature_id, f.status, f.iteration_id, f.iteration_status
+                    )
+                })
                 .collect::<Vec<_>>(),
             max_chars,
         );
@@ -290,6 +313,22 @@ pub fn collect_research(
     // 本地工作区 + 未完成特性 + 阶段反馈
     let previous_iteration_id = crate::persistence::get_iteration_id();
     for iteration in iterations.iter().rev().take(3) {
+        // 已交付的迭代组成"项目本来要做什么"的基线：只给文件清单，
+        // 模型无法判断缺什么，只会回一句"没有明显缺口"。
+        if iteration.status == IterationStatus::Completed {
+            let stages = if iteration.completed_stages.is_empty() {
+                String::new()
+            } else {
+                format!("，已完成阶段 {}", iteration.completed_stages.join("/"))
+            };
+            let scope = truncated_excerpt(iteration.description.trim(), EXCERPT_CHARS);
+            ctx.completed_iterations.push(if scope.is_empty() {
+                format!("[{}] {}{}", iteration.id, iteration.title, stages)
+            } else {
+                format!("[{}] {}：{}{}", iteration.id, iteration.title, scope, stages)
+            });
+        }
+
         if config.local {
             crate::persistence::set_iteration_id(iteration.id.clone());
             if let Ok(features) = crate::persistence::load_feature_list() {
@@ -302,6 +341,7 @@ pub fn collect_research(
                     }
                     ctx.pending_features.push(PendingFeature {
                         iteration_id: iteration.id.clone(),
+                        iteration_status: iteration.status.to_string(),
                         feature_id: feature.id.clone(),
                         name: truncated_excerpt(&feature.name, EXCERPT_CHARS),
                         status: format!("{:?}", feature.status),
@@ -369,15 +409,55 @@ const SCANNED_EXTENSIONS: [&str; 14] = [
     "rs", "ts", "tsx", "js", "jsx", "mjs", "py", "go", "java", "vue", "toml", "md", "json", "css",
 ];
 
+/// 生成物与依赖目录，一律不计入证据。
+///
+/// `standard_filters(true)` 只认 `.gitignore`，而迭代工作区通常不是 git 仓库、
+/// 也没有 `.gitignore`：实测一个 Vite 项目的 60 条文件清单里 58 条是
+/// `node_modules`，模型从头到尾没看见 `src/`——这才是"没有明显缺口"的真正原因。
+const GENERATED_DIRS: [&str; 13] = [
+    "node_modules",
+    "dist",
+    "build",
+    "out",
+    "target",
+    "vendor",
+    "coverage",
+    "venv",
+    "__pycache__",
+    "bower_components",
+    ".next",
+    ".nuxt",
+    ".cache",
+];
+
+fn is_generated_dir(name: &str) -> bool {
+    GENERATED_DIRS.contains(&name)
+}
+
 /// 扫描工作区：文件清单 + TODO/FIXME/HACK 标记（带数量与体积上限）。
 pub fn scan_workspace(workspace: &Path) -> (Vec<String>, Vec<TodoMarker>) {
     let mut files = Vec::new();
     let mut markers = Vec::new();
     let mut scanned = 0usize;
 
+    let root = workspace.to_path_buf();
     let walker = ignore::WalkBuilder::new(workspace)
         .max_depth(Some(4))
         .standard_filters(true)
+        // `ignore` 默认只在 git 仓库里生效 `.gitignore`，而迭代工作区通常
+        // 没有 `.git`：不放开这一条，项目自己写的 `node_modules/` 规则等于白写。
+        .require_git(false)
+        .filter_entry(move |entry| {
+            // 根目录自身必须放行，否则整棵树都进不来
+            if entry.path() == root {
+                return true;
+            }
+            if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                let name = entry.file_name().to_string_lossy();
+                return !is_generated_dir(&name);
+            }
+            true
+        })
         .build();
 
     for entry in walker.flatten() {
@@ -483,6 +563,33 @@ mod tests {
     }
 
     #[test]
+    fn prompt_states_scope_baseline_and_iteration_status() {
+        let ctx = ResearchContext {
+            project_name: "demo".to_string(),
+            completed_iterations: vec![
+                "[iter-1] 入门培训网页：行业/业务模式/领域逻辑/流程，已完成阶段 idea/coding"
+                    .to_string(),
+            ],
+            pending_features: vec![PendingFeature {
+                iteration_id: "iter-1".to_string(),
+                iteration_status: "completed".to_string(),
+                feature_id: "FEAT-001".to_string(),
+                name: "培训总览仪表盘".to_string(),
+                status: "Pending".to_string(),
+            }],
+            ..Default::default()
+        };
+
+        let prompt = ctx.to_prompt();
+
+        // 没有基线段，模型无从判断"缺口"，只会回一句"没有明显缺口"
+        assert!(prompt.contains("已交付的迭代"), "{prompt}");
+        assert!(prompt.contains("入门培训网页"), "{prompt}");
+        // 特性行必须带上所属迭代状态，否则已交付的特性会被当成真缺口
+        assert!(prompt.contains("所属迭代 iter-1 completed"), "{prompt}");
+    }
+
+    #[test]
     fn prompt_budget_truncates_and_marks_omissions() {
         let ctx = ctx_with_many_items(50);
         let prompt = ctx.to_prompt_with_budget(200);
@@ -507,6 +614,46 @@ mod tests {
     fn local_evidence_detection() {
         assert!(!ResearchContext::default().has_local_evidence());
         assert!(ctx_with_many_items(1).has_local_evidence());
+    }
+
+    #[test]
+    fn scan_workspace_skips_dependencies_and_build_output() {
+        let temp = TempDir::new().expect("temp dir");
+        let root = temp.path();
+        std::fs::create_dir_all(root.join("src")).expect("mkdir src");
+        std::fs::create_dir_all(root.join("node_modules/pkg")).expect("mkdir node_modules");
+        std::fs::create_dir_all(root.join("dist/assets")).expect("mkdir dist");
+        std::fs::write(root.join("src").join("main.ts"), "// TODO: 补上进度持久化\n")
+            .expect("write src");
+        std::fs::write(root.join("node_modules/pkg/index.js"), "TODO: 依赖里的标记")
+            .expect("write dep");
+        std::fs::write(root.join("dist/assets/index.js"), "TODO: 构建产物").expect("write dist");
+
+        let (files, markers) = scan_workspace(root);
+
+        assert_eq!(files, vec!["src/main.ts".to_string()], "档清单只能是源码");
+        assert_eq!(markers.len(), 1, "依赖与产物里的 TODO 不算项目证据");
+        assert_eq!(markers[0].path, "src/main.ts");
+    }
+
+    #[test]
+    fn scan_workspace_honors_gitignore_without_git_repo() {
+        let temp = TempDir::new().expect("temp dir");
+        let root = temp.path();
+        std::fs::create_dir_all(root.join("src")).expect("mkdir src");
+        std::fs::create_dir_all(root.join("generated")).expect("mkdir generated");
+        std::fs::write(root.join(".gitignore"), "generated/\n").expect("write gitignore");
+        std::fs::write(root.join("src").join("main.ts"), "export const a = 1;\n").expect("write");
+        std::fs::write(root.join("generated").join("schema.ts"), "export const b = 2;\n")
+            .expect("write generated");
+
+        let (files, _) = scan_workspace(root);
+
+        assert_eq!(
+            files,
+            vec!["src/main.ts".to_string()],
+            "没有 .git 时也要按 .gitignore 排除"
+        );
     }
 
     #[test]

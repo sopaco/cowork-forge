@@ -1256,7 +1256,9 @@ impl SimpleArtifacts {
                     .join(iteration_id)
                     .join("artifacts")
             });
-        let _ = std::fs::create_dir_all(&artifacts_dir);
+        // 不在这里建目录：只要构造一次调用上下文就会落下 iterations/<id>/artifacts。
+        // 自主调研用的临时迭代（iter-N-<ts>）因此每次都留下一个空壳目录，
+        // 在 .cowork-v2/iterations 里越积越多。改到第一次真正写入时再建。
         Self { artifacts_dir }
     }
 
@@ -1283,6 +1285,12 @@ impl adk_core::Artifacts for SimpleArtifacts {
         let path = self.path_for(name).ok_or_else(|| {
             adk_core::AdkError::tool(format!("Invalid artifact name: {}", name))
         })?;
+        // 目录按需创建（构造时不再落盘，见 `new`）
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                adk_core::AdkError::tool(format!("Failed to create artifacts dir: {}", e))
+            })?;
+        }
 
         match data {
             adk_core::Part::Text { text } => {

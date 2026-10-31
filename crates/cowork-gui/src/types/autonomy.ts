@@ -214,6 +214,12 @@ export interface CycleSnapshot {
 	note: string | null;
 	mcp_servers: string[];
 	evidence_digest: string;
+	/** 模型本轮的自由文本（截断），用于复核"为什么没有新发现" */
+	planner_note?: string | null;
+	/** 本轮真实调用过的工具名（按顺序） */
+	called_tools?: string[];
+	/** 模型是否真的调用了 propose_ideas */
+	propose_called?: boolean;
 }
 
 export interface DecisionOutcome {

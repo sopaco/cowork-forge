@@ -775,6 +775,7 @@ impl AutonomyController {
             budget.llm_limit(),
             CYCLE_TOOL_TIMEOUT,
             budget.mcp_limit(),
+            external_allowed,
         )
         .await
         {
@@ -789,19 +790,65 @@ impl AutonomyController {
             }
         };
 
-        budget.consume_llm();
+        // 留下复核依据：模型说了什么、调了哪些工具、有没有真的提交。
+        // 没有这三样，"没有新发现"就是一句无法证伪的空话。
+        if !outcome.text.trim().is_empty() {
+            snapshot.planner_note = Some(truncate(&outcome.text, 4000));
+        }
+        snapshot.called_tools = outcome.called_tools.clone();
+        snapshot.propose_called = outcome.propose_called;
+
+        // 「0 条提案」有三种来源，只有第一种是结论：
+        // ① 模型提交了空数组 ② 预算掐断 ③ 压根没调用 propose_ideas
+        if outcome.truncated && outcome.drafts.is_empty() {
+            return self.fail_cycle(
+                cycle_id,
+                trigger,
+                format!(
+                    "外部检索用满 {} 次预算，本轮在提交提案前被中止（这不算「没有缺口」）",
+                    budget.mcp_limit()
+                ),
+                progress,
+            );
+        }
+        if !outcome.propose_called {
+            return self.fail_cycle(
+                cycle_id,
+                trigger,
+                "模型没有提交提案（未调用 propose_ideas），本轮不作数".to_string(),
+                progress,
+            );
+        }
+        if outcome.drafts.is_empty() && outcome.parse_errors > 0 {
+            return self.fail_cycle(
+                cycle_id,
+                trigger,
+                format!(
+                    "提案参数不合法（{} 次解析失败），本轮不作数",
+                    outcome.parse_errors
+                ),
+                progress,
+            );
+        }
+
         // 外部检索次数由 Agent 侧真实计数（不是跑完再数工具名）
         for _ in 0..outcome.external_calls {
             budget.consume_mcp();
         }
-        snapshot.llm_calls = budget.llm_used();
+        // 真实模型回合数：一次收尾回合 + 每个发起工具调用的回合。
+        // 以前这里写的是 budget.llm_used()，恒等于 1，等于没记。
+        snapshot.llm_calls = 1 + outcome.tool_rounds;
         snapshot.mcp_calls = budget.mcp_used();
         if outcome.used_external_search() && snapshot.mcp_servers.is_empty() {
             snapshot.mcp_servers = vec!["外部检索".to_string()];
         }
 
         step.status = StepStatus::Done;
-        step.detail = Some(format!("模型提交了 {} 条提案", outcome.drafts.len()));
+        step.detail = Some(format!(
+            "模型提交了 {} 条提案（{} 次工具调用）",
+            outcome.drafts.len(),
+            outcome.called_tools.len()
+        ));
         self.record_step(cycle_id, &step, progress);
         snapshot.steps.push(step);
 

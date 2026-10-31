@@ -142,6 +142,20 @@ pub struct CycleSnapshot {
     pub mcp_servers: Vec<String>,
     /// 调研输入的摘要指纹（增量调研依据）。
     pub evidence_digest: String,
+    /// 模型本轮的自由文本（截断保存）。
+    ///
+    /// "没有新发现"必须能复核：没有这段，"模型判断项目无缺口"和
+    /// "模型根本没跑完"在磁盘上长得一模一样。
+    #[serde(default)]
+    pub planner_note: Option<String>,
+    /// 本轮真实调用过的工具序列（按调用顺序）。
+    ///
+    /// 用于解释"为什么是空轮"：没读过文件 vs 读了但没提案 vs 查了外部。
+    #[serde(default)]
+    pub called_tools: Vec<String>,
+    /// 模型是否真的调用了 `propose_ideas`（false ⇒ 本轮不算结论）。
+    #[serde(default)]
+    pub propose_called: bool,
 }
 
 impl CycleSnapshot {
@@ -164,6 +178,9 @@ impl CycleSnapshot {
             note: None,
             mcp_servers: Vec::new(),
             evidence_digest,
+            planner_note: None,
+            called_tools: Vec::new(),
+            propose_called: false,
         }
     }
 
@@ -183,6 +200,9 @@ impl CycleSnapshot {
             CycleOutcome::Empty => {
                 if discarded > 0 {
                     format!("这轮没有新发现：{} 条候选与已有建议重复或未达标。", discarded)
+                } else if let Some(reason) = self.planner_note.as_deref().and_then(last_line) {
+                    // 把模型自己的判断摆出来：否则"没有新发现"是句无从复核的空话
+                    format!("这轮没有新发现。模型的判断：{}", reason)
                 } else {
                     "这轮没有新发现，项目目前没有明显的缺口。".to_string()
                 }
@@ -192,6 +212,21 @@ impl CycleSnapshot {
             CycleOutcome::Tripped => "自主循环已熔断，需要人工确认后恢复。".to_string(),
         });
     }
+}
+
+/// 取模型输出中最后一条非空行（结论通常在末尾），去掉 markdown 记号并截断。
+fn last_line(text: &str) -> Option<String> {
+    let raw = text
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|line| !line.trim().is_empty())?;
+    let cleaned = raw
+        .trim_start_matches(['#', '-', '*', '>', ' '])
+        .trim_end_matches(['*', ' ', '\t'])
+        .trim();
+    let cleaned = if cleaned.is_empty() { raw } else { cleaned };
+    Some(cleaned.chars().take(160).collect())
 }
 
 /// 步骤进度推送端口（core 不感知 UI；GUI 实现为 Tauri 事件）。
@@ -250,6 +285,30 @@ mod tests {
         empty.discarded = vec!["重复".to_string()];
         empty.summarize();
         assert!(empty.note.as_deref().unwrap().contains("没有新发现"));
+    }
+
+    #[test]
+    fn empty_summary_quotes_the_model_when_it_explained_itself() {
+        let mut snapshot = CycleSnapshot::new(
+            "cycle-empty".to_string(),
+            CycleTrigger::Manual,
+            "digest".to_string(),
+        );
+        snapshot.outcome = CycleOutcome::Empty;
+        snapshot.propose_called = true;
+        snapshot.planner_note = Some(
+            "我看了 src 下的实现。\n\n**结论：8 个培训模块都已经实现，本轮没有值得提的方向。**"
+                .to_string(),
+        );
+        snapshot.summarize();
+
+        let note = snapshot.note.as_deref().expect("note");
+        assert!(note.contains("模型的判断"), "{note}");
+        // markdown 记号要清掉，最后一行的内容要出来
+        assert!(note.contains("8 个培训模块都已经实现"), "{note}");
+        assert!(!note.contains("**"), "{note}");
+        // 不能退化成那句没有依据的空话
+        assert!(!note.contains("项目目前没有明显的缺口"), "{note}");
     }
 
     #[test]
