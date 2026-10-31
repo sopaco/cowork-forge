@@ -89,8 +89,8 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier};
 
-    // 全局执行槽是进程级单例，测试之间必须串行
-    static TEST_LOCK: Mutex<()> = Mutex::new(());
+    // 执行槽是进程级单例：与所有会触碰该单例的测试共用同一把锁串行执行
+    use crate::persistence::WORKSPACE_TEST_LOCK as TEST_LOCK;
 
     #[test]
     fn conflicting_acquire_is_rejected_with_readable_error() {

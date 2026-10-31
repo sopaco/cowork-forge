@@ -1,5 +1,14 @@
 // Iterative Assistant Agent - Intelligent iteration scheduling
 // Analyzes user intent and auto-schedules Modify mode for completed projects
+//
+// ⚠️ 已废弃（superseded，2026-10-31）：本文件**不参与编译**——
+// `agents/mod.rs` 里没有 `pub mod iterative_assistant;` 声明，因此 rustc 不会
+// 检查它、测试也不会覆盖它。里面的 `IterationIntent` / `ModifySuggestion` /
+// `ChatResponse` 是自主规划环的早期雏形，现已被 `domain::idea`（Idea 聚合 +
+// 质量门槛 + 去重指纹）与其上的 `autonomy::AutonomyController` 取代。
+//
+// 保留原因：这是一份可参考的数据结构设计；若要复活，请直接改用
+// `domain::idea::IdeaDraft` / `Idea`，不要在本文件里再造一套。
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};

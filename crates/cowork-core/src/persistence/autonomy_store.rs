@@ -66,6 +66,96 @@ impl AutonomyStore {
     fn state_file_path(&self) -> anyhow::Result<PathBuf> {
         Ok(get_cowork_dir()?.join("autonomy").join("state.json"))
     }
+
+    // --------------------------------------------------------------------
+    // 每日预算（autonomy/budget.json）
+    // --------------------------------------------------------------------
+
+    pub fn load_daily_budget(&self) -> anyhow::Result<crate::autonomy::budget::DailyBudget> {
+        let path = self.budget_file_path()?;
+        let now = chrono::Utc::now();
+        if !path.exists() {
+            return Ok(crate::autonomy::budget::DailyBudget::for_day(now));
+        }
+        let content = std::fs::read_to_string(&path)?;
+        let mut budget: crate::autonomy::budget::DailyBudget =
+            from_versioned_json(&content, &path.display().to_string())?;
+        budget.rollover(now);
+        Ok(budget)
+    }
+
+    pub fn save_daily_budget(
+        &self,
+        budget: &crate::autonomy::budget::DailyBudget,
+    ) -> anyhow::Result<()> {
+        let path = self.budget_file_path()?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&path, to_versioned_json(budget)?)?;
+        Ok(())
+    }
+
+    fn budget_file_path(&self) -> anyhow::Result<PathBuf> {
+        Ok(get_cowork_dir()?.join("autonomy").join("budget.json"))
+    }
+
+    // --------------------------------------------------------------------
+    // 周期快照（autonomy/cycles/{cycle_id}.json）
+    // --------------------------------------------------------------------
+
+    pub fn save_cycle(&self, snapshot: &crate::autonomy::cycle::CycleSnapshot) -> anyhow::Result<()> {
+        let path = self.cycle_file_path(&snapshot.cycle_id)?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&path, to_versioned_json(snapshot)?)?;
+        Ok(())
+    }
+
+    pub fn load_cycle(&self, cycle_id: &str) -> anyhow::Result<crate::autonomy::cycle::CycleSnapshot> {
+        let path = self.cycle_file_path(cycle_id)?;
+        if !path.exists() {
+            anyhow::bail!("Cycle snapshot not found: {}", cycle_id);
+        }
+        let content = std::fs::read_to_string(&path)?;
+        from_versioned_json(&content, &path.display().to_string())
+    }
+
+    /// 全部周期快照，按开始时间升序。
+    pub fn load_cycles(&self) -> anyhow::Result<Vec<crate::autonomy::cycle::CycleSnapshot>> {
+        let dir = get_cowork_dir()?.join("autonomy").join("cycles");
+        if !dir.exists() {
+            return Ok(Vec::new());
+        }
+        let mut cycles = Vec::new();
+        for entry in std::fs::read_dir(&dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().map(|e| e == "json").unwrap_or(false) {
+                let content = std::fs::read_to_string(&path)?;
+                let snapshot: crate::autonomy::cycle::CycleSnapshot =
+                    from_versioned_json(&content, &path.display().to_string())?;
+                cycles.push(snapshot);
+            }
+        }
+        cycles.sort_by_key(|c| c.started_at);
+        Ok(cycles)
+    }
+
+    /// 最近一次周期快照（增量调研依据）。
+    pub fn load_latest_cycle(
+        &self,
+    ) -> anyhow::Result<Option<crate::autonomy::cycle::CycleSnapshot>> {
+        Ok(self.load_cycles()?.pop())
+    }
+
+    fn cycle_file_path(&self, cycle_id: &str) -> anyhow::Result<PathBuf> {
+        Ok(get_cowork_dir()?
+            .join("autonomy")
+            .join("cycles")
+            .join(format!("{}.json", cycle_id)))
+    }
 }
 
 impl Default for AutonomyStore {

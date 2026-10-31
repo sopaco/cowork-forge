@@ -44,10 +44,44 @@ export type {
   KnowledgeListResult,
 } from './knowledge';
 
+// Autonomous mode types
+export type {
+	AutonomyStatus,
+	AutonomyState,
+	AutonomyTriggers,
+	AutonomyResearch,
+	AutonomyBudgetConfig,
+	AutonomyConfig,
+	AutonomyStatusPayload,
+	BudgetStatus,
+	IdeaScope,
+	Effort,
+	IdeaPriority,
+	IdeaStatus,
+	Credibility,
+	FileRefEvidence,
+	IterationRefEvidence,
+	FeedbackRefEvidence,
+	ExternalRefEvidence,
+	IdeaEvidence,
+	IdeaRewrite,
+	IdeaDecision,
+	IdeaSummary,
+	Idea,
+	DecisionLogEntry,
+	CycleTrigger,
+	CycleOutcome,
+	StepStatus,
+	CycleStep,
+	CycleSnapshot,
+	DecisionOutcome,
+	AutonomyIteration,
+} from './autonomy';
+
 // Config types
 export type {
-  AgentType,
-  ModelConfig,
+	AgentType,
+	ModelConfig,
   ToolReference,
   IncludeContentsMode,
   AgentDefinition,

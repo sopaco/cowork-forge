@@ -1,6 +1,6 @@
 # Cowork Forge 自主模式（Autonomous Mode）架构设计方案
 
-> 状态：待评审 ｜ 依据：2026-10-31 源码实读（commit fbaab05）｜ 范围：设计，不含代码改动
+> 状态：**已实现**（2026-10-31，Phase 0–3 落地；实现规格见 `spec.md`，任务状态见 `tasks.md`）｜ 依据：2026-10-31 源码实读（commit fbaab05）｜ 范围：本文件是方案来源，实现细节以 `spec.md` 为准
 
 ---
 

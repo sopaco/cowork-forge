@@ -51,6 +51,10 @@ pub struct AutonomyState {
     pub last_cycle_at: Option<chrono::DateTime<chrono::Utc>>,
     /// 熔断原因（status=Tripped 时给出）。
     pub tripped_reason: Option<String>,
+    /// 连续无新有效 idea 的轮数（熔断条件①：连续 3 轮 → 降频/暂停）。
+    pub consecutive_empty_cycles: u32,
+    /// 连续创建迭代失败次数（熔断条件④：≥3 次 → 熔断待人工）。
+    pub iteration_create_failures: u32,
 }
 
 impl Default for AutonomyState {
@@ -60,6 +64,8 @@ impl Default for AutonomyState {
             cycle_count: 0,
             last_cycle_at: None,
             tripped_reason: None,
+            consecutive_empty_cycles: 0,
+            iteration_create_failures: 0,
         }
     }
 }
@@ -94,5 +100,7 @@ mod tests {
         assert_eq!(state.cycle_count, 0);
         assert!(state.last_cycle_at.is_none());
         assert!(state.tripped_reason.is_none());
+        assert_eq!(state.consecutive_empty_cycles, 0);
+        assert_eq!(state.iteration_create_failures, 0);
     }
 }

@@ -6,10 +6,11 @@
 use serde::{Deserialize, Serialize};
 
 /// 外部 MCP 调研来源策略。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ExternalMcpPolicy {
     /// 按需使用外部 MCP 调研。
+    #[default]
     AsNeeded,
     /// 关闭外部 MCP 调研。
     Off,
@@ -63,14 +64,12 @@ pub struct AutonomyConfig {
     pub research: AutonomyResearchConfig,
     /// 预算限制。
     pub budget: AutonomyBudget,
-    /// 是否自动创建迭代。
+    /// 采纳建议后是否**自动开始执行**新迭代。
+    ///
+    /// 注意：采纳时**创建**迭代始终发生（这是决策门语义），本开关只控制
+    /// 是否顺手把执行也拉起来。仅对低风险范围（文档/调研）生效，默认关
+    /// （D6=A：本期不自动采纳）。
     pub auto_create_iteration: bool,
-}
-
-impl Default for ExternalMcpPolicy {
-    fn default() -> Self {
-        Self::AsNeeded
-    }
 }
 
 impl Default for AutonomyConfig {

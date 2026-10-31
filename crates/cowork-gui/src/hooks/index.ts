@@ -11,3 +11,4 @@ export { useIterationsData } from './useIterationsData';
 export { useProjectsData } from './useProjectsData';
 export { useIterationEvents } from './useIterationEvents';
 export { useProjectEvents } from './useProjectEvents';
+export { useAutonomy } from './useAutonomy';

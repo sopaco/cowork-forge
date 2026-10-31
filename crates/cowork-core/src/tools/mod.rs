@@ -146,6 +146,7 @@ pub mod knowledge_tools;
 
 // Project Manager Agent tools
 pub mod pm_tools;
+pub mod idea_tools;
 
 // Legacy Project Analyzer tools
 pub mod legacy_project_analyzer_tools;
@@ -167,5 +168,6 @@ pub use goto_stage_tool::*;
 pub use memory_tools::*;
 pub use knowledge_tools::*;
 pub use pm_tools::*;
+pub use idea_tools::*;
 pub use legacy_project_analyzer_tools::*;
 pub use mcp_tools::*;

@@ -128,12 +128,8 @@ pub async fn gui_create_iteration(
     let mut project = project_store.load().map_err(|e| e.to_string())?
         .ok_or_else(|| "Project not initialized".to_string())?;
 
-    // Determine inheritance mode
-    let inheritance = match request.inheritance.as_str() {
-        "none" => InheritanceMode::None,
-        "full" => InheritanceMode::Full,
-        _ => InheritanceMode::Partial, // Default to Partial for incremental development
-    };
+    // 继承模式解析收敛为 core 单实现（设计 Phase 0.2），与 PM 工具共享同一语义
+    let inheritance = InheritanceMode::parse(&request.inheritance);
 
     // Create iteration
     let iteration = if let Some(base_id) = request.base_iteration_id {
@@ -218,6 +214,7 @@ pub async fn gui_execute_iteration(
             Ok(_) => {
                 crate::tray::set_working(false);
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);
+                crate::commands::autonomy::notify_iteration_finished();
             }
             Err(e) => {
                 crate::tray::set_working(false);
@@ -269,6 +266,7 @@ pub async fn gui_continue_iteration(
                 crate::tray::set_working(false);
                 tracing::info!("[GUI] continue_iteration completed successfully");
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);
+                crate::commands::autonomy::notify_iteration_finished();
             }
             Err(e) => {
                 crate::tray::set_working(false);
@@ -321,6 +319,7 @@ pub async fn gui_retry_iteration(
                 crate::tray::set_working(false);
                 tracing::info!("[GUI] retry_iteration completed successfully");
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);
+                crate::commands::autonomy::notify_iteration_finished();
             }
             Err(e) => {
                 crate::tray::set_working(false);
@@ -400,6 +399,55 @@ pub async fn gui_get_project_knowledge(
     }))
 }
 
+/// Returns the iteration IDs whose knowledge generation is currently running.
+///
+/// The frontend uses this on mount (and on manual refresh) to restore the
+/// "generating" UI state after the Knowledge panel has been unmounted by a tab
+/// switch, so a stale Generate button is never shown while work is in flight.
+#[tauri::command]
+pub async fn gui_get_knowledge_generation_status(
+    state: State<'_, AppState>,
+) -> Result<Vec<String>, String> {
+    let guard = state.knowledge_generating.lock().map_err(|e| e.to_string())?;
+    Ok(guard.iter().cloned().collect())
+}
+
+/// RAII guard that removes an iteration from the in-flight set on drop.
+///
+/// Guarantees the slot is released on *every* exit path — early `return`s in the
+/// command, task completion, and task panics — so the UI can never get stuck
+/// showing "generating" forever.
+struct KnowledgeInflightGuard {
+    generating: Arc<std::sync::Mutex<std::collections::HashSet<String>>>,
+    iteration_id: String,
+}
+
+impl KnowledgeInflightGuard {
+    /// Claims the slot; returns `None` when generation is already running.
+    fn claim(
+        generating: Arc<std::sync::Mutex<std::collections::HashSet<String>>>,
+        iteration_id: String,
+    ) -> Option<Self> {
+        let inserted = {
+            let mut guard = generating.lock().ok()?;
+            guard.insert(iteration_id.clone())
+        };
+        if inserted {
+            Some(Self { generating, iteration_id })
+        } else {
+            None
+        }
+    }
+}
+
+impl Drop for KnowledgeInflightGuard {
+    fn drop(&mut self) {
+        if let Ok(mut guard) = self.generating.lock() {
+            guard.remove(&self.iteration_id);
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn gui_regenerate_knowledge(
     iteration_id: String,
@@ -419,6 +467,22 @@ pub async fn gui_regenerate_knowledge(
             iteration.status
         ));
     }
+
+    // Claim the in-flight slot: refuse duplicate runs for the same iteration.
+    // This also protects against a remounted panel firing Generate twice.
+    let inflight = match KnowledgeInflightGuard::claim(
+        state.knowledge_generating.clone(),
+        iteration_id.clone(),
+    ) {
+        Some(guard) => guard,
+        None => {
+            tracing::warn!(
+                "[GUI] Knowledge generation already running for iteration: {}",
+                iteration_id
+            );
+            return Ok(());
+        }
+    };
 
     let model_config = load_config()
         .map_err(|e| format!("Failed to load LLM configuration: {}", e))?;
@@ -442,6 +506,8 @@ pub async fn gui_regenerate_knowledge(
     let iteration_id_clone = iteration_id.clone();
 
     tokio::spawn(async move {
+        // Owned by the task: released when the task finishes or unwinds.
+        let _inflight = inflight;
         tracing::info!("[GUI] Starting knowledge regeneration for iteration: {}", iteration_id_clone);
         match executor.regenerate_iteration_knowledge(&iteration_id_clone, model).await {
             Ok(_) => {
@@ -453,6 +519,9 @@ pub async fn gui_regenerate_knowledge(
                 let _ = window_clone.emit("knowledge_regeneration_failed", (iteration_id_clone, e.to_string()));
             }
         }
+        // `_inflight` drops here, *after* the event is emitted, so a panel that
+        // remounts upon receiving the event still sees the running state and
+        // never flashes a stale Generate button.
     });
 
     Ok(())

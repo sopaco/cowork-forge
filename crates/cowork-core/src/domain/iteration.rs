@@ -24,6 +24,9 @@ pub struct Iteration {
 
     // Artifacts
     pub artifacts: Artifacts,
+
+    /// 来源 idea（设计 §9）：人类主动输入创建的迭代没有来源 idea，`None` 是真实状态。
+    pub source_idea_id: Option<String>,
 }
 
 impl Iteration {
@@ -42,6 +45,7 @@ impl Iteration {
             current_stage: None,
             completed_stages: Vec::new(),
             artifacts: Artifacts::default(),
+            source_idea_id: None,
         }
     }
 
@@ -66,6 +70,7 @@ impl Iteration {
             current_stage: None,
             completed_stages: Vec::new(),
             artifacts: Artifacts::default(),
+            source_idea_id: None,
         }
     }
 
@@ -226,6 +231,28 @@ pub enum InheritanceMode {
 impl Default for InheritanceMode {
     fn default() -> Self {
         InheritanceMode::Full
+    }
+}
+
+impl InheritanceMode {
+    /// 继承模式的**唯一**字符串解析实现（设计 Phase 0.2）。
+    ///
+    /// 未知/空值按增量开发语义落到 `Partial`（只复制代码、重新生成文档）。
+    /// GUI 命令层与 PM 工具都必须走这里，禁止各自再写一份 match。
+    pub fn parse(value: &str) -> Self {
+        match value {
+            "none" => InheritanceMode::None,
+            "full" => InheritanceMode::Full,
+            _ => InheritanceMode::Partial,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            InheritanceMode::None => "none",
+            InheritanceMode::Full => "full",
+            InheritanceMode::Partial => "partial",
+        }
     }
 }
 
@@ -469,5 +496,41 @@ mod tests {
         // Test deserialization
         let mode: InheritanceMode = serde_json::from_str("\"none\"").unwrap();
         assert_eq!(mode, InheritanceMode::None);
+    }
+
+    #[test]
+    fn test_inheritance_mode_parse_is_single_source_of_truth() {
+        assert_eq!(InheritanceMode::parse("none"), InheritanceMode::None);
+        assert_eq!(InheritanceMode::parse("full"), InheritanceMode::Full);
+        assert_eq!(InheritanceMode::parse("partial"), InheritanceMode::Partial);
+        // 未知与空值按增量开发语义落到 Partial（GUI 与 PM 工具必须一致）
+        assert_eq!(InheritanceMode::parse(""), InheritanceMode::Partial);
+        assert_eq!(InheritanceMode::parse("whatever"), InheritanceMode::Partial);
+
+        assert_eq!(InheritanceMode::None.as_str(), "none");
+        assert_eq!(InheritanceMode::Full.as_str(), "full");
+        assert_eq!(InheritanceMode::Partial.as_str(), "partial");
+    }
+
+    #[test]
+    fn test_iteration_source_idea_id_defaults_to_none() {
+        let project = create_test_project();
+        let genesis = Iteration::create_genesis(&project, "T".into(), "D".into());
+        assert!(genesis.source_idea_id.is_none(), "人工创建的迭代没有来源 idea");
+
+        let evolution = Iteration::create_evolution(
+            &project,
+            "T".into(),
+            "D".into(),
+            "iter-0-1".into(),
+            InheritanceMode::Partial,
+        );
+        assert!(evolution.source_idea_id.is_none());
+
+        // 无 source_idea_id 字段的旧迭代 JSON 也能读出（None 是真实状态）
+        let mut value = serde_json::to_value(&genesis).expect("to value");
+        value.as_object_mut().expect("object").remove("source_idea_id");
+        let restored: Iteration = serde_json::from_value(value).expect("from value");
+        assert!(restored.source_idea_id.is_none());
     }
 }

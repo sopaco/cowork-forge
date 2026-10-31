@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::fs;
 use tauri::{Emitter, Manager, State, Window};
 use cowork_core::interaction::{InteractiveBackend, InputResponse, MessageContext, MessageType};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tokio::sync::oneshot;
 use anyhow::Context;
 use serde_json::Value;
@@ -182,6 +182,12 @@ pub struct AppState {
     pub workspace_path: Arc<Mutex<Option<String>>>,
     /// Tracks whether config registry has finished loading
     pub config_ready: Arc<std::sync::atomic::AtomicBool>,
+    /// Iteration IDs whose knowledge generation is currently running.
+    ///
+    /// This is the source of truth for the GUI's "generating" UI state: the
+    /// frontend component can be unmounted/remounted freely (tab switches) and
+    /// re-sync from here instead of relying on transient component state.
+    pub knowledge_generating: Arc<Mutex<HashSet<String>>>,
 }
 
 impl AppState {
@@ -194,6 +200,7 @@ impl AppState {
             project_registry_manager: Arc::new(Mutex::new(project_registry_manager)),
             workspace_path: Arc::new(Mutex::new(None)),
             config_ready: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            knowledge_generating: Arc::new(Mutex::new(HashSet::new())),
         })
     }
 }
@@ -711,6 +718,9 @@ pub fn run() {
             // Initialize app handle for project runner
             init_app_handle(app.handle().clone());
 
+            // 自主循环宿主需要 AppHandle 才能把调研进度推给前端
+            commands::AUTONOMY_HOST.set_app_handle(app.handle().clone());
+
             // Initialize system tray (per-window, one tray per process)
             tray::init_tray(app.handle());
 
@@ -830,6 +840,28 @@ pub fn run() {
                 }
             }
 
+            // 自主循环：上次是开启状态则恢复常驻宿主（幂等续跑，设计 R7）
+            // 必须放在 workspace 设置之后：配置路径依赖工作区。
+            {
+                use cowork_core::autonomy::AutonomyController;
+                match AutonomyController::new() {
+                    Ok(mut controller) => {
+                        // 复位上次异常退出遗留的"正在调研"僵尸状态
+                        if let Err(e) = controller.recover_stale_state() {
+                            tracing::warn!("[GUI] 复位自主模式状态失败: {}", e);
+                        }
+                        let enabled = controller.config().map(|c| c.enabled).unwrap_or(false);
+                        if enabled {
+                            match commands::AUTONOMY_HOST.start() {
+                                Ok(_) => tracing::info!("[GUI] 自主循环已恢复"),
+                                Err(e) => tracing::warn!("[GUI] 自主循环恢复失败: {}", e),
+                            }
+                        }
+                    }
+                    Err(e) => tracing::warn!("[GUI] 读取自主模式配置失败: {}", e),
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -847,6 +879,7 @@ pub fn run() {
             iteration_commands::gui_retry_iteration,
             iteration_commands::gui_delete_iteration,
             iteration_commands::gui_get_project_knowledge,
+            iteration_commands::gui_get_knowledge_generation_status,
             iteration_commands::gui_regenerate_knowledge,
             // File commands
             file::open_in_file_manager,
@@ -902,6 +935,16 @@ pub fn run() {
             autonomy::autonomy_pause,
             autonomy::autonomy_resume,
             autonomy::autonomy_get_status,
+            autonomy::autonomy_reset_trip,
+            autonomy::autonomy_update_config,
+            autonomy::autonomy_run_cycle,
+            autonomy::autonomy_list_ideas,
+            autonomy::autonomy_get_idea,
+            autonomy::autonomy_decide_idea,
+            autonomy::autonomy_undo_decision,
+            autonomy::autonomy_propose_idea,
+            autonomy::autonomy_get_budget,
+            autonomy::autonomy_list_cycles,
             // Import commands
             import_cmd::preview_import,
             import_cmd::analyze_existing_project,

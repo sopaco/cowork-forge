@@ -54,6 +54,35 @@ interface McpConfig {
   deepwiki_enabled: boolean;
 }
 
+/** 判断是否为普通对象（数组与 null 不算） */
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * 深合并：表单值覆盖基线，表单**未提供**的字段保留基线值。
+ *
+ * antd 的 `validateFields()` 只返回**已注册**字段的值。
+ * 「Enable External Agent」关闭时，其下的 agent_type / command / args 等
+ * Form.Item 会被卸载，于是这些字段从提交载荷里消失——而后端
+ * `ExternalAgentConfig` 要求它们必须存在，于是报
+ * `missing field 'agent_type'`。
+ * 用基线配置兜底，既修掉这个报错，也保住了用户已填的外部 Agent 配置。
+ */
+function deepMergeConfig<T>(base: T | null | undefined, patch: unknown): T {
+  if (!isPlainObject(base)) {
+    return (patch === undefined ? base : patch) as T;
+  }
+  if (!isPlainObject(patch)) {
+    return patch as T;
+  }
+  const result: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) continue;
+    result[key] = isPlainObject(value) ? deepMergeConfig(result[key], value) : value;
+  }
+  return result as T;
+}
+
 const SettingsPanel: React.FC = () => {
   const { message } = App.useApp();
   const [form] = Form.useForm();
@@ -63,6 +92,12 @@ const SettingsPanel: React.FC = () => {
   const [hasConfig, setHasConfig] = useState(false);
   const [testingTavily, setTestingTavily] = useState(false);
   const [testingDeepWiki, setTestingDeepWiki] = useState(false);
+  /**
+   * 最近一次加载到的完整配置。保存时用作合并基线——
+   * 表单里被条件渲染卸载的字段（如关闭外部 Agent 后的 agent_type/command/args）
+   * 只能从这里取回，否则提交载荷缺字段，后端反序列化直接失败。
+   */
+  const [baselineConfig, setBaselineConfig] = useState<AppConfig | null>(null);
 
   // Preset configs for known agent types
   const AGENT_PRESETS: Record<string, { command: string; args: string[] }> = {
@@ -96,14 +131,17 @@ const SettingsPanel: React.FC = () => {
 
       if (valid) {
         const config = await invoke<AppConfig>("get_app_config");
+        setBaselineConfig(config);
         form.setFieldsValue(config);
       } else {
         const defaultConfig = await invoke<AppConfig>("get_default_config");
+        setBaselineConfig(defaultConfig);
         form.setFieldsValue(defaultConfig);
       }
     } catch (error) {
       message.error("Failed to load config: " + error);
       const defaultConfig = await invoke<AppConfig>("get_default_config");
+      setBaselineConfig(defaultConfig);
       form.setFieldsValue(defaultConfig);
     } finally {
       setLoading(false);
@@ -114,7 +152,14 @@ const SettingsPanel: React.FC = () => {
     try {
       const values = await form.validateFields();
       setSaving(true);
-      await invoke("save_app_config", { config: values });
+      // 与基线合并：补回被条件渲染卸载的字段
+      const merged = deepMergeConfig<AppConfig>(baselineConfig, values);
+      // 可选字符串留空 → 归一为 null（后端是 Option，TOML 里省略该键）
+      if (merged.coding_agent && merged.coding_agent.workspace_path === "") {
+        merged.coding_agent.workspace_path = undefined;
+      }
+      await invoke("save_app_config", { config: merged });
+      setBaselineConfig(merged);
       message.success("Configuration saved successfully");
       setHasConfig(true);
     } catch (error: unknown) {

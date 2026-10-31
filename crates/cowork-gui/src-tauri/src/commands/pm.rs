@@ -273,6 +273,7 @@ pub async fn pm_restart_iteration(
                 crate::tray::set_working(false);
                 println!("[PM] goto_stage completed successfully");
                 let _ = window_clone.emit("iteration_completed", iteration_id_clone);
+                crate::commands::autonomy::notify_iteration_finished();
             }
             Err(e) => {
                 crate::tray::set_working(false);

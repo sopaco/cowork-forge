@@ -203,12 +203,8 @@ impl Tool for PMCreateIterationTool {
             .map_err(|e| adk_core::AdkError::tool(e.to_string()))?
             .ok_or_else(|| adk_core::AdkError::tool("Project not initialized".to_string()))?;
 
-        // Determine inheritance mode
-        let inheritance_mode = match inheritance.as_str() {
-            "none" => crate::domain::InheritanceMode::None,
-            "full" => crate::domain::InheritanceMode::Full,
-            _ => crate::domain::InheritanceMode::Partial,
-        };
+        // 继承模式解析收敛为 core 单实现（设计 Phase 0.2），禁止在此另写 match
+        let inheritance_mode = crate::domain::InheritanceMode::parse(&inheritance);
 
         // Create new iteration
         let new_iteration = Iteration::create_evolution(

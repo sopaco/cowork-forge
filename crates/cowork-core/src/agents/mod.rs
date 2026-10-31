@@ -38,6 +38,12 @@ pub use external_coding_agent::{ExternalCodingAgent, StreamingTask};
 pub mod legacy_project_analyzer;
 pub use legacy_project_analyzer::{create_legacy_project_analyzer, create_legacy_project_analyzer_with_id, create_legacy_project_analyzer_with_context};
 
+// Autonomous Planner Agent (PM 自主规划环)
+pub mod research_agent;
+pub use research_agent::{
+    create_autonomous_planner_agent, run_autonomous_planner, PlannerOutcome,
+};
+
 // ============================================================================
 // Summary Agent - Generates summaries of iteration documents
 // ============================================================================

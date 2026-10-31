@@ -29,6 +29,7 @@ import {
 
 import { useIterationsData } from '../hooks';
 import { CreateIterationModal, IterationDetailsModal, InitProjectModal } from './iterations';
+import { AutonomyPanel } from './autonomy';
 import type { IterationInfo, StageDef } from '../types';
 import { STAGES } from '../constants';
 import { useConfigStore } from '../stores/configStore';
@@ -229,6 +230,11 @@ const IterationsPanelInner: React.FC<IterationsPanelProps> = ({
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>
           New Iteration
         </Button>
+      </div>
+
+      {/* Autonomous mode panel (PM planner loop) — status + proposals + decision gate */}
+      <div style={{ marginBottom: "16px" }}>
+        <AutonomyPanel />
       </div>
 
       {/* Iteration list */}

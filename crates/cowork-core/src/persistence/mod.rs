@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
 pub mod autonomy_store;
+pub mod idea_store;
 pub mod iteration_store;
 pub mod memory_store;
 pub mod project_store;
@@ -10,6 +11,7 @@ pub mod iteration_data;
 pub mod schema;
 
 pub use autonomy_store::*;
+pub use idea_store::*;
 pub use iteration_store::*;
 pub use memory_store::*;
 pub use project_store::*;

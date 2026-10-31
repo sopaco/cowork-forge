@@ -1,109 +1,116 @@
-# Spec — 自主模式 Phase 0 前置改造
+# Spec — PM 自主规划环（Autonomous Mode）实现规格
 
-> 状态：待审批 ｜ 依据：autonomous-mode-design.md §11/§12 路线 Phase 0 + 2026-10-31 源码实读 ｜ 语言：Rust（cowork-core / cowork-gui src-tauri）
+> 状态：已实现（2026-10-31）｜ 依据：`autonomous-mode-design.md` §4–§12 ｜ 语言：Rust（cowork-core / cowork-gui src-tauri）+ TypeScript（React）
+>
+> 本文档描述**已落地**的实现。设计文档仍是方案来源，本文件是实现现状与验收口径。
 
-## 0. 目标与范围
+## 0. 范围
 
-只做四件事，**不含 Phase 1**（Idea 聚合、提案、调研流程一律不做）：
+在现有 7 阶段流水线**上方**新增「PM 自主规划环」：PM Agent 周期性调研项目 → 产出结构化 **Idea 提案** → 人在**决策门**采纳/驳回/改写/置后 → 被采纳的 Idea 复用现有 `Iteration` + `IterationExecutor` 进入既有流水线。**不新增第 8 个 stage，不改动 7 阶段本身。**
 
-| # | 事项 | 主要落点 |
-|---|------|---------|
-| T1 | PM 提示词工具名与注册名对齐 + 语言一致性 | `cowork-core/src/instructions/`、`cowork-core/src/agents/mod.rs` |
-| T2 | 存储层 `schema_version` 一次定型 + 读取时版本校验（无迁移垫片） | `cowork-core/src/persistence/`、`cowork-core/src/data/models.rs` |
-| T3 | 全局单例执行互斥（同一时刻仅一个迭代执行，冲突报可读错误） | 新 `cowork-core/src/execution_guard.rs` + executor + PM 工具 |
-| T4 | GUI 自主循环宿主骨架 + `AutonomyConfig` 最小加载 | 新 `cowork-core/src/autonomy/` + `cowork-gui/src-tauri/src/` |
+交付面：仅 GUI（`cowork-cli` 不新增命令）。核心业务逻辑全部在 `cowork-core`，GUI 侧只做薄壳转发 + 事件推送。
 
-**不做**：git commit；前端 React 改动（T4 仅 Tauri 后端，不触发 `npm run build`）；InheritanceMode 解析收敛（设计表 0.2，不在用户四项清单内）；Idea/IdeaStore（Phase 1）。
+## 1. 领域层
 
-**约束**：hexagonal（core 不依赖 Tauri/clap/dialoguer 新增）、统一 `anyhow::Result`、生产代码禁 `unwrap()`、不硬编码 stage ID、不绕过限流/路径校验、不改动无关代码（工作区仅有 `.terrain/.meta/freshness.json` 与 `autonomous-mode-design.md` 为既有未提交内容，均不动）。
+| 事项 | 落点 | 要点 |
+|------|------|------|
+| Idea 聚合 | 新 `cowork-core/src/domain/idea.rs` | `Idea` / `IdeaDraft` / `IdeaSummary` / `IdeaEvidence` / `IdeaDecision` / `IdeaRewrite`；`IdeaScope`、`Effort`、`IdeaStatus`、`IdeaSource`、`Credibility`、`DecisionAction` 枚举 |
+| 质量门槛 | `Idea::quality_issues()` | ① problem/hypothesis 非空且 hypothesis 可验证 ② **至少 1 条本地证据**（外部 URL 不能作唯一证据）③ scope 不越权（禁止绕过限流/路径校验/沙箱）④ effort 必填 |
+| 去重指纹 | `compute_fingerprint()` | title+problem 规范化后 FNV-1a 64（自实现，跨进程确定）；同指纹合并、证据未变则状态抑制不重提 |
+| 证据可信度 | `Evidence::credibility()` | 文件引用=High，迭代/反馈=Mid，外部=Low |
 
----
+**`Iteration` 增加 `source_idea_id: Option<String>`**（采纳建议创建的迭代回填来源）。
 
-## 1. 已核实现状（改动依据）
+## 2. 持久化层
 
-- PM 注册工具名 7 个：`pm_goto_stage`/`pm_create_iteration`/`pm_respond`/`pm_save_decision`/`query_memory`/`list_files`/`read_file`（[agents/mod.rs L98-L119](crates/cowork-core/src/agents/mod.rs)），映射同名于 agent_factory.rs L475-478；`read_file_truncated` 亦有注册（agent_factory.rs L424）→ pm_agent.json 工具清单无失配。
-- 提示词失配点（instructions/project_manager.rs）：L148 `respond_to_user`（应为 `pm_respond`）、L138 `## goto_stage`、L142 `## create_iteration`（应为 `pm_goto_stage`/`pm_create_iteration`）、L119 示例 `[调用 goto_stage 工具]`。语言混杂点：提示词正文中文，而 agents/mod.rs L283-305 拼接 prompt 为英文（"User message:"、"## Current Iteration Info:"、"Please analyze..." 等），且 L157 硬编码"使用中文"与 `config::get_language_instruction()`（config.rs L21，按 locale 下发语言指令）语义冲突。
-- persistence 9 类 JSON 均裸 `serde_json::from_str/to_string_pretty` 读写；`IterationStore::load_all`（iteration_store.rs L72-77）静默跳过坏文件；data/models.rs 中 `Requirements/FeatureList/DesignSpec/ImplementationPlan/CodeMetadata` 各带 `schema_version: String = "1.0"` 字段但从无校验、无读取方（全仓 grep 确认仅 models.rs 自身引用）。
-- 执行全局单例：`CURRENT_ITERATION_ID`（persistence/iteration_data.rs L12-30）、`GOTO_STAGE_SIGNAL`（pipeline/mod.rs L18-34）、`CURRENT_EXECUTION_LLM`（llm/mod.rs L12-27）；三者均 `.lock().unwrap()`（违反 AGENTS.md 禁 unwrap，本次触碰时一并修为 poison 容错）。执行唯一入口 `IterationExecutor::execute`（pipeline/executor/mod.rs L81-103）；`continue_iteration`/`retry_iteration`（L545/L585）末尾委托 `self.execute` → 在 `execute` 加锁即可全覆盖。`PMGotoStageTool::execute` 调 `set_iteration_id`（覆盖单例）、`PMCreateIterationTool::execute` 并发写 project.json。
-- GUI：invoke_handler（lib.rs L834-941）注册命令；全局单例先例 commands/mod.rs `lazy_static`；事件先例 `window.emit("iteration_failed", ...)`（iteration_commands.rs L216-227）；TauriBackend 用 `app_handle.emit`。
+| 文件 | 内容 | 说明 |
+|------|------|------|
+| `.cowork-v2/ideas/{idea_id}.json` | `Idea` 聚合 | 一 idea 一文件，版本化读写 |
+| `.cowork-v2/autonomy/decisions.log.jsonl` | 决策审计 | **追加式**；撤销也追加一条 `reversed_by` 记录，绝不改写历史 |
+| `.cowork-v2/autonomy/config.json` | `AutonomyConfig` | 自主模式唯一配置源 |
+| `.cowork-v2/autonomy/state.json` | `AutonomyState` | 状态机 + 熔断计数 |
+| `.cowork-v2/autonomy/budget.json` | `DailyBudget` | 每日周期数，跨天自动归零 |
+| `.cowork-v2/autonomy/cycles/{cycle_id}.json` | `CycleSnapshot` | 调研轮次证据快照（增量调研依据） |
 
----
+全部走 `persistence::schema` 的 `to_versioned_json` / `from_versioned_json`（`schema_version` 一次定型，无迁移垫片）。**被跳过的轮次不落盘**（宿主 30s 一次 tick，落盘会淹没历史）。
 
-## 2. 变更规格
+## 3. 自主循环（`cowork-core/src/autonomy/`）
 
-### T2 存储层 schema_version（先做，被 T4 复用）
-
-**新文件 `crates/cowork-core/src/persistence/schema.rs`**：
-- `pub const SCHEMA_VERSION: u32 = 1;`
-- `pub fn to_versioned_json<T: Serialize>(value: &T) -> anyhow::Result<String>`：序列化为 pretty JSON 对象并在**顶层**插入 `"schema_version": 1`（扁平信封，不包裹 `data` 字段，保持现有 JSON 风格）。
-- `pub fn from_versioned_json<T: DeserializeOwned>(content: &str, source: &str) -> anyhow::Result<T>`：先解析为 `serde_json::Value`，校验顶层 `schema_version`：
-  - 缺失 → `Err`：`"{source}: missing schema_version field (expected 1)"`；
-  - 非当前版本（含非数字）→ `Err`：`"{source}: unsupported schema_version {v} (this build only supports 1); automatic migration is not supported"`；
-  - 校验通过后 **remove** 该键再反序列化 payload。**不做任何迁移/降级/serde default**。
-- 单测（同文件 `#[cfg(test)]`）：往返（to→from 相等）、缺版本报错、错版本报错且信息含 source 与版本号、非对象报错。
-
-**修改（读写全部改走上述 helper）**：
-- `persistence/mod.rs`：`pub mod schema;` + re-export；`init_project_structure` 末尾创建 `autonomy/` 目录并写入初始 `autonomy/config.json` + `autonomy/state.json`（若不存在才写，见 T4）。
-- `persistence/project_store.rs`：`load/save` ↔ `project.json`。
-- `persistence/iteration_store.rs`：`load/save` ↔ `iterations/{id}.json`；`load_all` **改为显式报错**（`?` + 文件路径 context），不再静默跳过坏文件。
-- `persistence/memory_store.rs`：project/iteration memory 的 load/save 及两处默认 memory 落盘。
-- `persistence/iteration_data.rs`：`requirements/feature_list/design_spec/implementation_plan/code_metadata/session meta/feedback` 共 7 组 load/save。
-- `data/models.rs`：**删除** 5 个模型的 `schema_version: String` 字段及构造函数里的赋值（无读取方；保留会与顶层 `schema_version` 冲突，且属"两套版本语义"）。
-
-行为变化（有意为之）：旧的无版本文件读取时报错而非兼容——符合"无旧版本兼容、明确报错"裁定。
-
-### T3 执行互斥
-
-**新文件 `crates/cowork-core/src/execution_guard.rs`**（lib.rs 注册 `pub mod execution_guard;`）：
-- 静态 `EXECUTION_OWNER: Mutex<Option<ExecutionOwner{holder, iteration_id}>>`，锁获取统一 `unwrap_or_else(PoisonError::into_inner)`（线程/任务边界一致，panic 不致死锁）。
-- `pub struct ExecutionGuard`（RAII）：`try_acquire(holder: &str, iteration_id: &str) -> anyhow::Result<Self>`；冲突时错误信息含在跑的 iteration 与 holder："execution already in progress: iteration '{id}' is being executed by '{holder}'; only one iteration may execute at a time…"；`Drop` 释放（仅当 owner 仍是自己）。
-- `pub fn is_execution_in_progress() -> bool`、`pub fn current_execution() -> Option<(String, String)>`（供自主循环让路/状态查询）。
-- 单测（模块内 `static TEST_LOCK` 串行化）：二次 acquire 报错且信息可读；drop 后可再 acquire；多线程 barrier 下恰好一个成功。
-
-**修改**：
-- `pipeline/executor/mod.rs` `IterationExecutor::execute`：函数体首行 `let _guard = ExecutionGuard::try_acquire("pipeline", iteration_id)?;`（覆盖 continue/retry）。
-- `tools/pm_tools.rs`：`PMGotoStageTool::execute`（在 `set_iteration_id` 之前）与 `PMCreateIterationTool::execute` 开头 acquire（holder `"pm_agent"`，iteration_id 用 `self.current_iteration_id`）；冲突时返回工具 JSON `{"status":"error","message":...}`（与现有 invalid stage 的返回风格一致），**不覆盖单例状态**。
-- `persistence/iteration_data.rs` / `pipeline/mod.rs` / `llm/mod.rs`：触碰到的 `.lock().unwrap()` 一并改 poison 容错（不改语义）。
-
-### T1 PM 提示词修复
-
-**`instructions/project_manager.rs`**（保持中文单一语言）：
-- L148 `## respond_to_user` → `## pm_respond`；L138 `## goto_stage` → `## pm_goto_stage`；L142 `## create_iteration` → `## pm_create_iteration`；L119 示例 → `[调用 pm_goto_stage 工具]`。
-- §2 操作标题绑定真实工具名：`### pm_goto_stage - 返回之前阶段`、`### pm_create_iteration - 创建新迭代`、`### pm_respond - 回答问题`、`### pm_respond - 请求澄清`（保留 answer_question/ask_clarification 作为用法说明词）。
-- L157 `4. **使用中文**：…` → 改为遵循消息末尾附加的语言指令（消除与 `get_language_instruction()` 的冲突）；其余英文标识符（bug_fix 等枚举值、文件名）保留。
-- 新增单测（同文件）：指令中不出现 `respond_to_user`/裸 `goto_stage`/裸 `create_iteration` 工具名；出现 `pm_respond`/`pm_goto_stage`/`pm_create_iteration`。
-
-**`agents/mod.rs`**（execute_pm_agent_message_streaming 及 load_artifacts_summary_for_pm）：拼接 prompt 的英文模板/标签译为中文（"用户消息："、"## 当前迭代信息："、"请分析用户的请求…"、"## 历史决策："、"## 对话历史："、"## 项目文件："、角色标签"用户/助手"、"[已截断]"），消除中英混杂；不改逻辑。
-
-### T4 GUI 自主循环宿主骨架
-
-**core 侧（只放接口 + 领域类型 + 生命周期状态机，业务逻辑不进 GUI）**：
-
-- 新 `crates/cowork-core/src/autonomy/mod.rs`（`pub mod config; pub mod state; pub mod controller;` + re-export；lib.rs 注册）。
-- `autonomy/config.rs`：`AutonomyConfig { enabled: bool, triggers: AutonomyTriggers{on_iteration_completed, on_idle, on_schedule: bool, schedule_interval_mins: u64}, research: AutonomyResearchConfig{local, memory, feedback: bool, external_mcp: ExternalMcpPolicy(AsNeeded|Off)}, budget: AutonomyBudget{max_llm_calls_per_cycle: u32, max_cycles_per_day: u32, max_mcp_calls_per_cycle: u32}, auto_create_iteration: bool }`（即设计 §4.1 schema 一次定型，全部 serde derive，**无 serde default 垫片**）。`Default`：`enabled=false`、triggers 全 false、`schedule_interval_mins=60`、research local/memory/feedback=true + `external_mcp=AsNeeded`、budget `10/20/3`、`auto_create_iteration=false`（D2/D6）。
-- `autonomy/state.rs`：`AutonomyStatus`（§4.2 全集枚举，snake_case）：`Disabled/Idle/Researching/Proposing/AwaitingDecision/Executing/Paused/Tripped`；`AutonomyState { status, cycle_count: u64, last_cycle_at: Option<DateTime<Utc>>, tripped_reason: Option<String> }`。
-- `autonomy/controller.rs`：`AutonomyController` 生命周期接口（`anyhow::Result`）：`enable()`（→Idle，写 config.enabled=true）、`pause()`（Idle→Paused，否则可读错误）、`resume()`（Paused→Idle）、`stop()`（任意→Disabled，config.enabled=false）、`status()`；迁移校验错误信息含当前状态。本期不实现 run_cycle/decide_idea（Phase 1）。单测：迁移全链 + 非法迁移报错 + config/state 落盘往返（tempfile + `set_workspace_path`，模块内 TEST_LOCK 串行）。
-- 新 `crates/cowork-core/src/persistence/autonomy_store.rs`：`load_config/save_config/load_state/save_state` ↔ `.cowork-v2/autonomy/{config,state}.json`，走 T2 版本化 helper；文件缺失→返回 `Default`（创建语义，非兼容垫片）；版本不明→报错。注册进 persistence/mod.rs。
-
-**GUI 侧（Tauri 后端薄壳，无业务逻辑）**：
-
-- 新 `crates/cowork-gui/src-tauri/src/autonomy_host.rs`：`AutonomyHost`（`Mutex<HostInner{ join_handle, stop_tx: watch::Sender<bool>, paused: Arc<AtomicBool> }>`）：`start(app_handle)`（已在运行→可读错误；`tokio::spawn` 常驻循环）、`stop()`（watch 通知退出 + 回收句柄）、`pause()/resume()`（AtomicBool）、`is_running()/is_paused()`。循环骨架：`tokio::time::interval(30s)` + `select!` 停止信号；每 tick：暂停则跳过；`cowork_core::execution_guard::is_execution_in_progress()` 为真则**让路**（debug 日志，D5 执行优先）；循环体留空并注释标注 Phase 1 接入点。
-- 新 `crates/cowork-gui/src-tauri/src/commands/autonomy.rs`：Tauri 命令 `autonomy_start/autonomy_stop/autonomy_pause/autonomy_resume/autonomy_get_status`；每个变更命令先调 core `AutonomyController` 再驱动 `AUTONOMY_HOST`，成功后 `window.emit("autonomy_state_changed", state)`；`autonomy_get_status` 返回 `{ state, config, host_running, host_paused }`（serde struct）。冲突/非法迁移错误 `map_err(|e| e.to_string())` 可读返回。
-- `commands/mod.rs`：`pub mod autonomy;` + `lazy_static! AUTONOMY_HOST`（沿用 PROJECT_RUNNER 模式）。
-- `lib.rs`：`mod autonomy_host;`、use 列表加 `autonomy`、invoke_handler 注册 5 个命令。
-
----
-
-## 3. 验证（必须真实执行，结果写入交付摘要）
-
-```bash
-cargo check --workspace          # 0 error / 0 warning 新增
-cargo test --workspace           # 含新增单测全绿（至少 cowork-core；GUI 测试随 workspace 跑）
-cargo clippy --workspace         # 0 warning（新代码不引入 lint）
+```
+controller.rs  AutonomyController —— 业务控制器（唯一决策落库实现）
+cycle.rs       CycleSnapshot / CycleStep / CycleTrigger / CycleOutcome
+budget.rs      BudgetGuard（单轮 LLM/MCP 记账）+ DailyBudget（每日周期）
+research.rs    证据收集（Rust 侧确定性，不调 LLM）
+config.rs      AutonomyConfig（schema 一次定型）
+state.rs       AutonomyState + AutonomyStatus
 ```
 
-新增测试清单：schema 4 项、execution_guard 3 项、autonomy controller/store ≥4 项、PM 指令工具名 1 项。前端零改动 → 不跑 `npm run build`。任何失败修到通过再交付。
+**一轮 cycle 的流程**：
 
-## 4. 交付物
+0. **状态机迁移**：`Idle → Researching`（落盘）`→ Proposing` → 结束按结果落 `AwaitingDecision`（有新建议）/ `Idle`（无新建议）/ `Tripped`（熔断）。调研中途崩溃残留的 `Researching`/`Proposing` 会在**进程启动时**由 `recover_stale_state()` 复位为 Idle（否则重入保护会让自主循环永久死锁）。`Researching`/`Proposing` 期间拒绝重入（`SkipReason::AlreadyRunning`）。
+1. **前置检查** `should_trigger()`：熔断 → 暂停 → 已在跑 → 未启用 → 触发源未开 → 迭代执行中（让路）→ 当日预算耗尽 → 未到间隔。任一命中即跳过并返回可读原因（`SkipReason`）。
+2. **收集证据** `collect_research()`：项目记忆（已知问题/近期决策）、未完成特性、阶段反馈、工作区文件清单与 TODO/FIXME 标记。全部带上限（文件 60、扫描 40、已知问题 12、反馈 12、TODO 20…）。
+3. **组装 prompt**：`ResearchContext::to_prompt_with_budget()`，**硬性字符预算**（默认 12000），超限的条目丢弃并标注「…（其余 N 条从略）」。
+4. **生成提案**：调用 `agents::run_autonomous_planner()`（adk-rust Agent，提示词 `instructions/autonomous_planner.rs`，工具 `propose_ideas` / `update_idea` + 只读工具 + 按需 MCP）。
+5. **质量门槛 → 去重 → 状态抑制 → 限量 → 落库**：每轮最多发布 3 条（`MAX_PROPOSALS_PER_CYCLE`），超出的存为 `Draft` 池；同指纹合并；证据未变的被驳回建议不再重提。
+6. **更新状态 + 熔断判定** + 落 cycle 快照 + 每日预算记账。
 
-中文 Markdown 变更摘要（结论先行）：每项改了什么、涉及文件、三项验证的真实输出结论、遗留到 Phase 1 的事项。
+**熔断条件**（设计 §8-6）：
+
+| 条件 | 阈值 | 动作 |
+|------|------|------|
+| 连续空转 | ≥3 轮 | Tripped |
+| 单轮重复提案 | ≥3 条 | Tripped |
+| 连续创建迭代失败 | ≥3 次 | Tripped |
+
+Tripped 后需人工点「恢复」（`reset_trip()`）才继续。
+
+**外部检索**（设计 §5.4）：仅当本地三处（已知问题/未完成特性/反馈/TODO）都查不到且策略为 `AsNeeded` 时才允许；无 MCP 服务时标记 `degraded` 并用本地证据继续，绝不因外查失败中断本轮。
+
+## 4. 决策门
+
+四类人工决策，**core 单点实现**（GUI 与 Agent 工具都调用同一套方法）：
+
+| 动作 | 结果 | 审计 |
+|------|------|------|
+| 采纳 Accept | 创建迭代（`source_idea_id` 回填）+ 状态 `Converted` | 记录 `resulting_iteration_id` |
+| 驳回 Reject | 状态 `Rejected` | 记录 |
+| 改写 Rewrite | 保留原文（`original`）+ 状态 `Rewritten`（仍可继续决策） | 记录改写内容 |
+| 置后 Defer | 状态 `Deferred` + `deferred_until` | 记录 |
+
+**撤销**：`undo_decision()` 追加一条 `reversed_by` 记录，建议回到未决；已创建的迭代保留不删。
+
+**转迭代规则**：有已完成的基线迭代 → `create_evolution` + `inheritance=Partial`（显式指定，不依赖 `Default`）；没有 → `create_genesis`（`inheritance=None`）。
+
+**InheritanceMode 解析收敛**（设计 Phase 0.2）：`domain::InheritanceMode::parse()` 是唯一实现，GUI `iteration_commands.rs` 与 core `pm_tools.rs` 都改走它（此前两份 match 且默认值相反）。
+
+## 5. GUI 层
+
+**Tauri 命令**（`commands/autonomy.rs`，薄壳）：`autonomy_start/stop/pause/resume/get_status/reset_trip/update_config/run_cycle/list_ideas/get_idea/decide_idea/undo_decision/propose_idea/get_budget/list_cycles`。
+
+**常驻宿主**（`autonomy_host.rs`）：30s tick；事件触发（迭代完成）优先，其次定时触发，再次空闲触发；迭代执行中让路；进度经 `CycleProgressSink` 推成 Tauri 事件。
+
+**事件**：`autonomy_cycle_step` / `autonomy_cycle_snapshot` / `autonomy_cycle_report` / `autonomy_ideas_changed` / `autonomy_state_changed`。
+
+**React**（`src/components/autonomy/`）：
+- `AutonomyPanel` —— 状态胶囊 + 开关 + 「立即调研」+ 步骤进度 + 建议卡片（一行结论 / 一条证据位置 / 一行操作）+ 路线图归类 + 「我也有想法」入口。挂在迭代页顶部（导航融合，不新建孤立页面）。
+- `IdeaDetailDrawer` —— 问题/假设/预期收益/全部证据原文/改写表单/决策历史时间线 + 四类决策 + 撤销。
+
+**状态常驻**（`src/stores/autonomyStore.ts`）：自主模式的 status / ideas / cycles / 步骤进度放在**全局 zustand store**，Tauri 事件订阅是**应用级一次性绑定**（模块级 flag，永久存活）。原因：面板挂在迭代页，切 tab 会卸载组件 —— 组件内 state 会跟着消失，用户会看到"调研跑完了但建议列表空了"。`running` 取两个来源的或：本客户端发起的调用 + 后端状态机（researching/proposing）。调研中另有 2s 轮询兜底，防止事件丢失。
+
+## 6. 验收口径
+
+```bash
+cargo check --workspace      # 0 error
+cargo test --workspace       # 129 项全绿
+cargo clippy --workspace     # 新增代码 0 warning
+cd crates/cowork-gui && npx tsc --noEmit && npm run build
+```
+
+新增测试：idea 聚合 8 项、idea_store 3 项、autonomy_store 增量、budget 3 项、cycle 3 项、research 5 项、controller 11 项、planner 指令 3 项、idea_tools 4 项、execution_guard 3 项、iteration 继承解析 2 项。
+
+## 7. 明确不做
+
+- **CLI 接入**：CLI 不新增命令、不参与验收（设计 D 范围裁定）。
+- **`propose_roadmap` 独立路线图产物**：面板里的「路线图」是从真实建议派生出的归类视图，不是 Agent 生成的独立路线图文档。
+- **自动采纳**：本期不自动采纳（D6=A）；`auto_create_iteration` 只控制低风险范围是否**顺手启动**已创建的迭代，且采纳动作本身始终需要人点。

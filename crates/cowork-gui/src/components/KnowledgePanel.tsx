@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { App, Card, Input, Button, Tag, Empty, Spin, Modal, Tabs, Typography, Space, Divider, Timeline, Tooltip, Badge } from "antd";
-import { SearchOutlined, EyeOutlined, BookOutlined, ClockCircleOutlined, ReloadOutlined, RocketOutlined, FileTextOutlined, CodeOutlined, CheckCircleOutlined, CloseCircleOutlined, PlusOutlined } from "@ant-design/icons";
+import { SearchOutlined, EyeOutlined, BookOutlined, ClockCircleOutlined, ReloadOutlined, RocketOutlined, FileTextOutlined, CodeOutlined, CheckCircleOutlined, CloseCircleOutlined, PlusOutlined, LoadingOutlined } from "@ant-design/icons";
 
 const { Text, Paragraph, Title } = Typography;
 
@@ -44,51 +44,16 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
   const { message } = App.useApp();
   const [knowledgeList, setKnowledgeList] = useState<Knowledge[]>([]);
   const [loading, setLoading] = useState(false);
-  const [regenerating, setRegenerating] = useState<string | null>(null);
+  // Iteration IDs whose knowledge generation is running. This mirrors the
+  // backend's in-flight set instead of being pure component state, so that a
+  // tab switch (which unmounts this panel) does not lose the "generating" UI.
+  const [generatingIds, setGeneratingIds] = useState<string[]>([]);
   const [selectedKnowledge, setSelectedKnowledge] = useState<Knowledge | null>(null);
   const [searchText, setSearchText] = useState("");
   const [iterations, setIterations] = useState<IterationInfo[]>([]);
   const [loadingIterations, setLoadingIterations] = useState(false);
 
-  useEffect(() => {
-    loadProjectKnowledge();
-  }, [currentSession, refreshTrigger]);
-
-  useEffect(() => {
-    if (currentSession && knowledgeList.length === 0 && !loading) {
-      loadIterations();
-    }
-  }, [currentSession, knowledgeList.length, loading, currentIterationId]);
-
-  // Listen for knowledge regeneration events to clear regenerating state
-  useEffect(() => {
-    let unlistenCompleted: (() => void) | null = null;
-    let unlistenFailed: (() => void) | null = null;
-
-    const setupListeners = async () => {
-      unlistenCompleted = await listen<string>('knowledge_regeneration_completed', () => {
-        setRegenerating(null);
-      });
-
-      unlistenFailed = await listen<[string, string]>('knowledge_regeneration_failed', () => {
-        setRegenerating(null);
-      });
-    };
-
-    setupListeners();
-
-    return () => {
-      if (unlistenCompleted) unlistenCompleted();
-      if (unlistenFailed) unlistenFailed();
-    };
-  }, []);
-
-  // Find current iteration from iterations list
-  const currentIterationInfo = currentIterationId 
-    ? iterations.find(iter => iter.id === currentIterationId) 
-    : null;
-
-  const loadProjectKnowledge = async () => {
+  const loadProjectKnowledge = useCallback(async () => {
     if (!currentSession) {
       setKnowledgeList([]);
       return;
@@ -105,9 +70,25 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentSession, message]);
 
-  const loadIterations = async () => {
+  /**
+   * Re-sync the in-flight generation set from the backend.
+   *
+   * This is what makes the UI honest after a remount: the backend owns the
+   * truth, so a panel that was unmounted mid-generation restores the running
+   * state instead of offering a clickable Generate button.
+   */
+  const syncGenerationStatus = useCallback(async () => {
+    try {
+      const ids = await invoke<string[]>("gui_get_knowledge_generation_status");
+      setGeneratingIds(Array.isArray(ids) ? ids : []);
+    } catch (error) {
+      console.error("[KnowledgePanel] Failed to read generation status:", error);
+    }
+  }, []);
+
+  const loadIterations = useCallback(async () => {
     if (!currentSession) {
       setIterations([]);
       return;
@@ -126,23 +107,89 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
     } finally {
       setLoadingIterations(false);
     }
-  };
+  }, [currentSession]);
 
-  const handleRegenerateKnowledge = async (iterationId: string) => {
-    setRegenerating(iterationId);
-    try {
-      await invoke("gui_regenerate_knowledge", { iterationId });
-      // Don't show success message here - wait for event from backend
-      // The actual knowledge generation happens in background
-    } catch (error) {
-      console.error("[KnowledgePanel] Failed to start knowledge regeneration:", error);
-      message.error("Failed to start regeneration: " + error);
-      setRegenerating(null);
+  const markGenerating = useCallback((iterationId: string) => {
+    setGeneratingIds((prev) => (prev.includes(iterationId) ? prev : [...prev, iterationId]));
+  }, []);
+
+  const clearGenerating = useCallback((iterationId: string) => {
+    setGeneratingIds((prev) => prev.filter((id) => id !== iterationId));
+  }, []);
+
+  useEffect(() => {
+    loadProjectKnowledge();
+    syncGenerationStatus();
+  }, [loadProjectKnowledge, syncGenerationStatus, refreshTrigger]);
+
+  useEffect(() => {
+    if (currentSession && knowledgeList.length === 0 && !loading) {
+      loadIterations();
     }
-  };
+  }, [currentSession, knowledgeList.length, loading, currentIterationId, loadIterations]);
+
+  // Generation lifecycle events keep the state in sync while the panel is mounted.
+  useEffect(() => {
+    let disposed = false;
+    const unlisteners: Array<() => void> = [];
+
+    const setupListeners = async () => {
+      const registered = await Promise.all([
+        listen<string>('knowledge_regeneration_started', (event) => {
+          if (disposed) return;
+          markGenerating(event.payload);
+        }),
+        listen<string>('knowledge_regeneration_completed', (event) => {
+          if (disposed) return;
+          clearGenerating(event.payload);
+          // The backend rewrites knowledge on completion; pull the fresh copy.
+          loadProjectKnowledge();
+        }),
+        listen<[string, string]>('knowledge_regeneration_failed', (event) => {
+          if (disposed) return;
+          const [iterationId, reason] = event.payload;
+          clearGenerating(iterationId);
+          // A failed run leaves the previous knowledge removed — reload so the
+          // list matches what is actually on disk.
+          loadProjectKnowledge();
+          message.error("Knowledge generation failed: " + reason);
+        }),
+      ]);
+
+      if (disposed) {
+        registered.forEach((unlisten) => unlisten());
+      } else {
+        unlisteners.push(...registered);
+      }
+    };
+
+    setupListeners();
+
+    return () => {
+      disposed = true;
+      unlisteners.forEach((unlisten) => unlisten());
+    };
+  }, [markGenerating, clearGenerating, loadProjectKnowledge, message]);
+
+  // Safety net: if a lifecycle event is ever missed, polling reconciles the
+  // state instead of leaving the panel stuck on "Generating..." forever.
+  useEffect(() => {
+    if (generatingIds.length === 0) return;
+    const timer = window.setInterval(syncGenerationStatus, 10000);
+    return () => window.clearInterval(timer);
+  }, [generatingIds.length, syncGenerationStatus]);
+
+  // Find current iteration from iterations list
+  const currentIterationInfo = currentIterationId 
+    ? iterations.find(iter => iter.id === currentIterationId) 
+    : null;
+
+  const isGenerating = (iterationId: string) => generatingIds.includes(iterationId);
+  const isAnyGenerating = generatingIds.length > 0;
 
   const handleGenerateKnowledge = async (iterationId: string) => {
-    setRegenerating(iterationId);
+    // Optimistic: reflect the click immediately, then let the backend confirm.
+    markGenerating(iterationId);
     try {
       await invoke("gui_regenerate_knowledge", { iterationId });
       // Don't show success message here - wait for event from backend
@@ -150,7 +197,7 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
     } catch (error) {
       console.error("[KnowledgePanel] Failed to start knowledge generation:", error);
       message.error("Failed to start generation: " + error);
-      setRegenerating(null);
+      clearGenerating(iterationId);
     }
   };
 
@@ -188,6 +235,11 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
               <BookOutlined style={{ fontSize: "16px", color: "#1890ff" }} />
               <Text strong>Knowledge</Text>
               <Tag color="blue">{filteredKnowledge.length} iterations</Tag>
+              {isAnyGenerating && (
+                <Tag color="processing" icon={<LoadingOutlined spin />}>
+                  Generating{generatingIds.length > 1 ? ` (${generatingIds.length})` : ""}…
+                </Tag>
+              )}
             </Space>
             <Button icon={<ReloadOutlined />} size="small" onClick={loadProjectKnowledge} loading={loading}>Refresh</Button>
           </div>
@@ -206,37 +258,58 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
           ) : currentIterationInfo ? (
             // Current iteration is selected but has no knowledge - show generate option
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div style={{ padding: "12px", background: "var(--info-light)", borderRadius: "3px", border: "1px solid var(--border-light)", borderLeft: "3px solid var(--info)", marginBottom: "8px" }}>
-                <Text style={{ color: "var(--primary)" }}>Current iteration has no knowledge. Generate knowledge for it:</Text>
-              </div>
-              <Card size="small" hoverable>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                      <Text strong>#{currentIterationInfo.number} {currentIterationInfo.title}</Text>
-                      <Badge status="success" text="Completed" />
+              {isGenerating(currentIterationInfo.id) ? (
+                // Generation is running (possibly resumed after a tab switch):
+                // never offer a clickable Generate button here.
+                <Card size="small" style={{ borderLeft: "3px solid var(--primary)" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                    <LoadingOutlined spin style={{ fontSize: "18px", color: "var(--primary)", marginTop: "2px" }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                        <Text strong>Generating knowledge for #{currentIterationInfo.number} {currentIterationInfo.title}</Text>
+                        <Tag color="processing">In progress</Tag>
+                      </div>
+                      <Paragraph style={{ margin: 0, fontSize: "12px", color: "var(--text-secondary)" }}>
+                        Reading artifacts and summarizing with the model. This can take a few minutes — the status is kept if you switch tabs.
+                      </Paragraph>
                     </div>
-                    <Paragraph ellipsis={{ rows: 2 }} style={{ margin: 0, fontSize: "13px", color: "#888" }}>
-                      {currentIterationInfo.description}
-                    </Paragraph>
                   </div>
-                  <Tooltip title="Generate knowledge">
-                    <Button 
-                      type="primary" 
-                      icon={<PlusOutlined />} 
-                      size="small" 
-                      onClick={() => handleGenerateKnowledge(currentIterationInfo.id)} 
-                      loading={regenerating === currentIterationInfo.id}
-                      disabled={regenerating !== null}
-                    >
-                      Generate
-                    </Button>
-                  </Tooltip>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#666" }}>
-                  <Space size="small"><span><ClockCircleOutlined /> {formatDate(currentIterationInfo.created_at)}</span></Space>
-                </div>
-              </Card>
+                </Card>
+              ) : (
+                <>
+                  <div style={{ padding: "12px", background: "var(--info-light)", borderRadius: "3px", border: "1px solid var(--border-light)", borderLeft: "3px solid var(--info)", marginBottom: "8px" }}>
+                    <Text style={{ color: "var(--primary)" }}>Current iteration has no knowledge. Generate knowledge for it:</Text>
+                  </div>
+                  <Card size="small" hoverable>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <Text strong>#{currentIterationInfo.number} {currentIterationInfo.title}</Text>
+                          <Badge status="success" text="Completed" />
+                        </div>
+                        <Paragraph ellipsis={{ rows: 2 }} style={{ margin: 0, fontSize: "13px", color: "#888" }}>
+                          {currentIterationInfo.description}
+                        </Paragraph>
+                      </div>
+                      <Tooltip title={isAnyGenerating ? "Another generation is already running" : "Generate knowledge"}>
+                        <Button 
+                          type="primary" 
+                          icon={<PlusOutlined />} 
+                          size="small" 
+                          onClick={() => handleGenerateKnowledge(currentIterationInfo.id)} 
+                          loading={isGenerating(currentIterationInfo.id)}
+                          disabled={isAnyGenerating}
+                        >
+                          Generate
+                        </Button>
+                      </Tooltip>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#666" }}>
+                      <Space size="small"><span><ClockCircleOutlined /> {formatDate(currentIterationInfo.created_at)}</span></Space>
+                    </div>
+                  </Card>
+                </>
+              )}
             </div>
           ) : iterations.length > 0 ? (
             // No current iteration selected - show all completed iterations
@@ -251,21 +324,22 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
                         <Text strong>#{iteration.number} {iteration.title}</Text>
                         <Badge status="success" text="Completed" />
+                        {isGenerating(iteration.id) && <Tag color="processing" icon={<LoadingOutlined spin />}>In progress</Tag>}
                       </div>
                       <Paragraph ellipsis={{ rows: 2 }} style={{ margin: 0, fontSize: "13px", color: "#888" }}>
                         {iteration.description}
                       </Paragraph>
                     </div>
-                    <Tooltip title="Generate knowledge">
+                    <Tooltip title={isGenerating(iteration.id) ? "Generation in progress…" : isAnyGenerating ? "Another generation is already running" : "Generate knowledge"}>
                       <Button 
                         type="primary" 
                         icon={<PlusOutlined />} 
                         size="small" 
                         onClick={() => handleGenerateKnowledge(iteration.id)} 
-                        loading={regenerating === iteration.id}
-                        disabled={regenerating !== null}
+                        loading={isGenerating(iteration.id)}
+                        disabled={isGenerating(iteration.id) || isAnyGenerating}
                       >
-                        Generate
+                        {isGenerating(iteration.id) ? "Generating…" : "Generate"}
                       </Button>
                     </Tooltip>
                   </div>
@@ -287,6 +361,7 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
                       <Text strong>{knowledge.title}</Text>
                       <Tag color="geekblue">{knowledge.iteration_id.slice(0, 8)}</Tag>
+                      {isGenerating(knowledge.iteration_id) && <Tag color="processing" icon={<LoadingOutlined spin />}>Regenerating</Tag>}
                     </div>
                     <Paragraph ellipsis={{ rows: 2 }} style={{ margin: 0, fontSize: "13px", color: "#888" }}>
                       {knowledge.plan_summary || knowledge.design_summary || knowledge.idea_summary}
@@ -296,8 +371,8 @@ const KnowledgePanel: React.FC<KnowledgePanelProps> = ({ currentSession, current
                     <Tooltip title="查看详情">
                       <Button type="text" icon={<EyeOutlined />} size="small" onClick={(e) => { e.stopPropagation(); handleViewDetail(knowledge); }} />
                     </Tooltip>
-                    <Tooltip title="重新生成知识">
-                      <Button type="text" icon={<ReloadOutlined />} size="small" onClick={(e) => { e.stopPropagation(); handleRegenerateKnowledge(knowledge.iteration_id); }} loading={regenerating === knowledge.iteration_id} />
+                    <Tooltip title={isGenerating(knowledge.iteration_id) ? "重新生成中…" : isAnyGenerating ? "已有生成任务在进行中" : "重新生成知识"}>
+                      <Button type="text" icon={<ReloadOutlined />} size="small" onClick={(e) => { e.stopPropagation(); handleGenerateKnowledge(knowledge.iteration_id); }} loading={isGenerating(knowledge.iteration_id)} disabled={isGenerating(knowledge.iteration_id) || isAnyGenerating} />
                     </Tooltip>
                   </Space>
                 </div>
