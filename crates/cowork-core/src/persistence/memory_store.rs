@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::domain::{IterationMemory, MemoryQuery, MemoryQueryResult, ProjectMemory};
 
-use super::get_cowork_dir;
+use super::{from_versioned_json, get_cowork_dir, to_versioned_json};
 
 /// Memory store for persistence
 pub struct MemoryStore;
@@ -22,14 +22,14 @@ impl MemoryStore {
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
                 let default_memory = ProjectMemory::new();
-                let content = serde_json::to_string_pretty(&default_memory)?;
+                let content = to_versioned_json(&default_memory)?;
                 std::fs::write(&path, content)?;
                 return Ok(default_memory);
             }
             return Ok(ProjectMemory::new());
         }
         let content = std::fs::read_to_string(&path)?;
-        let memory: ProjectMemory = serde_json::from_str(&content)?;
+        let memory: ProjectMemory = from_versioned_json(&content, &path.display().to_string())?;
         Ok(memory)
     }
 
@@ -39,7 +39,7 @@ impl MemoryStore {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let content = serde_json::to_string_pretty(memory)?;
+        let content = to_versioned_json(memory)?;
         std::fs::write(&path, content)?;
         Ok(())
     }
@@ -68,14 +68,14 @@ impl MemoryStore {
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
                 let default_memory = IterationMemory::new(iteration_id);
-                let content = serde_json::to_string_pretty(&default_memory)?;
+                let content = to_versioned_json(&default_memory)?;
                 std::fs::write(&path, content)?;
                 return Ok(default_memory);
             }
             return Ok(IterationMemory::new(iteration_id));
         }
         let content = std::fs::read_to_string(&path)?;
-        let memory: IterationMemory = serde_json::from_str(&content)?;
+        let memory: IterationMemory = from_versioned_json(&content, &path.display().to_string())?;
         Ok(memory)
     }
 
@@ -85,7 +85,7 @@ impl MemoryStore {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let content = serde_json::to_string_pretty(memory)?;
+        let content = to_versioned_json(memory)?;
         std::fs::write(&path, content)?;
         Ok(())
     }

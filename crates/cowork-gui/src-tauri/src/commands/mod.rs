@@ -1,3 +1,4 @@
+pub mod autonomy;
 pub mod file;
 pub mod preview;
 pub mod runner;
@@ -16,6 +17,7 @@ use crate::project_runner::ProjectRunner;
 lazy_static! {
     pub static ref PROJECT_RUNNER: ProjectRunner = ProjectRunner::new();
     pub static ref RUNTIME_ANALYZER: Mutex<Option<cowork_core::RuntimeAnalyzer>> = Mutex::new(None);
+    pub static ref AUTONOMY_HOST: crate::autonomy_host::AutonomyHost = crate::autonomy_host::AutonomyHost::new();
 }
 
 pub fn init_app_handle(handle: tauri::AppHandle) {

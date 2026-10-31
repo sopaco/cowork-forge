@@ -60,6 +60,17 @@ impl Tool for PMGotoStageTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        // 执行互斥：拒绝在迭代执行期间改动全局单例/重启流水线，避免覆盖执行状态
+        if let Err(e) = crate::execution_guard::ExecutionGuard::try_acquire(
+            "pm_agent",
+            &self.current_iteration_id,
+        ) {
+            return Ok(json!({
+                "status": "error",
+                "message": e.to_string()
+            }));
+        }
+
         let stage_str = get_required_string_param(&args, "stage")?;
         let reason = get_required_string_param(&args, "reason")?;
 
@@ -170,6 +181,17 @@ impl Tool for PMCreateIterationTool {
     }
 
     async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> adk_core::Result<Value> {
+        // 执行互斥：迭代执行期间不允许并发创建迭代（会与执行路径竞争 project.json 写入）
+        if let Err(e) = crate::execution_guard::ExecutionGuard::try_acquire(
+            "pm_agent",
+            &self.current_iteration_id,
+        ) {
+            return Ok(json!({
+                "status": "error",
+                "message": e.to_string()
+            }));
+        }
+
         let title = get_required_string_param(&args, "title")?;
         let description = get_required_string_param(&args, "description")?;
         let inheritance = get_optional_string_param(&args, "inheritance")

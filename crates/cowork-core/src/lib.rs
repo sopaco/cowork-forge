@@ -32,6 +32,12 @@ pub mod pipeline;
 pub mod instructions;
 pub mod interaction;
 
+// Execution exclusivity (same-time single iteration execution)
+pub mod execution_guard;
+
+// Autonomy domain types + lifecycle state machine (Phase 0 skeleton, no business flows)
+pub mod autonomy;
+
 // Skills ecosystem (agentskills.io standard via adk-skill)
 pub mod skills;
 

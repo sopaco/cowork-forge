@@ -13,6 +13,7 @@ use serde_json::Value;
 // GUI-specific modules
 mod gui_types;
 mod commands;
+mod autonomy_host;
 mod project_runner;
 mod project_manager;
 mod iteration_commands;
@@ -23,7 +24,7 @@ mod tray;
 use project_manager::*;
 
 // Re-export commands from new module structure
-use commands::{init_app_handle, init_path_for_app_bundle, file, preview, runner, memory, template, pm, system, import_cmd};
+use commands::{init_app_handle, init_path_for_app_bundle, file, preview, runner, memory, template, pm, system, import_cmd, autonomy};
 
 
 
@@ -895,6 +896,12 @@ pub fn run() {
             pm::pm_restart_iteration,
             pm::pm_get_iteration_context,
             pm::pm_get_welcome_message,
+            // Autonomy commands
+            autonomy::autonomy_start,
+            autonomy::autonomy_stop,
+            autonomy::autonomy_pause,
+            autonomy::autonomy_resume,
+            autonomy::autonomy_get_status,
             // Import commands
             import_cmd::preview_import,
             import_cmd::analyze_existing_project,

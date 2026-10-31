@@ -2,30 +2,35 @@
 // Handles data, artifacts, and session files within .cowork-v2/iterations/{iteration_id}/
 
 use crate::data::*;
-use super::get_cowork_dir;
+use super::{from_versioned_json, get_cowork_dir, to_versioned_json};
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 
 // Global static storage for current iteration ID
 static CURRENT_ITERATION_ID: Mutex<Option<String>> = Mutex::new(None);
 
+/// Poison 容错的锁获取：跨线程/任务边界保持一致行为，panic 不致后续永久失败。
+fn lock_iteration_id() -> std::sync::MutexGuard<'static, Option<String>> {
+    CURRENT_ITERATION_ID.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
 /// Set the current iteration ID for data operations
 pub fn set_iteration_id(iteration_id: String) {
-    let mut id = CURRENT_ITERATION_ID.lock().unwrap();
+    let mut id = lock_iteration_id();
     *id = Some(iteration_id);
 }
 
 /// Get the current iteration ID
 pub fn get_iteration_id() -> Option<String> {
-    let id = CURRENT_ITERATION_ID.lock().unwrap();
+    let id = lock_iteration_id();
     id.clone()
 }
 
 /// Clear the current iteration ID
 pub fn clear_iteration_id() {
-    let mut id = CURRENT_ITERATION_ID.lock().unwrap();
+    let mut id = lock_iteration_id();
     *id = None;
 }
 
@@ -74,8 +79,7 @@ pub fn load_requirements() -> Result<Requirements> {
     }
     let content =
         fs::read_to_string(&path).with_context(|| format!("Failed to read {:?}", path))?;
-    let requirements: Requirements = serde_json::from_str(&content)
-        .with_context(|| format!("Failed to parse requirements.json"))?;
+    let requirements: Requirements = from_versioned_json(&content, "requirements.json")?;
     Ok(requirements)
 }
 
@@ -88,7 +92,7 @@ pub fn save_requirements(requirements: &Requirements) -> Result<()> {
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
 
-    let content = serde_json::to_string_pretty(requirements)?;
+    let content = to_versioned_json(requirements)?;
     fs::write(&path, content).with_context(|| format!("Failed to write {:?}", path))?;
     Ok(())
 }
@@ -103,7 +107,7 @@ pub fn load_feature_list() -> Result<FeatureList> {
         return Ok(FeatureList::new());
     }
     let content = fs::read_to_string(&path)?;
-    let features: FeatureList = serde_json::from_str(&content)?;
+    let features: FeatureList = from_versioned_json(&content, "feature_list.json")?;
     Ok(features)
 }
 
@@ -116,7 +120,7 @@ pub fn save_feature_list(features: &FeatureList) -> Result<()> {
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
 
-    let content = serde_json::to_string_pretty(features)?;
+    let content = to_versioned_json(features)?;
     fs::write(&path, content)?;
     Ok(())
 }
@@ -131,7 +135,7 @@ pub fn load_design_spec() -> Result<DesignSpec> {
         return Ok(DesignSpec::new());
     }
     let content = fs::read_to_string(&path)?;
-    let design: DesignSpec = serde_json::from_str(&content)?;
+    let design: DesignSpec = from_versioned_json(&content, "design_spec.json")?;
     Ok(design)
 }
 
@@ -144,7 +148,7 @@ pub fn save_design_spec(design: &DesignSpec) -> Result<()> {
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
 
-    let content = serde_json::to_string_pretty(design)?;
+    let content = to_versioned_json(design)?;
     fs::write(&path, content)?;
     Ok(())
 }
@@ -159,7 +163,7 @@ pub fn load_implementation_plan() -> Result<ImplementationPlan> {
         return Ok(ImplementationPlan::new());
     }
     let content = fs::read_to_string(&path)?;
-    let plan: ImplementationPlan = serde_json::from_str(&content)?;
+    let plan: ImplementationPlan = from_versioned_json(&content, "implementation_plan.json")?;
     Ok(plan)
 }
 
@@ -172,7 +176,7 @@ pub fn save_implementation_plan(plan: &ImplementationPlan) -> Result<()> {
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
 
-    let content = serde_json::to_string_pretty(plan)?;
+    let content = to_versioned_json(plan)?;
     fs::write(&path, content)?;
     Ok(())
 }
@@ -187,7 +191,7 @@ pub fn load_code_metadata() -> Result<CodeMetadata> {
         return Ok(CodeMetadata::new());
     }
     let content = fs::read_to_string(&path)?;
-    let metadata: CodeMetadata = serde_json::from_str(&content)?;
+    let metadata: CodeMetadata = from_versioned_json(&content, "code_metadata.json")?;
     Ok(metadata)
 }
 
@@ -200,7 +204,7 @@ pub fn save_code_metadata(metadata: &CodeMetadata) -> Result<()> {
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
 
-    let content = serde_json::to_string_pretty(metadata)?;
+    let content = to_versioned_json(metadata)?;
     fs::write(&path, content)?;
     Ok(())
 }
@@ -215,7 +219,7 @@ pub fn load_session_meta() -> Result<Option<SessionMeta>> {
         return Ok(None);
     }
     let content = fs::read_to_string(&path)?;
-    let meta: SessionMeta = serde_json::from_str(&content)?;
+    let meta: SessionMeta = from_versioned_json(&content, "meta.json")?;
     Ok(Some(meta))
 }
 
@@ -228,7 +232,7 @@ pub fn save_session_meta(meta: &SessionMeta) -> Result<()> {
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
 
-    let content = serde_json::to_string_pretty(meta)?;
+    let content = to_versioned_json(meta)?;
     fs::write(&path, content)?;
     Ok(())
 }
@@ -243,7 +247,7 @@ pub fn load_feedback_history() -> Result<FeedbackHistory> {
         return Ok(FeedbackHistory::new());
     }
     let content = fs::read_to_string(&path)?;
-    let history: FeedbackHistory = serde_json::from_str(&content)?;
+    let history: FeedbackHistory = from_versioned_json(&content, "feedback.json")?;
     Ok(history)
 }
 
@@ -256,7 +260,7 @@ pub fn save_feedback_history(history: &FeedbackHistory) -> Result<()> {
             .with_context(|| format!("Failed to create directory {:?}", parent))?;
     }
 
-    let content = serde_json::to_string_pretty(history)?;
+    let content = to_versioned_json(history)?;
     fs::write(&path, content)?;
     Ok(())
 }

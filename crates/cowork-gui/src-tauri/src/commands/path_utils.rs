@@ -993,8 +993,10 @@ mod tests {
 
     #[test]
     fn merge_paths_deduplicates_and_preserves_order() {
-        let merged = merge_paths("/a:/b:/c", "/b:/d");
-        assert_eq!(merged, "/a:/b:/c:/d");
+        // 使用平台路径分隔符（Windows ';' / Unix ':'），避免测试依赖 Unix 语义
+        let sep = PATH_SEP.to_string();
+        let merged = merge_paths(&format!("/a{sep}/b{sep}/c"), &format!("/b{sep}/d"));
+        assert_eq!(merged, format!("/a{sep}/b{sep}/c{sep}/d"));
     }
 
     #[test]

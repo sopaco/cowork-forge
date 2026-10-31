@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Requirements {
-    pub schema_version: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub requirements: Vec<Requirement>,
@@ -46,7 +45,6 @@ pub enum RequirementCategory {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeatureList {
-    pub schema_version: String,
     pub features: Vec<Feature>,
 }
 
@@ -88,7 +86,6 @@ pub struct FeatureMetadata {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DesignSpec {
-    pub schema_version: String,
     pub architecture: Architecture,
     pub technology_stack: TechnologyStack,
     pub deployment: DeploymentInfo,
@@ -165,7 +162,6 @@ pub struct DeploymentInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImplementationPlan {
-    pub schema_version: String,
     pub milestones: Vec<Milestone>,
     pub tasks: Vec<Task>,
 }
@@ -212,7 +208,6 @@ pub enum TaskStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeMetadata {
-    pub schema_version: String,
     pub files: Vec<FileMetadata>,
     pub build_status: BuildStatus,
     pub test_status: TestStatus,
@@ -330,7 +325,6 @@ pub enum Severity {
 impl Requirements {
     pub fn new() -> Self {
         Self {
-            schema_version: "1.0".to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
             requirements: Vec::new(),
@@ -341,7 +335,6 @@ impl Requirements {
 impl FeatureList {
     pub fn new() -> Self {
         Self {
-            schema_version: "1.0".to_string(),
             features: Vec::new(),
         }
     }
@@ -350,7 +343,6 @@ impl FeatureList {
 impl DesignSpec {
     pub fn new() -> Self {
         Self {
-            schema_version: "1.0".to_string(),
             architecture: Architecture {
                 style: String::new(),
                 components: Vec::new(),
@@ -371,7 +363,6 @@ impl DesignSpec {
 impl ImplementationPlan {
     pub fn new() -> Self {
         Self {
-            schema_version: "1.0".to_string(),
             milestones: Vec::new(),
             tasks: Vec::new(),
         }
@@ -381,7 +372,6 @@ impl ImplementationPlan {
 impl CodeMetadata {
     pub fn new() -> Self {
         Self {
-            schema_version: "1.0".to_string(),
             files: Vec::new(),
             build_status: BuildStatus {
                 last_build: Utc::now(),

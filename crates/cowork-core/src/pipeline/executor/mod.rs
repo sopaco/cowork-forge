@@ -85,6 +85,11 @@ impl IterationExecutor {
         resume_stage: Option<String>,
         model: Option<Arc<dyn adk_core::Llm>>,
     ) -> anyhow::Result<()> {
+        // 执行互斥：同一时刻只允许一个迭代执行；冲突时报可读错误，
+        // 不覆盖 CURRENT_ITERATION_ID / GOTO_STAGE_SIGNAL / 执行 LLM 等全局单例。
+        // continue_iteration / retry_iteration 委托本入口，一并受保护。
+        let _guard = crate::execution_guard::ExecutionGuard::try_acquire("pipeline", iteration_id)?;
+
         let mut iteration = self.iteration_store.load(iteration_id)?;
 
         let model = match model {

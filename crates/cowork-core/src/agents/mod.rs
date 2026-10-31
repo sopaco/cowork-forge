@@ -141,11 +141,11 @@ fn load_artifacts_summary_for_pm(iteration_store: &IterationStore, iteration_id:
             if let Ok(content) = fs::read_to_string(&path) {
                 // Only include first 500 chars of each artifact (UTF-8 safe)
                 let truncated = if content.chars().count() > 500 {
-                    format!("{}...[truncated]", content.chars().take(500).collect::<String>())
+                    format!("{}...[已截断]", content.chars().take(500).collect::<String>())
                 } else {
                     content
                 };
-                summary.push_str(&format!("\n\n## {} ({}):\n{}", name.to_uppercase(), filename, truncated));
+                summary.push_str(&format!("\n\n## 工件 {}（{}）：\n{}", name.to_uppercase(), filename, truncated));
             }
         }
     }
@@ -153,7 +153,7 @@ fn load_artifacts_summary_for_pm(iteration_store: &IterationStore, iteration_id:
     // Add code structure info
     let code_dir = iteration_dir.join("workspace");
     if code_dir.exists() {
-        summary.push_str("\n\n## Project Files:\n");
+        summary.push_str("\n\n## 项目文件：\n");
         if let Ok(entries) = fs::read_dir(&code_dir) {
             for entry in entries.flatten().take(20) {
                 if let Ok(name) = entry.file_name().into_string() {
@@ -249,7 +249,7 @@ pub async fn execute_pm_agent_message_streaming(
         .unwrap_or_default();
 
     let decisions_summary = if !project_memory.decisions.is_empty() {
-        let mut summary = String::from("\n\n## Previous Decisions:\n");
+        let mut summary = String::from("\n\n## 历史决策：\n");
         for decision in project_memory.decisions.iter().take(10) {
             summary.push_str(&format!("- {}: {}\n", decision.title, decision.decision));
         }
@@ -264,11 +264,11 @@ pub async fn execute_pm_agent_message_streaming(
 
     // Build conversation history string
     let conversation_history = if !history.is_empty() {
-        let mut history_str = String::from("\n\n## Conversation History:\n");
+        let mut history_str = String::from("\n\n## 对话历史：\n");
         for msg in history.iter() {
             let msg_type = msg.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
             let content = msg.get("content").and_then(|v| v.as_str()).unwrap_or("");
-            let role = if msg_type == "user" { "User" } else { "Assistant" };
+            let role = if msg_type == "user" { "用户" } else { "助手" };
             history_str.push_str(&format!("{}: {}\n", role, content));
         }
         history_str
@@ -281,18 +281,18 @@ pub async fn execute_pm_agent_message_streaming(
 
     // Build prompt with context
     let prompt = format!(
-        "User message: {}\n\n\
-        ## Current Iteration Info:\n\
-        - Title: {}\n\
-        - Description: {}\n\
-        - Status: {}\n\
-        - Current Stage: {}\n\
+        "用户消息：{}\n\n\
+        ## 当前迭代信息：\n\
+        - 标题：{}\n\
+        - 描述：{}\n\
+        - 状态：{}\n\
+        - 当前阶段：{}\n\
         {}\
         {}\
         {}\
-        \n\nPlease analyze the user's request and respond appropriately. \
-        If the user wants to fix a bug or make changes, use the appropriate tool (pm_goto_stage or pm_create_iteration). \
-        If you need more information, use pm_respond to ask for clarification.\n\n{}",
+        \n\n请分析用户的请求并做出恰当的响应。\
+        如果用户想修复 bug 或进行修改，请使用相应工具（pm_goto_stage 或 pm_create_iteration）。\
+        如果你需要了解更多信息，请使用 pm_respond 请求澄清。\n\n{}",
         message,
         iteration.title,
         iteration.description,

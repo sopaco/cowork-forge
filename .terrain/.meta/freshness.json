@@ -3,8 +3,8 @@
   "project": "cowork-forge",
   "repo_path": ".",
   "baseline": {
-    "git_head": "3648988c24af4765ce097bfce94c36802afa799a",
-    "git_head_at": "2026-07-17T08:50:26.910002+00:00",
+    "git_head": "fbaab05ffde32b3892028aa0b4876b41c0dd6024",
+    "git_head_at": "2026-08-22T13:50:14.089128800+00:00",
     "dirty": false
   },
   "assets": {
@@ -13,20 +13,20 @@
       "synced_at": "2026-07-17T08:47:15.068260+00:00",
       "baseline_git_head": "3648988c24af4765ce097bfce94c36802afa799a",
       "stale": false,
-      "freshness_score": 100
+      "freshness_score": 95
     },
     "agent_context": {
       "path": "agent/context.md",
       "synced_at": "2026-07-17T08:50:26.623612+00:00",
       "baseline_git_head": "3648988c24af4765ce097bfce94c36802afa799a",
       "stale": false,
-      "freshness_score": 90
+      "freshness_score": 85
     },
     "human_docs": {
       "path": "human/",
       "synced_at": "2026-07-17T08:47:15.071298+00:00",
       "stale": false,
-      "freshness_score": 100
+      "freshness_score": 95
     }
   },
   "drift": {
@@ -35,41 +35,48 @@
     "sample_changed_files": []
   },
   "summary": {
-    "overall_score": 90,
+    "overall_score": 85,
     "overall_stale": false,
     "commits_since_baseline": 0,
     "changed_files_count": 0,
-    "current_git_head": "3648988",
+    "current_git_head": "fbaab05",
     "working_tree_dirty": false,
     "is_git_repo": true,
-    "last_computed_at": "2026-07-17T08:50:26.910002+00:00",
-    "agent_pack_score": 100,
-    "agent_context_score": 90,
-    "human_docs_score": 100,
+    "last_computed_at": "2026-08-22T13:50:14.089128800+00:00",
+    "agent_pack_score": 95,
+    "agent_context_score": 85,
+    "human_docs_score": 95,
     "macro_preload_allowed": true,
     "drift_factors": [
       {
         "id": "baseline_match",
         "severity": "info",
-        "title": "与 baseline 提交一致",
-        "detail": "源码索引与 Agent 上下文均基于提交 3648988c24af4765ce097bfce94c36802afa799a 生成，相对 HEAD 无文件漂移。"
+        "title": "In sync with the baseline commit",
+        "detail": "Both the source index and the Agent context were generated from commit 3648988c24af4765ce097bfce94c36802afa799a, with no file drift relative to HEAD."
+      },
+      {
+        "id": "pack_age",
+        "severity": "medium",
+        "title": "Source index generated 36 days ago",
+        "detail": "The longer since the last Repomix pack, the more extra points are lost (about 1 per day, capped at 5).",
+        "points_lost": 5
       },
       {
         "id": "context_lineage",
         "severity": "info",
-        "title": "Agent 上下文受源码索引牵连",
-        "detail": "架构上下文原始分 100/100，按规则不超过源码索引分数的 90%，现为 90/100。",
+        "title": "Agent context discounted as a derived asset",
+        "detail": "context.md is derived from the source index by an LLM, so its confidence is discounted to 90%: raw score 95/100 → 85/100. This layer is therefore capped at 90, and the overall score cannot be higher either.",
         "points_lost": 10
       },
       {
         "id": "overall_driver",
         "severity": "info",
-        "title": "总分由 Agent 架构上下文决定",
-        "detail": "综合分取三层最低值：源码索引 100、Agent 上下文 90、人类文档 100。"
+        "title": "Overall score is driven by the Agent architecture context",
+        "detail": "The overall score is the lowest of the three layers: source index 95, Agent context 85, human docs 95."
       }
     ],
     "pack_baseline_short": "3648988",
     "context_baseline_short": "3648988"
   },
-  "last_computed_at": "2026-07-17T08:50:26.910002+00:00"
+  "last_computed_at": "2026-08-22T13:50:14.089128800+00:00"
 }

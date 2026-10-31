@@ -17,20 +17,24 @@ pub use stage_executor::*;
 
 static GOTO_STAGE_SIGNAL: LazyLock<Mutex<Option<(String, String)>>> = LazyLock::new(|| Mutex::new(None));
 
+/// Poison 容错的锁获取：跨线程/任务边界保持一致行为，panic 不致后续永久失败。
+fn lock_goto_stage_signal() -> std::sync::MutexGuard<'static, Option<(String, String)>> {
+    use std::sync::PoisonError;
+    GOTO_STAGE_SIGNAL.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
 pub fn set_goto_stage_signal(stage: String, reason: String) {
-    if let Ok(mut guard) = GOTO_STAGE_SIGNAL.lock() {
-        *guard = Some((stage, reason));
-    }
+    let mut guard = lock_goto_stage_signal();
+    *guard = Some((stage, reason));
 }
 
 pub fn take_goto_stage_signal() -> Option<(String, String)> {
-    GOTO_STAGE_SIGNAL.lock().ok().and_then(|mut g| g.take())
+    lock_goto_stage_signal().take()
 }
 
 pub fn clear_goto_stage_signal() {
-    if let Ok(mut guard) = GOTO_STAGE_SIGNAL.lock() {
-        *guard = None;
-    }
+    let mut guard = lock_goto_stage_signal();
+    *guard = None;
 }
 
 /// Stage execution result

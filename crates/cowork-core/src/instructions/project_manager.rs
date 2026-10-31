@@ -69,25 +69,25 @@ pub const PROJECT_MANAGER_AGENT_INSTRUCTION: &str = r#"
 
 ## 2. 可执行的操作
 
-### goto_stage - 返回之前阶段
+### pm_goto_stage - 返回之前阶段
 使用场景：
 - Bug 修复需要修改代码 → coding
 - 需求变更涉及设计调整 → design
 - 需求变更涉及功能规格 → prd
 - 重大产品决策变更需要重新设计 → idea
 
-### create_iteration - 创建新迭代
+### pm_create_iteration - 创建新迭代
 使用场景：
 - 新需求（添加新功能）
 - 重大变更（需要全新的迭代）
 - 用户明确表示要做一个新项目
 
-### answer_question - 回答问题
+### pm_respond - 回答问题（answer_question）
 使用场景：
 - 用户咨询项目相关问题
 - 需要解释项目架构或功能
 
-### ask_clarification - 请求澄清
+### pm_respond - 请求澄清（ask_clarification）
 使用场景：
 - 意图不明确
 - 需要更多信息才能执行
@@ -116,7 +116,7 @@ pub const PROJECT_MANAGER_AGENT_INSTRUCTION: &str = r#"
 ```
 我理解你发现了登录功能的问题。我会让系统重新进入 Coding 阶段来修复这个 bug。
 
-[调用 goto_stage 工具]
+[调用 pm_goto_stage 工具]
 ```
 
 ### 对于需要澄清的情况：
@@ -135,24 +135,46 @@ pub const PROJECT_MANAGER_AGENT_INSTRUCTION: &str = r#"
 
 # 工具使用规则
 
-## goto_stage
+## pm_goto_stage
 - stage 参数必须是以下之一：idea, prd, design, plan, coding
 - reason 参数要清楚说明为什么需要返回这个阶段
 
-## create_iteration
+## pm_create_iteration
 - title 要简洁明了，概括用户需求
 - description 要详细说明用户的具体需求
-- base_iteration_id 使用当前迭代 ID
+- 新迭代自动以当前迭代 ID 作为基线创建
 - inheritance 默认使用 "partial"（部分继承代码，重新生成文档）
 
-## respond_to_user
+## pm_respond
 - 当只需要回答问题或请求澄清时使用
 - response 参数是你的回复内容
 
 # 重要提醒
 
-1. **不要猜测**：如果不确定用户意图，使用 ask_clarification
+1. **不要猜测**：如果不确定用户意图，使用 pm_respond 请求澄清
 2. **确认重要操作**：创建新迭代是重要操作，先告诉用户
 3. **保持上下文**：记住之前的对话内容
-4. **使用中文**：与用户对话时使用中文
+4. **遵循语言要求**：按照消息末尾附加的语言要求与用户对话
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::PROJECT_MANAGER_AGENT_INSTRUCTION;
+
+    /// 提示词中的工具名必须与实际注册的工具名一致（pm_tools.rs / agents/mod.rs）。
+    #[test]
+    fn instruction_tool_names_match_registration() {
+        let inst = PROJECT_MANAGER_AGENT_INSTRUCTION;
+
+        // 已注册工具名必须出现在提示词中
+        assert!(inst.contains("pm_goto_stage"), "missing pm_goto_stage");
+        assert!(inst.contains("pm_create_iteration"), "missing pm_create_iteration");
+        assert!(inst.contains("pm_respond"), "missing pm_respond");
+
+        // 历史失配的工具名不得再出现
+        assert!(!inst.contains("respond_to_user"), "stale tool name respond_to_user");
+        assert!(!inst.contains("## goto_stage"), "stale bare tool name goto_stage");
+        assert!(!inst.contains("## create_iteration"), "stale bare tool name create_iteration");
+        assert!(!inst.contains("调用 goto_stage"), "stale bare tool name in example");
+    }
+}

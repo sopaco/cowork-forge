@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::domain::{Iteration, IterationSummary};
 
-use super::get_cowork_dir;
+use super::{from_versioned_json, get_cowork_dir, to_versioned_json};
 
 /// Iteration store for persistence
 pub struct IterationStore;
@@ -19,7 +19,7 @@ impl IterationStore {
             anyhow::bail!("Iteration not found: {}", iteration_id);
         }
         let content = std::fs::read_to_string(&path)?;
-        let iteration: Iteration = serde_json::from_str(&content)?;
+        let iteration: Iteration = from_versioned_json(&content, &path.display().to_string())?;
         Ok(iteration)
     }
 
@@ -32,7 +32,7 @@ impl IterationStore {
             std::fs::create_dir_all(parent)?;
         }
         
-        let content = serde_json::to_string_pretty(iteration)?;
+        let content = to_versioned_json(iteration)?;
         std::fs::write(&path, content)?;
         Ok(())
     }
@@ -69,11 +69,12 @@ impl IterationStore {
                 .map(|e| e == "json")
                 .unwrap_or(false)
             {
-                if let Ok(content) = std::fs::read_to_string(entry.path()) {
-                    if let Ok(iteration) = serde_json::from_str::<Iteration>(&content) {
-                        iterations.push(iteration);
-                    }
-                }
+                // 显式报错而非静默跳过：无法解析或版本无法识别的迭代文件必须暴露问题
+                let path = entry.path();
+                let content = std::fs::read_to_string(&path)?;
+                let iteration: Iteration =
+                    from_versioned_json(&content, &path.display().to_string())?;
+                iterations.push(iteration);
             }
         }
 

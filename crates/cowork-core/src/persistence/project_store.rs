@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::domain::{IterationSummary, Project};
 
-use super::{get_cowork_dir, is_project_initialized};
+use super::{from_versioned_json, get_cowork_dir, is_project_initialized, to_versioned_json};
 
 const PROJECT_FILE: &str = "project.json";
 #[allow(dead_code)]
@@ -29,7 +29,7 @@ impl ProjectStore {
         }
 
         let content = std::fs::read_to_string(&path)?;
-        let project: Project = serde_json::from_str(&content)?;
+        let project: Project = from_versioned_json(&content, &path.display().to_string())?;
         Ok(Some(project))
     }
 
@@ -42,7 +42,7 @@ impl ProjectStore {
             std::fs::create_dir_all(parent)?;
         }
         
-        let content = serde_json::to_string_pretty(project)?;
+        let content = to_versioned_json(project)?;
         std::fs::write(&path, content)?;
         Ok(())
     }

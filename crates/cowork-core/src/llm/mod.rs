@@ -7,21 +7,26 @@ pub use rate_limiter::*;
 
 use std::sync::Arc;
 use adk_core::Llm;
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 
 static CURRENT_EXECUTION_LLM: Mutex<Option<Arc<dyn Llm>>> = Mutex::new(None);
 
+/// Poison 容错的锁获取：跨线程/任务边界保持一致行为，panic 不致后续永久失败。
+fn lock_execution_llm() -> std::sync::MutexGuard<'static, Option<Arc<dyn Llm>>> {
+    CURRENT_EXECUTION_LLM.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
 pub fn set_execution_llm(client: Arc<dyn Llm>) {
-    let mut guard = CURRENT_EXECUTION_LLM.lock().unwrap();
+    let mut guard = lock_execution_llm();
     *guard = Some(client);
 }
 
 pub fn get_execution_llm() -> Option<Arc<dyn Llm>> {
-    let guard = CURRENT_EXECUTION_LLM.lock().unwrap();
+    let guard = lock_execution_llm();
     guard.clone()
 }
 
 pub fn clear_execution_llm() {
-    let mut guard = CURRENT_EXECUTION_LLM.lock().unwrap();
+    let mut guard = lock_execution_llm();
     *guard = None;
 }
