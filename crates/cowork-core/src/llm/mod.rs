@@ -1,9 +1,11 @@
 // LLM module - Using adk-rust's built-in OpenAI client with custom base URL
 pub mod config;
 pub mod rate_limiter;
+pub mod timeout;
 
 pub use config::*;
 pub use rate_limiter::*;
+pub use timeout::*;
 
 use std::sync::Arc;
 use adk_core::Llm;

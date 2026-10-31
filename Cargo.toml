@@ -15,14 +15,14 @@ repository = "https://github.com/sopaco/cowork-forge"
 
 [workspace.dependencies]
 # ADK Rust framework
-adk-rust = "1.0.0"
-adk-core = "1.0.0"
-adk-agent = "1.0.0"
-adk-model = { version = "1.0.0", features = ["openai"] }
-adk-tool = "1.0.0"
-adk-runner = "1.0.0"
-adk-session = "1.0.0"
-adk-skill = "1.0.0"
+adk-rust = "2.3.0"
+adk-core = "2.3.0"
+adk-agent = "2.3.0"
+adk-model = { version = "2.3.0", features = ["openai"] }
+adk-tool = "2.3.0"
+adk-runner = "2.3.0"
+adk-session = "2.3.0"
+adk-skill = "2.3.0"
 
 # Core dependencies
 tokio = { version = "1", features = ["full"] }

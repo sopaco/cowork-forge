@@ -20,6 +20,32 @@ import type {
 export type NotifyKind = 'success' | 'info' | 'warning' | 'error';
 export type Notify = (kind: NotifyKind, text: string) => void;
 
+/**
+ * 前端等待一轮调研的上限。
+ *
+ * 后端 `CYCLE_TIMEOUT` 是 30 分钟，这里故意比它**长**一点：
+ * 让后端自己的超时收敛先生效（能给出"卡在哪一步"的准确文案），
+ * 前端只在后端连状态都读不出来时兜底，避免按钮永远转圈。
+ */
+const CYCLE_CLIENT_TIMEOUT_MS = 32 * 60 * 1000;
+
+/** 给 promise 加硬超时：后端/桥接层不响应时也能结束等待。 */
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+	return new Promise<T>((resolve, reject) => {
+		const timer = setTimeout(() => reject(new Error(message)), ms);
+		promise.then(
+			value => {
+				clearTimeout(timer);
+				resolve(value);
+			},
+			error => {
+				clearTimeout(timer);
+				reject(error);
+			}
+		);
+	});
+}
+
 export interface IdeaDetail {
 	idea: Idea;
 	timeline: DecisionLogEntry[];
@@ -88,7 +114,14 @@ export const useAutonomyStore = create<AutonomyStoreState>((set, get) => ({
 
 	refreshStatus: async () => {
 		try {
-			set({ status: await autonomyApi.getStatus() });
+			const status = await autonomyApi.getStatus();
+			const active = status.state.active_cycle ?? null;
+			set(prev => ({
+				status,
+				// 后端把每一步都落盘了，轮询时以它为准重放进度：
+				// 事件丢了、或者用户刷新过页面，进度条也不会空着。
+				steps: active && active.steps.length > 0 ? active.steps : prev.steps
+			}));
 		} catch (error) {
 			console.warn('[autonomy] 读取状态失败', error);
 		}
@@ -122,11 +155,18 @@ export const useAutonomyStore = create<AutonomyStoreState>((set, get) => ({
 		const { notify } = get();
 		set({ localRunning: true, steps: [] });
 		try {
-			const result = await autonomyApi.runCycle();
+			const result = await withTimeout(
+				autonomyApi.runCycle(),
+				CYCLE_CLIENT_TIMEOUT_MS,
+				'调研没有在预期时间内返回结果，后端可能仍在跑；请稍后刷新查看进度。'
+			);
 			const report = result.report;
-			set({ localRunning: false, lastNote: report.snapshot.note });
+			set({ lastNote: report.snapshot.note });
 			if (report.skipped) {
 				notify('info', report.snapshot.note ?? '这轮调研被跳过了');
+			} else if (report.snapshot.outcome === 'failed') {
+				// 失败已经在后端收敛过（状态回 Idle、快照落盘），这里只负责说清楚
+				notify('error', report.snapshot.note ?? '这轮调研没跑完');
 			} else if (report.published.length > 0) {
 				notify('success', report.snapshot.note ?? `找到 ${report.published.length} 条建议`);
 			} else {
@@ -134,8 +174,13 @@ export const useAutonomyStore = create<AutonomyStoreState>((set, get) => ({
 			}
 			await get().refresh();
 		} catch (error) {
-			set({ localRunning: false });
 			notify('error', '调研失败：' + error);
+		} finally {
+			// 兜底：不管走成功、失败还是超时，本地 loading 必须结束。
+			// 之前没有 finally —— 只要调用不 settle，按钮就永远转圈。
+			set({ localRunning: false });
+			// 再拉一次后端状态，让界面与磁盘上的真实状态对齐
+			await get().refreshStatus();
 		}
 	},
 

@@ -1290,7 +1290,7 @@ impl adk_core::Artifacts for SimpleArtifacts {
                     adk_core::AdkError::tool(format!("Failed to write artifact {}: {}", name, e))
                 })?;
             }
-            adk_core::Part::InlineData { mime_type, data } => {
+            adk_core::Part::InlineData { mime_type, data, .. } => {
                 let ext = match mime_type.as_str() {
                     "text/markdown" | "text/plain" => "txt",
                     "application/json" => "json",
@@ -1338,7 +1338,12 @@ impl adk_core::Artifacts for SimpleArtifacts {
                 _ => "application/octet-stream",
             }
             .to_string();
-            Ok(adk_core::Part::InlineData { mime_type, data })
+            Ok(adk_core::Part::InlineData {
+                mime_type,
+                data,
+                uri: None,
+                annotations: None,
+            })
         }
     }
 

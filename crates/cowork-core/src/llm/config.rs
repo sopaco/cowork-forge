@@ -252,6 +252,7 @@ pub fn save_config(config: &ModelConfig) -> Result<PathBuf> {
 
 pub fn create_llm_client(config: &LlmConfig) -> Result<Arc<dyn Llm>> {
     use crate::llm::rate_limiter::TokenBucketRateLimiter;
+    use crate::llm::timeout::TimeoutLlm;
 
     let openai_config =
         OpenAIConfig::compatible(&config.api_key, &config.api_base_url, &config.model_name);
@@ -262,7 +263,11 @@ pub fn create_llm_client(config: &LlmConfig) -> Result<Arc<dyn Llm>> {
     // Use token bucket rate limiter: 5 burst requests, 30 req/min average
     let rate_limited_client = TokenBucketRateLimiter::with_defaults(Arc::new(client));
 
-    Ok(Arc::new(rate_limited_client))
+    // 超时兜底放在最外层：上游"连上就不回包"时，限流器与 RPC 都不会自己超时，
+    // 调用方的 future 会永久 pending。这一层保证任何调用都有确定结局。
+    let timeout_client = TimeoutLlm::with_defaults(Arc::new(rate_limited_client));
+
+    Ok(Arc::new(timeout_client))
 }
 
 #[cfg(test)]

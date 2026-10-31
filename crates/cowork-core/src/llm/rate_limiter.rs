@@ -4,7 +4,7 @@
 // while maintaining an average rate limit. This is more efficient than fixed
 // delays as it allows immediate execution when tokens are available.
 
-use adk_core::{Llm, LlmRequest, LlmResponseStream, AdkError};
+use adk_core::{Llm, LlmRequest, LlmResponseStream, AdkError, SchemaAdapter};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -136,6 +136,16 @@ impl TokenBucketRateLimiter {
 impl Llm for TokenBucketRateLimiter {
     fn name(&self) -> &str {
         self.inner.name()
+    }
+
+    // 装饰器必须完全透明：schema 归一化与交互式 API 判定交回真实 provider。
+    // 否则 OpenAI/Gemini 等 provider 的专用 schema 适配会被静默替换成通用实现。
+    fn schema_adapter(&self) -> &dyn SchemaAdapter {
+        self.inner.schema_adapter()
+    }
+
+    fn uses_interactions_api(&self) -> bool {
+        self.inner.uses_interactions_api()
     }
 
     async fn generate_content(

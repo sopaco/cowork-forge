@@ -94,7 +94,7 @@ impl StepStatus {
 }
 
 /// 单个步骤的可读进度。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CycleStep {
     pub name: String,
     pub status: StepStatus,

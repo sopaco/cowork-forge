@@ -13,6 +13,15 @@ export type AutonomyStatus =
 	| 'paused'
 	| 'tripped';
 
+/** 进行中的调研周期：跨页面/跨刷新展示"现在卡在哪一步" */
+export interface ActiveCycle {
+	cycle_id: string;
+	trigger: CycleTrigger;
+	started_at: string;
+	heartbeat_at: string;
+	steps: CycleStep[];
+}
+
 export interface AutonomyState {
 	status: AutonomyStatus;
 	cycle_count: number;
@@ -20,6 +29,8 @@ export interface AutonomyState {
 	tripped_reason: string | null;
 	consecutive_empty_cycles: number;
 	iteration_create_failures: number;
+	/** 进行中的调研（无调研时为 null） */
+	active_cycle?: ActiveCycle | null;
 }
 
 export interface AutonomyTriggers {

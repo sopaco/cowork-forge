@@ -3,9 +3,9 @@
   "project": "cowork-forge",
   "repo_path": ".",
   "baseline": {
-    "git_head": "77d195b32a1b2e4ce2eb20335b946e1bf565a18d",
-    "git_head_at": "2026-10-31T17:53:33.694814+00:00",
-    "dirty": true
+    "git_head": "e8e064dc8576f4e87e99716b5a4d1fff837cd3c5",
+    "git_head_at": "2026-10-31T17:55:53.041624+00:00",
+    "dirty": false
   },
   "assets": {
     "agent_pack": {
@@ -13,69 +13,69 @@
       "synced_at": "2026-07-17T08:47:15.068260+00:00",
       "baseline_git_head": "3648988c24af4765ce097bfce94c36802afa799a",
       "stale": false,
-      "freshness_score": 83
+      "freshness_score": 80
     },
     "agent_context": {
       "path": "agent/context.md",
       "synced_at": "2026-07-17T08:50:26.623612+00:00",
       "baseline_git_head": "3648988c24af4765ce097bfce94c36802afa799a",
       "stale": true,
-      "stale_reason": "repo_advanced_2_commits",
-      "freshness_score": 74
+      "stale_reason": "repo_advanced_4_commits",
+      "freshness_score": 72
     },
     "human_docs": {
       "path": "human/",
       "synced_at": "2026-07-17T08:47:15.071298+00:00",
       "stale": false,
-      "freshness_score": 83
+      "freshness_score": 80
     }
   },
   "drift": {
-    "commits_since_baseline": 2,
-    "changed_files_since_baseline": 28,
+    "commits_since_baseline": 4,
+    "changed_files_since_baseline": 58,
     "sample_changed_files": [
+      ".gitignore",
       "autonomous-mode-design.md",
+      "crates/cowork-core/src/agents/iterative_assistant.rs",
       "crates/cowork-core/src/agents/mod.rs",
+      "crates/cowork-core/src/agents/research_agent.rs",
+      "crates/cowork-core/src/autonomy/budget.rs",
       "crates/cowork-core/src/autonomy/config.rs",
       "crates/cowork-core/src/autonomy/controller.rs",
+      "crates/cowork-core/src/autonomy/cycle.rs",
       "crates/cowork-core/src/autonomy/mod.rs",
-      "crates/cowork-core/src/autonomy/state.rs",
-      "crates/cowork-core/src/data/models.rs",
-      "crates/cowork-core/src/execution_guard.rs",
-      "crates/cowork-core/src/instructions/project_manager.rs",
-      "crates/cowork-core/src/lib.rs",
-      "crates/cowork-core/src/llm/mod.rs",
-      "crates/cowork-core/src/persistence/autonomy_store.rs"
+      "crates/cowork-core/src/autonomy/research.rs",
+      "crates/cowork-core/src/autonomy/state.rs"
     ]
   },
   "summary": {
-    "overall_score": 74,
+    "overall_score": 72,
     "overall_stale": true,
-    "commits_since_baseline": 2,
-    "changed_files_count": 28,
-    "current_git_head": "77d195b",
-    "working_tree_dirty": true,
+    "commits_since_baseline": 4,
+    "changed_files_count": 58,
+    "current_git_head": "e8e064d",
+    "working_tree_dirty": false,
     "is_git_repo": true,
-    "last_computed_at": "2026-10-31T17:53:33.694814+00:00",
-    "stale_reason": "repo_advanced_2_commits",
-    "agent_pack_score": 83,
-    "agent_context_score": 74,
-    "human_docs_score": 83,
+    "last_computed_at": "2026-10-31T17:55:53.041624+00:00",
+    "stale_reason": "repo_advanced_4_commits",
+    "agent_pack_score": 80,
+    "agent_context_score": 72,
+    "human_docs_score": 80,
     "macro_preload_allowed": true,
     "drift_factors": [
       {
         "id": "commits_behind",
         "severity": "medium",
-        "title": "代码已前进 2 个提交",
-        "detail": "知识资产 baseline 为 3648988c24af4765ce097bfce94c36802afa799a，当前 HEAD 为 77d195b。每多 1 个提交约扣 2 分（上限 40 分）。",
-        "points_lost": 4
+        "title": "代码已前进 4 个提交",
+        "detail": "知识资产 baseline 为 3648988c24af4765ce097bfce94c36802afa799a，当前 HEAD 为 e8e064d。每多 1 个提交约扣 2 分（上限 40 分）。",
+        "points_lost": 8
       },
       {
         "id": "files_changed",
-        "severity": "medium",
-        "title": "28 个文件相对 baseline 有变更",
+        "severity": "high",
+        "title": "58 个文件相对 baseline 有变更",
         "detail": "变更文件占索引规模的比例越高，扣分越多（上限 30 分）。下方列出部分路径。",
-        "points_lost": 3
+        "points_lost": 7
       },
       {
         "id": "pack_age",
@@ -85,42 +85,35 @@
         "points_lost": 5
       },
       {
-        "id": "dirty_tree",
-        "severity": "medium",
-        "title": "工作区有未提交修改",
-        "detail": "Git 工作区在源码路径上有未提交改动（已排除 `.terrain/` 等知识产出目录）。知识资产基于某次提交快照，与磁盘上的未提交源码改动不一致，扣 5 分。",
-        "points_lost": 5
-      },
-      {
         "id": "context_lineage",
         "severity": "info",
         "title": "Agent 上下文按派生资产折算",
-        "detail": "context.md 由 LLM 从源码索引推导而来，可信度按 90% 折算：原始分 83/100 → 74/100。因此该层上限为 90 分，综合分也不会更高。",
-        "points_lost": 9
+        "detail": "context.md 由 LLM 从源码索引推导而来，可信度按 90% 折算：原始分 80/100 → 72/100。因此该层上限为 90 分，综合分也不会更高。",
+        "points_lost": 8
       },
       {
         "id": "overall_driver",
         "severity": "info",
         "title": "总分由 Agent 架构上下文决定",
-        "detail": "综合分取三层最低值：源码索引 83、Agent 上下文 74、人类文档 83。"
+        "detail": "综合分取三层最低值：源码索引 80、Agent 上下文 72、人类文档 80。"
       }
     ],
     "sample_changed_files": [
+      ".gitignore",
       "autonomous-mode-design.md",
+      "crates/cowork-core/src/agents/iterative_assistant.rs",
       "crates/cowork-core/src/agents/mod.rs",
+      "crates/cowork-core/src/agents/research_agent.rs",
+      "crates/cowork-core/src/autonomy/budget.rs",
       "crates/cowork-core/src/autonomy/config.rs",
       "crates/cowork-core/src/autonomy/controller.rs",
+      "crates/cowork-core/src/autonomy/cycle.rs",
       "crates/cowork-core/src/autonomy/mod.rs",
-      "crates/cowork-core/src/autonomy/state.rs",
-      "crates/cowork-core/src/data/models.rs",
-      "crates/cowork-core/src/execution_guard.rs",
-      "crates/cowork-core/src/instructions/project_manager.rs",
-      "crates/cowork-core/src/lib.rs",
-      "crates/cowork-core/src/llm/mod.rs",
-      "crates/cowork-core/src/persistence/autonomy_store.rs"
+      "crates/cowork-core/src/autonomy/research.rs",
+      "crates/cowork-core/src/autonomy/state.rs"
     ],
     "pack_baseline_short": "3648988",
     "context_baseline_short": "3648988"
   },
-  "last_computed_at": "2026-10-31T17:53:33.694814+00:00"
+  "last_computed_at": "2026-10-31T17:55:53.041624+00:00"
 }

@@ -68,6 +68,20 @@ const PRIORITY_LABEL: Record<string, string> = {
 /** 工作量档位 → 粗略人档，仅用于路线图上的相对比较 */
 const EFFORT_WEIGHT: Record<string, number> = { s: 1, m: 2, l: 3, xl: 5 };
 
+/** 后端阶段 → 人话（用于"卡在哪一步"的说明，不笼统写"正在调研"） */
+const STAGE_HINT: Record<string, string> = {
+	researching: '正在收集证据',
+	proposing: '正在生成提案'
+};
+
+/** 距某个 ISO 时间点过去了多少分钟（无法解析时返回 null）。 */
+function minutesSince(iso: string | null | undefined): number | null {
+	if (!iso) return null;
+	const ts = Date.parse(iso);
+	if (Number.isNaN(ts)) return null;
+	return Math.max(0, Math.floor((Date.now() - ts) / 60000));
+}
+
 const STATUS_BADGE: Record<string, 'default' | 'processing' | 'success' | 'warning' | 'error'> = {
 	disabled: 'default',
 	idle: 'success',
@@ -159,6 +173,41 @@ const AutonomyPanel: React.FC<AutonomyPanelProps> = ({ compact = false }) => {
 		if (parts.length === 0) return '只在你点「立即调研」时跑';
 		return parts.join('、') + '自动调研';
 	}, [status]);
+
+	/**
+	 * 运行中的说明按**真实阶段**生成。
+	 *
+	 * 原来的实现只有一句硬编码的"正在调研"：卡在生成提案时用户看到的
+	 * 和卡在收集证据时一模一样，没法判断是慢还是死了。这里给出阶段名、
+	 * 当前步骤名，以及"多久没进展"——排查时这一行就是全部依据。
+	 *
+	 * 拆成两句：`runningHint` 用于还没有任何步骤时（刷新后/刚起步），
+	 * `stallHint` 用于步骤列表已渲染但长时间没有心跳时——否则最常见的
+	 * "卡在生成提案"场景下这条提示根本不会显示。
+	 */
+	const { runningHint, stallHint } = useMemo(() => {
+		if (!running) return { runningHint: '', stallHint: '' };
+		const phase = status?.state.status;
+		const active = status?.state.active_cycle ?? null;
+		const currentStep =
+			steps.find(step => step.status === 'running') ??
+			active?.steps.find(step => step.status === 'running');
+		const stage = STAGE_HINT[phase ?? ''] ?? '正在调研';
+		const stepText = currentStep ? `（${currentStep.name}）` : '';
+		const idleMinutes = minutesSince(active?.heartbeat_at ?? active?.started_at);
+		// 阈值对齐单次模型调用上限（10 分钟）：慢模型思考十分钟是正常的，
+		// 低于这个量级提示"可能卡住"只会制造误判。
+		const stalled = idleMinutes !== null && idleMinutes >= 10;
+		const stall = stalled
+			? `已经 ${idleMinutes} 分钟没有进展，很可能卡在模型调用上；超过 30 分钟会自动中止并回到空闲。`
+			: '';
+		return {
+			runningHint: stalled
+				? `${stage}${stepText}${stall}`
+				: `${stage}${stepText}，切到别的页面也不会中断。`,
+			stallHint: stall
+		};
+	}, [running, status, steps]);
 
 	const handleAccept = (idea: IdeaSummary) => {
 		Modal.confirm({
@@ -257,12 +306,17 @@ const AutonomyPanel: React.FC<AutonomyPanelProps> = ({ compact = false }) => {
 							)}
 						</div>
 					))}
+					{stallHint && (
+						<Text type="warning" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
+							{stallHint}
+						</Text>
+					)}
 				</div>
 			)}
 
 			{running && steps.length === 0 && (
 				<Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
-					正在调研，切到别的页面也不会中断。
+					{runningHint}
 				</Text>
 			)}
 

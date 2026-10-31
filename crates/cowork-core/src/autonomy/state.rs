@@ -1,6 +1,9 @@
 // AutonomyState —— 自主模式生命周期状态（设计 §4.2 全集）
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+
+use super::cycle::{CycleStep, CycleTrigger};
 
 /// 自主模式状态全集。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -40,6 +43,52 @@ impl AutonomyStatus {
     }
 }
 
+/// 进行中的调研周期。
+///
+/// **只用于展示**（"现在卡在哪一步"），不作为重入保护依据——
+/// 重入由进程内 `CycleRunGuard` 判定。进程崩溃后这里会残留，
+/// 启动时由 `recover_stale_state` 清掉。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActiveCycle {
+    pub cycle_id: String,
+    pub trigger: CycleTrigger,
+    pub started_at: DateTime<Utc>,
+    /// 最后一次进度心跳（每推进一步刷新）。
+    pub heartbeat_at: DateTime<Utc>,
+    /// 已发生的步骤（含正在跑的那一步）。
+    pub steps: Vec<CycleStep>,
+}
+
+impl ActiveCycle {
+    pub fn new(cycle_id: impl Into<String>, trigger: CycleTrigger) -> Self {
+        let now = Utc::now();
+        Self {
+            cycle_id: cycle_id.into(),
+            trigger,
+            started_at: now,
+            heartbeat_at: now,
+            steps: Vec::new(),
+        }
+    }
+
+    /// 按名字覆盖同一步骤（同一步骤会经历 running → done 两次推送）。
+    pub fn upsert_step(&mut self, step: CycleStep) {
+        if let Some(existing) = self.steps.iter_mut().find(|s| s.name == step.name) {
+            *existing = step;
+        } else {
+            self.steps.push(step);
+        }
+        self.heartbeat_at = Utc::now();
+    }
+
+    /// 正在跑的步骤名（面板找不到本地进度时用来兜底显示）。
+    pub fn running_step(&self) -> Option<&CycleStep> {
+        self.steps
+            .iter()
+            .find(|s| s.status == super::cycle::StepStatus::Running)
+    }
+}
+
 /// 自主模式运行状态（顶层文档，持久化于 autonomy/state.json）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AutonomyState {
@@ -55,6 +104,12 @@ pub struct AutonomyState {
     pub consecutive_empty_cycles: u32,
     /// 连续创建迭代失败次数（熔断条件④：≥3 次 → 熔断待人工）。
     pub iteration_create_failures: u32,
+    /// 进行中的调研（无调研时为 None）。
+    ///
+    /// `serde(default)`：这是**新增可选字段**，旧 state.json 没有它也能读，
+    /// 属于兼容变更，不需要提升 schema_version。
+    #[serde(default)]
+    pub active_cycle: Option<ActiveCycle>,
 }
 
 impl Default for AutonomyState {
@@ -66,6 +121,7 @@ impl Default for AutonomyState {
             tripped_reason: None,
             consecutive_empty_cycles: 0,
             iteration_create_failures: 0,
+            active_cycle: None,
         }
     }
 }

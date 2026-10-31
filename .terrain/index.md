@@ -25,19 +25,15 @@ source: .
     - cowork-cli/
     - cowork-core/
   - LICENSE
-  - .agents/
-    - skills/
-  - .claude/
-    - skills/
   - Cargo.lock
   - litho.docs/
     - zh/
     - en/
   - README.md
-  - .gitignore
+  - tasks.md
+  - autonomous-mode-design.md
   - README_zh.md
-  - .github/
-    - workflows/
+  - spec.md
   - AGENTS.md
   - assets/
     - icon_cowork.png
@@ -48,6 +44,3 @@ source: .
     - icon_cowork_v1.png
     - clarify_teams_like_human.jpg
     - clarify_snapshot_gui.jpg
-  - .codegraph/
-    - codegraph.db
-    - .gitignore

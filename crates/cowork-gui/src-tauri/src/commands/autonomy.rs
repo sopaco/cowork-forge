@@ -134,7 +134,12 @@ pub async fn autonomy_resume(window: Window) -> Result<AutonomyStatusPayload, St
 
 #[tauri::command]
 pub async fn autonomy_get_status() -> Result<AutonomyStatusPayload, String> {
-    let controller = AutonomyController::new().map_err(|e| e.to_string())?;
+    let mut controller = AutonomyController::new().map_err(|e| e.to_string())?;
+    // 读状态时顺手自愈：状态说"在跑"但进程里没有在跑的周期，
+    // 说明是上次崩溃的残留。否则前端会永远显示"正在调研"。
+    if let Err(e) = controller.heal_if_orphaned() {
+        tracing::warn!("[autonomy] 状态自愈失败: {}", e);
+    }
     build_payload(&controller)
 }
 
@@ -162,6 +167,11 @@ pub async fn autonomy_update_config(
 }
 
 /// 手动跑一轮调研（立即调研）。
+///
+/// 核心层的 `run_cycle` 自带整轮超时与失败收敛，正常情况**总是**返回一份
+/// 带结局的快照（失败在 `report.snapshot.outcome == failed` 里，文案在
+/// `note` 里），所以这里的 `Err` 只对应"连状态都读不出来"这类异常。
+/// 无论走哪条路，都必须把最新状态推给前端，否则按钮会一直转圈。
 #[tauri::command]
 pub async fn autonomy_run_cycle(window: Window) -> Result<serde_json::Value, String> {
     let config = cowork_core::llm::load_config().map_err(|e| format!("读取 LLM 配置失败: {}", e))?;
@@ -172,26 +182,28 @@ pub async fn autonomy_run_cycle(window: Window) -> Result<serde_json::Value, Str
         window: window.app_handle().clone(),
     };
     let mut controller = AutonomyController::new().map_err(|e| e.to_string())?;
-    let report = controller
+    let outcome = controller
         .run_cycle(CycleTrigger::Manual, model, &sink)
-        .await
-        .map_err(|e| format!("自主调研失败: {}", e))?;
+        .await;
 
-    let _ = window.emit(
-        "autonomy_cycle_report",
-        serde_json::json!({
-            "report": report,
-            "trigger": "manual",
-        }),
-    );
-    let _ = window.emit(
-        "autonomy_state_changed",
-        controller.status().map_err(|e| e.to_string())?,
-    );
+    // 先推状态：失败分支也要推，前端靠它结束 loading
+    if let Ok(state) = controller.status() {
+        let _ = window.emit("autonomy_state_changed", state);
+    }
 
-    Ok(serde_json::json!({
-        "report": report,
-    }))
+    match outcome {
+        Ok(report) => {
+            let _ = window.emit(
+                "autonomy_cycle_report",
+                serde_json::json!({
+                    "report": report,
+                    "trigger": "manual",
+                }),
+            );
+            Ok(serde_json::json!({ "report": report }))
+        }
+        Err(e) => Err(format!("自主调研失败: {:#}", e)),
+    }
 }
 
 /// 建议列表（列表视图）。

@@ -11,6 +11,7 @@
 // 禁止各自另写一份状态迁移。
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use adk_core::Llm;
 use chrono::{DateTime, Utc};
@@ -29,8 +30,9 @@ use super::config::{AutonomyConfig, ExternalMcpPolicy};
 use super::cycle::{
     CycleOutcome, CycleProgressSink, CycleSnapshot, CycleStep, CycleTrigger, StepStatus,
 };
+use super::guard::{CycleRunGuard, is_cycle_running};
 use super::research::collect_research;
-use super::state::{AutonomyState, AutonomyStatus};
+use super::state::{ActiveCycle, AutonomyState, AutonomyStatus};
 
 /// 连续空转多少轮后熔断（设计 §8-6 熔断条件①）。
 pub const MAX_CONSECUTIVE_EMPTY_CYCLES: u32 = 3;
@@ -38,6 +40,20 @@ pub const MAX_CONSECUTIVE_EMPTY_CYCLES: u32 = 3;
 pub const MAX_DUPLICATES_PER_CYCLE: usize = 3;
 /// 连续创建迭代失败多少次熔断（设计 §8-6 熔断条件④）。
 pub const MAX_ITERATION_CREATE_FAILURES: u32 = 3;
+
+/// 单轮调研的总时长上限。
+///
+/// 单个 LLM 请求已由 `TimeoutLlm` 兜底（600s / 600s），这一层是**整轮**的
+/// 最后一道闸：无论卡在哪一步（多个慢请求叠加、MCP 工具串行、上游反复重试），
+/// 时间到就收敛成一条 failed 快照并回 Idle，绝不留下永不返回的将来时。
+///
+/// 取 30 分钟：单请求上限已是 10 分钟，而规划 Agent 一轮里可能发起多次调用
+/// （`max_iterations = max_llm_calls_per_cycle`）。若整轮闸门设得和单请求同一量级，
+/// 慢网关下会出现"明明没挂死却被整轮超时砍断"，反而掩盖真实原因。
+pub const CYCLE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+
+/// 单个工具调用的超时（adk 默认 5 分钟且会重试，对自主调研太长）。
+const CYCLE_TOOL_TIMEOUT: Duration = Duration::from_secs(90);
 
 /// 跳过一轮的原因。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -225,8 +241,8 @@ impl AutonomyController {
     /// 异常退出后残留的 Researching / Proposing 状态复位（进程启动时调用一次）。
     ///
     /// 调研中途崩溃或被强杀时，`state.json` 会停在"正在调研"，
-    /// 而重入保护会一直拒绝新一轮 —— 自主循环就此死锁。
-    /// 这里把这类"僵尸状态"复位成 Idle。
+    /// 这里把这类"僵尸状态"复位成 Idle。启动时刻进程内必然没有在跑的周期，
+    /// 所以不需要额外的存活判定。
     pub fn recover_stale_state(&mut self) -> anyhow::Result<bool> {
         if matches!(
             self.state.status,
@@ -237,10 +253,36 @@ impl AutonomyController {
                 self.state.status.as_str()
             );
             self.state.status = AutonomyStatus::Idle;
+            self.state.active_cycle = None;
             self.persist()?;
             return Ok(true);
         }
         Ok(false)
+    }
+
+    /// 运行期自愈：状态说"在跑"，但进程里没有任何一轮在跑 → 孤立状态，复位。
+    ///
+    /// 判据是进程内的 [`is_cycle_running`] 而不是磁盘上的状态：
+    /// 磁盘状态只能证明"曾经开始过"，不能证明"现在还活着"。
+    /// 只在**没有**持有者时才复位，因此不会误伤真正在跑的周期。
+    pub fn heal_if_orphaned(&mut self) -> anyhow::Result<bool> {
+        if !matches!(
+            self.state.status,
+            AutonomyStatus::Researching | AutonomyStatus::Proposing
+        ) {
+            return Ok(false);
+        }
+        if is_cycle_running() {
+            return Ok(false);
+        }
+        tracing::warn!(
+            "[autonomy] 状态为 {:?} 但进程内没有在跑的调研，判定为孤立状态并复位为 Idle",
+            self.state.status.as_str()
+        );
+        self.state.status = AutonomyStatus::Idle;
+        self.state.active_cycle = None;
+        self.persist()?;
+        Ok(true)
     }
 
     /// 当前状态快照。
@@ -556,11 +598,10 @@ impl AutonomyController {
         if self.state.status == AutonomyStatus::Paused {
             return TriggerDecision::skip(SkipReason::Paused);
         }
-        if matches!(
-            self.state.status,
-            AutonomyStatus::Researching | AutonomyStatus::Proposing
-        ) {
-            // 上一轮还没跑完，不重入（宿主 tick 与人工触发都走这里）
+        if is_cycle_running() {
+            // 上一轮还没跑完，不重入（宿主 tick 与人工触发都走这里）。
+            // 判据是**进程内**的持有者，不是磁盘状态：磁盘上的 researching
+            // 可能只是上次崩溃的残留，用它拦会让循环永久死锁。
             return TriggerDecision::skip(SkipReason::AlreadyRunning);
         }
         if trigger != CycleTrigger::Manual && !self.config.enabled {
@@ -587,37 +628,88 @@ impl AutonomyController {
     }
 
     /// 跑一轮自主调研。
+    ///
+    /// 三重保护，缺一不可：
+    /// 1. **进程内互斥**（[`CycleRunGuard`]）：宿主 tick 与人工触发不会同时开跑；
+    /// 2. **单请求超时**（`TimeoutLlm`）：上游不回包也不会永久 pending；
+    /// 3. **整轮超时**（[`CYCLE_TIMEOUT`]）：无论卡在哪一步，一定有结局。
+    ///
+    /// 任何失败路径都统一收敛成一条 failed 快照 + 状态回 Idle，
+    /// 不留"永不返回的将来时"，也不留"永远转圈的状态"。
     pub async fn run_cycle(
         &mut self,
         trigger: CycleTrigger,
         model: Arc<dyn Llm>,
         progress: &dyn CycleProgressSink,
     ) -> anyhow::Result<CycleReport> {
+        // 孤立状态自愈：上次崩溃留下的 researching/proposing 不该继续拦路
+        self.heal_if_orphaned()?;
+
         let decision = self.should_trigger(trigger);
         if !decision.should_run {
             let reason = decision.skip_reason.unwrap_or(SkipReason::Disabled);
             return Ok(self.skipped_report(trigger, reason));
         }
 
-        let mut budget = BudgetGuard::new(&self.config.budget);
+        let budget = BudgetGuard::new(&self.config.budget);
         if !budget.can_call_llm() {
             return Ok(self.skipped_report(trigger, SkipReason::BudgetExhausted));
         }
 
         let cycle_id = format!("cycle-{}", Utc::now().timestamp_millis());
+
+        // 进程内互斥（真闸门）：拿不到槽位说明有别的周期刚抢进来
+        let Some(_run_guard) = CycleRunGuard::try_acquire(&cycle_id, trigger.as_str()) else {
+            return Ok(self.skipped_report(trigger, SkipReason::AlreadyRunning));
+        };
+
+        // 状态机：Idle → Researching；同时把"进行中的周期"落盘，
+        // 让前端切走再回来（甚至重启）也知道卡在哪一步。
+        self.state.status = AutonomyStatus::Researching;
+        self.state.active_cycle = Some(ActiveCycle::new(cycle_id.clone(), trigger));
+        self.persist()?;
+
+        // 落到局部变量再 match：临时 future 在语句结束时被丢弃，
+        // 超时分支才能安全地重新借用 self。
+        let attempt = tokio::time::timeout(
+            CYCLE_TIMEOUT,
+            self.run_cycle_body(&cycle_id, trigger, model, budget, progress),
+        )
+        .await;
+
+        match attempt {
+            Ok(Ok(report)) => Ok(report),
+            Ok(Err(e)) => self.fail_cycle(&cycle_id, trigger, format!("{:#}", e), progress),
+            Err(_) => self.fail_cycle(
+                &cycle_id,
+                trigger,
+                format!(
+                    "整轮调研超过 {} 分钟仍未完成，已中止（多半是模型或网关没有响应）",
+                    CYCLE_TIMEOUT.as_secs() / 60
+                ),
+                progress,
+            ),
+        }
+    }
+
+    /// 一轮调研的主体（不含互斥与超时，由 [`Self::run_cycle`] 包裹）。
+    async fn run_cycle_body(
+        &mut self,
+        cycle_id: &str,
+        trigger: CycleTrigger,
+        model: Arc<dyn Llm>,
+        mut budget: BudgetGuard,
+        progress: &dyn CycleProgressSink,
+    ) -> anyhow::Result<CycleReport> {
         let existing_ideas = self.idea_store.load_all()?;
         let previous_cycle = self.store.load_latest_cycle().ok().flatten();
 
-        let mut snapshot = CycleSnapshot::new(cycle_id.clone(), trigger, String::new());
-
-        // 状态机：Idle → Researching（落盘，让前端即使切走再回来也知道在跑）
-        self.state.status = AutonomyStatus::Researching;
-        self.persist()?;
+        let mut snapshot = CycleSnapshot::new(cycle_id.to_string(), trigger, String::new());
 
         // --- 步骤 1：收集证据 -------------------------------------------------
         let mut step = CycleStep::new("收集证据");
         step.status = StepStatus::Running;
-        progress.on_step(&cycle_id, &step);
+        self.record_step(cycle_id, &step, progress);
 
         let mut ctx = match collect_research(
             &self.config.research,
@@ -626,21 +718,12 @@ impl AutonomyController {
         ) {
             Ok(ctx) => ctx,
             Err(e) => {
-                step.status = StepStatus::Failed;
-                step.detail = Some(e.to_string());
-                progress.on_step(&cycle_id, &step);
-                snapshot.steps.push(step);
-                snapshot.outcome = CycleOutcome::Failed;
-                snapshot.finished_at = Some(Utc::now());
-                snapshot.summarize();
-                self.store.save_cycle(&snapshot)?;
-                self.state.status = AutonomyStatus::Idle;
-                self.persist()?;
-                return Ok(CycleReport {
-                    snapshot,
-                    published: Vec::new(),
-                    skipped: None,
-                });
+                return self.fail_cycle(
+                    cycle_id,
+                    trigger,
+                    format!("收集证据失败：{}", e),
+                    progress,
+                );
             }
         };
         snapshot.evidence_digest = ctx.evidence_digest();
@@ -669,50 +752,46 @@ impl AutonomyController {
             ctx.feedback_items.len(),
             ctx.todo_markers.len()
         ));
-        progress.on_step(&cycle_id, &step);
+        self.record_step(cycle_id, &step, progress);
         snapshot.steps.push(step);
 
         // --- 步骤 2：生成提案 -------------------------------------------------
         let mut step = CycleStep::new("生成提案");
         step.status = StepStatus::Running;
-        progress.on_step(&cycle_id, &step);
+        self.record_step(cycle_id, &step, progress);
 
         // 状态机：Researching → Proposing
         self.state.status = AutonomyStatus::Proposing;
         self.persist()?;
 
         let prompt = build_planner_prompt(&ctx, external_allowed);
-        let outcome =
-            match crate::agents::run_autonomous_planner(model, prompt, "autonomy-research".to_string())
-                .await
-            {
-                Ok(outcome) => outcome,
-                Err(e) => {
-                    step.status = StepStatus::Failed;
-                    step.detail = Some(e.to_string());
-                    progress.on_step(&cycle_id, &step);
-                    snapshot.steps.push(step);
-                    snapshot.outcome = CycleOutcome::Failed;
-                    snapshot.finished_at = Some(Utc::now());
-                    snapshot.summarize();
-                    self.store.save_cycle(&snapshot)?;
-                    self.state.status = AutonomyStatus::Idle;
-                    self.persist()?;
-                    return Ok(CycleReport {
-                        snapshot,
-                        published: Vec::new(),
-                        skipped: None,
-                    });
-                }
-            };
+        // 预算在这里变成**真闸门**：迭代上限 = LLM 调用上限，
+        // 外部检索次数超限直接掐断本轮，工具超时防止某个 MCP 卡死拖垮整轮
+        // （adk 默认单工具 5 分钟且带重试）。
+        let outcome = match crate::agents::run_autonomous_planner_bounded(
+            model,
+            prompt,
+            "autonomy-research".to_string(),
+            budget.llm_limit(),
+            CYCLE_TOOL_TIMEOUT,
+            budget.mcp_limit(),
+        )
+        .await
+        {
+            Ok(outcome) => outcome,
+            Err(e) => {
+                return self.fail_cycle(
+                    cycle_id,
+                    trigger,
+                    format!("生成提案失败：{}", e),
+                    progress,
+                );
+            }
+        };
 
         budget.consume_llm();
-        let mcp_calls = outcome
-            .called_tools
-            .iter()
-            .filter(|name| !is_readonly_tool(name))
-            .count() as u32;
-        for _ in 0..mcp_calls {
+        // 外部检索次数由 Agent 侧真实计数（不是跑完再数工具名）
+        for _ in 0..outcome.external_calls {
             budget.consume_mcp();
         }
         snapshot.llm_calls = budget.llm_used();
@@ -723,15 +802,25 @@ impl AutonomyController {
 
         step.status = StepStatus::Done;
         step.detail = Some(format!("模型提交了 {} 条提案", outcome.drafts.len()));
-        progress.on_step(&cycle_id, &step);
+        self.record_step(cycle_id, &step, progress);
         snapshot.steps.push(step);
 
         // --- 步骤 3：质量门槛 + 去重 + 发布 ---------------------------------
         let mut step = CycleStep::new("质量门槛与去重");
         step.status = StepStatus::Running;
-        progress.on_step(&cycle_id, &step);
+        self.record_step(cycle_id, &step, progress);
 
-        let publish = self.publish_proposals(&outcome.drafts, &mut snapshot, &existing_ideas)?;
+        let publish = match self.publish_proposals(&outcome.drafts, &mut snapshot, &existing_ideas) {
+            Ok(publish) => publish,
+            Err(e) => {
+                return self.fail_cycle(
+                    cycle_id,
+                    trigger,
+                    format!("发布建议失败：{}", e),
+                    progress,
+                );
+            }
+        };
 
         step.status = StepStatus::Done;
         step.detail = Some(format!(
@@ -740,7 +829,7 @@ impl AutonomyController {
             snapshot.merged_count,
             snapshot.discarded.len()
         ));
-        progress.on_step(&cycle_id, &step);
+        self.record_step(cycle_id, &step, progress);
         snapshot.steps.push(step);
 
         // --- 状态更新与熔断 -------------------------------------------------
@@ -773,6 +862,8 @@ impl AutonomyController {
 
         snapshot.finished_at = Some(Utc::now());
         snapshot.summarize();
+        // 一轮结束：清掉进行中标记，状态与磁盘都回到"有结局"的样子
+        self.state.active_cycle = None;
         self.store.save_cycle(&snapshot)?;
 
         // 每日预算记账
@@ -787,6 +878,79 @@ impl AutonomyController {
         Ok(CycleReport {
             snapshot,
             published: publish.published,
+            skipped: None,
+        })
+    }
+
+    /// 推进一个步骤：更新进行中周期的步骤表 → 落盘 → 推送前端。
+    ///
+    /// 落盘是这里的关键：前端刷新/切换页面后靠 `state.active_cycle.steps`
+    /// 重放进度，而不是依赖可能丢过一次就没了的 Tauri 事件。
+    fn record_step(&mut self, cycle_id: &str, step: &CycleStep, progress: &dyn CycleProgressSink) {
+        if let Some(active) = self.state.active_cycle.as_mut() {
+            active.upsert_step(step.clone());
+        }
+        if let Err(e) = self.store.save_state(&self.state) {
+            tracing::warn!("[autonomy] 调研进度落盘失败: {}", e);
+        }
+        progress.on_step(cycle_id, step);
+    }
+
+    /// 失败收敛：**唯一**的失败出口。
+    ///
+    /// 无论失败来自哪一步、是错误还是超时，都走这里，保证：
+    /// 落一条 failed 快照（保留已发生的步骤）→ 状态回 Idle →
+    /// 清掉进行中标记 → 记账 → 推送前端。调用方永远不会拿到 Err。
+    fn fail_cycle(
+        &mut self,
+        cycle_id: &str,
+        trigger: CycleTrigger,
+        reason: String,
+        progress: &dyn CycleProgressSink,
+    ) -> anyhow::Result<CycleReport> {
+        let mut snapshot = CycleSnapshot::new(cycle_id.to_string(), trigger, String::new());
+        // 保留已经跑过的步骤，让"卡在哪一步"可追溯
+        if let Some(active) = self.state.active_cycle.as_ref() {
+            snapshot.steps = active.steps.clone();
+        }
+        if let Some(running) = snapshot
+            .steps
+            .iter_mut()
+            .find(|s| s.status == StepStatus::Running)
+        {
+            running.status = StepStatus::Failed;
+            running.detail = Some(reason.clone());
+        }
+        snapshot.outcome = CycleOutcome::Failed;
+        snapshot.finished_at = Some(Utc::now());
+        snapshot.note = Some(format!("这轮调研没跑完：{}。已有的建议不受影响。", reason));
+
+        self.state.status = AutonomyStatus::Idle;
+        self.state.active_cycle = None;
+        if let Err(e) = self.persist() {
+            tracing::warn!("[autonomy] 失败状态落盘失败: {}", e);
+        }
+
+        // 失败也记账：真的调过模型，就该算这一轮，避免失败重试无限刷
+        match self.store.load_daily_budget() {
+            Ok(mut daily) => {
+                daily.rollover(Utc::now());
+                daily.consume();
+                if let Err(e) = self.store.save_daily_budget(&daily) {
+                    tracing::warn!("[autonomy] 每日预算记账失败: {}", e);
+                }
+            }
+            Err(e) => tracing::warn!("[autonomy] 读取每日预算失败: {}", e),
+        }
+
+        if let Err(e) = self.store.save_cycle(&snapshot) {
+            tracing::warn!("[autonomy] 失败快照落盘失败: {}", e);
+        }
+        progress.on_snapshot(&snapshot);
+
+        Ok(CycleReport {
+            snapshot,
+            published: Vec::new(),
             skipped: None,
         })
     }
@@ -989,17 +1153,6 @@ fn elapsed_since(last: DateTime<Utc>) -> std::time::Duration {
         .signed_duration_since(last)
         .to_std()
         .unwrap_or(std::time::Duration::ZERO)
-}
-
-fn is_readonly_tool(name: &str) -> bool {    matches!(
-        name,
-        "propose_ideas"
-            | "update_idea"
-            | "list_files"
-            | "read_file"
-            | "read_file_truncated"
-            | "query_memory"
-    )
 }
 
 fn truncate(text: &str, max_chars: usize) -> String {
@@ -1400,8 +1553,8 @@ mod tests {
         assert_eq!(iteration.source_idea_id.as_deref(), Some(idea.id.as_str()));
     }
 
-    #[test]
-    fn run_cycle_skips_when_paused_and_records_snapshot() {
+    #[tokio::test]
+    async fn run_cycle_skips_when_paused_and_records_snapshot() {
         let _t = TEST_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
         let _temp = setup_workspace();
 
@@ -1411,12 +1564,14 @@ mod tests {
 
         // 暂停时不应调用 LLM，直接跳过
         let model: Arc<dyn Llm> = Arc::new(PanicLlm);
-        let report = futures::executor::block_on(controller.run_cycle(
-            CycleTrigger::Manual,
-            model,
-            &super::super::cycle::NoopProgressSink,
-        ))
-        .expect("run cycle");
+        let report = controller
+            .run_cycle(
+                CycleTrigger::Manual,
+                model,
+                &super::super::cycle::NoopProgressSink,
+            )
+            .await
+            .expect("run cycle");
 
         assert_eq!(report.skipped, Some(SkipReason::Paused));
         assert_eq!(report.snapshot.outcome, CycleOutcome::Skipped);
@@ -1461,27 +1616,6 @@ mod tests {
     }
 
     #[test]
-    fn running_state_blocks_reentry() {
-        let _t = TEST_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
-        let _temp = setup_workspace();
-
-        let mut controller = AutonomyController::new().expect("controller");
-        controller.enable().expect("enable");
-
-        // 模拟"上一轮还在跑"
-        controller.state.status = AutonomyStatus::Researching;
-        assert_eq!(
-            controller.should_trigger(CycleTrigger::Manual).skip_reason,
-            Some(SkipReason::AlreadyRunning)
-        );
-        controller.state.status = AutonomyStatus::Proposing;
-        assert_eq!(
-            controller.should_trigger(CycleTrigger::Schedule).skip_reason,
-            Some(SkipReason::AlreadyRunning)
-        );
-    }
-
-    #[test]
     fn stale_running_state_is_recovered_on_startup() {
         let _t = TEST_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
         let _temp = setup_workspace();
@@ -1489,20 +1623,124 @@ mod tests {
         let mut controller = AutonomyController::new().expect("controller");
         controller.enable().expect("enable");
         controller.state.status = AutonomyStatus::Researching;
+        controller.state.active_cycle = Some(ActiveCycle::new("cycle-dead", CycleTrigger::Manual));
 
-        // 复位前：重入保护会一直拒绝
+        // 启动时复位 → 恢复可跑，且进行中标记一并清掉
+        assert!(controller.recover_stale_state().expect("recover"));
+        let state = controller.status().expect("status");
+        assert_eq!(state.status, AutonomyStatus::Idle);
+        assert!(state.active_cycle.is_none(), "崩溃残留的进行中周期必须清掉");
+        assert!(controller.should_trigger(CycleTrigger::Manual).should_run);
+
+        // 幂等：已经是 Idle 时不再改动
+        assert!(!controller.recover_stale_state().expect("recover again"));
+    }
+
+    #[test]
+    fn orphaned_running_state_is_healed_without_restart() {
+        let _t = TEST_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let _temp = setup_workspace();
+
+        let mut controller = AutonomyController::new().expect("controller");
+        controller.enable().expect("enable");
+        // 模拟"上次崩溃/超时后状态没收回"：磁盘说在跑，进程内没有持有者
+        controller.state.status = AutonomyStatus::Proposing;
+        controller
+            .store
+            .save_state(&controller.state)
+            .expect("persist orphaned state");
+
+        // 重新读一份（模拟下一次 tick / 用户点开面板）
+        let mut next = AutonomyController::new().expect("controller");
+        assert!(next.heal_if_orphaned().expect("heal"));
+        let state = next.status().expect("status");
+        assert_eq!(state.status, AutonomyStatus::Idle);
+        assert!(state.active_cycle.is_none());
+    }
+
+    #[test]
+    fn persisted_running_state_no_longer_blocks_new_cycle() {
+        let _t = TEST_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let _temp = setup_workspace();
+
+        let mut controller = AutonomyController::new().expect("controller");
+        controller.enable().expect("enable");
+        // 只剩磁盘状态、进程内没有持有者 → 不该再被 AlreadyRunning 拦下
+        controller.state.status = AutonomyStatus::Researching;
+        assert!(
+            controller.should_trigger(CycleTrigger::Manual).should_run,
+            "重入保护必须看进程内持有者，而不是磁盘状态"
+        );
+    }
+
+    #[test]
+    fn in_process_guard_blocks_reentry() {
+        let _t = TEST_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let _temp = setup_workspace();
+
+        let controller = AutonomyController::new().expect("controller");
+        let guard = crate::autonomy::guard::CycleRunGuard::try_acquire("cycle-live", "manual")
+            .expect("acquire");
+
         assert_eq!(
             controller.should_trigger(CycleTrigger::Manual).skip_reason,
             Some(SkipReason::AlreadyRunning)
         );
 
-        // 启动时复位 → 恢复可跑
-        assert!(controller.recover_stale_state().expect("recover"));
-        assert_eq!(controller.status().expect("status").status, AutonomyStatus::Idle);
+        drop(guard);
+        assert!(controller.should_trigger(CycleTrigger::Manual).should_run);
+    }
+
+    #[test]
+    fn fail_cycle_converges_state_and_keeps_steps() {
+        let _t = TEST_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let _temp = setup_workspace();
+
+        let mut controller = AutonomyController::new().expect("controller");
+        controller.enable().expect("enable");
+        controller.state.status = AutonomyStatus::Proposing;
+        let mut active = ActiveCycle::new("cycle-fail", CycleTrigger::Manual);
+        let mut step = CycleStep::new("生成提案");
+        step.status = StepStatus::Running;
+        active.upsert_step(step);
+        controller.state.active_cycle = Some(active);
+
+        let report = controller
+            .fail_cycle(
+                "cycle-fail",
+                CycleTrigger::Manual,
+                "模型在 600 秒内没有返回响应".to_string(),
+                &crate::autonomy::cycle::NoopProgressSink,
+            )
+            .expect("fail cycle");
+
+        assert_eq!(report.snapshot.outcome, CycleOutcome::Failed);
+        assert!(
+            report
+                .snapshot
+                .note
+                .as_deref()
+                .expect("note")
+                .contains("没有返回响应"),
+            "失败原因必须写进 note: {:?}",
+            report.snapshot.note
+        );
+        // 保留已发生的步骤，并标成失败
+        assert_eq!(report.snapshot.steps.len(), 1);
+        assert_eq!(report.snapshot.steps[0].status, StepStatus::Failed);
+
+        // 状态收敛：必须回 Idle 且清掉进行中标记，否则下一轮会被挡在门外
+        let state = controller.status().expect("status");
+        assert_eq!(state.status, AutonomyStatus::Idle);
+        assert!(state.active_cycle.is_none());
         assert!(controller.should_trigger(CycleTrigger::Manual).should_run);
 
-        // 幂等：已经是 Idle 时不再改动
-        assert!(!controller.recover_stale_state().expect("recover again"));
+        // 失败也记账，避免失败重试无限刷
+        let cycles = controller.list_cycles().expect("cycles");
+        assert_eq!(cycles.len(), 1);
+        assert_eq!(cycles[0].outcome, CycleOutcome::Failed);
+        let budget = controller.budget_status().expect("budget");
+        assert_eq!(budget.daily_cycles_used, 1);
     }
 
     #[test]

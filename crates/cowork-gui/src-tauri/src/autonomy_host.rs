@@ -276,4 +276,10 @@ async fn run_cycle_with_trigger(app_handle: tauri::AppHandle, trigger: CycleTrig
             tracing::warn!("[autonomy] 调研失败: {}", e);
         }
     }
+
+    // 无论成功、失败还是超时，都把状态推给前端：
+    // 后端已经收敛到 Idle，界面不能还停在"正在调研"。
+    if let Ok(state) = controller.status() {
+        let _ = app_handle.emit("autonomy_state_changed", state);
+    }
 }

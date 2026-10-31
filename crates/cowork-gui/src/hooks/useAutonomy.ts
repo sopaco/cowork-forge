@@ -42,12 +42,14 @@ export function useAutonomy() {
 		useAutonomyStore.getState().refresh();
 	}, []);
 
-	// 调研进行中时轮询后端状态：事件在极端情况下可能丢失，轮询兜底
+	// 轮询后端状态：事件在极端情况下可能丢失，轮询兜底。
+	// 运行中 2s 一次（进度要跟手），空闲 15s 一次（能发现后台触发的调研，
+	// 否则宿主自己跑的那一轮在界面上是隐形的）。
 	useEffect(() => {
-		if (!running) return;
+		const interval = running ? 2000 : 15000;
 		const timer = setInterval(() => {
 			useAutonomyStore.getState().refreshStatus();
-		}, 2000);
+		}, interval);
 		return () => clearInterval(timer);
 	}, [running]);
 

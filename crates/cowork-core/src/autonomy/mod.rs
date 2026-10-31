@@ -8,6 +8,7 @@ pub mod budget;
 pub mod config;
 pub mod controller;
 pub mod cycle;
+pub mod guard;
 pub mod research;
 pub mod state;
 
@@ -17,9 +18,13 @@ pub use config::{
 };
 pub use controller::{
     AutonomyController, CycleReport, DecisionOutcome, SkipReason, TriggerDecision,
+    CYCLE_TIMEOUT,
 };
 pub use cycle::{
     CycleOutcome, CycleProgressSink, CycleSnapshot, CycleStep, CycleTrigger, NoopProgressSink,
     StepStatus,
 };
-pub use state::{AutonomyState, AutonomyStatus};
+pub use guard::{
+    CycleRunGuard, current_cycle, current_cycle_elapsed, is_cycle_running,
+};
+pub use state::{ActiveCycle, AutonomyState, AutonomyStatus};

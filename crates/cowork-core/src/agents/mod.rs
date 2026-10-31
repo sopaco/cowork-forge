@@ -41,7 +41,8 @@ pub use legacy_project_analyzer::{create_legacy_project_analyzer, create_legacy_
 // Autonomous Planner Agent (PM 自主规划环)
 pub mod research_agent;
 pub use research_agent::{
-    create_autonomous_planner_agent, run_autonomous_planner, PlannerOutcome,
+    create_autonomous_planner_agent, run_autonomous_planner_bounded,
+    run_autonomous_planner_with_limits, PlannerOutcome,
 };
 
 // ============================================================================
